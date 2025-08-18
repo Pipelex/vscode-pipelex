@@ -4,7 +4,7 @@ import { BaseLanguageClient } from "vscode-languageclient";
 export function register(ctx: vscode.ExtensionContext, c: BaseLanguageClient) {
   ctx.subscriptions.push(
     vscode.commands.registerTextEditorCommand(
-      "evenBetterToml.selectSchema",
+      "pipelexToml.selectSchema",
       async editor => {
         if (!editor) {
           return;

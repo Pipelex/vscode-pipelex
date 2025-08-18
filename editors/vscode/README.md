@@ -113,7 +113,7 @@ The formatter is rather conservative by default, additional features can be enab
 
 There is support for completion, hover text, links and validation.
 
-Schemas can be associated with document URIs with the `evenBetterToml.schema.associations` configuration.
+Schemas can be associated with document URIs with the `pipelexToml.schema.associations` configuration.
 
 You can provide your own schemas or use existing schemas from the [JSON Schema Store](https://www.schemastore.org/json/). More details [here](https://taplo.tamasfe.dev/configuration/using-schemas.html#using-schemas).
 

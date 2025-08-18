@@ -12,7 +12,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   schemaIndicator.text = "no schema selected";
   schemaIndicator.tooltip = "TOML Schema";
-  schemaIndicator.command = "evenBetterToml.selectSchema";
+  schemaIndicator.command = "pipelexToml.selectSchema";
 
   const c = await createClient(context);
   await c.start();

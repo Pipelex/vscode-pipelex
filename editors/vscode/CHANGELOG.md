@@ -62,7 +62,7 @@
 
 ### Features
 
-- Added `reorder_arrays` (`evenBetterToml.formatter.reorderArrays`) formatter option that allows for sorting values within arrays. ([#343](https://github.com/tamasfe/taplo/pull/343))
+- Added `reorder_arrays` (`pipelexToml.formatter.reorderArrays`) formatter option that allows for sorting values within arrays. ([#343](https://github.com/tamasfe/taplo/pull/343))
 
 ## 0.18.3
 
@@ -88,7 +88,7 @@
 
 ### Features
 
-- Added `evenBetterToml.formatter.inlineTableExpand` option.
+- Added `pipelexToml.formatter.inlineTableExpand` option.
 
 ### Fixes
 
@@ -105,7 +105,7 @@
 
 ### Features
 
-- The language server now accepts Taplo rules in the `evenBetterToml.rules` setting
+- The language server now accepts Taplo rules in the `pipelexToml.rules` setting
 - Show schema title in hover
 - Added builtin schema for `taplo.toml`
 
@@ -123,7 +123,7 @@
 
 ### Fixes
 
-- Fixed the language server ignoring the given path to the configuration file in `evenBetterToml.taplo.configFile.path`
+- Fixed the language server ignoring the given path to the configuration file in `pipelexToml.taplo.configFile.path`
 - Environment variables are now correctly passed to the bundled language server
 
 ## 0.16.4

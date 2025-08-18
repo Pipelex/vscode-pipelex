@@ -36,7 +36,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
 
   const bundled = !!vscode.workspace
     .getConfiguration()
-    .get("evenBetterToml.taplo.bundled");
+    .get("pipelexToml.taplo.bundled");
 
   let serverOpts: node.ServerOptions;
   if (bundled) {
@@ -52,7 +52,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
         env:
           vscode.workspace
             .getConfiguration()
-            .get("evenBetterToml.taplo.environment") ?? undefined,
+            .get("pipelexToml.taplo.environment") ?? undefined,
       },
     };
 
@@ -62,7 +62,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
     };
   } else {
     const taploPath =
-      vscode.workspace.getConfiguration().get("evenBetterToml.taplo.path") ??
+      vscode.workspace.getConfiguration().get("pipelexToml.taplo.path") ??
       which.sync("taplo", { nothrow: true });
 
     if (typeof taploPath !== "string") {
@@ -72,7 +72,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
 
     let extraArgs = vscode.workspace
       .getConfiguration()
-      .get("evenBetterToml.taplo.extraArgs");
+      .get("pipelexToml.taplo.extraArgs");
 
     if (!Array.isArray(extraArgs)) {
       extraArgs = [];
@@ -89,7 +89,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
         env:
           vscode.workspace
             .getConfiguration()
-            .get("evenBetterToml.taplo.environment") ?? undefined,
+            .get("pipelexToml.taplo.environment") ?? undefined,
       },
     };
 
@@ -100,7 +100,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
   }
 
   return new node.LanguageClient(
-    "evenBetterToml",
+    "pipelexToml",
     "Even Better TOML LSP",
     serverOpts,
     await clientOpts(context)
@@ -117,7 +117,7 @@ async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
     ],
 
     initializationOptions: {
-      configurationSection: "evenBetterToml",
+      configurationSection: "pipelexToml",
       cachePath: context.globalStorageUri.fsPath,
     },
   };
