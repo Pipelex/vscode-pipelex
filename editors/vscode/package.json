@@ -140,6 +140,11 @@
         "id": "pmlTableKey",
         "superType": "variable",
         "description": "Keys of inline tables."
+      },
+      {
+        "id": "pmlPipeKey",
+        "superType": "variable",
+        "description": "Keys for pipe objects at root level."
       }
     ],
     "semanticTokenScopes": [
@@ -150,10 +155,25 @@
           ],
           "pmlTableKey": [
             "support.type.property-name.table.pml"
+          ],
+          "pmlPipeKey": [
+            "support.type.property-name.pipe.pml"
           ]
         }
       }
     ],
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": "support.type.property-name.pipe.pml",
+            "settings": {
+              "foreground": "#FF0000"
+            }
+          }
+        ]
+      }
+    },
     "configuration": {
       "title": "Even Better PML",
       "properties": {
