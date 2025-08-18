@@ -14,10 +14,8 @@ export const value = {
     jinjaVariable,
     htmlTag,
     htmlComment,
-    pipeType,
-    nativeConcepts,
-    conceptName,
-    dataVariable,
+    // Removed overly broad patterns: pipeType, nativeConcepts, conceptName, dataVariable
+    // These are now handled by semantic token provider for precise context-aware highlighting
     string,
     datetime,
     boolean,

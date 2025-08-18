@@ -170,6 +170,16 @@
         "id": "pmlPipeName",
         "superType": "function",
         "description": "snake_case pipe names."
+      },
+      {
+        "id": "pmlPipeSection",
+        "superType": "keyword",
+        "description": "Pipe section headers."
+      },
+      {
+        "id": "pmlConceptSection",
+        "superType": "keyword",
+        "description": "Concept section headers."
       }
     ],
     "semanticTokenScopes": [
@@ -199,11 +209,18 @@
           ],
           "pmlPipeName": [
             "support.function.pipe-name.pml"
+          ],
+          "pmlPipeSection": [
+            "support.type.property-name.pipe.pml"
+          ],
+          "pmlConceptSection": [
+            "support.type.property-name.concept.pml"
           ]
         }
       }
     ],
     "configurationDefaults": {
+      "editor.semanticHighlighting.enabled": true,
       "editor.tokenColorCustomizations": {
         "textMateRules": [
           {

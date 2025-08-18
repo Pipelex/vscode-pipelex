@@ -234,8 +234,8 @@
           }
         },
         {
-          "name": "meta.entry.pipe-step.pml",
-          "match": "\\s*(pipe)\\s*(=)\\s*(\"([a-z][a-z0-9]*(?:_[a-z0-9]+)*)\")",
+          "name": "meta.entry.output-type.pml",
+          "match": "\\s*(output)\\s*(=)\\s*(\")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(\")",
           "captures": {
             "1": {
               "name": "support.type.property-name.pml"
@@ -244,34 +244,19 @@
               "name": "punctuation.eq.pml"
             },
             "3": {
-              "name": "string.quoted.double.pml"
-            },
-            "4": {
-              "name": "support.function.pipe-name.pml"
-            }
-          }
-        },
-        {
-          "name": "meta.entry.input-parameter.pml",
-          "match": "\\s*([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)\\s*(=)\\s*(\"([A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)\")",
-          "captures": {
-            "1": {
-              "name": "variable.name.data.pml"
-            },
-            "2": {
-              "name": "punctuation.eq.pml"
-            },
-            "3": {
-              "name": "string.quoted.double.pml"
+              "name": "punctuation.definition.string.begin.pml"
             },
             "4": {
               "name": "support.type.concept.pml"
+            },
+            "5": {
+              "name": "punctuation.definition.string.end.pml"
             }
           }
         },
         {
-          "name": "meta.entry.variable-assignment.pml",
-          "match": "\\s*(result|batch_as|batch_over)\\s*(=)\\s*(\"([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)\")",
+          "name": "meta.entry.refines-type.pml",
+          "match": "\\s*(refines)\\s*(=)\\s*(\")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(\")",
           "captures": {
             "1": {
               "name": "support.type.property-name.pml"
@@ -280,10 +265,13 @@
               "name": "punctuation.eq.pml"
             },
             "3": {
-              "name": "string.quoted.double.pml"
+              "name": "punctuation.definition.string.begin.pml"
             },
             "4": {
-              "name": "variable.name.data.pml"
+              "name": "support.type.concept.pml"
+            },
+            "5": {
+              "name": "punctuation.definition.string.end.pml"
             }
           }
         },
@@ -393,22 +381,6 @@
           }
         },
         {
-          "match": "\\b(Pipe[A-Z][a-zA-Z0-9]*)\\b",
-          "name": "support.type.pipe-type.pml"
-        },
-        {
-          "match": "\\b(Text|Image|PDF|Page|Number|Anything|String)\\b",
-          "name": "support.type.concept.native.pml"
-        },
-        {
-          "match": "\\b([A-Z][a-zA-Z0-9]*(?:\\.[A-Z][a-zA-Z0-9]*)*)\\b",
-          "name": "support.type.concept.pml"
-        },
-        {
-          "match": "\\b([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)\\b",
-          "name": "variable.name.data.pml"
-        },
-        {
           "name": "string.quoted.triple.basic.block.pml",
           "begin": "\"\"\"",
           "end": "\"\"\"",
@@ -436,12 +408,50 @@
               }
             },
             {
-              "match": "(\\{\\{|\\}\\}|\\{%|%\\})",
-              "name": "punctuation.definition.jinja.pml"
+              "begin": "(\\{%)",
+              "end": "(%\\})",
+              "name": "meta.template.jinja.pml",
+              "beginCaptures": {
+                "1": {
+                  "name": "punctuation.definition.jinja.begin.pml"
+                }
+              },
+              "endCaptures": {
+                "1": {
+                  "name": "punctuation.definition.jinja.end.pml"
+                }
+              },
+              "patterns": [
+                {
+                  "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
+                  "name": "keyword.control.jinja.pml"
+                },
+                {
+                  "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
+                  "name": "variable.other.jinja.pml"
+                }
+              ]
             },
             {
-              "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
-              "name": "keyword.control.jinja.pml"
+              "begin": "(\\{\\{)",
+              "end": "(\\}\\})",
+              "name": "meta.template.jinja.expression.pml",
+              "beginCaptures": {
+                "1": {
+                  "name": "punctuation.definition.jinja.begin.pml"
+                }
+              },
+              "endCaptures": {
+                "1": {
+                  "name": "punctuation.definition.jinja.end.pml"
+                }
+              },
+              "patterns": [
+                {
+                  "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
+                  "name": "variable.other.jinja.pml"
+                }
+              ]
             },
             {
               "match": "(</?)(\\w+)([^>]*)(>)",
@@ -527,12 +537,50 @@
               }
             },
             {
-              "match": "(\\{\\{|\\}\\}|\\{%|%\\})",
-              "name": "punctuation.definition.jinja.pml"
+              "begin": "(\\{%)",
+              "end": "(%\\})",
+              "name": "meta.template.jinja.pml",
+              "beginCaptures": {
+                "1": {
+                  "name": "punctuation.definition.jinja.begin.pml"
+                }
+              },
+              "endCaptures": {
+                "1": {
+                  "name": "punctuation.definition.jinja.end.pml"
+                }
+              },
+              "patterns": [
+                {
+                  "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
+                  "name": "keyword.control.jinja.pml"
+                },
+                {
+                  "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
+                  "name": "variable.other.jinja.pml"
+                }
+              ]
             },
             {
-              "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
-              "name": "keyword.control.jinja.pml"
+              "begin": "(\\{\\{)",
+              "end": "(\\}\\})",
+              "name": "meta.template.jinja.expression.pml",
+              "beginCaptures": {
+                "1": {
+                  "name": "punctuation.definition.jinja.begin.pml"
+                }
+              },
+              "endCaptures": {
+                "1": {
+                  "name": "punctuation.definition.jinja.end.pml"
+                }
+              },
+              "patterns": [
+                {
+                  "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
+                  "name": "variable.other.jinja.pml"
+                }
+              ]
             },
             {
               "match": "(</?)(\\w+)([^>]*)(>)",

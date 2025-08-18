@@ -33,12 +33,50 @@ const stringTemplatePatterns = [
     },
   },
   {
-    match: "(\\{\\{|\\}\\}|\\{%|%\\})",
-    name: "punctuation.definition.jinja.pml",
+    begin: "(\\{%)",
+    end: "(%\\})",
+    name: "meta.template.jinja.pml",
+    beginCaptures: {
+      1: {
+        name: "punctuation.definition.jinja.begin.pml",
+      },
+    },
+    endCaptures: {
+      1: {
+        name: "punctuation.definition.jinja.end.pml",
+      },
+    },
+    patterns: [
+      {
+        match: "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
+        name: "keyword.control.jinja.pml",
+      },
+      {
+        match: "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
+        name: "variable.other.jinja.pml",
+      },
+    ],
   },
   {
-    match: "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
-    name: "keyword.control.jinja.pml",
+    begin: "(\\{\\{)",
+    end: "(\\}\\})",
+    name: "meta.template.jinja.expression.pml",
+    beginCaptures: {
+      1: {
+        name: "punctuation.definition.jinja.begin.pml",
+      },
+    },
+    endCaptures: {
+      1: {
+        name: "punctuation.definition.jinja.end.pml",
+      },
+    },
+    patterns: [
+      {
+        match: "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
+        name: "variable.other.jinja.pml",
+      },
+    ],
   },
   {
     match: "(</?)(\\w+)([^>]*)(>)",

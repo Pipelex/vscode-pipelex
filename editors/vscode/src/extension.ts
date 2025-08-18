@@ -3,6 +3,7 @@ import { registerCommands } from "./commands";
 import { createClient } from "./client";
 import { syncExtensionSchemas } from "./tomlValidation";
 import { getOutput, showMessage } from "./util";
+import { PipelexSemanticTokensProvider } from "./semanticTokenProvider";
 
 export async function activate(context: vscode.ExtensionContext) {
   const schemaIndicator = vscode.window.createStatusBarItem(
@@ -23,6 +24,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
   registerCommands(context, c);
   syncExtensionSchemas(context, c);
+
+  // Register semantic token provider
+  const semanticTokensProvider = new PipelexSemanticTokensProvider();
+  context.subscriptions.push(
+    vscode.languages.registerDocumentSemanticTokensProvider(
+      { language: 'pml' },
+      semanticTokensProvider,
+      semanticTokensProvider.getSemanticTokensLegend()
+    )
+  );
 
   context.subscriptions.push(
     getOutput(),
