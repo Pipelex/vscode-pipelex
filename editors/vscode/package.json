@@ -1,20 +1,20 @@
 {
-  "name": "even-better-toml",
-  "displayName": "Even Better TOML",
-  "description": "Fully-featured TOML support",
-  "version": "0.21.2",
+  "name": "pipelex",
+  "displayName": "Pipelex",
+  "description": "Pipelex-specialized TOML support",
+  "version": "0.0.1",
   "autoTag": {
     "enabled": true
   },
   "repository": {
-    "url": "https://github.com/tamasfe/taplo"
+    "url": "https://github.com/Pipelex/pipelex-toml"
   },
   "bugs": {
-    "url": "https://github.com/tamasfe/taplo/issues"
+    "url": "https://github.com/Pipelex/pipelex-toml/issues"
   },
-  "publisher": "tamasfe",
+  "publisher": "Pipelex",
   "author": {
-    "name": "tamasfe"
+    "name": "Pipelex team"
   },
   "preview": true,
   "icon": "taplo-icon.png",
@@ -72,7 +72,7 @@
     ],
     "languages": [
       {
-        "id": "toml",
+        "id": "pipelex-toml",
         "aliases": [
           "TOML"
         ],
