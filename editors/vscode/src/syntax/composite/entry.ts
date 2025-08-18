@@ -67,6 +67,26 @@ const entryPipeStep = {
   },
 };
 
+// Special highlighting for input parameter assignments (var_name = "ConceptType")
+const entryInputParameter = {
+  name: "meta.entry.input-parameter.pml",
+  match: `\\s*([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)\\s*(=)\\s*("([A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)")`,
+  captures: {
+    1: {
+      name: "variable.name.data.pml",
+    },
+    2: {
+      name: "punctuation.eq.pml",
+    },
+    3: {
+      name: "string.quoted.double.pml",
+    },
+    4: {
+      name: "support.type.concept.pml",
+    },
+  },
+};
+
 // Special highlighting for variable assignments (result = "var_name", batch_as = "var_name", etc.)
 const entryVariableAssignment = {
   name: "meta.entry.variable-assignment.pml",
@@ -88,5 +108,5 @@ const entryVariableAssignment = {
 };
 
 export const entryBegin = {
-  patterns: [entryPipe, entryPipeStep, entryVariableAssignment, entryGeneral],
+  patterns: [entryPipe, entryPipeStep, entryInputParameter, entryVariableAssignment, entryGeneral],
 };

@@ -252,6 +252,24 @@
           }
         },
         {
+          "name": "meta.entry.input-parameter.pml",
+          "match": "\\s*([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)\\s*(=)\\s*(\"([A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)\")",
+          "captures": {
+            "1": {
+              "name": "variable.name.data.pml"
+            },
+            "2": {
+              "name": "punctuation.eq.pml"
+            },
+            "3": {
+              "name": "string.quoted.double.pml"
+            },
+            "4": {
+              "name": "support.type.concept.pml"
+            }
+          }
+        },
+        {
           "name": "meta.entry.variable-assignment.pml",
           "match": "\\s*(result|batch_as|batch_over)\\s*(=)\\s*(\"([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)\")",
           "captures": {
@@ -295,7 +313,7 @@
     "value": {
       "patterns": [
         {
-          "match": "(@)\\s*([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)",
+          "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
           "captures": {
             "1": {
               "name": "punctuation.definition.data-injection.pml"
@@ -306,7 +324,7 @@
           }
         },
         {
-          "match": "(\\$)\\s*([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)",
+          "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
           "captures": {
             "1": {
               "name": "punctuation.definition.template-variable.pml"
@@ -387,7 +405,7 @@
           "name": "support.type.concept.pml"
         },
         {
-          "match": "\\b([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)\\b",
+          "match": "\\b([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)\\b",
           "name": "variable.name.data.pml"
         },
         {
@@ -395,6 +413,82 @@
           "begin": "\"\"\"",
           "end": "\"\"\"",
           "patterns": [
+            {
+              "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.data-injection.pml"
+                },
+                "2": {
+                  "name": "variable.name.data.pml"
+                }
+              }
+            },
+            {
+              "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.template-variable.pml"
+                },
+                "2": {
+                  "name": "variable.name.data.pml"
+                }
+              }
+            },
+            {
+              "match": "(\\{\\{|\\}\\}|\\{%|%\\})",
+              "name": "punctuation.definition.jinja.pml"
+            },
+            {
+              "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
+              "name": "keyword.control.jinja.pml"
+            },
+            {
+              "match": "(</?)(\\w+)([^>]*)(>)",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.tag.html.pml"
+                },
+                "2": {
+                  "name": "entity.name.tag.html.pml"
+                },
+                "3": {
+                  "patterns": [
+                    {
+                      "match": "(\\w+)(=)(\"[^\"]*\"|'[^']*')",
+                      "captures": {
+                        "1": {
+                          "name": "entity.other.attribute-name.html.pml"
+                        },
+                        "2": {
+                          "name": "punctuation.separator.key-value.html.pml"
+                        },
+                        "3": {
+                          "name": "string.quoted.html.pml"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "4": {
+                  "name": "punctuation.definition.tag.html.pml"
+                }
+              }
+            },
+            {
+              "match": "(<!--)(.*?)(-->)",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.comment.html.pml"
+                },
+                "2": {
+                  "name": "comment.block.html.pml"
+                },
+                "3": {
+                  "name": "punctuation.definition.comment.html.pml"
+                }
+              }
+            },
             {
               "match": "\\\\([btnfr\"\\\\\\n/ ]|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})",
               "name": "constant.character.escape.pml"
@@ -410,6 +504,82 @@
           "begin": "\"",
           "end": "\"",
           "patterns": [
+            {
+              "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.data-injection.pml"
+                },
+                "2": {
+                  "name": "variable.name.data.pml"
+                }
+              }
+            },
+            {
+              "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.template-variable.pml"
+                },
+                "2": {
+                  "name": "variable.name.data.pml"
+                }
+              }
+            },
+            {
+              "match": "(\\{\\{|\\}\\}|\\{%|%\\})",
+              "name": "punctuation.definition.jinja.pml"
+            },
+            {
+              "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
+              "name": "keyword.control.jinja.pml"
+            },
+            {
+              "match": "(</?)(\\w+)([^>]*)(>)",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.tag.html.pml"
+                },
+                "2": {
+                  "name": "entity.name.tag.html.pml"
+                },
+                "3": {
+                  "patterns": [
+                    {
+                      "match": "(\\w+)(=)(\"[^\"]*\"|'[^']*')",
+                      "captures": {
+                        "1": {
+                          "name": "entity.other.attribute-name.html.pml"
+                        },
+                        "2": {
+                          "name": "punctuation.separator.key-value.html.pml"
+                        },
+                        "3": {
+                          "name": "string.quoted.html.pml"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "4": {
+                  "name": "punctuation.definition.tag.html.pml"
+                }
+              }
+            },
+            {
+              "match": "(<!--)(.*?)(-->)",
+              "captures": {
+                "1": {
+                  "name": "punctuation.definition.comment.html.pml"
+                },
+                "2": {
+                  "name": "comment.block.html.pml"
+                },
+                "3": {
+                  "name": "punctuation.definition.comment.html.pml"
+                }
+              }
+            },
             {
               "match": "\\\\([btnfr\"\\\\\\n/ ]|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})",
               "name": "constant.character.escape.pml"
@@ -578,7 +748,7 @@
       ]
     },
     "dataInjection": {
-      "match": "(@)\\s*([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)",
+      "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
           "name": "punctuation.definition.data-injection.pml"
@@ -589,7 +759,7 @@
       }
     },
     "templateVariable": {
-      "match": "(\\$)\\s*([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)",
+      "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
           "name": "punctuation.definition.template-variable.pml"
