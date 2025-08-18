@@ -1,3 +1,33 @@
+// Special highlighting for concept table headers
+const tableConcept = {
+  name: "meta.table.concept.pml",
+  match: `^\\s*(\\[)\\s*(concept(?:\\.(?:[A-Za-z][A-Za-z0-9]*|"[^"]+"|'[^']+'))?)\\s*(\\])`,
+  captures: {
+    1: {
+      name: "punctuation.definition.table.pml",
+    },
+    2: {
+      patterns: [
+        {
+          match: "concept",
+          name: "support.type.property-name.concept.pml",
+        },
+        {
+          match: "\\.",
+          name: "punctuation.separator.dot.pml",
+        },
+        {
+          match: "(?:[A-Za-z][A-Za-z0-9]*)|(?:\"[^\"]+\")|(?:'[^']+')",
+          name: "support.type.property-name.concept.pml",
+        },
+      ],
+    },
+    3: {
+      name: "punctuation.definition.table.pml",
+    },
+  },
+};
+
 // Special highlighting for pipe table headers and direct children
 const tablePipe = {
   name: "meta.table.pipe.pml",
@@ -110,5 +140,5 @@ export const tableInline = {
 };
 
 export const table = {
-  patterns: [tablePipe, tableBasic, tableArray, tableInline],
+  patterns: [tableConcept, tablePipe, tableBasic, tableArray, tableInline],
 };

@@ -3,6 +3,8 @@ import { writeFileSync } from "fs";
 import { comment, commentDirective } from "./comment";
 import { table, entryBegin } from "./composite";
 import { value } from "./composite/value";
+import { dataInjection, templateVariable } from "./pipelex/variables";
+import { jinjaDelimiters, jinjaKeywords, jinjaVariable, htmlTag, htmlComment } from "./pipelex/templates";
 
 const syntax = {
   version: "1.0.0",
@@ -17,6 +19,27 @@ const syntax = {
     },
     {
       include: "#comment",
+    },
+    {
+      include: "#dataInjection",
+    },
+    {
+      include: "#templateVariable",
+    },
+    {
+      include: "#jinjaDelimiters",
+    },
+    {
+      include: "#jinjaKeywords",
+    },
+    {
+      include: "#jinjaVariable",
+    },
+    {
+      include: "#htmlTag",
+    },
+    {
+      include: "#htmlComment",
     },
     {
       include: "#table",
@@ -34,6 +57,13 @@ const syntax = {
     table,
     entryBegin,
     value,
+    dataInjection,
+    templateVariable,
+    jinjaDelimiters,
+    jinjaKeywords,
+    jinjaVariable,
+    htmlTag,
+    htmlComment,
   },
 };
 

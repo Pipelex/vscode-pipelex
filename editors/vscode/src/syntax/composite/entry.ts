@@ -47,6 +47,46 @@ const entryGeneral = {
   },
 };
 
+// Special highlighting for pipe step entries (pipe = "pipe_name")
+const entryPipeStep = {
+  name: "meta.entry.pipe-step.pml",
+  match: `\\s*(pipe)\\s*(=)\\s*("([a-z][a-z0-9]*(?:_[a-z0-9]+)*)")`,
+  captures: {
+    1: {
+      name: "support.type.property-name.pml",
+    },
+    2: {
+      name: "punctuation.eq.pml",
+    },
+    3: {
+      name: "string.quoted.double.pml",
+    },
+    4: {
+      name: "support.function.pipe-name.pml",
+    },
+  },
+};
+
+// Special highlighting for variable assignments (result = "var_name", batch_as = "var_name", etc.)
+const entryVariableAssignment = {
+  name: "meta.entry.variable-assignment.pml",
+  match: `\\s*(result|batch_as|batch_over)\\s*(=)\\s*("([a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*)")`,
+  captures: {
+    1: {
+      name: "support.type.property-name.pml",
+    },
+    2: {
+      name: "punctuation.eq.pml",
+    },
+    3: {
+      name: "string.quoted.double.pml",
+    },
+    4: {
+      name: "variable.name.data.pml",
+    },
+  },
+};
+
 export const entryBegin = {
-  patterns: [entryPipe, entryGeneral],
+  patterns: [entryPipe, entryPipeStep, entryVariableAssignment, entryGeneral],
 };
