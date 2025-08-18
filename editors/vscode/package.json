@@ -1,7 +1,7 @@
 {
   "name": "pipelex",
   "displayName": "Pipelex",
-  "description": "Pipelex-specialized TOML support",
+  "description": "Pipelex-specialized PML support",
   "version": "0.0.1",
   "autoTag": {
     "enabled": true
@@ -36,7 +36,7 @@
     "onLanguage:cargoLock"
   ],
   "keywords": [
-    "toml",
+    "pml",
     "syntax",
     "rust",
     "formatter",
@@ -48,36 +48,36 @@
   "contributes": {
     "grammars": [
       {
-        "language": "toml",
-        "scopeName": "source.toml",
-        "path": "./toml.tmLanguage.json"
+        "language": "pml",
+        "scopeName": "source.pml",
+        "path": "./pml.tmLanguage.json"
       },
       {
-        "scopeName": "markdown.toml.frontmatter.codeblock",
-        "path": "./toml.frontmatter.tmLanguage.json",
+        "scopeName": "markdown.pml.frontmatter.codeblock",
+        "path": "./pml.frontmatter.tmLanguage.json",
         "injectTo": [
           "text.html.markdown"
         ]
       },
       {
-        "scopeName": "markdown.toml.codeblock",
-        "path": "./toml.markdown.tmLanguage.json",
+        "scopeName": "markdown.pml.codeblock",
+        "path": "./pml.markdown.tmLanguage.json",
         "injectTo": [
           "text.html.markdown"
         ],
         "embeddedLanguages": {
-          "meta.embedded.block.toml": "toml"
+          "meta.embedded.block.pml": "pml"
         }
       }
     ],
     "languages": [
       {
-        "id": "toml",
+        "id": "pml",
         "aliases": [
-          "TOML"
+          "PML"
         ],
         "extensions": [
-          ".toml"
+          ".pml"
         ],
         "filenames": [
           "Cargo.lock",
@@ -90,7 +90,7 @@
       "commandPalette": [
         {
           "command": "pipelexToml.selectSchema",
-          "when": "editorLangId == toml"
+          "when": "editorLangId == pml"
         },
         {
           "command": "pipelexToml.copyAsJson"
@@ -109,35 +109,35 @@
     "commands": [
       {
         "command": "pipelexToml.selectSchema",
-        "title": "TOML: Select Schema"
+        "title": "PML: Select Schema"
       },
       {
         "command": "pipelexToml.copyAsJson",
-        "title": "TOML: Copy as JSON",
+        "title": "PML: Copy as JSON",
         "enablement": "editorHasSelection"
       },
       {
         "command": "pipelexToml.copyAsToml",
-        "title": "TOML: Copy as TOML",
+        "title": "PML: Copy as PML",
         "enablement": "editorHasSelection"
       },
       {
         "command": "pipelexToml.pasteAsJson",
-        "title": "TOML: Paste as JSON"
+        "title": "PML: Paste as JSON"
       },
       {
         "command": "pipelexToml.pasteAsToml",
-        "title": "TOML: Paste as TOML"
+        "title": "PML: Paste as PML"
       }
     ],
     "semanticTokenTypes": [
       {
-        "id": "tomlArrayKey",
+        "id": "pmlArrayKey",
         "superType": "variable",
         "description": "Keys of regular arrays."
       },
       {
-        "id": "tomlTableKey",
+        "id": "pmlTableKey",
         "superType": "variable",
         "description": "Keys of inline tables."
       }
@@ -145,17 +145,17 @@
     "semanticTokenScopes": [
       {
         "scopes": {
-          "tomlArrayKey": [
-            "support.type.property-name.array.toml"
+          "pmlArrayKey": [
+            "support.type.property-name.array.pml"
           ],
-          "tomlTableKey": [
-            "support.type.property-name.table.toml"
+          "pmlTableKey": [
+            "support.type.property-name.table.pml"
           ]
         }
       }
     ],
     "configuration": {
-      "title": "Even Better TOML",
+      "title": "Even Better PML",
       "properties": {
         "pipelexToml.taplo.bundled": {
           "description": "Use the bundled taplo language server. If set to `false`, the `taplo` executable must be found in PATH or must be set in `pipelexToml.taplo.path`.",

@@ -30,7 +30,7 @@ export function register(ctx: vscode.ExtensionContext, c: BaseLanguageClient) {
         const out = getOutput();
 
         if (res.error?.length ?? 0 !== 0) {
-          out.appendLine(`Failed to convert TOML to JSON: ${res.error}`);
+          out.appendLine(`Failed to convert PML to JSON: ${res.error}`);
 
           const show = await vscode.window.showErrorMessage(
             "Copying has failed!",
@@ -98,7 +98,7 @@ export function register(ctx: vscode.ExtensionContext, c: BaseLanguageClient) {
         const out = getOutput();
 
         if (res.error?.length ?? 0 !== 0) {
-          out.appendLine(`Failed to convert JSON to TOML: ${res.error}`);
+          out.appendLine(`Failed to convert JSON to PML: ${res.error}`);
 
           const show = await vscode.window.showErrorMessage(
             "Copying has failed!",
@@ -138,7 +138,7 @@ export function register(ctx: vscode.ExtensionContext, c: BaseLanguageClient) {
           return;
         }
 
-        await vscode.window.showInformationMessage("TOML copied!");
+        await vscode.window.showInformationMessage("PML copied!");
       }
     ),
     vscode.commands.registerTextEditorCommand(
@@ -215,7 +215,7 @@ export function register(ctx: vscode.ExtensionContext, c: BaseLanguageClient) {
         );
 
         if (res.error?.length ?? 0 !== 0) {
-          out.appendLine(`Failed to convert to TOML: ${res.error}`);
+          out.appendLine(`Failed to convert to PML: ${res.error}`);
 
           const show = await vscode.window.showErrorMessage(
             "Paste from clipboard has failed!",

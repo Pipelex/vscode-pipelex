@@ -101,7 +101,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
 
   return new node.LanguageClient(
     "pipelexToml",
-    "Even Better TOML LSP",
+    "Even Better PML LSP",
     serverOpts,
     await clientOpts(context)
   );
@@ -112,7 +112,7 @@ async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
 
   return {
     documentSelector: [
-      { scheme: "file", language: "toml" },
+      { scheme: "file", language: "pml" },
       { scheme: "file", language: "cargoLock" },
     ],
 

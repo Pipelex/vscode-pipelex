@@ -11,13 +11,13 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   schemaIndicator.text = "no schema selected";
-  schemaIndicator.tooltip = "TOML Schema";
+  schemaIndicator.tooltip = "PML Schema";
   schemaIndicator.command = "pipelexToml.selectSchema";
 
   const c = await createClient(context);
   await c.start();
 
-  if (vscode.window.activeTextEditor?.document.languageId === "toml") {
+  if (vscode.window.activeTextEditor?.document.languageId === "pml") {
     schemaIndicator.show();
   }
 
@@ -31,7 +31,7 @@ export async function activate(context: vscode.ExtensionContext) {
       showMessage(params, c)
     ),
     vscode.window.onDidChangeActiveTextEditor(editor => {
-      if (editor?.document.languageId === "toml") {
+      if (editor?.document.languageId === "pml") {
         schemaIndicator.show();
       } else {
         schemaIndicator.hide();

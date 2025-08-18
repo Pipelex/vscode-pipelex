@@ -1,10 +1,10 @@
 export const comment = {
     captures: {
         1: {
-            name: 'comment.line.number-sign.toml',
+            name: 'comment.line.number-sign.pml',
         },
         2: {
-            name: 'punctuation.definition.comment.toml',
+            name: 'punctuation.definition.comment.pml',
         },
     },
     comment: 'Comments',
@@ -14,10 +14,10 @@ export const comment = {
 export const commentDirective = {
     captures: {
         1: {
-            name: 'meta.preprocessor.toml',
+            name: 'meta.preprocessor.pml',
         },
         2: {
-            name: 'punctuation.definition.meta.preprocessor.toml',
+            name: 'punctuation.definition.meta.preprocessor.pml',
         },
     },
     comment: 'Comments',
