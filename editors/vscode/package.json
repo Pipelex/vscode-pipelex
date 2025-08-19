@@ -235,6 +235,112 @@
         }
       }
     ],
+    "configurationDefaults": {
+      "editor.semanticHighlighting.enabled": true,
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": "support.type.property-name.pipe.pml",
+            "settings": {
+              "foreground": "#FF6666",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "support.type.pipe-type.pml",
+            "settings": {
+              "foreground": "#FF6B6B",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "support.type.property-name.concept.pml",
+            "settings": {
+              "foreground": "#4ECDC4",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "support.type.concept.pml",
+            "settings": {
+              "foreground": "#4ECDC4",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "support.type.concept.native.pml",
+            "settings": {
+              "foreground": "#98FB98",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "variable.name.data.pml",
+            "settings": {
+              "foreground": "#98FB98",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "support.function.pipe-name.pml",
+            "settings": {
+              "foreground": "#FF6B6B",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "punctuation.definition.data-injection.pml",
+            "settings": {
+              "foreground": "#FF79C6"
+            }
+          },
+          {
+            "scope": "punctuation.definition.template-variable.pml",
+            "settings": {
+              "foreground": "#FF79C6"
+            }
+          },
+          {
+            "scope": "punctuation.definition.jinja.pml",
+            "settings": {
+              "foreground": "#FF79C6",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.control.jinja.pml",
+            "settings": {
+              "foreground": "#8BE9FD"
+            }
+          },
+          {
+            "scope": "variable.other.jinja.pml",
+            "settings": {
+              "foreground": "#50FA7B"
+            }
+          },
+          {
+            "scope": "entity.name.tag.html.pml",
+            "settings": {
+              "foreground": "#FFB86C"
+            }
+          },
+          {
+            "scope": "entity.other.attribute-name.html.pml",
+            "settings": {
+              "foreground": "#F1FA8C"
+            }
+          },
+          {
+            "scope": "comment.block.html.pml",
+            "settings": {
+              "foreground": "#6272A4",
+              "fontStyle": "italic"
+            }
+          }
+        ]
+      }
+    },
     "configuration": {
       "title": "Even Better TOML",
       "properties": {
