@@ -1,134 +1,174 @@
+# Pipelex VS Code Extension
 
+**Rich language support for Pipelex Markup Language (PML) and TOML files**
 
-A TOML language support extension backed by [Taplo](https://taplo.tamasfe.dev).
+The Pipelex extension provides comprehensive language support for both PML files (`.pml`) and TOML files (`.toml`), featuring advanced syntax highlighting, semantic tokens, and intelligent language features powered by the Taplo language server.
 
-It is currently a **preview extension**, it might contain bugs, or might even crash. If you encounter any issues, please report them [on github](https://github.com/tamasfe/taplo/issues).
+![Pipelex Logo](https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png)
 
-- [Features](#features)
-  - [TOML version 1.0.0 support](#toml-version-100-support)
-  - [Syntax highlighting](#syntax-highlighting)
-    - [Additional Syntax Colors](#additional-syntax-colors)
-  - [Semantic highlighting](#semantic-highlighting)
-  - [Validation](#validation)
-  - [Folding](#folding)
-  - [Symbol tree and navigation](#symbol-tree-and-navigation)
-  - [Refactors](#refactors)
-    - [Renaming](#renaming)
-  - [Formatting](#formatting)
-  - [Completion and Validation with JSON Schema](#completion-and-validation-with-json-schema)
-  - [Commands](#commands)
-- [Configuration File](#configuration-file)
-- [Special Thanks](#special-thanks)
+---
 
-# Features
+## 🚀 Features
 
-## TOML version [1.0.0](https://toml.io/en/v1.0.0) support
+### 📝 **Pipelex Markup Language (PML) Support**
+- **Rich syntax highlighting** for PML-specific constructs
+- **Concept definitions**: `[concept.Name]` sections with specialized highlighting  
+- **Pipe definitions**: `[pipe.name]` sections for workflow steps
+- **Data injection**: `@variable` syntax with smart highlighting
+- **Template variables**: `$variable` support
+- **Jinja2 templates**: `{{ }}` and `{% %}` blocks with keyword highlighting
+- **HTML templates**: Basic HTML tag support within strings
+- **Semantic tokens** for context-aware highlighting
 
-This extension will try to support all the TOML versions in the future.
+### 🔧 **TOML Support**
+- **Full TOML 1.0.0 support** - Complete compatibility with the TOML specification
+- **Syntax highlighting** with TextMate grammar
+- **Validation** with error detection and reporting
+- **Formatting** with customizable options
+- **Symbol navigation** and document outline
+- **Folding** for better code organization
 
-## Syntax highlighting
+### ⚡ **Smart Language Features**
+- **Auto-completion** for keys and values
+- **JSON Schema validation** for structured configuration
+- **Document symbols** and navigation
+- **Hover information** and inline documentation
+- **Format on save** with customizable rules
+- **Error highlighting** and diagnostics
 
-Syntax highlighting for TOML documents with TextMate grammar.
+---
 
-![Syntax Highlighting](images/highlight.png)
+## 🎨 **PML Syntax Highlighting**
 
-### Additional Syntax Colors
+The extension provides rich, context-aware highlighting for PML files:
 
-The extension defines custom scopes for array headers and arrays of tables.
+- **🔵 Concept sections** - `[concept.Name]` in teal (`#4ECDC4`)
+- **🔴 Pipe sections** - `[pipe.name]` in red (`#FF6666`) 
+- **🟢 Data variables** - `@variable`, `$variable` in green (`#98FB98`)
+- **🟣 Template syntax** - Jinja delimiters in pink (`#FF79C6`)
+- **🟡 HTML elements** - Tags and attributes in orange/yellow
+- **🔷 Concept types** - `ConceptType` references highlighted
+- **🔶 Pipe types** - `PipeLLM`, `PipeSequence` etc. highlighted
 
-In order to differentiate them from regular keys, you can set your own colors for them. Unfortunately this [has to be done manually](https://github.com/Microsoft/vscode/issues/32813).
+### Example PML File
+```toml
+# Pipelex workflow definition
+[concept.UserQuery]
+definition = "A user's natural language query"
 
-You might also want to set a color for dates and times, as they don't have have one in most themes.
+[pipe.analyze_query]
+type = "PipeLLM"
+inputs = { query = "UserQuery" }
+output = "QueryAnalysis"
+prompt_template = """
+Analyze this user query:
 
-<details>
-<summary>Custom color settings for the Dark+ theme</summary>
+@query
 
+Extract the key information and intent.
+"""
+```
+
+---
+
+## 📦 **Installation**
+
+1. **From VS Code Marketplace**: Search for "Pipelex" in the Extensions view
+2. **From Command Line**: `code --install-extension Pipelex.pipelex`
+3. **Manual Installation**: Download `.vsix` from [releases](https://github.com/Pipelex/vscode-pipelex/releases)
+
+---
+
+## ⚙️ **Configuration**
+
+The extension can be configured through VS Code settings:
+
+### Language Server Settings
 ```json
 {
-  "editor.tokenColorCustomizations": {
-      "textMateRules": [
-          {
-              "scope": "support.type.property-name.table",
-              "settings": {
-                  "foreground": "#4EC9B0",
-              },
-          },
-          {
-              "scope": "support.type.property-name.array",
-              "settings": {
-                  "foreground": "#569CD6",
-              }
-          },
-          {
-              "scope": "constant.other.time",
-              "settings": {
-                  "foreground": "#DCDCAA",
-              }
-          }
-      ]
-  },
+  "pipelex.server.bundled": true,
+  "pipelex.server.path": null,
+  "pipelex.server.environment": {},
+  "pipelex.server.extraArgs": []
 }
 ```
-</details>
 
-![Extended Color Highlighting](images/extended_colors.png)
+### Schema and Validation
+```json
+{
+  "pipelex.schema.enabled": true,
+  "pipelex.schema.links": false,
+  "pipelex.schema.associations": {}
+}
+```
 
-## Semantic highlighting
+### Formatting Options
+```json
+{
+  "pipelex.formatter.alignEntries": false,
+  "pipelex.formatter.alignComments": false,
+  "pipelex.formatter.arrayTrailingComma": true,
+  "pipelex.formatter.columnWidth": 80,
+  "pipelex.formatter.indentTables": false
+}
+```
 
-Semantic key highlighting for inline tables and arrays can be enabled in the settings.
+---
 
-**You need to set extended colors in order for this to have any practical effect.**
+## 🎯 **File Associations**
 
-![Semantic Highlighting](images/semantic_colors.png)
+The extension automatically recognizes:
+- **`.pml`** files - Pipelex Markup Language
+- **`.toml`** files - TOML configuration files
+- **Special files**: `Cargo.lock`, `uv.lock`
 
-## Validation
+---
 
-![Validation](images/validation.gif)
+## 🔗 **Commands**
 
-## Folding
+Access these commands through the Command Palette (`Ctrl+Shift+P`):
 
-Arrays, multi-line strings and top level tables and comments can be folded.
+- **TOML: Select Schema** - Choose JSON schema for validation
+- **TOML: Copy as JSON** - Convert TOML selection to JSON
+- **TOML: Copy as TOML** - Format TOML selection  
+- **TOML: Paste as JSON** - Convert clipboard TOML to JSON
+- **TOML: Paste as TOML** - Convert clipboard JSON to TOML
 
-![Folding](images/folding.gif)
+---
 
-## Symbol tree and navigation
+## 🛠️ **Development**
 
-Works even for tables not in order.
+### Building from Source
+```bash
+git clone https://github.com/Pipelex/vscode-pipelex.git
+cd vscode-pipelex/editors/vscode
+yarn install
+yarn build
+```
 
-![Symbols](images/symbols.gif)
+### Contributing
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-## Refactors
+---
 
-### Renaming
+## 📄 **License**
 
-![Rename](images/rename.gif)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
 
-## Formatting
+---
 
-The formatter is rather conservative by default, additional features can be enabled in the settings. If you're missing a configuration option, feel free to open an issue about it!
+## 🙏 **Acknowledgments**
 
-![Formatting](images/formatting.gif)
+This extension is built on top of the excellent [Taplo](https://taplo.tamasfe.dev) language server, providing robust TOML language support. Special thanks to the Taplo team for their foundational work.
 
-## Completion and Validation with [JSON Schema](https://json-schema.org/)
+---
 
-There is support for completion, hover text, links and validation.
+## 🐛 **Issues & Support**
 
-Schemas can be associated with document URIs with the `evenBetterToml.schema.associations` configuration.
+- **Bug Reports**: [GitHub Issues](https://github.com/Pipelex/vscode-pipelex/issues)
+- **Feature Requests**: [GitHub Discussions](https://github.com/Pipelex/vscode-pipelex/discussions)
+- **Documentation**: [Pipelex Docs](https://docs.pipelex.com)
 
-You can provide your own schemas or use existing schemas from the [JSON Schema Store](https://www.schemastore.org/json/). More details [here](https://taplo.tamasfe.dev/configuration/using-schemas.html#using-schemas).
+---
 
-![Schema](images/schema.gif)
-
-## Commands
-
-The extension provides commands for easy JSON<->TOML conversions.
-
-# Configuration File
-
-Taplo CLI's [configuration file](https://taplo.tamasfe.dev/configuration/file) is supported and automatically found in workspace roots, or can be manually set in the VS Code configuration.
-
-# Special Thanks
-
-- To [@GalAster](https://github.com/GalAster) and [@be5invis](https://github.com/be5invis) for letting me use their TextMate grammar.
-- To every contributor.
-- And to everyone else using this extension.
+**Made with ❤️ by the Pipelex team**
