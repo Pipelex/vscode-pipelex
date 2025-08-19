@@ -36,7 +36,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
 
   const bundled = !!vscode.workspace
     .getConfiguration()
-    .get("evenBetterToml.taplo.bundled");
+    .get("pipelex.server.bundled");
 
   let serverOpts: node.ServerOptions;
   if (bundled) {
@@ -52,7 +52,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
         env:
           vscode.workspace
             .getConfiguration()
-            .get("evenBetterToml.taplo.environment") ?? undefined,
+            .get("pipelex.server.environment") ?? undefined,
       },
     };
 
@@ -62,17 +62,17 @@ async function createNodeClient(context: vscode.ExtensionContext) {
     };
   } else {
     const taploPath =
-      vscode.workspace.getConfiguration().get("evenBetterToml.taplo.path") ??
+      vscode.workspace.getConfiguration().get("pipelex.server.path") ??
       which.sync("taplo", { nothrow: true });
 
     if (typeof taploPath !== "string") {
-      out.appendLine("failed to locate Taplo LSP");
-      throw new Error("failed to locate Taplo LSP");
+      out.appendLine("failed to locate language server");
+      throw new Error("failed to locate language server");
     }
 
     let extraArgs = vscode.workspace
       .getConfiguration()
-      .get("evenBetterToml.taplo.extraArgs");
+      .get("pipelex.server.extraArgs");
 
     if (!Array.isArray(extraArgs)) {
       extraArgs = [];
@@ -89,7 +89,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
         env:
           vscode.workspace
             .getConfiguration()
-            .get("evenBetterToml.taplo.environment") ?? undefined,
+            .get("pipelex.server.environment") ?? undefined,
       },
     };
 
@@ -100,8 +100,8 @@ async function createNodeClient(context: vscode.ExtensionContext) {
   }
 
   return new node.LanguageClient(
-    "evenBetterToml",
-    "Even Better TOML LSP",
+    "pipelex",
+    "Pipelex LSP",
     serverOpts,
     await clientOpts(context)
   );
@@ -118,7 +118,7 @@ async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
     ],
 
     initializationOptions: {
-      configurationSection: "evenBetterToml",
+      configurationSection: "pipelex",
       cachePath: context.globalStorageUri.fsPath,
     },
   };

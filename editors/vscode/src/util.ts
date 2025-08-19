@@ -5,7 +5,7 @@ let output: vscode.OutputChannel;
 
 export function getOutput(): vscode.OutputChannel {
   if (!output) {
-    output = vscode.window.createOutputChannel("Even Better TOML");
+    output = vscode.window.createOutputChannel("Pipelex");
   }
 
   return output;

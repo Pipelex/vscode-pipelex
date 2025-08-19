@@ -1,23 +1,23 @@
 {
-  "name": "even-better-toml",
-  "displayName": "Even Better TOML",
-  "description": "Fully-featured TOML support",
+  "name": "pipelex",
+  "displayName": "Pipelex",
+  "description": "Pipelex Markup Language (PML) and TOML support",
   "version": "0.21.2",
   "autoTag": {
     "enabled": true
   },
   "repository": {
-    "url": "https://github.com/tamasfe/taplo"
+    "url": "https://github.com/Pipelex/vscode-pipelex"
   },
   "bugs": {
-    "url": "https://github.com/tamasfe/taplo/issues"
+    "url": "https://github.com/Pipelex/vscode-pipelex/issues"
   },
-  "publisher": "tamasfe",
+  "publisher": "Pipelex",
   "author": {
-    "name": "tamasfe"
+    "name": "Pipelex"
   },
   "preview": true,
-  "icon": "taplo-icon.png",
+  "icon": "pipelex-icon.png",
   "galleryBanner": {
     "color": "#731c12",
     "theme": "dark"
@@ -36,11 +36,13 @@
     "onLanguage:cargoLock"
   ],
   "keywords": [
+    "pipelex",
+    "pml",
     "toml",
     "syntax",
-    "rust",
     "formatter",
-    "config"
+    "config",
+    "markup"
   ],
   "extensionKind": [
     "workspace"
@@ -122,44 +124,44 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "evenBetterToml.selectSchema",
+          "command": "pipelex.selectSchema",
           "when": "editorLangId == toml"
         },
         {
-          "command": "evenBetterToml.copyAsJson"
+          "command": "pipelex.copyAsJson"
         },
         {
-          "command": "evenBetterToml.copyAsToml"
+          "command": "pipelex.copyAsToml"
         },
         {
-          "command": "evenBetterToml.pasteAsJson"
+          "command": "pipelex.pasteAsJson"
         },
         {
-          "command": "evenBetterToml.pasteAsToml"
+          "command": "pipelex.pasteAsToml"
         }
       ]
     },
     "commands": [
       {
-        "command": "evenBetterToml.selectSchema",
+        "command": "pipelex.selectSchema",
         "title": "TOML: Select Schema"
       },
       {
-        "command": "evenBetterToml.copyAsJson",
+        "command": "pipelex.copyAsJson",
         "title": "TOML: Copy as JSON",
         "enablement": "editorHasSelection"
       },
       {
-        "command": "evenBetterToml.copyAsToml",
+        "command": "pipelex.copyAsToml",
         "title": "TOML: Copy as TOML",
         "enablement": "editorHasSelection"
       },
       {
-        "command": "evenBetterToml.pasteAsJson",
+        "command": "pipelex.pasteAsJson",
         "title": "TOML: Paste as JSON"
       },
       {
-        "command": "evenBetterToml.pasteAsToml",
+        "command": "pipelex.pasteAsToml",
         "title": "TOML: Paste as TOML"
       }
     ],
@@ -342,16 +344,16 @@
       }
     },
     "configuration": {
-      "title": "Even Better TOML",
+      "title": "Pipelex",
       "properties": {
-        "evenBetterToml.taplo.bundled": {
-          "description": "Use the bundled taplo language server. If set to `false`, the `taplo` executable must be found in PATH or must be set in `evenBetterToml.taplo.path`.",
+        "pipelex.server.bundled": {
+          "description": "Use the bundled language server. If set to `false`, the `taplo` executable must be found in PATH or must be set in `pipelex.server.path`.",
           "type": "boolean",
           "scope": "resource",
           "default": true
         },
-        "evenBetterToml.taplo.path": {
-          "description": "An absolute path to the `taplo` executable. `evenBetterToml.taplo.bundled` needs to be set to `false` for this to have any effect.",
+        "pipelex.server.path": {
+          "description": "An absolute path to the `taplo` executable. `pipelex.server.bundled` needs to be set to `false` for this to have any effect.",
           "type": [
             "string",
             "null"
@@ -359,60 +361,60 @@
           "scope": "resource",
           "default": null
         },
-        "evenBetterToml.taplo.environment": {
+        "pipelex.server.environment": {
           "type": [
             "object"
           ],
           "scope": "resource",
-          "description": "Environment variables for Taplo.",
+          "description": "Environment variables for the language server.",
           "additionalProperties": {
             "type": "string"
           },
           "default": {}
         },
-        "evenBetterToml.taplo.extraArgs": {
+        "pipelex.server.extraArgs": {
           "type": [
             "array",
             "null"
           ],
           "scope": "resource",
-          "description": "Additional arguments for Taplo. Has no effect for the bundled LSP.",
+          "description": "Additional arguments for the language server. Has no effect for the bundled LSP.",
           "items": {
             "type": "string"
           },
           "default": []
         },
-        "evenBetterToml.taplo.configFile.path": {
-          "description": "An absolute, or workspace relative path to the Taplo configuration file.",
+        "pipelex.server.configFile.path": {
+          "description": "An absolute, or workspace relative path to the configuration file.",
           "type": "string",
           "default": null,
           "scope": "resource"
         },
-        "evenBetterToml.taplo.configFile.enabled": {
-          "description": "Whether to enable the usage of a Taplo configuration file.",
+        "pipelex.server.configFile.enabled": {
+          "description": "Whether to enable the usage of a configuration file.",
           "type": "boolean",
           "scope": "resource",
           "default": true
         },
-        "evenBetterToml.semanticTokens": {
+        "pipelex.semanticTokens": {
           "description": "Enable semantic tokens for inline table and array keys.",
           "type": "boolean",
           "scope": "resource",
           "default": false
         },
-        "evenBetterToml.schema.enabled": {
+        "pipelex.schema.enabled": {
           "description": "Enable completion and validation based on JSON schemas.",
           "type": "boolean",
           "scope": "resource",
           "default": true
         },
-        "evenBetterToml.schema.links": {
+        "pipelex.schema.links": {
           "description": "Whether to show clickable links for keys in the editor.",
           "type": "boolean",
           "scope": "resource",
           "default": false
         },
-        "evenBetterToml.schema.catalogs": {
+        "pipelex.schema.catalogs": {
           "description": "A list of URLs to schema catalogs where schemas and associations can be fetched from",
           "type": "array",
           "scope": "resource",
@@ -423,14 +425,14 @@
             "https://json.schemastore.org/api/json/catalog.json"
           ]
         },
-        "evenBetterToml.schema.associations": {
+        "pipelex.schema.associations": {
           "description": "Document and schema associations.",
           "markdownDescription": "Additional document and schema associations. \n\n The key must be a regular expression, this pattern is used to associate schemas with absolute document URIs. Overlapping patterns result in undefined behaviour and either matching schema can be used. \n\n The value must be an absolute URI to the JSON schema, for supported values and more information [read here](https://taplo.tamasfe.dev/configuration#visual-studio-code).",
           "type": "object",
           "scope": "resource",
           "default": {}
         },
-        "evenBetterToml.schema.cache.memoryExpiration": {
+        "pipelex.schema.cache.memoryExpiration": {
           "description": "The amount of seconds after which schemas will be invalidated from memory.",
           "markdownDescription": "The amount of seconds after which schemas will be invalidated from memory. \n**NOTE**: setting too low values will cause performance issues and validation of some schemas will fail.",
           "type": "integer",
@@ -438,141 +440,141 @@
           "minimum": 0,
           "default": 60
         },
-        "evenBetterToml.schema.cache.diskExpiration": {
+        "pipelex.schema.cache.diskExpiration": {
           "description": "The amount of seconds after which cached catalogs and schemas expire and will be attempted to be fetched again.",
           "type": "integer",
           "scope": "resource",
           "minimum": 0,
           "default": 600
         },
-        "evenBetterToml.completion.maxKeys": {
+        "pipelex.completion.maxKeys": {
           "description": "The maximum amount of keys in a dotted key to display during completion, 0 effectively disables key completions.",
           "type": "integer",
           "scope": "resource",
           "minimum": 0,
           "default": 5
         },
-        "evenBetterToml.syntax.semanticTokens": {
+        "pipelex.syntax.semanticTokens": {
           "description": "Whether to enable semantic tokens for tables and arrays.",
           "type": "boolean",
           "scope": "resource",
           "default": true
         },
-        "evenBetterToml.formatter.alignEntries": {
+        "pipelex.formatter.alignEntries": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Align entries vertically. Entries that have table headers, comments, or blank lines between them are not aligned."
         },
-        "evenBetterToml.formatter.alignComments": {
+        "pipelex.formatter.alignComments": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Align consecutive comments after entries and items vertically. This applies to comments that are after entries or array items"
         },
-        "evenBetterToml.formatter.arrayTrailingComma": {
+        "pipelex.formatter.arrayTrailingComma": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Put trailing commas for multiline arrays."
         },
-        "evenBetterToml.formatter.arrayAutoExpand": {
+        "pipelex.formatter.arrayAutoExpand": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Automatically expand arrays to multiple lines."
         },
-        "evenBetterToml.formatter.inlineTableExpand": {
+        "pipelex.formatter.inlineTableExpand": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Expand values inside in line tables."
         },
-        "evenBetterToml.formatter.arrayAutoCollapse": {
+        "pipelex.formatter.arrayAutoCollapse": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Automatically collapse arrays if they fit in one line."
         },
-        "evenBetterToml.formatter.compactArrays": {
+        "pipelex.formatter.compactArrays": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Omit whitespace padding inside single-line arrays."
         },
-        "evenBetterToml.formatter.compactInlineTables": {
+        "pipelex.formatter.compactInlineTables": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Omit whitespace padding inside inline tables."
         },
-        "evenBetterToml.formatter.compactEntries": {
+        "pipelex.formatter.compactEntries": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Omit whitespace around `=`."
         },
-        "evenBetterToml.formatter.columnWidth": {
+        "pipelex.formatter.columnWidth": {
           "scope": "resource",
           "type": "number",
           "default": null,
           "description": "Target maximum column width after which arrays are expanded into new lines."
         },
-        "evenBetterToml.formatter.indentTables": {
+        "pipelex.formatter.indentTables": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Indent subtables if they come in order."
         },
-        "evenBetterToml.formatter.indentEntries": {
+        "pipelex.formatter.indentEntries": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Indent entries under tables."
         },
-        "evenBetterToml.formatter.indentString": {
+        "pipelex.formatter.indentString": {
           "scope": "resource",
           "type": "string",
           "default": null,
           "description": "Indentation to use, should be tabs or spaces but technically could be anything."
         },
-        "evenBetterToml.formatter.trailingNewline": {
+        "pipelex.formatter.trailingNewline": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Add trailing newline to the source."
         },
-        "evenBetterToml.formatter.reorderKeys": {
+        "pipelex.formatter.reorderKeys": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Alphabetically reorder keys that are not separated by blank lines."
         },
-        "evenBetterToml.formatter.reorderArrays": {
+        "pipelex.formatter.reorderArrays": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Alphabetically reorder array values that are not separated by blank lines."
         },
-        "evenBetterToml.formatter.reorderInlineTables": {
+        "pipelex.formatter.reorderInlineTables": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Alphabetically reorder inline tables."
         },
-        "evenBetterToml.formatter.allowedBlankLines": {
+        "pipelex.formatter.allowedBlankLines": {
           "scope": "resource",
           "type": "number",
           "default": null,
           "description": "The maximum amount of consecutive blank lines allowed."
         },
-        "evenBetterToml.formatter.crlf": {
+        "pipelex.formatter.crlf": {
           "scope": "resource",
           "type": "boolean",
           "default": null,
           "description": "Use CRLF line endings."
         },
-        "evenBetterToml.rules": {
+        "pipelex.rules": {
           "scope": "resource",
           "type": "array",
           "default": [],
