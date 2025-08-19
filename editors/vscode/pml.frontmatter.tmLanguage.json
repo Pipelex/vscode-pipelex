@@ -1,0 +1,22 @@
+{
+  "fileTypes": [],
+  "injectionSelector": "L:text.html.markdown",
+  "patterns": [
+    {
+      "include": "#pmlFrontmatterCodeblock"
+    }
+  ],
+  "repository": {
+    "pmlFrontmatterCodeblock": {
+      "begin": "\\A\\+{3}\\s*$",
+      "end": "(^|\\G)(?=\\s*[\\+~]{3,}\\s*$)",
+      "contentName": "meta.embedded.block.pml.frontmatter",
+      "patterns": [
+        {
+          "include": "source.pml"
+        }
+      ]
+    }
+  },
+  "scopeName": "markdown.pml.frontmatter.codeblock"
+}

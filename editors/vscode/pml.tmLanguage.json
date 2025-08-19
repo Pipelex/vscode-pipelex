@@ -1,0 +1,343 @@
+{
+  "version": "1.0.0",
+  "scopeName": "source.pml",
+  "uuid": "8b4e5008-c50d-11ea-a91b-54ee75aeeb97",
+  "information_for_contributors": [
+    "Originally was maintained by aster (galaster@foxmail.com). This notice is only kept here for the record, please don't send e-mails about bugs and other issues."
+  ],
+  "patterns": [
+    {
+      "include": "#commentDirective"
+    },
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#table"
+    },
+    {
+      "include": "#entryBegin"
+    },
+    {
+      "include": "#value"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "captures": {
+        "1": {
+          "name": "comment.line.number-sign.pml"
+        },
+        "2": {
+          "name": "punctuation.definition.comment.pml"
+        }
+      },
+      "comment": "Comments",
+      "match": "\\s*((#).*)$"
+    },
+    "commentDirective": {
+      "captures": {
+        "1": {
+          "name": "meta.preprocessor.pml"
+        },
+        "2": {
+          "name": "punctuation.definition.meta.preprocessor.pml"
+        }
+      },
+      "comment": "Comments",
+      "match": "\\s*((#):.*)$"
+    },
+    "table": {
+      "patterns": [
+        {
+          "name": "meta.table.pml",
+          "match": "^\\s*(\\[)\\s*((?:(?:(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+'))\\s*\\.?\\s*)+)\\s*(\\])",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.table.pml"
+            },
+            "2": {
+              "patterns": [
+                {
+                  "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
+                  "name": "support.type.property-name.table.pml"
+                },
+                {
+                  "match": "\\.",
+                  "name": "punctuation.separator.dot.pml"
+                }
+              ]
+            },
+            "3": {
+              "name": "punctuation.definition.table.pml"
+            }
+          }
+        },
+        {
+          "name": "meta.array.table.pml",
+          "match": "^\\s*(\\[\\[)\\s*((?:(?:(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+'))\\s*\\.?\\s*)+)\\s*(\\]\\])",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.array.table.pml"
+            },
+            "2": {
+              "patterns": [
+                {
+                  "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
+                  "name": "support.type.property-name.array.pml"
+                },
+                {
+                  "match": "\\.",
+                  "name": "punctuation.separator.dot.pml"
+                }
+              ]
+            },
+            "3": {
+              "name": "punctuation.definition.array.table.pml"
+            }
+          }
+        },
+        {
+          "begin": "(\\{)",
+          "end": "(\\})",
+          "name": "meta.table.inline.pml",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.table.inline.pml"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.table.inline.pml"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comment"
+            },
+            {
+              "match": ",",
+              "name": "punctuation.separator.table.inline.pml"
+            },
+            {
+              "include": "#entryBegin"
+            },
+            {
+              "include": "#value"
+            }
+          ]
+        }
+      ]
+    },
+    "entryBegin": {
+      "name": "meta.entry.pml",
+      "match": "\\s*((?:(?:(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+'))\\s*\\.?\\s*)+)\\s*(=)",
+      "captures": {
+        "1": {
+          "patterns": [
+            {
+              "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
+              "name": "support.type.property-name.pml"
+            },
+            {
+              "match": "\\.",
+              "name": "punctuation.separator.dot.pml"
+            }
+          ]
+        },
+        "2": {
+          "name": "punctuation.eq.pml"
+        }
+      }
+    },
+    "value": {
+      "patterns": [
+        {
+          "name": "string.quoted.triple.basic.block.pml",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "patterns": [
+            {
+              "match": "\\\\([btnfr\"\\\\\\n/ ]|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})",
+              "name": "constant.character.escape.pml"
+            },
+            {
+              "match": "\\\\[^btnfr/\"\\\\\\n]",
+              "name": "invalid.illegal.escape.pml"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.basic.line.pml",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "match": "\\\\([btnfr\"\\\\\\n/ ]|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})",
+              "name": "constant.character.escape.pml"
+            },
+            {
+              "match": "\\\\[^btnfr/\"\\\\\\n]",
+              "name": "invalid.illegal.escape.pml"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.triple.literal.block.pml",
+          "begin": "'''",
+          "end": "'''"
+        },
+        {
+          "name": "string.quoted.single.literal.line.pml",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "constant.other.time.datetime.offset.pml"
+            }
+          },
+          "match": "(?<!\\w)(\\d{4}\\-\\d{2}\\-\\d{2}[T| ]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[\\+\\-]\\d{2}:\\d{2}))(?!\\w)"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "constant.other.time.datetime.local.pml"
+            }
+          },
+          "match": "(\\d{4}\\-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?)"
+        },
+        {
+          "name": "constant.other.time.date.pml",
+          "match": "\\d{4}\\-\\d{2}\\-\\d{2}"
+        },
+        {
+          "name": "constant.other.time.time.pml",
+          "match": "\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?"
+        },
+        {
+          "match": "(?<!\\w)(true|false)(?!\\w)",
+          "captures": {
+            "1": {
+              "name": "constant.language.boolean.pml"
+            }
+          }
+        },
+        {
+          "match": "(?<!\\w)([\\+\\-]?(0|([1-9](([0-9]|_[0-9])+)?))(?:(?:\\.([0-9]+))?[eE][\\+\\-]?[1-9]_?[0-9]*|(?:\\.[0-9_]*)))(?!\\w)",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.float.pml"
+            }
+          }
+        },
+        {
+          "match": "(?<!\\w)((?:[\\+\\-]?(0|([1-9](([0-9]|_[0-9])+)?))))(?!\\w)",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.integer.pml"
+            }
+          }
+        },
+        {
+          "match": "(?<!\\w)([\\+\\-]?inf)(?!\\w)",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.inf.pml"
+            }
+          }
+        },
+        {
+          "match": "(?<!\\w)([\\+\\-]?nan)(?!\\w)",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.nan.pml"
+            }
+          }
+        },
+        {
+          "match": "(?<!\\w)((?:0x(([0-9a-fA-F](([0-9a-fA-F]|_[0-9a-fA-F])+)?))))(?!\\w)",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.hex.pml"
+            }
+          }
+        },
+        {
+          "match": "(?<!\\w)(0o[0-7](_?[0-7])*)(?!\\w)",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.oct.pml"
+            }
+          }
+        },
+        {
+          "match": "(?<!\\w)(0b[01](_?[01])*)(?!\\w)",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.bin.pml"
+            }
+          }
+        },
+        {
+          "name": "meta.array.pml",
+          "begin": "(?<!\\w)(\\[)\\s*",
+          "end": "\\s*(\\])(?!\\w)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.array.pml"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.array.pml"
+            }
+          },
+          "patterns": [
+            {
+              "match": ",",
+              "name": "punctuation.separator.array.pml"
+            },
+            {
+              "include": "#comment"
+            },
+            {
+              "include": "#value"
+            }
+          ]
+        },
+        {
+          "begin": "(\\{)",
+          "end": "(\\})",
+          "name": "meta.table.inline.pml",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.table.inline.pml"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.table.inline.pml"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comment"
+            },
+            {
+              "match": ",",
+              "name": "punctuation.separator.table.inline.pml"
+            },
+            {
+              "include": "#entryBegin"
+            },
+            {
+              "include": "#value"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

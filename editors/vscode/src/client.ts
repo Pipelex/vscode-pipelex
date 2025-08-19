@@ -113,6 +113,7 @@ async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
   return {
     documentSelector: [
       { scheme: "file", language: "toml" },
+      { scheme: "file", language: "pml" },
       { scheme: "file", language: "cargoLock" },
     ],
 

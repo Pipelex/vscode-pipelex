@@ -3,6 +3,7 @@ import { registerCommands } from "./commands";
 import { createClient } from "./client";
 import { syncExtensionSchemas } from "./tomlValidation";
 import { getOutput, showMessage } from "./util";
+import { registerPipelexFeatures } from "./pipelex/pipelexExtension";
 
 export async function activate(context: vscode.ExtensionContext) {
   const schemaIndicator = vscode.window.createStatusBarItem(
@@ -19,10 +20,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
   if (vscode.window.activeTextEditor?.document.languageId === "toml") {
     schemaIndicator.show();
+  } else if (vscode.window.activeTextEditor?.document.languageId === "pml") {
+    schemaIndicator.show();
   }
 
   registerCommands(context, c);
   syncExtensionSchemas(context, c);
+
+  // Register Pipelex-specific features for PML
+  registerPipelexFeatures(context);
 
   context.subscriptions.push(
     getOutput(),
@@ -31,7 +37,7 @@ export async function activate(context: vscode.ExtensionContext) {
       showMessage(params, c)
     ),
     vscode.window.onDidChangeActiveTextEditor(editor => {
-      if (editor?.document.languageId === "toml") {
+      if (editor?.document.languageId === "toml" || editor?.document.languageId === "pml") {
         schemaIndicator.show();
       } else {
         schemaIndicator.hide();
