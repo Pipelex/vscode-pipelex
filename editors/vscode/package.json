@@ -33,6 +33,9 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
+    "onLanguage:pml",
+    "onLanguage:toml",
     "onLanguage:cargoLock"
   ],
   "keywords": [
@@ -74,7 +77,11 @@
       {
         "language": "pml",
         "scopeName": "source.pml",
-        "path": "./pml.tmLanguage.json"
+        "path": "./pml.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.tag.html.pml": "html",
+          "comment.block.html.pml": "html"
+        }
       },
       {
         "scopeName": "markdown.pml.frontmatter.codeblock",
