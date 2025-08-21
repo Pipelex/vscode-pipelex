@@ -15,7 +15,7 @@ Please read the upstream Taplo guidelines below. Here are the key differences fo
 ## Development setup
 ```bash
 # Clone and setup
-git clone https://github.com/PipelexLab/vscode-pipelex.git
+git clone https://github.com/Pipelex/vscode-pipelex.git
 cd vscode-pipelex/editors/vscode
 yarn install
 yarn build

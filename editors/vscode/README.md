@@ -50,7 +50,7 @@ Extract the key information and intent.
 ## 📦 **Installation**
 1. **From extensions marketplace**: Search for "Pipelex" in the Extensions view
 2. **From Command Line**: `code --install-extension Pipelex.pipelex` or `cursor --install-extension Pipelex.pipelex`
-3. **Manual Installation**: Download `.vsix` from [releases](https://github.com/PipelexLab/vscode-pipelex/releases)
+3. **Manual Installation**: Download `.vsix` from [releases](https://github.com/Pipelex/vscode-pipelex/releases)
 
 ---
 

@@ -14,7 +14,7 @@ This repo provides VS Code support for the **Pipelex Markup Language (PML)** whi
 
 ## Where to file issues
 - **Taplo behavior/bugs** → [upstream Taplo project](https://github.com/tamasfe/taplo)
-- **PML-specific issues** → [this repository](https://github.com/PipelexLab/vscode-pipelex/issues)
+- **PML-specific issues** → [this repository](https://github.com/Pipelex/vscode-pipelex/issues)
 
 ## Quick Start with PML
 ```toml
