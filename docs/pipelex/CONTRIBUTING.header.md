@@ -1,6 +1,3 @@
-<!-- GENERATED: do not edit CONTRIBUTING.md directly.
-     Edit docs/pipelex/CONTRIBUTING.header.md and run scripts/compose-docs.sh -->
-
 # Contributing to vscode-pipelex
 
 Please read the upstream Taplo guidelines below. Here are the key differences for this fork:

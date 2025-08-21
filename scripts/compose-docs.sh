@@ -34,9 +34,13 @@ compose () {
   local header="$1"
   local upstream_copy="$2"
   local target="$3"
+  local header_file="$4"
 
   echo "📝 Composing ${target}"
   {
+    echo "<!-- GENERATED: do not edit ${target} directly."
+    echo "     Edit ${header_file} and run scripts/compose-docs.sh -->"
+    echo
     cat "$header"
     echo
     if [[ -f "$upstream_copy" ]]; then
@@ -47,9 +51,9 @@ compose () {
   } > "$target"
 }
 
-compose "docs/pipelex/README.header.md" "docs/upstream/README.UPSTREAM.md" "$ROOT_README_PATH"
-compose "docs/pipelex/CONTRIBUTING.header.md" "docs/upstream/CONTRIBUTING.UPSTREAM.md" "$CONTRIB_PATH"
-compose "docs/pipelex/VSCODE_README.header.md" "docs/upstream/VSCODE_README.UPSTREAM.md" "$VSCODE_README_PATH"
+compose "docs/pipelex/README.header.md" "docs/upstream/README.UPSTREAM.md" "$ROOT_README_PATH" "docs/pipelex/README.header.md"
+compose "docs/pipelex/CONTRIBUTING.header.md" "docs/upstream/CONTRIBUTING.UPSTREAM.md" "$CONTRIB_PATH" "docs/pipelex/CONTRIBUTING.header.md"
+compose "docs/pipelex/VSCODE_README.header.md" "docs/upstream/VSCODE_README.UPSTREAM.md" "$VSCODE_README_PATH" "docs/pipelex/VSCODE_README.header.md"
 
 echo
 echo "✅ Docs composed successfully!"

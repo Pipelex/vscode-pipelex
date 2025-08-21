@@ -1,4 +1,4 @@
-<!-- GENERATED: do not edit the root README.md directly.
+<!-- GENERATED: do not edit README.md directly.
      Edit docs/pipelex/README.header.md and run scripts/compose-docs.sh -->
 
 <div style="text-align:left"><img src="pipelex-icon.png" width="128"></div>

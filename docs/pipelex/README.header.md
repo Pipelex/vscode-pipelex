@@ -1,6 +1,3 @@
-<!-- GENERATED: do not edit the root README.md directly.
-     Edit docs/pipelex/README.header.md and run scripts/compose-docs.sh -->
-
 <div style="text-align:left"><img src="pipelex-icon.png" width="128"></div>
 
 [![Build Status](https://github.com/PipelexLab/vscode-pipelex/workflows/CI/badge.svg)](https://github.com/PipelexLab/vscode-pipelex/actions)

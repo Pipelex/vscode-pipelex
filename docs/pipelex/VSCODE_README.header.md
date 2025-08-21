@@ -1,6 +1,3 @@
-<!-- GENERATED: do not edit editors/vscode/README.md directly.
-     Edit docs/pipelex/VSCODE_README.header.md and run scripts/compose-docs.sh -->
-
 # Pipelex VS Code Extension
 
 **Rich language support for Pipelex Markup Language (PML) and TOML files**
