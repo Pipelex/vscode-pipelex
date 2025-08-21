@@ -7,7 +7,11 @@
 
 This repo provides VS Code support for the **Pipelex Markup Language (PML)** which is based on TOML syntax. The repo is a fork of [Taplo](https://github.com/tamasfe/taplo) and it tracks Taplo upstream closely.
 
-## What's different here
+**About Pipelex:**
+
+[Pipelex](https://github.com/Pipelex/pipelex) is an open-source language for building deterministic AI workflows. It enables agents and developers to transform natural language requirements into production-ready pipelines that process information reliably at scale. Unlike traditional workflow tools, Pipelex uses a declarative syntax that captures business logic directly, making pipelines readable by domain experts while remaining executable by any runtime. Write once, run anywhere, share with everyone.
+
+## What we offer in addition to Taplo
 - **PML language support**: Rich syntax highlighting, semantic tokens, and language features for `.pml` files
 - **Concept definitions**: `[concept.Name]` sections with specialized highlighting  
 - **Pipe definitions**: `[pipe.name]` sections for workflow steps

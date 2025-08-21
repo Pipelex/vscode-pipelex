@@ -9,6 +9,10 @@
 
 This extension provides comprehensive VS Code support for the **Pipelex Markup Language (PML)**, which is based on TOML syntax, along with full TOML language support. Built as a fork of the excellent [Taplo](https://github.com/tamasfe/taplo) language server, it tracks upstream closely while adding PML-specific features like advanced syntax highlighting, semantic tokens, and intelligent language features for `.pml` files.
 
+**About Pipelex:**
+
+[Pipelex](https://github.com/Pipelex/pipelex) is an open-source language for building deterministic AI workflows. It enables agents and developers to transform natural language requirements into production-ready pipelines that process information reliably at scale. Unlike traditional workflow tools, Pipelex uses a declarative syntax that captures business logic directly, making pipelines readable by domain experts while remaining executable by any runtime. Write once, run anywhere, share with everyone.
+
 ## 🚀 **PML Features**
 
 ### 📝 **Pipelex Markup Language Support**
