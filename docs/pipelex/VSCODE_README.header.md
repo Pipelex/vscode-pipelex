@@ -55,6 +55,10 @@ Extract the key information and intent.
 
 ---
 
+"Pipelex" is a trademark of Evotis S.A.S.
+
+---
+
 ## Original Taplo VS Code README (kept in sync)
 
 Everything below is the original Taplo README, kept in sync with upstream for your reference.

@@ -39,4 +39,8 @@ Extract the key information and intent.
 
 ---
 
+"Pipelex" is a trademark of Evotis S.A.S.
+
+---
+
 ## Original Taplo README (kept in sync)
