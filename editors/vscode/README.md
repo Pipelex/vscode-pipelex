@@ -3,7 +3,7 @@
 
 <div align="center"><img src="https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_vs_code_extension_v1.png" alt="Pipelex VS Code extension banner" width="800" style="max-width: 100%; height: auto;"></div>
 
-# Pipelex VS Code Extension
+# Pipelex Extension
 
 **Rich language support for Pipelex Markup Language (PML) and TOML files**
 
