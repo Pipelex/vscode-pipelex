@@ -19,7 +19,7 @@
   "preview": true,
   "icon": "pipelex-icon.png",
   "galleryBanner": {
-    "color": "#731c12",
+    "color": "#45bf9f",
     "theme": "dark"
   },
   "license": "SEE LICENSE IN LICENSE.md",
@@ -34,17 +34,14 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onLanguage:pml",
-    "onLanguage:toml",
     "onLanguage:cargoLock"
   ],
   "keywords": [
     "pipelex",
     "pml",
+    "dsl",
     "toml",
     "syntax",
-    "formatter",
-    "config",
     "markup"
   ],
   "extensionKind": [
