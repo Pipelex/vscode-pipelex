@@ -59,7 +59,28 @@ compose "docs/pipelex/VSCODE_README.header.md" "docs/upstream/VSCODE_README.UPST
 
 # Handle VS Code CHANGELOG if header exists
 if [[ -f "docs/pipelex/CHANGELOG.header.md" ]]; then
-  compose "docs/pipelex/CHANGELOG.header.md" "docs/upstream/VSCODE_CHANGELOG.UPSTREAM.md" "$VSCODE_CHANGELOG_PATH" "docs/pipelex/CHANGELOG.header.md"
+  echo "📝 Composing ${VSCODE_CHANGELOG_PATH}"
+  {
+    echo "<!-- GENERATED: do not edit ${VSCODE_CHANGELOG_PATH} directly."
+    echo "     Edit CHANGELOG.md and docs/pipelex/CHANGELOG.header.md and run scripts/compose-docs.sh -->"
+    echo
+    # Include root CHANGELOG.md content first
+    if [[ -f "CHANGELOG.md" ]]; then
+      cat "CHANGELOG.md"
+      echo
+      echo "---"
+      echo
+    fi
+    # Then add the header (which contains Taplo section)
+    cat "docs/pipelex/CHANGELOG.header.md"
+    echo
+    # Finally add upstream Taplo changelog
+    if [[ -f "docs/upstream/VSCODE_CHANGELOG.UPSTREAM.md" ]]; then
+      cat "docs/upstream/VSCODE_CHANGELOG.UPSTREAM.md"
+    else
+      echo "_(No upstream file present for this path in ${UPSTREAM_BRANCH}.)_"
+    fi
+  } > "$VSCODE_CHANGELOG_PATH"
 fi
 
 echo

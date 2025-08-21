@@ -1,23 +1,14 @@
-# Pipelex Changelog
+# Pipelex Extension Changelog
 
-All notable changes to the Pipelex-specific features of this project will be documented in this file.
+## [0.1.1] - 2025-08-21
 
-## [Unreleased]
+### Added
+- Documentation composition system for maintaining Pipelex docs alongside Taplo upstream now also manages the Changelog
+
+## [0.1.0] - 2025-08-21 (Initial Fork 🎉)
 
 ### Added
 - Documentation composition system for maintaining Pipelex docs alongside Taplo upstream
-- Pipelex banner image in VS Code extension README
-- "About Pipelex" section explaining the language and its purpose
-- Trademark notice for Pipelex
-
-### Changed
-- Updated installation instructions to include Cursor IDE support
-- Changed PML variable syntax from `@variable` to `$variable` in examples
-- Improved README structure with cleaner separation of Pipelex and Taplo content
-
-## [0.1.0] - 2024-01-XX (Initial Fork)
-
-### Added
 - **PML Language Support**: Full support for `.pml` files (Pipelex Markup Language)
 - **Semantic Token Provider**: Context-aware highlighting for PML constructs
   - Concept definitions: `[concept.Name]` sections
@@ -40,7 +31,3 @@ All notable changes to the Pipelex-specific features of this project will be doc
 - Added `PIPELEX.md` documenting the implementation
 - Added `PIPELEX_CHANGES.md` tracking technical changes
 - Created comprehensive VS Code extension README
-
----
-
-For Taplo-specific changes, see the main [CHANGELOG.md](CHANGELOG.md).
