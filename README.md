@@ -1,13 +1,11 @@
 <!-- GENERATED: do not edit README.md directly.
      Edit docs/pipelex/README.header.md and run scripts/compose-docs.sh -->
 
-<div style="text-align:left"><img src="pipelex-icon.png" width="128"></div>
+<div align="center"><img src="https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_vs_code_extension_v1.png" alt="Pipelex VS Code extension banner" width="800" style="max-width: 100%; height: auto;"></div>
 
-[![Build Status](https://github.com/PipelexLab/vscode-pipelex/workflows/CI/badge.svg)](https://github.com/PipelexLab/vscode-pipelex/actions)
+# vscode-pipelex
 
-# vscode-pipelex (Taplo fork)
-
-This fork adds **Pipelex Markup Language (PML)** support while tracking Taplo upstream closely.
+This repo provides VS Code support for the **Pipelex Markup Language (PML)** which is based on TOML syntax. The repo is a fork of [Taplo](https://github.com/tamasfe/taplo) and it tracks Taplo upstream closely.
 
 ## What's different here
 - **PML language support**: Rich syntax highlighting, semantic tokens, and language features for `.pml` files
@@ -29,10 +27,11 @@ definition = "A user's natural language query"
 
 [pipe.analyze_query]
 type = "PipeLLM"
+definition = "Analyzes a user's natural language query"
 inputs = { query = "UserQuery" }
 output = "QueryAnalysis"
 prompt_template = """
-Analyze this user query: @query
+Analyze this user query: $query
 Extract the key information and intent.
 """
 ```

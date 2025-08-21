@@ -1,10 +1,10 @@
+<div align="center"><img src="https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_vs_code_extension_v1.png" alt="Pipelex VS Code extension banner" width="800" style="max-width: 100%; height: auto;"></div>
+
 # Pipelex VS Code Extension
 
 **Rich language support for Pipelex Markup Language (PML) and TOML files**
 
-This is the **Taplo** extension enhanced with **Pipelex Markup Language (PML)** support. It provides comprehensive language support for both PML files (`.pml`) and TOML files (`.toml`), featuring advanced syntax highlighting, semantic tokens, and intelligent language features.
-
-![Pipelex Logo](pipelex-icon.png)
+This extension provides comprehensive VS Code support for the **Pipelex Markup Language (PML)**, which is based on TOML syntax, along with full TOML language support. Built as a fork of the excellent [Taplo](https://github.com/tamasfe/taplo) language server, it tracks upstream closely while adding PML-specific features like advanced syntax highlighting, semantic tokens, and intelligent language features for `.pml` files.
 
 ## 🚀 **PML Features**
 
@@ -35,17 +35,18 @@ definition = "A user's natural language query"
 
 [pipe.analyze_query]
 type = "PipeLLM"
+definition = "Analyzes a user's natural language query"
 inputs = { query = "UserQuery" }
 output = "QueryAnalysis"
 prompt_template = """
-Analyze this user query: @query
+Analyze this user query: $query
 Extract the key information and intent.
 """
 ```
 
 ## 📦 **Installation**
-1. **From VS Code Marketplace**: Search for "Pipelex" in the Extensions view
-2. **From Command Line**: `code --install-extension Pipelex.pipelex`
+1. **From extensions marketplace**: Search for "Pipelex" in the Extensions view
+2. **From Command Line**: `code --install-extension Pipelex.pipelex` or `cursor --install-extension Pipelex.pipelex`
 3. **Manual Installation**: Download `.vsix` from [releases](https://github.com/PipelexLab/vscode-pipelex/releases)
 
 ---
