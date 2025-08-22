@@ -1,6 +1,6 @@
 {
   "name": "@pipelex/lsp",
-  "version": "0.1.22",
+  "version": "0.1.25",
   "description": "A JavaScript wrapper for the Pipelex TOML/PML language server.",
   "scripts": {
     "build": "yarn rollup --silent -c rollup.config.mjs",
@@ -31,6 +31,6 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@pipelex/core": "^0.1.2"
+    "@taplo/core": "^0.2.0"
   }
 }

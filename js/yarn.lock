@@ -36,15 +36,15 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@pipelex/core@^0.1.2", "@pipelex/core@file:/Users/lchoquel/repos/PipelexLab/vscode-pipelex/js/core":
+"@pipelex/core@file:/Users/lchoquel/repos/PipelexLab/vscode-pipelex/js/core":
   version "0.1.2"
   resolved "file:core"
 
 "@pipelex/lsp@file:/Users/lchoquel/repos/PipelexLab/vscode-pipelex/js/lsp":
-  version "0.1.22"
+  version "0.1.25"
   resolved "file:lsp"
   dependencies:
-    "@pipelex/core" "^0.1.2"
+    "@taplo/core" "^0.2.0"
 
 "@pkgjs/parseargs@^0.11.0":
   version "0.11.0"
