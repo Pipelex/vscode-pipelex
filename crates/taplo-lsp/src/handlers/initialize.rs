@@ -7,10 +7,11 @@ use crate::World;
 use lsp_async_stub::{rpc::Error, Context, Params};
 use lsp_types::{
     CompletionOptions, DocumentLinkOptions, FoldingRangeProviderCapability,
-    HoverProviderCapability, InitializedParams, OneOf, RenameOptions, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind,
-    WorkDoneProgressOptions, WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
+    HoverProviderCapability, InitializedParams, OneOf, PositionEncodingKind, RenameOptions,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
+    TextDocumentSyncKind, WorkDoneProgressOptions, WorkspaceFoldersServerCapabilities,
+    WorkspaceServerCapabilities,
 };
 use lsp_types::{InitializeParams, InitializeResult};
 use taplo_common::environment::Environment;
@@ -50,8 +51,10 @@ pub async fn initialize<E: Environment>(
         }
     }
 
-    Ok(InitializeResult {
+    let result = InitializeResult {
         capabilities: ServerCapabilities {
+            // Be explicit to avoid client crashes on missing defaults.
+            position_encoding: Some(PositionEncodingKind::UTF16),
             workspace: Some(WorkspaceServerCapabilities {
                 workspace_folders: Some(WorkspaceFoldersServerCapabilities {
                     supported: Some(true),
@@ -104,7 +107,9 @@ pub async fn initialize<E: Environment>(
             version: Some(env!("CARGO_PKG_VERSION").into()),
         }),
         offset_encoding: None,
-    })
+    };
+    
+    Ok(result)
 }
 
 #[tracing::instrument(skip_all)]

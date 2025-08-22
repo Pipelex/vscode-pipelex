@@ -293,6 +293,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@pipelex/core@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "@pipelex/core@npm:0.1.2"
+  checksum: 99c606b2180465efbb1df77f33f3ace28745a116bcec7619fa3c03fd92479de1a8d3c4fcaf27bded05675b4dc41aa0cb7641b5b38bec56a44b25a8ce98cd3a17
+  languageName: node
+  linkType: hard
+
+"@pipelex/lsp@npm:^0.1.22":
+  version: 0.1.22
+  resolution: "@pipelex/lsp@npm:0.1.22"
+  dependencies:
+    "@pipelex/core": "npm:^0.1.2"
+  checksum: bb11841ff0d6e150f982f0b69b4520503c6f293249399c023c8c50e9e8fcfb6df483aec817d93733c83a53d4b07382004efbf05abcd769db1e38771164b720a2
+  languageName: node
+  linkType: hard
+
 "@pkgjs/parseargs@npm:^0.11.0":
   version: 0.11.0
   resolution: "@pkgjs/parseargs@npm:0.11.0"
@@ -514,22 +530,6 @@ __metadata:
   version: 4.47.1
   resolution: "@rollup/rollup-win32-x64-msvc@npm:4.47.1"
   conditions: os=win32 & cpu=x64
-  languageName: node
-  linkType: hard
-
-"@taplo/core@npm:^0.2.0":
-  version: 0.2.0
-  resolution: "@taplo/core@npm:0.2.0"
-  checksum: 4bbc3b696c49e267da2dfcd13e7812e5c09febda583856b35569773542e93f9c28a50dab69c635e1d5e11a4de6962ab08e006985fa38d2df1b3ef19d471efa05
-  languageName: node
-  linkType: hard
-
-"@taplo/lsp@npm:^0.8.0":
-  version: 0.8.0
-  resolution: "@taplo/lsp@npm:0.8.0"
-  dependencies:
-    "@taplo/core": "npm:^0.2.0"
-  checksum: f556092473fdb7c0dd2bdd967768e855d7139aa82e169a97d1eaf0db580ac593fbbe77909fdea51c9faf4fa84c22855b33dec0dcf9464f015f5a80fe83bcd519
   languageName: node
   linkType: hard
 
@@ -2640,10 +2640,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "pipelex@workspace:."
   dependencies:
+    "@pipelex/lsp": "npm:^0.1.22"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
     "@rollup/plugin-replace": "npm:^5.0.5"
-    "@taplo/lsp": "npm:^0.8.0"
     "@types/deep-equal": "npm:^1.0.4"
     "@types/node": "npm:^20.11.9"
     "@types/vscode": "npm:^1.90.0"

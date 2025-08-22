@@ -27,7 +27,7 @@ impl Default for InitConfig {
 }
 
 fn default_configuration_section() -> String {
-    String::from("evenBetterToml")
+    String::from("pipelex")
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

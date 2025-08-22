@@ -1,10 +1,10 @@
 {
-  "name": "@taplo/core",
-  "version": "0.2.0",
-  "description": "Commonly used types for Taplo",
+  "name": "@pipelex/core",
+  "version": "0.1.2",
+  "description": "Commonly used types for Pipelex (fork of Taplo with PML support)",
   "author": {
-    "name": "tamasfe",
-    "url": "https://github.com/tamasfe"
+    "name": "Pipelex",
+    "url": "https://github.com/Pipelex/vscode-pipelex"
   },
   "scripts": {
     "build": "yarn rollup --silent -c rollup.config.mjs",

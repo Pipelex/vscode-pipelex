@@ -46,6 +46,7 @@ pub fn create_server<E: Environment>() -> Server<World<E>> {
         .on_notification::<notification::DidCloseTextDocument, _>(handlers::document_close)
         .on_notification::<notification::DidChangeConfiguration, _>(handlers::configuration_change)
         .on_notification::<notification::DidChangeWorkspaceFolders, _>(handlers::workspace_change)
+        .on_notification::<notification::DidChangeWatchedFiles, _>(handlers::watched_files_change)
         .on_request::<lsp_ext::request::ConvertToJsonRequest, _>(handlers::convert_to_json)
         .on_request::<lsp_ext::request::ConvertToTomlRequest, _>(handlers::convert_to_toml)
         .on_request::<lsp_ext::request::ListSchemasRequest, _>(handlers::list_schemas)

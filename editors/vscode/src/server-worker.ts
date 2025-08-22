@@ -3,7 +3,7 @@ import {
   BrowserMessageWriter,
 } from "vscode-languageserver-protocol/browser";
 
-import { TaploLsp, RpcMessage } from "@taplo/lsp";
+import { TaploLsp, RpcMessage } from "@pipelex/lsp";
 
 const worker: Worker = self as any;
 

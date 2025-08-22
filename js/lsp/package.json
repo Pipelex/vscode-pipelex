@@ -1,18 +1,18 @@
 {
-  "name": "@taplo/lsp",
-  "version": "0.8.1",
-  "description": "A JavaScript wrapper for the Taplo TOML language server.",
+  "name": "@pipelex/lsp",
+  "version": "0.1.22",
+  "description": "A JavaScript wrapper for the Pipelex TOML/PML language server.",
   "scripts": {
     "build": "yarn rollup --silent -c rollup.config.mjs",
     "prepublish": "RELEASE=true yarn build"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "homepage": "https://taplo.tamasfe.dev",
-  "repository": "https://github.com/tamasfe/taplo",
+  "homepage": "https://github.com/Pipelex/vscode-pipelex",
+  "repository": "https://github.com/Pipelex/vscode-pipelex",
   "author": {
-    "name": "tamasfe",
-    "url": "https://github.com/tamasfe"
+    "name": "Pipelex",
+    "url": "https://github.com/Pipelex"
   },
   "license": "MIT",
   "autoTag": {
@@ -31,6 +31,6 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@taplo/core": "^0.2.0"
+    "@pipelex/core": "^0.1.2"
   }
 }

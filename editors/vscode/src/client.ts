@@ -17,13 +17,59 @@ export async function createClient(
   }
 }
 
+// Ensure the client always advertises UTF-16 position encoding per LSP 3.17
+class PipelexNodeLanguageClient extends node.LanguageClient {
+  protected fillInitializeParams(params: any) {
+    // Call base to populate defaults
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    // @ts-ignore - base signature is intentionally loose
+    super.fillInitializeParams(params);
+    params.capabilities ??= {};
+    params.capabilities.general ??= {};
+    // VS Code uses UTF-16 positions internally
+    params.capabilities.general.positionEncodings = ["utf-16"];
+  }
+
+  protected handleInitializeResult(result: any): void {
+    // Ensure capabilities exist and have positionEncoding
+    if (!result.capabilities) {
+      result.capabilities = {};
+    }
+    if (!result.capabilities.positionEncoding) {
+      result.capabilities.positionEncoding = 'utf-16';
+    }
+    super.handleInitializeResult(result);
+  }
+}
+
+class PipelexBrowserLanguageClient extends browser.LanguageClient {
+  protected fillInitializeParams(params: any) {
+    // @ts-ignore - base signature is intentionally loose
+    super.fillInitializeParams(params);
+    params.capabilities ??= {};
+    params.capabilities.general ??= {};
+    params.capabilities.general.positionEncodings = ["utf-16"];
+  }
+
+  protected handleInitializeResult(result: any): void {
+    // Ensure capabilities exist and have positionEncoding
+    if (!result.capabilities) {
+      result.capabilities = {};
+    }
+    if (!result.capabilities.positionEncoding) {
+      result.capabilities.positionEncoding = 'utf-16';
+    }
+    super.handleInitializeResult(result);
+  }
+}
+
 async function createBrowserClient(context: vscode.ExtensionContext) {
   const serverMain = vscode.Uri.joinPath(
     context.extensionUri,
     "dist/server-worker.js"
   );
   const worker = new Worker(serverMain.toString(true));
-  return new browser.LanguageClient(
+  return new PipelexBrowserLanguageClient(
     "taplo-lsp",
     "Taplo LSP",
     await clientOpts(context),
@@ -99,7 +145,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
     };
   }
 
-  return new node.LanguageClient(
+  return new PipelexNodeLanguageClient(
     "pipelex",
     "Pipelex LSP",
     serverOpts,
@@ -120,6 +166,16 @@ async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
     initializationOptions: {
       configurationSection: "pipelex",
       cachePath: context.globalStorageUri.fsPath,
+    },
+
+    synchronize: {
+      // Synchronize the setting section 'pipelex' to the server
+      configurationSection: 'pipelex',
+      // Notify the server about file changes to '.toml' and '.pml' files contained in the workspace
+      fileEvents: [
+        vscode.workspace.createFileSystemWatcher('**/*.toml'),
+        vscode.workspace.createFileSystemWatcher('**/*.pml')
+      ]
     },
   };
 }
