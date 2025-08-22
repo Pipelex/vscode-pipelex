@@ -1,4 +1,6 @@
 {
+  "name": "@pipelex/workspace",
+  "version": "1.0.0",
   "private": true,
   "workspaces": [
     "cli",
@@ -8,6 +10,11 @@
   ],
   "packageManager": "yarn@4.0.2",
   "scripts": {
-    "build": "yarn workspaces foreach -W run build"
+    "build": "yarn workspaces foreach -W run build",
+    "lsp:build": "yarn workspace @pipelex/lsp run build",
+    "lsp:clean": "yarn workspace @pipelex/lsp run clean",
+    "lsp:pub:patch": "yarn workspace @pipelex/lsp run clean && yarn workspace @pipelex/lsp run build && yarn workspace @pipelex/lsp version --patch && yarn workspace @pipelex/lsp npm publish --access public",
+    "lsp:pub:minor": "yarn workspace @pipelex/lsp run clean && yarn workspace @pipelex/lsp run build && yarn workspace @pipelex/lsp version --minor && yarn workspace @pipelex/lsp npm publish --access public",
+    "lsp:pub:major": "yarn workspace @pipelex/lsp run clean && yarn workspace @pipelex/lsp run build && yarn workspace @pipelex/lsp version --major && yarn workspace @pipelex/lsp npm publish --access public"
   }
 }
