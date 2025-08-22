@@ -1,4 +1,4 @@
-include = ["**/*.toml"]
+include = ["**/*.toml", "**/*.pml"]
 exclude = [
   "**/*nested-1000.toml",
   "**/node_modules/**",

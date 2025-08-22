@@ -75,7 +75,7 @@ impl Config {
     pub fn prepare(&mut self, e: &impl Environment, base: &Path) -> Result<(), anyhow::Error> {
         self.make_absolute(e, base);
 
-        let default_include = String::from("**/*.toml");
+        let default_include = String::from("**/*.{toml,pml}");
 
         self.file_rule = Some(GlobRule::new(
             self.include
