@@ -41,7 +41,7 @@
   resolved "file:core"
 
 "@pipelex/lsp@file:/Users/lchoquel/repos/PipelexLab/vscode-pipelex/js/lsp":
-  version "0.1.25"
+  version "0.1.27"
   resolved "file:lsp"
   dependencies:
     "@taplo/core" "^0.2.0"
