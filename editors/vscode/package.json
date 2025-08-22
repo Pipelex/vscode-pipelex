@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex Markup Language (PML) and TOML support",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "autoTag": {
     "enabled": true
   },
