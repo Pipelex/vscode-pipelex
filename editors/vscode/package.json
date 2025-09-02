@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex Language (PLX) and TOML support",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "autoTag": {
     "enabled": true
   },

@@ -1,8 +1,0 @@
-src
-target
-util
-**/.local*
-*.tgz
-tsconfig.json
-rollup.config.mjs
-yarn-error.log
