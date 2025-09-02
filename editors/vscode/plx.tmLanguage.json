@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "scopeName": "source.pml",
+  "scopeName": "source.plx",
   "uuid": "8b4e5008-c50d-11ea-a91b-54ee75aeeb97",
   "information_for_contributors": [
     "Originally was maintained by aster (galaster@foxmail.com). This notice is only kept here for the record, please don't send e-mails about bugs and other issues."
@@ -47,10 +47,10 @@
     "comment": {
       "captures": {
         "1": {
-          "name": "comment.line.number-sign.pml"
+          "name": "comment.line.number-sign.plx"
         },
         "2": {
-          "name": "punctuation.definition.comment.pml"
+          "name": "punctuation.definition.comment.plx"
         }
       },
       "comment": "Comments",
@@ -59,10 +59,10 @@
     "commentDirective": {
       "captures": {
         "1": {
-          "name": "meta.preprocessor.pml"
+          "name": "meta.preprocessor.plx"
         },
         "2": {
-          "name": "punctuation.definition.meta.preprocessor.pml"
+          "name": "punctuation.definition.meta.preprocessor.plx"
         }
       },
       "comment": "Comments",
@@ -71,121 +71,121 @@
     "table": {
       "patterns": [
         {
-          "name": "meta.table.concept.pml",
+          "name": "meta.table.concept.plx",
           "match": "^\\s*(\\[)\\s*(concept(?:\\.(?:[A-Za-z][A-Za-z0-9]*|\"[^\"]+\"|'[^']+'))?)\\s*(\\])",
           "captures": {
             "1": {
-              "name": "punctuation.definition.table.pml"
+              "name": "punctuation.definition.table.plx"
             },
             "2": {
               "patterns": [
                 {
                   "match": "concept",
-                  "name": "support.type.property-name.concept.pml"
+                  "name": "support.type.property-name.concept.plx"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.pml"
+                  "name": "punctuation.separator.dot.plx"
                 },
                 {
                   "match": "(?:[A-Za-z][A-Za-z0-9]*)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.concept.pml"
+                  "name": "support.type.property-name.concept.plx"
                 }
               ]
             },
             "3": {
-              "name": "punctuation.definition.table.pml"
+              "name": "punctuation.definition.table.plx"
             }
           }
         },
         {
-          "name": "meta.table.pipe.pml",
+          "name": "meta.table.pipe.plx",
           "match": "^\\s*(\\[)\\s*(pipe(?:\\.(?:[A-Za-z0-9_+-]+|\"[^\"]+\"|'[^']+'))?)\\s*(\\])",
           "captures": {
             "1": {
-              "name": "punctuation.definition.table.pml"
+              "name": "punctuation.definition.table.plx"
             },
             "2": {
               "patterns": [
                 {
                   "match": "pipe",
-                  "name": "support.type.property-name.pipe.pml"
+                  "name": "support.type.property-name.pipe.plx"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.pml"
+                  "name": "punctuation.separator.dot.plx"
                 },
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.pipe.pml"
+                  "name": "support.type.property-name.pipe.plx"
                 }
               ]
             },
             "3": {
-              "name": "punctuation.definition.table.pml"
+              "name": "punctuation.definition.table.plx"
             }
           }
         },
         {
-          "name": "meta.table.pml",
+          "name": "meta.table.plx",
           "match": "^\\s*(\\[)\\s*((?:(?:(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+'))\\s*\\.?\\s*)+)\\s*(\\])",
           "captures": {
             "1": {
-              "name": "punctuation.definition.table.pml"
+              "name": "punctuation.definition.table.plx"
             },
             "2": {
               "patterns": [
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.table.pml"
+                  "name": "support.type.property-name.table.plx"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.pml"
+                  "name": "punctuation.separator.dot.plx"
                 }
               ]
             },
             "3": {
-              "name": "punctuation.definition.table.pml"
+              "name": "punctuation.definition.table.plx"
             }
           }
         },
         {
-          "name": "meta.array.table.pml",
+          "name": "meta.array.table.plx",
           "match": "^\\s*(\\[\\[)\\s*((?:(?:(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+'))\\s*\\.?\\s*)+)\\s*(\\]\\])",
           "captures": {
             "1": {
-              "name": "punctuation.definition.array.table.pml"
+              "name": "punctuation.definition.array.table.plx"
             },
             "2": {
               "patterns": [
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.array.pml"
+                  "name": "support.type.property-name.array.plx"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.pml"
+                  "name": "punctuation.separator.dot.plx"
                 }
               ]
             },
             "3": {
-              "name": "punctuation.definition.array.table.pml"
+              "name": "punctuation.definition.array.table.plx"
             }
           }
         },
         {
           "begin": "(\\{)",
           "end": "(\\})",
-          "name": "meta.table.inline.pml",
+          "name": "meta.table.inline.plx",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.table.inline.pml"
+              "name": "punctuation.definition.table.inline.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.table.inline.pml"
+              "name": "punctuation.definition.table.inline.plx"
             }
           },
           "patterns": [
@@ -194,7 +194,7 @@
             },
             {
               "match": ",",
-              "name": "punctuation.separator.table.inline.pml"
+              "name": "punctuation.separator.table.inline.plx"
             },
             {
               "include": "#entryBegin"
@@ -209,93 +209,93 @@
     "entryBegin": {
       "patterns": [
         {
-          "name": "meta.entry.pipe.pml",
+          "name": "meta.entry.pipe.plx",
           "match": "^\\s*(pipe(?:\\.(?:[A-Za-z0-9_+-]+|\"[^\"]+\"|'[^']+'))?)\\s*(=)",
           "captures": {
             "1": {
               "patterns": [
                 {
                   "match": "pipe",
-                  "name": "support.type.property-name.pipe.pml"
+                  "name": "support.type.property-name.pipe.plx"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.pml"
+                  "name": "punctuation.separator.dot.plx"
                 },
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.pipe.pml"
+                  "name": "support.type.property-name.pipe.plx"
                 }
               ]
             },
             "2": {
-              "name": "punctuation.eq.pml"
+              "name": "punctuation.eq.plx"
             }
           }
         },
         {
-          "name": "meta.entry.output-type.pml",
+          "name": "meta.entry.output-type.plx",
           "match": "\\s*(output)\\s*(=)\\s*(\")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(\")",
           "captures": {
             "1": {
-              "name": "support.type.property-name.pml"
+              "name": "support.type.property-name.plx"
             },
             "2": {
-              "name": "punctuation.eq.pml"
+              "name": "punctuation.eq.plx"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.pml"
+              "name": "punctuation.definition.string.begin.plx"
             },
             "4": {
-              "name": "support.type.concept.pml"
+              "name": "support.type.concept.plx"
             },
             "5": {
-              "name": "punctuation.definition.string.end.pml"
+              "name": "punctuation.definition.string.end.plx"
             }
           }
         },
         {
-          "name": "meta.entry.refines-type.pml",
+          "name": "meta.entry.refines-type.plx",
           "match": "\\s*(refines)\\s*(=)\\s*(\")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(\")",
           "captures": {
             "1": {
-              "name": "support.type.property-name.pml"
+              "name": "support.type.property-name.plx"
             },
             "2": {
-              "name": "punctuation.eq.pml"
+              "name": "punctuation.eq.plx"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.pml"
+              "name": "punctuation.definition.string.begin.plx"
             },
             "4": {
-              "name": "support.type.concept.pml"
+              "name": "support.type.concept.plx"
             },
             "5": {
-              "name": "punctuation.definition.string.end.pml"
+              "name": "punctuation.definition.string.end.plx"
             }
           }
         },
         {
-          "name": "meta.entry.jinja2-template.pml",
+          "name": "meta.entry.jinja2-template.plx",
           "begin": "\\s*(jinja2)\\s*(=)\\s*(\"\"\")",
           "end": "(\"\"\")",
           "beginCaptures": {
             "1": {
-              "name": "support.type.property-name.pml"
+              "name": "support.type.property-name.plx"
             },
             "2": {
-              "name": "punctuation.eq.pml"
+              "name": "punctuation.eq.plx"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.pml"
+              "name": "punctuation.definition.string.begin.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.string.end.pml"
+              "name": "punctuation.definition.string.end.plx"
             }
           },
-          "contentName": "string.quoted.triple.basic.block.jinja2.pml",
+          "contentName": "string.quoted.triple.basic.block.jinja2.plx",
           "patterns": [
             {
               "include": "#jinjaTemplateContent"
@@ -315,26 +315,26 @@
           ]
         },
         {
-          "name": "meta.entry.prompt-template.pml",
+          "name": "meta.entry.prompt-template.plx",
           "begin": "\\s*(prompt_template)\\s*(=)\\s*(\"\"\")",
           "end": "(\"\"\")",
           "beginCaptures": {
             "1": {
-              "name": "support.type.property-name.pml"
+              "name": "support.type.property-name.plx"
             },
             "2": {
-              "name": "punctuation.eq.pml"
+              "name": "punctuation.eq.plx"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.pml"
+              "name": "punctuation.definition.string.begin.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.string.end.pml"
+              "name": "punctuation.definition.string.end.plx"
             }
           },
-          "contentName": "string.quoted.triple.basic.block.prompt.pml",
+          "contentName": "string.quoted.triple.basic.block.prompt.plx",
           "patterns": [
             {
               "include": "#jinjaTemplateContent"
@@ -351,26 +351,26 @@
           ]
         },
         {
-          "name": "meta.entry.jinja2-template-line.pml",
+          "name": "meta.entry.jinja2-template-line.plx",
           "begin": "\\s*(jinja2)\\s*(=)\\s*(\")",
           "end": "(\")",
           "beginCaptures": {
             "1": {
-              "name": "support.type.property-name.pml"
+              "name": "support.type.property-name.plx"
             },
             "2": {
-              "name": "punctuation.eq.pml"
+              "name": "punctuation.eq.plx"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.pml"
+              "name": "punctuation.definition.string.begin.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.string.end.pml"
+              "name": "punctuation.definition.string.end.plx"
             }
           },
-          "contentName": "string.quoted.single.basic.line.jinja2.pml",
+          "contentName": "string.quoted.single.basic.line.jinja2.plx",
           "patterns": [
             {
               "include": "#jinjaTemplateContent"
@@ -390,26 +390,26 @@
           ]
         },
         {
-          "name": "meta.entry.prompt-template-line.pml",
+          "name": "meta.entry.prompt-template-line.plx",
           "begin": "\\s*(prompt_template)\\s*(=)\\s*(\")",
           "end": "(\")",
           "beginCaptures": {
             "1": {
-              "name": "support.type.property-name.pml"
+              "name": "support.type.property-name.plx"
             },
             "2": {
-              "name": "punctuation.eq.pml"
+              "name": "punctuation.eq.plx"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.pml"
+              "name": "punctuation.definition.string.begin.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.string.end.pml"
+              "name": "punctuation.definition.string.end.plx"
             }
           },
-          "contentName": "string.quoted.single.basic.line.prompt.pml",
+          "contentName": "string.quoted.single.basic.line.prompt.plx",
           "patterns": [
             {
               "include": "#jinjaTemplateContent"
@@ -426,23 +426,23 @@
           ]
         },
         {
-          "name": "meta.entry.pml",
+          "name": "meta.entry.plx",
           "match": "\\s*((?:(?:(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+'))\\s*\\.?\\s*)+)\\s*(=)",
           "captures": {
             "1": {
               "patterns": [
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.pml"
+                  "name": "support.type.property-name.plx"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.pml"
+                  "name": "punctuation.separator.dot.plx"
                 }
               ]
             },
             "2": {
-              "name": "punctuation.eq.pml"
+              "name": "punctuation.eq.plx"
             }
           }
         }
@@ -454,10 +454,10 @@
           "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
           "captures": {
             "1": {
-              "name": "punctuation.definition.data-injection.pml"
+              "name": "punctuation.definition.data-injection.plx"
             },
             "2": {
-              "name": "variable.name.data.pml"
+              "name": "variable.name.data.plx"
             }
           }
         },
@@ -465,33 +465,33 @@
           "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
           "captures": {
             "1": {
-              "name": "punctuation.definition.template-variable.pml"
+              "name": "punctuation.definition.template-variable.plx"
             },
             "2": {
-              "name": "variable.name.data.pml"
+              "name": "variable.name.data.plx"
             }
           }
         },
         {
           "match": "(\\{\\{|\\}\\}|\\{%|%\\})",
-          "name": "punctuation.definition.jinja.pml"
+          "name": "punctuation.definition.jinja.plx"
         },
         {
           "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
-          "name": "keyword.control.jinja.pml"
+          "name": "keyword.control.jinja.plx"
         },
         {
           "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
-          "name": "variable.other.jinja.pml"
+          "name": "variable.other.jinja.plx"
         },
         {
           "match": "(</?)(\\w+)([^>]*)(>)",
           "captures": {
             "1": {
-              "name": "punctuation.definition.tag.html.pml"
+              "name": "punctuation.definition.tag.html.plx"
             },
             "2": {
-              "name": "entity.name.tag.html.pml"
+              "name": "entity.name.tag.html.plx"
             },
             "3": {
               "patterns": [
@@ -499,20 +499,20 @@
                   "match": "(\\w+)(=)(\"[^\"]*\"|'[^']*')",
                   "captures": {
                     "1": {
-                      "name": "entity.other.attribute-name.html.pml"
+                      "name": "entity.other.attribute-name.html.plx"
                     },
                     "2": {
-                      "name": "punctuation.separator.key-value.html.pml"
+                      "name": "punctuation.separator.key-value.html.plx"
                     },
                     "3": {
-                      "name": "string.quoted.html.pml"
+                      "name": "string.quoted.html.plx"
                     }
                   }
                 }
               ]
             },
             "4": {
-              "name": "punctuation.definition.tag.html.pml"
+              "name": "punctuation.definition.tag.html.plx"
             }
           }
         },
@@ -520,18 +520,18 @@
           "match": "(<!--)(.*?)(-->)",
           "captures": {
             "1": {
-              "name": "punctuation.definition.comment.html.pml"
+              "name": "punctuation.definition.comment.html.plx"
             },
             "2": {
-              "name": "comment.block.html.pml"
+              "name": "comment.block.html.plx"
             },
             "3": {
-              "name": "punctuation.definition.comment.html.pml"
+              "name": "punctuation.definition.comment.html.plx"
             }
           }
         },
         {
-          "name": "string.quoted.triple.basic.block.pml",
+          "name": "string.quoted.triple.basic.block.plx",
           "begin": "\"\"\"",
           "end": "\"\"\"",
           "patterns": [
@@ -553,7 +553,7 @@
           ]
         },
         {
-          "name": "string.quoted.single.basic.line.pml",
+          "name": "string.quoted.single.basic.line.plx",
           "begin": "\"",
           "end": "\"",
           "patterns": [
@@ -575,19 +575,19 @@
           ]
         },
         {
-          "name": "string.quoted.triple.literal.block.pml",
+          "name": "string.quoted.triple.literal.block.plx",
           "begin": "'''",
           "end": "'''"
         },
         {
-          "name": "string.quoted.single.literal.line.pml",
+          "name": "string.quoted.single.literal.line.plx",
           "begin": "'",
           "end": "'"
         },
         {
           "captures": {
             "1": {
-              "name": "constant.other.time.datetime.offset.pml"
+              "name": "constant.other.time.datetime.offset.plx"
             }
           },
           "match": "(?<!\\w)(\\d{4}\\-\\d{2}\\-\\d{2}[T| ]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[\\+\\-]\\d{2}:\\d{2}))(?!\\w)"
@@ -595,24 +595,24 @@
         {
           "captures": {
             "1": {
-              "name": "constant.other.time.datetime.local.pml"
+              "name": "constant.other.time.datetime.local.plx"
             }
           },
           "match": "(\\d{4}\\-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?)"
         },
         {
-          "name": "constant.other.time.date.pml",
+          "name": "constant.other.time.date.plx",
           "match": "\\d{4}\\-\\d{2}\\-\\d{2}"
         },
         {
-          "name": "constant.other.time.time.pml",
+          "name": "constant.other.time.time.plx",
           "match": "\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?"
         },
         {
           "match": "(?<!\\w)(true|false)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.language.boolean.pml"
+              "name": "constant.language.boolean.plx"
             }
           }
         },
@@ -620,7 +620,7 @@
           "match": "(?<!\\w)([\\+\\-]?(0|([1-9](([0-9]|_[0-9])+)?))(?:(?:\\.([0-9]+))?[eE][\\+\\-]?[1-9]_?[0-9]*|(?:\\.[0-9_]*)))(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.float.pml"
+              "name": "constant.numeric.float.plx"
             }
           }
         },
@@ -628,7 +628,7 @@
           "match": "(?<!\\w)((?:[\\+\\-]?(0|([1-9](([0-9]|_[0-9])+)?))))(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.integer.pml"
+              "name": "constant.numeric.integer.plx"
             }
           }
         },
@@ -636,7 +636,7 @@
           "match": "(?<!\\w)([\\+\\-]?inf)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.inf.pml"
+              "name": "constant.numeric.inf.plx"
             }
           }
         },
@@ -644,7 +644,7 @@
           "match": "(?<!\\w)([\\+\\-]?nan)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.nan.pml"
+              "name": "constant.numeric.nan.plx"
             }
           }
         },
@@ -652,7 +652,7 @@
           "match": "(?<!\\w)((?:0x(([0-9a-fA-F](([0-9a-fA-F]|_[0-9a-fA-F])+)?))))(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.hex.pml"
+              "name": "constant.numeric.hex.plx"
             }
           }
         },
@@ -660,7 +660,7 @@
           "match": "(?<!\\w)(0o[0-7](_?[0-7])*)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.oct.pml"
+              "name": "constant.numeric.oct.plx"
             }
           }
         },
@@ -668,28 +668,28 @@
           "match": "(?<!\\w)(0b[01](_?[01])*)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.bin.pml"
+              "name": "constant.numeric.bin.plx"
             }
           }
         },
         {
-          "name": "meta.array.pml",
+          "name": "meta.array.plx",
           "begin": "(?<!\\w)(\\[)\\s*",
           "end": "\\s*(\\])(?!\\w)",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.array.pml"
+              "name": "punctuation.definition.array.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.array.pml"
+              "name": "punctuation.definition.array.plx"
             }
           },
           "patterns": [
             {
               "match": ",",
-              "name": "punctuation.separator.array.pml"
+              "name": "punctuation.separator.array.plx"
             },
             {
               "include": "#comment"
@@ -702,15 +702,15 @@
         {
           "begin": "(\\{)",
           "end": "(\\})",
-          "name": "meta.table.inline.pml",
+          "name": "meta.table.inline.plx",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.table.inline.pml"
+              "name": "punctuation.definition.table.inline.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.table.inline.pml"
+              "name": "punctuation.definition.table.inline.plx"
             }
           },
           "patterns": [
@@ -719,7 +719,7 @@
             },
             {
               "match": ",",
-              "name": "punctuation.separator.table.inline.pml"
+              "name": "punctuation.separator.table.inline.plx"
             },
             {
               "include": "#entryBegin"
@@ -735,10 +735,10 @@
       "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.data-injection.pml"
+          "name": "punctuation.definition.data-injection.plx"
         },
         "2": {
-          "name": "variable.name.data.pml"
+          "name": "variable.name.data.plx"
         }
       }
     },
@@ -746,33 +746,33 @@
       "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.template-variable.pml"
+          "name": "punctuation.definition.template-variable.plx"
         },
         "2": {
-          "name": "variable.name.data.pml"
+          "name": "variable.name.data.plx"
         }
       }
     },
     "jinjaDelimiters": {
       "match": "(\\{\\{|\\}\\}|\\{%|%\\})",
-      "name": "punctuation.definition.jinja.pml"
+      "name": "punctuation.definition.jinja.plx"
     },
     "jinjaKeywords": {
       "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
-      "name": "keyword.control.jinja.pml"
+      "name": "keyword.control.jinja.plx"
     },
     "jinjaVariable": {
       "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
-      "name": "variable.other.jinja.pml"
+      "name": "variable.other.jinja.plx"
     },
     "htmlTag": {
       "match": "(</?)(\\w+)([^>]*)(>)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.tag.html.pml"
+          "name": "punctuation.definition.tag.html.plx"
         },
         "2": {
-          "name": "entity.name.tag.html.pml"
+          "name": "entity.name.tag.html.plx"
         },
         "3": {
           "patterns": [
@@ -780,20 +780,20 @@
               "match": "(\\w+)(=)(\"[^\"]*\"|'[^']*')",
               "captures": {
                 "1": {
-                  "name": "entity.other.attribute-name.html.pml"
+                  "name": "entity.other.attribute-name.html.plx"
                 },
                 "2": {
-                  "name": "punctuation.separator.key-value.html.pml"
+                  "name": "punctuation.separator.key-value.html.plx"
                 },
                 "3": {
-                  "name": "string.quoted.html.pml"
+                  "name": "string.quoted.html.plx"
                 }
               }
             }
           ]
         },
         "4": {
-          "name": "punctuation.definition.tag.html.pml"
+          "name": "punctuation.definition.tag.html.plx"
         }
       }
     },
@@ -801,30 +801,30 @@
       "match": "(<!--)(.*?)(-->)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.comment.html.pml"
+          "name": "punctuation.definition.comment.html.plx"
         },
         "2": {
-          "name": "comment.block.html.pml"
+          "name": "comment.block.html.plx"
         },
         "3": {
-          "name": "punctuation.definition.comment.html.pml"
+          "name": "punctuation.definition.comment.html.plx"
         }
       }
     },
     "jinjaTemplateContent": {
       "patterns": [
         {
-          "name": "meta.embedded.block.jinja.pml",
+          "name": "meta.embedded.block.jinja.plx",
           "begin": "(\\{%)",
           "end": "(%\\})",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.jinja.pml"
+              "name": "punctuation.definition.jinja.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.jinja.pml"
+              "name": "punctuation.definition.jinja.plx"
             }
           },
           "patterns": [
@@ -834,17 +834,17 @@
           ]
         },
         {
-          "name": "meta.embedded.expression.jinja.pml",
+          "name": "meta.embedded.expression.jinja.plx",
           "begin": "(\\{\\{)",
           "end": "(\\}\\})",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.jinja.pml"
+              "name": "punctuation.definition.jinja.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.jinja.pml"
+              "name": "punctuation.definition.jinja.plx"
             }
           },
           "patterns": [
@@ -854,17 +854,17 @@
           ]
         },
         {
-          "name": "comment.block.jinja.pml",
+          "name": "comment.block.jinja.plx",
           "begin": "(\\{#)",
           "end": "(#\\})",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.comment.begin.jinja.pml"
+              "name": "punctuation.definition.comment.begin.jinja.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.comment.end.jinja.pml"
+              "name": "punctuation.definition.comment.end.jinja.plx"
             }
           }
         }
@@ -874,27 +874,27 @@
       "patterns": [
         {
           "match": "\\b(if|elif|else|endif|for|endfor|set|with|endwith|block|endblock|macro|endmacro|call|endcall|filter|endfilter|autoescape|endautoescape|raw|endraw|extends|include|import|from)\\b",
-          "name": "keyword.control.jinja.pml"
+          "name": "keyword.control.jinja.plx"
         },
         {
           "match": "\\b(and|or|not|in|is|true|false|none)\\b",
-          "name": "keyword.operator.jinja.pml"
+          "name": "keyword.operator.jinja.plx"
         },
         {
           "match": "\\b(selectattr|rejectattr|map|select|reject|join|list|sort|reverse|length|first|last|random|min|max|sum|abs|round|int|float|string)\\b",
-          "name": "support.function.jinja.pml"
+          "name": "support.function.jinja.plx"
         },
         {
           "match": "[a-zA-Z_][a-zA-Z0-9_]*",
-          "name": "variable.other.jinja.pml"
+          "name": "variable.other.jinja.plx"
         },
         {
           "match": "\\.",
-          "name": "punctuation.accessor.jinja.pml"
+          "name": "punctuation.accessor.jinja.plx"
         },
         {
           "match": "\\|",
-          "name": "punctuation.separator.filter.jinja.pml"
+          "name": "punctuation.separator.filter.jinja.plx"
         }
       ]
     },
@@ -902,55 +902,55 @@
       "patterns": [
         {
           "match": "\\b(and|or|not|in|is|true|false|none)\\b",
-          "name": "keyword.operator.jinja.pml"
+          "name": "keyword.operator.jinja.plx"
         },
         {
           "match": "\\b(selectattr|rejectattr|map|select|reject|join|list|sort|reverse|length|first|last|random|min|max|sum|abs|round|int|float|string|equalto)\\b",
-          "name": "support.function.jinja.pml"
+          "name": "support.function.jinja.plx"
         },
         {
           "match": "[a-zA-Z_][a-zA-Z0-9_]*",
-          "name": "variable.other.jinja.pml"
+          "name": "variable.other.jinja.plx"
         },
         {
           "match": "\\.",
-          "name": "punctuation.accessor.jinja.pml"
+          "name": "punctuation.accessor.jinja.plx"
         },
         {
           "match": "\\|",
-          "name": "punctuation.separator.filter.jinja.pml"
+          "name": "punctuation.separator.filter.jinja.plx"
         },
         {
           "match": "\"[^\"]*\"",
-          "name": "string.quoted.double.jinja.pml"
+          "name": "string.quoted.double.jinja.plx"
         },
         {
           "match": "'[^']*'",
-          "name": "string.quoted.single.jinja.pml"
+          "name": "string.quoted.single.jinja.plx"
         },
         {
           "match": "\\d+",
-          "name": "constant.numeric.jinja.pml"
+          "name": "constant.numeric.jinja.plx"
         }
       ]
     },
     "htmlContent": {
       "patterns": [
         {
-          "name": "meta.tag.html.pml",
+          "name": "meta.tag.html.plx",
           "begin": "(<)([a-zA-Z][a-zA-Z0-9]*)",
           "end": "(>)",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.tag.begin.html.pml"
+              "name": "punctuation.definition.tag.begin.html.plx"
             },
             "2": {
-              "name": "entity.name.tag.html.pml"
+              "name": "entity.name.tag.html.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.tag.end.html.pml"
+              "name": "punctuation.definition.tag.end.html.plx"
             }
           },
           "patterns": [
@@ -960,35 +960,35 @@
           ]
         },
         {
-          "name": "meta.tag.html.pml",
+          "name": "meta.tag.html.plx",
           "begin": "(</)([a-zA-Z][a-zA-Z0-9]*)",
           "end": "(>)",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.tag.begin.html.pml"
+              "name": "punctuation.definition.tag.begin.html.plx"
             },
             "2": {
-              "name": "entity.name.tag.html.pml"
+              "name": "entity.name.tag.html.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.tag.end.html.pml"
+              "name": "punctuation.definition.tag.end.html.plx"
             }
           }
         },
         {
-          "name": "comment.block.html.pml",
+          "name": "comment.block.html.plx",
           "begin": "(<!--)",
           "end": "(-->)",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.comment.begin.html.pml"
+              "name": "punctuation.definition.comment.begin.html.plx"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.comment.end.html.pml"
+              "name": "punctuation.definition.comment.end.html.plx"
             }
           }
         }
@@ -1000,19 +1000,19 @@
           "match": "([a-zA-Z-]+)(=)(\"[^\"]*\"|'[^']*')",
           "captures": {
             "1": {
-              "name": "entity.other.attribute-name.html.pml"
+              "name": "entity.other.attribute-name.html.plx"
             },
             "2": {
-              "name": "punctuation.separator.key-value.html.pml"
+              "name": "punctuation.separator.key-value.html.plx"
             },
             "3": {
-              "name": "string.quoted.html.pml"
+              "name": "string.quoted.html.plx"
             }
           }
         },
         {
           "match": "[a-zA-Z-]+",
-          "name": "entity.other.attribute-name.html.pml"
+          "name": "entity.other.attribute-name.html.plx"
         }
       ]
     },
@@ -1020,11 +1020,11 @@
       "patterns": [
         {
           "match": "\\\\([btnfr\"\\\\\\n/ ]|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})",
-          "name": "constant.character.escape.pml"
+          "name": "constant.character.escape.plx"
         },
         {
           "match": "\\\\[^btnfr/\"\\\\\\n]",
-          "name": "invalid.illegal.escape.pml"
+          "name": "invalid.illegal.escape.plx"
         }
       ]
     },
@@ -1032,10 +1032,10 @@
       "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.data-injection.pml"
+          "name": "punctuation.definition.data-injection.plx"
         },
         "2": {
-          "name": "variable.name.data.pml"
+          "name": "variable.name.data.plx"
         }
       }
     },
@@ -1043,10 +1043,10 @@
       "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.template-variable.pml"
+          "name": "punctuation.definition.template-variable.plx"
         },
         "2": {
-          "name": "variable.name.data.pml"
+          "name": "variable.name.data.plx"
         }
       }
     }

@@ -5,18 +5,18 @@
 
 # Pipelex Extension
 
-**Rich language support for Pipelex Markup Language (PML) and TOML files**
+**Rich language support for Pipelex Language (PLX) and TOML files**
 
-This extension provides comprehensive VS Code support for the **Pipelex Markup Language (PML)**, which is based on TOML syntax, along with full TOML language support. Built as a fork of the excellent [Taplo](https://github.com/tamasfe/taplo) language server, it tracks upstream closely while adding PML-specific features like advanced syntax highlighting, semantic tokens, and intelligent language features for `.pml` files.
+This extension provides comprehensive VS Code support for the **Pipelex Language (PLX)**, which is based on TOML syntax, along with full TOML language support. Built as a fork of the excellent [Taplo](https://github.com/tamasfe/taplo) language server, it tracks upstream closely while adding PLX-specific features like advanced syntax highlighting, semantic tokens, and intelligent language features for `.plx` files.
 
 **About Pipelex:**
 
 [Pipelex](https://github.com/Pipelex/pipelex) is an open-source language for building deterministic AI workflows. It enables agents and developers to transform natural language requirements into production-ready pipelines that process information reliably at scale. Unlike traditional workflow tools, Pipelex uses a declarative syntax that captures business logic directly, making pipelines readable by domain experts while remaining executable by any runtime. Write once, run anywhere, share with everyone.
 
-## 🚀 **PML Features**
+## 🚀 **PLX Features**
 
-### 📝 **Pipelex Markup Language Support**
-- **Rich syntax highlighting** for PML-specific constructs
+### 📝 **Pipelex Language Support**
+- **Rich syntax highlighting** for PLX-specific constructs
 - **Concept definitions**: `[concept.Name]` sections with specialized highlighting  
 - **Pipe definitions**: `[pipe.name]` sections for workflow steps
 - **Data injection**: `@variable` syntax with smart highlighting
@@ -25,7 +25,7 @@ This extension provides comprehensive VS Code support for the **Pipelex Markup L
 - **HTML templates**: Basic HTML tag support within strings
 - **Semantic tokens** for context-aware highlighting
 
-### 🎨 **PML Syntax Highlighting**
+### 🎨 **PLX Syntax Highlighting**
 - **🔵 Concept sections** - `[concept.Name]` in teal (`#4ECDC4`)
 - **🔴 Pipe sections** - `[pipe.name]` in red (`#FF6666`) 
 - **🟢 Data variables** - `@variable`, `$variable` in green (`#98FB98`)
@@ -34,7 +34,7 @@ This extension provides comprehensive VS Code support for the **Pipelex Markup L
 - **🔷 Concept types** - `ConceptType` references highlighted
 - **🔶 Pipe types** - `PipeLLM`, `PipeSequence` etc. highlighted
 
-### Example PML File
+### Example PLX File
 ```toml
 # Pipelex workflow definition
 [concept.UserQuery]

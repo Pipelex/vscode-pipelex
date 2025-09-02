@@ -12,21 +12,21 @@
 
 ### Added
 - Documentation composition system for maintaining Pipelex docs alongside Taplo upstream
-- **PML Language Support**: Full support for `.pml` files (Pipelex Markup Language)
-- **Semantic Token Provider**: Context-aware highlighting for PML constructs
+- **PLX Language Support**: Full support for `.plx` files (Pipelex Language)
+- **Semantic Token Provider**: Context-aware highlighting for PLX constructs
   - Concept definitions: `[concept.Name]` sections
   - Pipe definitions: `[pipe.name]` sections
   - Variable injection: `$variable` syntax
   - Template support: Jinja2 `{{ }}` and `{% %}` blocks
 - **TextMate Grammars**: 
-  - `pml.tmLanguage.json` - Main PML grammar
-  - `pml.frontmatter.tmLanguage.json` - Frontmatter support
-  - `pml.markdown.tmLanguage.json` - Markdown code block support
-- **File Associations**: Automatic recognition of `.pml` files
-- **Example Files**: `test-data/example.pml` demonstrating PML syntax
+  - `plx.tmLanguage.json` - Main PLX grammar
+  - `plx.frontmatter.tmLanguage.json` - Frontmatter support
+  - `plx.markdown.tmLanguage.json` - Markdown code block support
+- **File Associations**: Automatic recognition of `.plx` files
+- **Example Files**: `test-data/example.plx` demonstrating PLX syntax
 
 ### Technical Implementation
-- Created isolated `src/pipelex/` directory for all PML-specific code
+- Created isolated `src/pipelex/` directory for all PLX-specific code
 - Minimal modifications to existing Taplo files
 - Additive-only approach preserving all TOML functionality
 

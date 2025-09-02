@@ -3,12 +3,12 @@
   "injectionSelector": "L:text.html.markdown",
   "patterns": [
     {
-      "include": "#pmlCodeBlock"
+      "include": "#plxCodeBlock"
     }
   ],
   "repository": {
-    "pmlCodeBlock": {
-      "begin": "(^|\\G)(\\s*)(\\`{3,}|~{3,})\\s*(?i:(pml)(\\s+[^`~]*)?$)",
+    "plxCodeBlock": {
+      "begin": "(^|\\G)(\\s*)(\\`{3,}|~{3,})\\s*(?i:(plx)(\\s+[^`~]*)?$)",
       "name": "markup.fenced_code.block.markdown",
       "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
       "beginCaptures": {
@@ -31,15 +31,15 @@
         {
           "begin": "(^|\\G)(\\s*)(.*)",
           "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
-          "contentName": "meta.embedded.block.pml",
+          "contentName": "meta.embedded.block.plx",
           "patterns": [
             {
-              "include": "source.pml"
+              "include": "source.plx"
             }
           ]
         }
       ]
     }
   },
-  "scopeName": "markdown.pml.codeblock"
+  "scopeName": "markdown.plx.codeblock"
 }

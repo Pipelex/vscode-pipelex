@@ -1,7 +1,7 @@
 {
   "name": "pipelex",
   "displayName": "Pipelex",
-  "description": "Pipelex Markup Language (PML) and TOML support",
+  "description": "Pipelex Language (PLX) and TOML support",
   "version": "0.1.2",
   "autoTag": {
     "enabled": true
@@ -38,7 +38,7 @@
   ],
   "keywords": [
     "pipelex",
-    "pml",
+    "plx",
     "dsl",
     "toml",
     "syntax",
@@ -72,29 +72,29 @@
         }
       },
       {
-        "language": "pml",
-        "scopeName": "source.pml",
-        "path": "./pml.tmLanguage.json",
+        "language": "plx",
+        "scopeName": "source.plx",
+        "path": "./plx.tmLanguage.json",
         "embeddedLanguages": {
-          "meta.tag.html.pml": "html",
-          "comment.block.html.pml": "html"
+          "meta.tag.html.plx": "html",
+          "comment.block.html.plx": "html"
         }
       },
       {
-        "scopeName": "markdown.pml.frontmatter.codeblock",
-        "path": "./pml.frontmatter.tmLanguage.json",
+        "scopeName": "markdown.plx.frontmatter.codeblock",
+        "path": "./plx.frontmatter.tmLanguage.json",
         "injectTo": [
           "text.html.markdown"
         ]
       },
       {
-        "scopeName": "markdown.pml.codeblock",
-        "path": "./pml.markdown.tmLanguage.json",
+        "scopeName": "markdown.plx.codeblock",
+        "path": "./plx.markdown.tmLanguage.json",
         "injectTo": [
           "text.html.markdown"
         ],
         "embeddedLanguages": {
-          "meta.embedded.block.pml": "pml"
+          "meta.embedded.block.plx": "plx"
         }
       }
     ],
@@ -114,13 +114,13 @@
         "configuration": "./language-configuration.json"
       },
       {
-        "id": "pml",
+        "id": "plx",
         "aliases": [
-          "PML",
-          "Pipelex Markup Language"
+          "PLX",
+          "Pipelex Language"
         ],
         "extensions": [
-          ".pml"
+          ".plx"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -181,32 +181,32 @@
         "description": "Keys of inline tables."
       },
       {
-        "id": "pmlConcept",
+        "id": "plxConcept",
         "superType": "type",
         "description": "Pipelex concept names"
       },
       {
-        "id": "pmlPipeType",
+        "id": "plxPipeType",
         "superType": "type",
         "description": "Pipelex pipe type identifiers"
       },
       {
-        "id": "pmlDataVariable",
+        "id": "plxDataVariable",
         "superType": "variable",
         "description": "Pipelex data variables"
       },
       {
-        "id": "pmlPipeName",
+        "id": "plxPipeName",
         "superType": "function",
         "description": "Pipelex pipe names"
       },
       {
-        "id": "pmlPipeSection",
+        "id": "plxPipeSection",
         "superType": "keyword",
         "description": "Pipelex pipe section headers"
       },
       {
-        "id": "pmlConceptSection",
+        "id": "plxConceptSection",
         "superType": "keyword",
         "description": "Pipelex concept section headers"
       }
@@ -220,23 +220,23 @@
           "tomlTableKey": [
             "support.type.property-name.table.toml"
           ],
-          "pmlConcept": [
-            "support.type.concept.pml"
+          "plxConcept": [
+            "support.type.concept.plx"
           ],
-          "pmlPipeType": [
-            "support.type.pipe-type.pml"
+          "plxPipeType": [
+            "support.type.pipe-type.plx"
           ],
-          "pmlDataVariable": [
-            "variable.name.data.pml"
+          "plxDataVariable": [
+            "variable.name.data.plx"
           ],
-          "pmlPipeName": [
-            "support.function.pipe-name.pml"
+          "plxPipeName": [
+            "support.function.pipe-name.plx"
           ],
-          "pmlPipeSection": [
-            "support.type.property-name.pipe.pml"
+          "plxPipeSection": [
+            "support.type.property-name.pipe.plx"
           ],
-          "pmlConceptSection": [
-            "support.type.property-name.concept.pml"
+          "plxConceptSection": [
+            "support.type.property-name.concept.plx"
           ]
         }
       }
@@ -246,99 +246,99 @@
       "editor.tokenColorCustomizations": {
         "textMateRules": [
           {
-            "scope": "support.type.property-name.pipe.pml",
+            "scope": "support.type.property-name.pipe.plx",
             "settings": {
               "foreground": "#FF6666",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.pipe-type.pml",
+            "scope": "support.type.pipe-type.plx",
             "settings": {
               "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.property-name.concept.pml",
+            "scope": "support.type.property-name.concept.plx",
             "settings": {
               "foreground": "#4ECDC4",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.concept.pml",
+            "scope": "support.type.concept.plx",
             "settings": {
               "foreground": "#4ECDC4",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.concept.native.pml",
+            "scope": "support.type.concept.native.plx",
             "settings": {
               "foreground": "#98FB98",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "variable.name.data.pml",
+            "scope": "variable.name.data.plx",
             "settings": {
               "foreground": "#98FB98",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.function.pipe-name.pml",
+            "scope": "support.function.pipe-name.plx",
             "settings": {
               "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "punctuation.definition.data-injection.pml",
+            "scope": "punctuation.definition.data-injection.plx",
             "settings": {
               "foreground": "#FF79C6"
             }
           },
           {
-            "scope": "punctuation.definition.template-variable.pml",
+            "scope": "punctuation.definition.template-variable.plx",
             "settings": {
               "foreground": "#FF79C6"
             }
           },
           {
-            "scope": "punctuation.definition.jinja.pml",
+            "scope": "punctuation.definition.jinja.plx",
             "settings": {
               "foreground": "#FF79C6",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "keyword.control.jinja.pml",
+            "scope": "keyword.control.jinja.plx",
             "settings": {
               "foreground": "#8BE9FD"
             }
           },
           {
-            "scope": "variable.other.jinja.pml",
+            "scope": "variable.other.jinja.plx",
             "settings": {
               "foreground": "#50FA7B"
             }
           },
           {
-            "scope": "entity.name.tag.html.pml",
+            "scope": "entity.name.tag.html.plx",
             "settings": {
               "foreground": "#FFB86C"
             }
           },
           {
-            "scope": "entity.other.attribute-name.html.pml",
+            "scope": "entity.other.attribute-name.html.plx",
             "settings": {
               "foreground": "#F1FA8C"
             }
           },
           {
-            "scope": "comment.block.html.pml",
+            "scope": "comment.block.html.plx",
             "settings": {
               "foreground": "#6272A4",
               "fontStyle": "italic"

@@ -2,21 +2,21 @@ import * as vscode from 'vscode';
 import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
 
 /**
- * Register all Pipelex-specific features for PML support
+ * Register all Pipelex-specific features for PLX support
  */
 export function registerPipelexFeatures(context: vscode.ExtensionContext) {
-    // Register PML semantic token provider
+    // Register PLX semantic token provider
     const semanticTokensProvider = new PipelexSemanticTokensProvider();
     context.subscriptions.push(
         vscode.languages.registerDocumentSemanticTokensProvider(
-            { language: 'pml' },
+            { language: 'plx' },
             semanticTokensProvider,
             semanticTokensProvider.getSemanticTokensLegend()
         )
     );
 
-    // Future: Add more PML-specific features here
-    // - PML-specific validation
-    // - PML-specific code actions
-    // - PML-specific hover providers
+    // Future: Add more PLX-specific features here
+    // - PLX-specific validation
+    // - PLX-specific code actions
+    // - PLX-specific hover providers
 }
