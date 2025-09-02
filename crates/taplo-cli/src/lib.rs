@@ -108,7 +108,7 @@ impl<E: Environment> Taplo<E> {
             patterns = match config.include.clone() {
                 Some(patterns) => patterns,
                 None => Vec::from([cwd
-                    .join("**/*.{toml,pml}")
+                    .join("**/*.{toml,plx}")
                     .normalize()
                     .to_string_lossy()
                     .into_owned()]),

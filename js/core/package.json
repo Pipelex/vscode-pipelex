@@ -1,7 +1,7 @@
 {
   "name": "@pipelex/core",
   "version": "0.1.2",
-  "description": "Commonly used types for Pipelex (fork of Taplo with PML support)",
+  "description": "Commonly used types for Pipelex (fork of Taplo with PLX support)",
   "author": {
     "name": "Pipelex",
     "url": "https://github.com/Pipelex/vscode-pipelex"
