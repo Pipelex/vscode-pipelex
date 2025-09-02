@@ -1,11 +1,20 @@
 # Pipelex Extension Changelog
 
-## [0.1.3] - 2025-08-21
+## [0.2.0] - 2025-09-02
 
 ### Changed
 
 - Set file extension to `.plx` for Pipelex Language files
+
+### Removed
+
 - Cleaned up unused package
+
+## [0.1.3] - 2025-08-21
+
+### Added
+
+- Build scripts
 
 ## [0.1.2] - 2025-08-21
 
