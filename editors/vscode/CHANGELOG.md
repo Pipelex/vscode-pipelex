@@ -3,6 +3,34 @@
 
 # Pipelex Extension Changelog
 
+## [0.2.1] - 2025-09-05
+
+### Fixed
+
+- Extension activation on language = "plx", enabling the extension to work in BlackBoxAI IDE
+
+## [0.2.0] - 2025-09-02
+
+### Changed
+
+- Set file extension to `.plx` for Pipelex Language files
+
+### Removed
+
+- Cleaned up unused package
+
+## [0.1.3] - 2025-08-21
+
+### Added
+
+- Build scripts
+
+## [0.1.2] - 2025-08-21
+
+### Changed
+
+- Rebranded syntax error messages to Pipelex
+
 ## [0.1.1] - 2025-08-21
 
 ### Added

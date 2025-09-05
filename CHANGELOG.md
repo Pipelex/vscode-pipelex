@@ -1,5 +1,11 @@
 # Pipelex Extension Changelog
 
+## [0.2.1] - 2025-09-05
+
+### Fixed
+
+- Extension activation on language = "plx", enabling the extension to work in BlackBoxAI IDE
+
 ## [0.2.0] - 2025-09-02
 
 ### Changed
