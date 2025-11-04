@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pipelex Extension Configuration",
+  "description": "Complete reusable configuration for Pipelex extensions",
+  "version": "1.0.0",
+  "extension": {
+    "name": "pipelex",
+    "displayName": "Pipelex",
+    "description": "Pipelex Language (PLX) and TOML support",
+    "publisher": "Pipelex",
+    "icon": "pipelex-icon.png",
+    "galleryBanner": {
+      "color": "#45bf9f",
+      "theme": "dark"
+    },
+    "categories": [
+      "Programming Languages",
+      "Linters", 
+      "Formatters",
+      "Other"
+    ],
+    "keywords": [
+      "pipelex",
+      "plx",
+      "dsl",
+      "toml",
+      "syntax",
+      "markup"
+    ]
+  },
+  "languages": [
+    {
+      "id": "toml",
+      "aliases": ["TOML"],
+      "extensions": [".toml"],
+      "filenames": ["Cargo.lock", "uv.lock"],
+      "configuration": "./language-configuration.json"
+    },
+    {
+      "id": "plx",
+      "aliases": ["PLX", "Pipelex Language"],
+      "extensions": [".plx"],
+      "configuration": "./language-configuration.json"
+    }
+  ],
+  "grammars": [
+    {
+      "language": "toml",
+      "scopeName": "source.toml",
+      "path": "./toml.tmLanguage.json"
+    },
+    {
+      "language": "plx",
+      "scopeName": "source.plx", 
+      "path": "./plx.tmLanguage.json",
+      "embeddedLanguages": {
+        "meta.tag.html.plx": "html",
+        "comment.block.html.plx": "html"
+      }
+    }
+  ],
+  "semanticTokenTypes": [
+    {
+      "id": "tomlArrayKey",
+      "superType": "variable",
+      "description": "Keys of regular arrays."
+    },
+    {
+      "id": "tomlTableKey", 
+      "superType": "variable",
+      "description": "Keys of inline tables."
+    },
+    {
+      "id": "plxConcept",
+      "superType": "type",
+      "description": "Pipelex concept names"
+    },
+    {
+      "id": "plxPipeType",
+      "superType": "type", 
+      "description": "Pipelex pipe type identifiers"
+    },
+    {
+      "id": "plxDataVariable",
+      "superType": "variable",
+      "description": "Pipelex data variables"
+    },
+    {
+      "id": "plxPipeName",
+      "superType": "function",
+      "description": "Pipelex pipe names"
+    },
+    {
+      "id": "plxPipeSection",
+      "superType": "keyword",
+      "description": "Pipelex pipe section headers"
+    },
+    {
+      "id": "plxConceptSection",
+      "superType": "keyword",
+      "description": "Pipelex concept section headers"
+    }
+  ],
+  "commands": [
+    {
+      "command": "pipelex.selectSchema",
+      "title": "TOML: Select Schema"
+    },
+    {
+      "command": "pipelex.copyAsJson",
+      "title": "TOML: Copy as JSON",
+      "enablement": "editorHasSelection"
+    },
+    {
+      "command": "pipelex.copyAsToml", 
+      "title": "TOML: Copy as TOML",
+      "enablement": "editorHasSelection"
+    },
+    {
+      "command": "pipelex.pasteAsJson",
+      "title": "TOML: Paste as JSON"
+    },
+    {
+      "command": "pipelex.pasteAsToml",
+      "title": "TOML: Paste as TOML"
+    }
+  ]
+}

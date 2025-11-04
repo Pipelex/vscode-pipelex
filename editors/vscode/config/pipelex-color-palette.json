@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pipelex Color Palette Configuration",
+  "description": "Centralized color definitions for Pipelex extensions - 2025 Best Practice",
+  "version": "1.0.0",
+  "palettes": {
+    "dark": {
+      "pipe": {
+        "primary": "#FF6666",
+        "secondary": "#FF6B6B",
+        "description": "Primary language constructs and pipe elements"
+      },
+      "concept": {
+        "primary": "#4ECDC4",
+        "native": "#98FB98",
+        "description": "Type definitions and concept names"
+      },
+      "data": {
+        "variable": "#98FB98",
+        "injection": "#FF79C6",
+        "description": "Variables and data injection syntax"
+      },
+      "template": {
+        "punctuation": "#FF79C6",
+        "keyword": "#8BE9FD",
+        "variable": "#50FA7B",
+        "description": "Jinja and templating syntax"
+      },
+      "html": {
+        "tag": "#FFB86C",
+        "attribute": "#F1FA8C",
+        "comment": "#6272A4",
+        "description": "Embedded HTML elements"
+      },
+      "brand": {
+        "primary": "#45bf9f",
+        "accent": "#4ECDC4",
+        "description": "Pipelex brand colors"
+      },
+      "toml": {
+        "string": "#CE9178",
+        "key": "#9CDCFE",
+        "value": "#B5CEA8",
+        "comment": "#6A9955",
+        "section": "#4FC1FF",
+        "array": "#DA70D6",
+        "description": "TOML syntax highlighting colors"
+      }
+    },
+    "light": {
+      "pipe": {
+        "primary": "#CC3333",
+        "secondary": "#CC4444",
+        "description": "Primary language constructs and pipe elements"
+      },
+      "concept": {
+        "primary": "#2B9B92",
+        "native": "#228B22",
+        "description": "Type definitions and concept names"
+      },
+      "data": {
+        "variable": "#228B22",
+        "injection": "#B83DBA",
+        "description": "Variables and data injection syntax"
+      },
+      "template": {
+        "punctuation": "#B83DBA",
+        "keyword": "#0066CC",
+        "variable": "#008000",
+        "description": "Jinja and templating syntax"
+      },
+      "html": {
+        "tag": "#CC6600",
+        "attribute": "#B8860B",
+        "comment": "#708090",
+        "description": "Embedded HTML elements"
+      },
+      "brand": {
+        "primary": "#45bf9f",
+        "accent": "#2B9B92",
+        "description": "Pipelex brand colors"
+      },
+      "toml": {
+        "string": "#A31515",
+        "key": "#0451A5",
+        "value": "#098658",
+        "comment": "#008000",
+        "section": "#0070C1",
+        "array": "#AF00DB",
+        "description": "TOML syntax highlighting colors"
+      }
+    }
+  },
+  "scopeMappings": {
+    "pipe.primary": "support.type.property-name.pipe.plx",
+    "pipe.secondary": [
+      "support.type.pipe-type.plx",
+      "support.function.pipe-name.plx"
+    ],
+    "concept.primary": [
+      "support.type.property-name.concept.plx",
+      "support.type.concept.plx"
+    ],
+    "concept.native": "support.type.concept.native.plx",
+    "data.variable": "variable.name.data.plx",
+    "data.injection": "punctuation.definition.data-injection.plx",
+    "template.punctuation": [
+      "punctuation.definition.template-variable.plx",
+      "punctuation.definition.jinja.plx"
+    ],
+    "template.keyword": "keyword.control.jinja.plx",
+    "template.variable": "variable.other.jinja.plx",
+    "html.tag": "entity.name.tag.html.plx",
+    "html.attribute": "entity.other.attribute-name.html.plx",
+    "html.comment": "comment.block.html.plx"
+  },
+  "tomlScopeMappings": {
+    "toml.string": [
+      "string.quoted.double.toml",
+      "string.quoted.single.toml",
+      "string.quoted.triple.toml"
+    ],
+    "toml.key": [
+      "entity.name.tag.toml",
+      "support.type.property-name.toml"
+    ],
+    "toml.value": [
+      "constant.numeric.toml",
+      "constant.language.boolean.toml"
+    ],
+    "toml.comment": "comment.line.number-sign.toml",
+    "toml.section": [
+      "entity.name.section.group-title.toml",
+      "punctuation.definition.section.toml"
+    ],
+    "toml.array": [
+      "punctuation.definition.array.toml",
+      "meta.array.toml"
+    ]
+  },
+  "fontStyles": {
+    "pipe.primary": "bold",
+    "pipe.secondary": "bold",
+    "concept.primary": "bold",
+    "concept.native": "bold",
+    "data.variable": "bold",
+    "template.punctuation": "bold",
+    "html.comment": "italic"
+  }
+}

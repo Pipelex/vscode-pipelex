@@ -1,0 +1,214 @@
+{
+  "name": "Pipelex Dark",
+  "type": "dark",
+  "semanticHighlighting": true,
+  "colors": {
+    "editor.background": "#1e1e1e",
+    "editor.foreground": "#d4d4d4",
+    "activityBar.background": "#2d2d30",
+    "sideBar.background": "#252526",
+    "statusBar.background": "#45bf9f",
+    "statusBar.foreground": "#ffffff"
+  },
+  "tokenColors": [
+    {
+      "name": "Pipelex Pipe Section Headers",
+      "scope": "support.type.property-name.pipe.plx",
+      "settings": {
+        "foreground": "#FF6666",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Pipelex Pipe Type Identifiers",
+      "scope": "support.type.pipe-type.plx",
+      "settings": {
+        "foreground": "#FF6B6B",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Pipelex Pipe Names",
+      "scope": "support.function.pipe-name.plx",
+      "settings": {
+        "foreground": "#FF6B6B",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Pipelex Concept Section Headers",
+      "scope": "support.type.property-name.concept.plx",
+      "settings": {
+        "foreground": "#4ECDC4",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Pipelex Concept Names",
+      "scope": "support.type.concept.plx",
+      "settings": {
+        "foreground": "#4ECDC4",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Pipelex Native Concepts",
+      "scope": "support.type.concept.native.plx",
+      "settings": {
+        "foreground": "#98FB98",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Pipelex Data Variables",
+      "scope": "variable.name.data.plx",
+      "settings": {
+        "foreground": "#98FB98",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Pipelex Data Injection Punctuation",
+      "scope": "punctuation.definition.data-injection.plx",
+      "settings": {
+        "foreground": "#FF79C6"
+      }
+    },
+    {
+      "name": "Pipelex Template Variable Punctuation",
+      "scope": "punctuation.definition.template-variable.plx",
+      "settings": {
+        "foreground": "#FF79C6",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Pipelex Jinja Punctuation",
+      "scope": "punctuation.definition.jinja.plx",
+      "settings": {
+        "foreground": "#FF79C6",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Pipelex Jinja Control Keywords",
+      "scope": "keyword.control.jinja.plx",
+      "settings": {
+        "foreground": "#8BE9FD"
+      }
+    },
+    {
+      "name": "Pipelex Jinja Variables",
+      "scope": "variable.other.jinja.plx",
+      "settings": {
+        "foreground": "#50FA7B"
+      }
+    },
+    {
+      "name": "Pipelex HTML Tags",
+      "scope": "entity.name.tag.html.plx",
+      "settings": {
+        "foreground": "#FFB86C"
+      }
+    },
+    {
+      "name": "Pipelex HTML Attributes",
+      "scope": "entity.other.attribute-name.html.plx",
+      "settings": {
+        "foreground": "#F1FA8C"
+      }
+    },
+    {
+      "name": "Pipelex HTML Comments",
+      "scope": "comment.block.html.plx",
+      "settings": {
+        "foreground": "#6272A4",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "TOML Strings",
+      "scope": "string.quoted.double.toml",
+      "settings": {
+        "foreground": "#CE9178"
+      }
+    },
+    {
+      "name": "TOML Strings",
+      "scope": "string.quoted.single.toml",
+      "settings": {
+        "foreground": "#CE9178"
+      }
+    },
+    {
+      "name": "TOML Multiline Strings",
+      "scope": "string.quoted.triple.toml",
+      "settings": {
+        "foreground": "#CE9178"
+      }
+    },
+    {
+      "name": "TOML Keys",
+      "scope": "entity.name.tag.toml",
+      "settings": {
+        "foreground": "#9CDCFE"
+      }
+    },
+    {
+      "name": "TOML Property Names",
+      "scope": "support.type.property-name.toml",
+      "settings": {
+        "foreground": "#9CDCFE"
+      }
+    },
+    {
+      "name": "TOML Numbers",
+      "scope": "constant.numeric.toml",
+      "settings": {
+        "foreground": "#B5CEA8"
+      }
+    },
+    {
+      "name": "TOML Booleans",
+      "scope": "constant.language.boolean.toml",
+      "settings": {
+        "foreground": "#B5CEA8"
+      }
+    },
+    {
+      "name": "TOML Comments",
+      "scope": "comment.line.number-sign.toml",
+      "settings": {
+        "foreground": "#6A9955"
+      }
+    },
+    {
+      "name": "TOML Section Headers",
+      "scope": "entity.name.section.group-title.toml",
+      "settings": {
+        "foreground": "#4FC1FF"
+      }
+    },
+    {
+      "name": "TOML Section Brackets",
+      "scope": "punctuation.definition.section.toml",
+      "settings": {
+        "foreground": "#4FC1FF"
+      }
+    },
+    {
+      "name": "TOML Array Brackets",
+      "scope": "punctuation.definition.array.toml",
+      "settings": {
+        "foreground": "#DA70D6"
+      }
+    },
+    {
+      "name": "TOML Arrays",
+      "scope": "meta.array.toml",
+      "settings": {
+        "foreground": "#DA70D6"
+      }
+    }
+  ]
+}

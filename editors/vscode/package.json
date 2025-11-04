@@ -33,9 +33,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onLanguage:cargoLock",
-    "onLanguage:plx"
+    "onStartupFinished"
   ],
   "keywords": [
     "pipelex",
@@ -242,111 +240,20 @@
         }
       }
     ],
-    "configurationDefaults": {
-      "editor.semanticHighlighting.enabled": true,
-      "editor.tokenColorCustomizations": {
-        "textMateRules": [
-          {
-            "scope": "support.type.property-name.pipe.plx",
-            "settings": {
-              "foreground": "#FF6666",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.type.pipe-type.plx",
-            "settings": {
-              "foreground": "#FF6B6B",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.type.property-name.concept.plx",
-            "settings": {
-              "foreground": "#4ECDC4",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.type.concept.plx",
-            "settings": {
-              "foreground": "#4ECDC4",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.type.concept.native.plx",
-            "settings": {
-              "foreground": "#98FB98",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "variable.name.data.plx",
-            "settings": {
-              "foreground": "#98FB98",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.function.pipe-name.plx",
-            "settings": {
-              "foreground": "#FF6B6B",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "punctuation.definition.data-injection.plx",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "punctuation.definition.template-variable.plx",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "punctuation.definition.jinja.plx",
-            "settings": {
-              "foreground": "#FF79C6",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "keyword.control.jinja.plx",
-            "settings": {
-              "foreground": "#8BE9FD"
-            }
-          },
-          {
-            "scope": "variable.other.jinja.plx",
-            "settings": {
-              "foreground": "#50FA7B"
-            }
-          },
-          {
-            "scope": "entity.name.tag.html.plx",
-            "settings": {
-              "foreground": "#FFB86C"
-            }
-          },
-          {
-            "scope": "entity.other.attribute-name.html.plx",
-            "settings": {
-              "foreground": "#F1FA8C"
-            }
-          },
-          {
-            "scope": "comment.block.html.plx",
-            "settings": {
-              "foreground": "#6272A4",
-              "fontStyle": "italic"
-            }
-          }
-        ]
+    "themes": [
+      {
+        "label": "Pipelex Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/pipelex-dark-color-theme.json"
+      },
+      {
+        "label": "Pipelex Light",
+        "uiTheme": "vs",
+        "path": "./themes/pipelex-light-color-theme.json"
       }
+    ],
+    "configurationDefaults": {
+      "editor.semanticHighlighting.enabled": true
     },
     "configuration": {
       "title": "Pipelex",
@@ -594,10 +501,11 @@
     "vscode:prepublish": "yarn build",
     "open-in-browser": "vscode-test-web --extensionDevelopmentPath=. .",
     "build:syntax": "ts-node --project node.tsconfig.json src/syntax/index.ts",
+    "build:themes": "node scripts/generate-from-config.js",
     "build:browser-extension": "rollup -c rollup.config.browser-extension.mjs",
     "build:browser-server": "rollup -c rollup.config.browser-server.mjs",
     "build:node": "rollup -c rollup.config.mjs",
-    "build": "node scripts/build.mjs"
+    "build": "yarn build:themes && node scripts/build.mjs"
   },
   "dependencies": {
     "@pipelex/lsp": "^0.1.34",
