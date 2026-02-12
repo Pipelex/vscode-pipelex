@@ -60,7 +60,7 @@ const refinesEntry = {
 // 4. type = "PipeType" (NEW)
 const typeEntry = {
   name: "meta.entry.type.mthds",
-  match: '\\s*(type)\\s*(=)\\s*(")((?:[A-Za-z][A-Za-z0-9]*))(")',
+  match: '\\s*(type)\\s*(=)\\s*(")(Pipe[A-Z][A-Za-z0-9]*)(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
