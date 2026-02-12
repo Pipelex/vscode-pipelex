@@ -3,20 +3,20 @@
   "injectionSelector": "L:text.html.markdown",
   "patterns": [
     {
-      "include": "#plxFrontmatterCodeblock"
+      "include": "#mthdsFrontmatterCodeblock"
     }
   ],
   "repository": {
-    "plxFrontmatterCodeblock": {
+    "mthdsFrontmatterCodeblock": {
       "begin": "\\A\\+{3}\\s*$",
       "end": "(^|\\G)(?=\\s*[\\+~]{3,}\\s*$)",
-      "contentName": "meta.embedded.block.plx.frontmatter",
+      "contentName": "meta.embedded.block.mthds.frontmatter",
       "patterns": [
         {
-          "include": "source.plx"
+          "include": "source.mthds"
         }
       ]
     }
   },
-  "scopeName": "markdown.plx.frontmatter.codeblock"
+  "scopeName": "markdown.mthds.frontmatter.codeblock"
 }

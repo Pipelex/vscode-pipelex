@@ -1,6 +1,6 @@
 # Pipelex Syntax Color Palette
 
-This document describes the semantic color palette used for syntax highlighting in `.plx` files. Use this as a reference for creating visual representations (e.g., flow-charts) of Pipelex pipeline execution.
+This document describes the semantic color palette used for syntax highlighting in `.mthds` files. Use this as a reference for creating visual representations (e.g., flow-charts) of Pipelex pipeline execution.
 
 ## Primary Element Colors
 

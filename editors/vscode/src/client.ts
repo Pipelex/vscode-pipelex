@@ -159,7 +159,7 @@ async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
   return {
     documentSelector: [
       { scheme: "file", language: "toml" },
-      { scheme: "file", language: "plx" },
+      { scheme: "file", language: "mthds" },
       { scheme: "file", language: "cargoLock" },
     ],
 
@@ -171,10 +171,10 @@ async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
     synchronize: {
       // Synchronize the setting section 'pipelex' to the server
       configurationSection: 'pipelex',
-      // Notify the server about file changes to '.toml' and '.plx' files contained in the workspace
+      // Notify the server about file changes to '.toml' and '.mthds' files contained in the workspace
       fileEvents: [
         vscode.workspace.createFileSystemWatcher('**/*.toml'),
-        vscode.workspace.createFileSystemWatcher('**/*.plx')
+        vscode.workspace.createFileSystemWatcher('**/*.mthds')
       ]
     },
   };

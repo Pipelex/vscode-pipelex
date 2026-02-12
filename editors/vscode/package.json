@@ -1,7 +1,7 @@
 {
   "name": "pipelex",
   "displayName": "Pipelex",
-  "description": "Pipelex Language (PLX) and TOML support",
+  "description": "Pipelex Language (MTHDS) and TOML support",
   "version": "0.2.1",
   "autoTag": {
     "enabled": true
@@ -35,10 +35,11 @@
   "activationEvents": [
     "onStartupFinished",
     "onLanguage:cargoLock",
-    "onLanguage:plx"
+    "onLanguage:mthds"
   ],
   "keywords": [
     "pipelex",
+    "mthds",
     "plx",
     "dsl",
     "toml",
@@ -73,29 +74,29 @@
         }
       },
       {
-        "language": "plx",
-        "scopeName": "source.plx",
-        "path": "./plx.tmLanguage.json",
+        "language": "mthds",
+        "scopeName": "source.mthds",
+        "path": "./mthds.tmLanguage.json",
         "embeddedLanguages": {
-          "meta.tag.html.plx": "html",
-          "comment.block.html.plx": "html"
+          "meta.tag.html.mthds": "html",
+          "comment.block.html.mthds": "html"
         }
       },
       {
-        "scopeName": "markdown.plx.frontmatter.codeblock",
-        "path": "./plx.frontmatter.tmLanguage.json",
+        "scopeName": "markdown.mthds.frontmatter.codeblock",
+        "path": "./mthds.frontmatter.tmLanguage.json",
         "injectTo": [
           "text.html.markdown"
         ]
       },
       {
-        "scopeName": "markdown.plx.codeblock",
-        "path": "./plx.markdown.tmLanguage.json",
+        "scopeName": "markdown.mthds.codeblock",
+        "path": "./mthds.markdown.tmLanguage.json",
         "injectTo": [
           "text.html.markdown"
         ],
         "embeddedLanguages": {
-          "meta.embedded.block.plx": "plx"
+          "meta.embedded.block.mthds": "mthds"
         }
       }
     ],
@@ -115,13 +116,14 @@
         "configuration": "./language-configuration.json"
       },
       {
-        "id": "plx",
+        "id": "mthds",
         "aliases": [
-          "PLX",
-          "Pipelex Language"
+          "MTHDS",
+          "Pipelex Language",
+          "PLX"
         ],
         "extensions": [
-          ".plx"
+          ".mthds"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -182,32 +184,32 @@
         "description": "Keys of inline tables."
       },
       {
-        "id": "plxConcept",
+        "id": "mthdsConcept",
         "superType": "type",
         "description": "Pipelex concept names"
       },
       {
-        "id": "plxPipeType",
+        "id": "mthdsPipeType",
         "superType": "type",
         "description": "Pipelex pipe type identifiers"
       },
       {
-        "id": "plxDataVariable",
+        "id": "mthdsDataVariable",
         "superType": "variable",
         "description": "Pipelex data variables"
       },
       {
-        "id": "plxPipeName",
+        "id": "mthdsPipeName",
         "superType": "function",
         "description": "Pipelex pipe names"
       },
       {
-        "id": "plxPipeSection",
+        "id": "mthdsPipeSection",
         "superType": "keyword",
         "description": "Pipelex pipe section headers"
       },
       {
-        "id": "plxConceptSection",
+        "id": "mthdsConceptSection",
         "superType": "keyword",
         "description": "Pipelex concept section headers"
       }
@@ -221,23 +223,23 @@
           "tomlTableKey": [
             "support.type.property-name.table.toml"
           ],
-          "plxConcept": [
-            "support.type.concept.plx"
+          "mthdsConcept": [
+            "support.type.concept.mthds"
           ],
-          "plxPipeType": [
-            "support.type.pipe-type.plx"
+          "mthdsPipeType": [
+            "support.type.pipe-type.mthds"
           ],
-          "plxDataVariable": [
-            "variable.name.data.plx"
+          "mthdsDataVariable": [
+            "variable.name.data.mthds"
           ],
-          "plxPipeName": [
-            "support.function.pipe-name.plx"
+          "mthdsPipeName": [
+            "support.function.pipe-name.mthds"
           ],
-          "plxPipeSection": [
-            "support.type.property-name.pipe.plx"
+          "mthdsPipeSection": [
+            "support.type.property-name.pipe.mthds"
           ],
-          "plxConceptSection": [
-            "support.type.property-name.concept.plx"
+          "mthdsConceptSection": [
+            "support.type.property-name.concept.mthds"
           ]
         }
       }
@@ -247,99 +249,99 @@
       "editor.tokenColorCustomizations": {
         "textMateRules": [
           {
-            "scope": "support.type.property-name.pipe.plx",
+            "scope": "support.type.property-name.pipe.mthds",
             "settings": {
               "foreground": "#FF6666",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.pipe-type.plx",
+            "scope": "support.type.pipe-type.mthds",
             "settings": {
               "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.property-name.concept.plx",
+            "scope": "support.type.property-name.concept.mthds",
             "settings": {
               "foreground": "#4ECDC4",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.concept.plx",
+            "scope": "support.type.concept.mthds",
             "settings": {
               "foreground": "#4ECDC4",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.concept.native.plx",
+            "scope": "support.type.concept.native.mthds",
             "settings": {
               "foreground": "#98FB98",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "variable.name.data.plx",
+            "scope": "variable.name.data.mthds",
             "settings": {
               "foreground": "#98FB98",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.function.pipe-name.plx",
+            "scope": "support.function.pipe-name.mthds",
             "settings": {
               "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "punctuation.definition.data-injection.plx",
+            "scope": "punctuation.definition.data-injection.mthds",
             "settings": {
               "foreground": "#FF79C6"
             }
           },
           {
-            "scope": "punctuation.definition.template-variable.plx",
+            "scope": "punctuation.definition.template-variable.mthds",
             "settings": {
               "foreground": "#FF79C6"
             }
           },
           {
-            "scope": "punctuation.definition.jinja.plx",
+            "scope": "punctuation.definition.jinja.mthds",
             "settings": {
               "foreground": "#FF79C6",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "keyword.control.jinja.plx",
+            "scope": "keyword.control.jinja.mthds",
             "settings": {
               "foreground": "#8BE9FD"
             }
           },
           {
-            "scope": "variable.other.jinja.plx",
+            "scope": "variable.other.jinja.mthds",
             "settings": {
               "foreground": "#50FA7B"
             }
           },
           {
-            "scope": "entity.name.tag.html.plx",
+            "scope": "entity.name.tag.html.mthds",
             "settings": {
               "foreground": "#FFB86C"
             }
           },
           {
-            "scope": "entity.other.attribute-name.html.plx",
+            "scope": "entity.other.attribute-name.html.mthds",
             "settings": {
               "foreground": "#F1FA8C"
             }
           },
           {
-            "scope": "comment.block.html.plx",
+            "scope": "comment.block.html.mthds",
             "settings": {
               "foreground": "#6272A4",
               "fontStyle": "italic"

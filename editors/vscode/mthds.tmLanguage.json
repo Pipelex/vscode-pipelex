@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "scopeName": "source.plx",
+  "scopeName": "source.mthds",
   "uuid": "8b4e5008-c50d-11ea-a91b-54ee75aeeb97",
   "information_for_contributors": [
     "Originally was maintained by aster (galaster@foxmail.com). This notice is only kept here for the record, please don't send e-mails about bugs and other issues."
@@ -47,10 +47,10 @@
     "comment": {
       "captures": {
         "1": {
-          "name": "comment.line.number-sign.plx"
+          "name": "comment.line.number-sign.mthds"
         },
         "2": {
-          "name": "punctuation.definition.comment.plx"
+          "name": "punctuation.definition.comment.mthds"
         }
       },
       "comment": "Comments",
@@ -59,10 +59,10 @@
     "commentDirective": {
       "captures": {
         "1": {
-          "name": "meta.preprocessor.plx"
+          "name": "meta.preprocessor.mthds"
         },
         "2": {
-          "name": "punctuation.definition.meta.preprocessor.plx"
+          "name": "punctuation.definition.meta.preprocessor.mthds"
         }
       },
       "comment": "Comments",
@@ -71,121 +71,121 @@
     "table": {
       "patterns": [
         {
-          "name": "meta.table.concept.plx",
+          "name": "meta.table.concept.mthds",
           "match": "^\\s*(\\[)\\s*(concept(?:\\.(?:[A-Za-z][A-Za-z0-9]*|\"[^\"]+\"|'[^']+'))?)\\s*(\\])",
           "captures": {
             "1": {
-              "name": "punctuation.definition.table.plx"
+              "name": "punctuation.definition.table.mthds"
             },
             "2": {
               "patterns": [
                 {
                   "match": "concept",
-                  "name": "support.type.property-name.concept.plx"
+                  "name": "support.type.property-name.concept.mthds"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.plx"
+                  "name": "punctuation.separator.dot.mthds"
                 },
                 {
                   "match": "(?:[A-Za-z][A-Za-z0-9]*)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.concept.plx"
+                  "name": "support.type.property-name.concept.mthds"
                 }
               ]
             },
             "3": {
-              "name": "punctuation.definition.table.plx"
+              "name": "punctuation.definition.table.mthds"
             }
           }
         },
         {
-          "name": "meta.table.pipe.plx",
+          "name": "meta.table.pipe.mthds",
           "match": "^\\s*(\\[)\\s*(pipe(?:\\.(?:[A-Za-z0-9_+-]+|\"[^\"]+\"|'[^']+'))?)\\s*(\\])",
           "captures": {
             "1": {
-              "name": "punctuation.definition.table.plx"
+              "name": "punctuation.definition.table.mthds"
             },
             "2": {
               "patterns": [
                 {
                   "match": "pipe",
-                  "name": "support.type.property-name.pipe.plx"
+                  "name": "support.type.property-name.pipe.mthds"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.plx"
+                  "name": "punctuation.separator.dot.mthds"
                 },
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.pipe.plx"
+                  "name": "support.type.property-name.pipe.mthds"
                 }
               ]
             },
             "3": {
-              "name": "punctuation.definition.table.plx"
+              "name": "punctuation.definition.table.mthds"
             }
           }
         },
         {
-          "name": "meta.table.plx",
+          "name": "meta.table.mthds",
           "match": "^\\s*(\\[)\\s*((?:(?:(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+'))\\s*\\.?\\s*)+)\\s*(\\])",
           "captures": {
             "1": {
-              "name": "punctuation.definition.table.plx"
+              "name": "punctuation.definition.table.mthds"
             },
             "2": {
               "patterns": [
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.table.plx"
+                  "name": "support.type.property-name.table.mthds"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.plx"
+                  "name": "punctuation.separator.dot.mthds"
                 }
               ]
             },
             "3": {
-              "name": "punctuation.definition.table.plx"
+              "name": "punctuation.definition.table.mthds"
             }
           }
         },
         {
-          "name": "meta.array.table.plx",
+          "name": "meta.array.table.mthds",
           "match": "^\\s*(\\[\\[)\\s*((?:(?:(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+'))\\s*\\.?\\s*)+)\\s*(\\]\\])",
           "captures": {
             "1": {
-              "name": "punctuation.definition.array.table.plx"
+              "name": "punctuation.definition.array.table.mthds"
             },
             "2": {
               "patterns": [
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.array.plx"
+                  "name": "support.type.property-name.array.mthds"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.plx"
+                  "name": "punctuation.separator.dot.mthds"
                 }
               ]
             },
             "3": {
-              "name": "punctuation.definition.array.table.plx"
+              "name": "punctuation.definition.array.table.mthds"
             }
           }
         },
         {
           "begin": "(\\{)",
           "end": "(\\})",
-          "name": "meta.table.inline.plx",
+          "name": "meta.table.inline.mthds",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.table.inline.plx"
+              "name": "punctuation.definition.table.inline.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.table.inline.plx"
+              "name": "punctuation.definition.table.inline.mthds"
             }
           },
           "patterns": [
@@ -194,7 +194,7 @@
             },
             {
               "match": ",",
-              "name": "punctuation.separator.table.inline.plx"
+              "name": "punctuation.separator.table.inline.mthds"
             },
             {
               "include": "#entryBegin"
@@ -209,93 +209,93 @@
     "entryBegin": {
       "patterns": [
         {
-          "name": "meta.entry.pipe.plx",
+          "name": "meta.entry.pipe.mthds",
           "match": "^\\s*(pipe(?:\\.(?:[A-Za-z0-9_+-]+|\"[^\"]+\"|'[^']+'))?)\\s*(=)",
           "captures": {
             "1": {
               "patterns": [
                 {
                   "match": "pipe",
-                  "name": "support.type.property-name.pipe.plx"
+                  "name": "support.type.property-name.pipe.mthds"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.plx"
+                  "name": "punctuation.separator.dot.mthds"
                 },
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.pipe.plx"
+                  "name": "support.type.property-name.pipe.mthds"
                 }
               ]
             },
             "2": {
-              "name": "punctuation.eq.plx"
+              "name": "punctuation.eq.mthds"
             }
           }
         },
         {
-          "name": "meta.entry.output-type.plx",
+          "name": "meta.entry.output-type.mthds",
           "match": "\\s*(output)\\s*(=)\\s*(\")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(\")",
           "captures": {
             "1": {
-              "name": "support.type.property-name.plx"
+              "name": "support.type.property-name.mthds"
             },
             "2": {
-              "name": "punctuation.eq.plx"
+              "name": "punctuation.eq.mthds"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.plx"
+              "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "support.type.concept.plx"
+              "name": "support.type.concept.mthds"
             },
             "5": {
-              "name": "punctuation.definition.string.end.plx"
+              "name": "punctuation.definition.string.end.mthds"
             }
           }
         },
         {
-          "name": "meta.entry.refines-type.plx",
+          "name": "meta.entry.refines-type.mthds",
           "match": "\\s*(refines)\\s*(=)\\s*(\")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(\")",
           "captures": {
             "1": {
-              "name": "support.type.property-name.plx"
+              "name": "support.type.property-name.mthds"
             },
             "2": {
-              "name": "punctuation.eq.plx"
+              "name": "punctuation.eq.mthds"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.plx"
+              "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "support.type.concept.plx"
+              "name": "support.type.concept.mthds"
             },
             "5": {
-              "name": "punctuation.definition.string.end.plx"
+              "name": "punctuation.definition.string.end.mthds"
             }
           }
         },
         {
-          "name": "meta.entry.jinja2-template.plx",
+          "name": "meta.entry.jinja2-template.mthds",
           "begin": "\\s*(jinja2)\\s*(=)\\s*(\"\"\")",
           "end": "(\"\"\")",
           "beginCaptures": {
             "1": {
-              "name": "support.type.property-name.plx"
+              "name": "support.type.property-name.mthds"
             },
             "2": {
-              "name": "punctuation.eq.plx"
+              "name": "punctuation.eq.mthds"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.plx"
+              "name": "punctuation.definition.string.begin.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.string.end.plx"
+              "name": "punctuation.definition.string.end.mthds"
             }
           },
-          "contentName": "string.quoted.triple.basic.block.jinja2.plx",
+          "contentName": "string.quoted.triple.basic.block.jinja2.mthds",
           "patterns": [
             {
               "include": "#jinjaTemplateContent"
@@ -315,26 +315,26 @@
           ]
         },
         {
-          "name": "meta.entry.prompt-template.plx",
+          "name": "meta.entry.prompt-template.mthds",
           "begin": "\\s*(prompt_template)\\s*(=)\\s*(\"\"\")",
           "end": "(\"\"\")",
           "beginCaptures": {
             "1": {
-              "name": "support.type.property-name.plx"
+              "name": "support.type.property-name.mthds"
             },
             "2": {
-              "name": "punctuation.eq.plx"
+              "name": "punctuation.eq.mthds"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.plx"
+              "name": "punctuation.definition.string.begin.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.string.end.plx"
+              "name": "punctuation.definition.string.end.mthds"
             }
           },
-          "contentName": "string.quoted.triple.basic.block.prompt.plx",
+          "contentName": "string.quoted.triple.basic.block.prompt.mthds",
           "patterns": [
             {
               "include": "#jinjaTemplateContent"
@@ -351,26 +351,26 @@
           ]
         },
         {
-          "name": "meta.entry.jinja2-template-line.plx",
+          "name": "meta.entry.jinja2-template-line.mthds",
           "begin": "\\s*(jinja2)\\s*(=)\\s*(\")",
           "end": "(\")",
           "beginCaptures": {
             "1": {
-              "name": "support.type.property-name.plx"
+              "name": "support.type.property-name.mthds"
             },
             "2": {
-              "name": "punctuation.eq.plx"
+              "name": "punctuation.eq.mthds"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.plx"
+              "name": "punctuation.definition.string.begin.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.string.end.plx"
+              "name": "punctuation.definition.string.end.mthds"
             }
           },
-          "contentName": "string.quoted.single.basic.line.jinja2.plx",
+          "contentName": "string.quoted.single.basic.line.jinja2.mthds",
           "patterns": [
             {
               "include": "#jinjaTemplateContent"
@@ -390,26 +390,26 @@
           ]
         },
         {
-          "name": "meta.entry.prompt-template-line.plx",
+          "name": "meta.entry.prompt-template-line.mthds",
           "begin": "\\s*(prompt_template)\\s*(=)\\s*(\")",
           "end": "(\")",
           "beginCaptures": {
             "1": {
-              "name": "support.type.property-name.plx"
+              "name": "support.type.property-name.mthds"
             },
             "2": {
-              "name": "punctuation.eq.plx"
+              "name": "punctuation.eq.mthds"
             },
             "3": {
-              "name": "punctuation.definition.string.begin.plx"
+              "name": "punctuation.definition.string.begin.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.string.end.plx"
+              "name": "punctuation.definition.string.end.mthds"
             }
           },
-          "contentName": "string.quoted.single.basic.line.prompt.plx",
+          "contentName": "string.quoted.single.basic.line.prompt.mthds",
           "patterns": [
             {
               "include": "#jinjaTemplateContent"
@@ -426,23 +426,23 @@
           ]
         },
         {
-          "name": "meta.entry.plx",
+          "name": "meta.entry.mthds",
           "match": "\\s*((?:(?:(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+'))\\s*\\.?\\s*)+)\\s*(=)",
           "captures": {
             "1": {
               "patterns": [
                 {
                   "match": "(?:[A-Za-z0-9_+-]+)|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.plx"
+                  "name": "support.type.property-name.mthds"
                 },
                 {
                   "match": "\\.",
-                  "name": "punctuation.separator.dot.plx"
+                  "name": "punctuation.separator.dot.mthds"
                 }
               ]
             },
             "2": {
-              "name": "punctuation.eq.plx"
+              "name": "punctuation.eq.mthds"
             }
           }
         }
@@ -454,10 +454,10 @@
           "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
           "captures": {
             "1": {
-              "name": "punctuation.definition.data-injection.plx"
+              "name": "punctuation.definition.data-injection.mthds"
             },
             "2": {
-              "name": "variable.name.data.plx"
+              "name": "variable.name.data.mthds"
             }
           }
         },
@@ -465,33 +465,33 @@
           "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
           "captures": {
             "1": {
-              "name": "punctuation.definition.template-variable.plx"
+              "name": "punctuation.definition.template-variable.mthds"
             },
             "2": {
-              "name": "variable.name.data.plx"
+              "name": "variable.name.data.mthds"
             }
           }
         },
         {
           "match": "(\\{\\{|\\}\\}|\\{%|%\\})",
-          "name": "punctuation.definition.jinja.plx"
+          "name": "punctuation.definition.jinja.mthds"
         },
         {
           "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
-          "name": "keyword.control.jinja.plx"
+          "name": "keyword.control.jinja.mthds"
         },
         {
           "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
-          "name": "variable.other.jinja.plx"
+          "name": "variable.other.jinja.mthds"
         },
         {
           "match": "(</?)(\\w+)([^>]*)(>)",
           "captures": {
             "1": {
-              "name": "punctuation.definition.tag.html.plx"
+              "name": "punctuation.definition.tag.html.mthds"
             },
             "2": {
-              "name": "entity.name.tag.html.plx"
+              "name": "entity.name.tag.html.mthds"
             },
             "3": {
               "patterns": [
@@ -499,20 +499,20 @@
                   "match": "(\\w+)(=)(\"[^\"]*\"|'[^']*')",
                   "captures": {
                     "1": {
-                      "name": "entity.other.attribute-name.html.plx"
+                      "name": "entity.other.attribute-name.html.mthds"
                     },
                     "2": {
-                      "name": "punctuation.separator.key-value.html.plx"
+                      "name": "punctuation.separator.key-value.html.mthds"
                     },
                     "3": {
-                      "name": "string.quoted.html.plx"
+                      "name": "string.quoted.html.mthds"
                     }
                   }
                 }
               ]
             },
             "4": {
-              "name": "punctuation.definition.tag.html.plx"
+              "name": "punctuation.definition.tag.html.mthds"
             }
           }
         },
@@ -520,18 +520,18 @@
           "match": "(<!--)(.*?)(-->)",
           "captures": {
             "1": {
-              "name": "punctuation.definition.comment.html.plx"
+              "name": "punctuation.definition.comment.html.mthds"
             },
             "2": {
-              "name": "comment.block.html.plx"
+              "name": "comment.block.html.mthds"
             },
             "3": {
-              "name": "punctuation.definition.comment.html.plx"
+              "name": "punctuation.definition.comment.html.mthds"
             }
           }
         },
         {
-          "name": "string.quoted.triple.basic.block.plx",
+          "name": "string.quoted.triple.basic.block.mthds",
           "begin": "\"\"\"",
           "end": "\"\"\"",
           "patterns": [
@@ -553,7 +553,7 @@
           ]
         },
         {
-          "name": "string.quoted.single.basic.line.plx",
+          "name": "string.quoted.single.basic.line.mthds",
           "begin": "\"",
           "end": "\"",
           "patterns": [
@@ -575,19 +575,19 @@
           ]
         },
         {
-          "name": "string.quoted.triple.literal.block.plx",
+          "name": "string.quoted.triple.literal.block.mthds",
           "begin": "'''",
           "end": "'''"
         },
         {
-          "name": "string.quoted.single.literal.line.plx",
+          "name": "string.quoted.single.literal.line.mthds",
           "begin": "'",
           "end": "'"
         },
         {
           "captures": {
             "1": {
-              "name": "constant.other.time.datetime.offset.plx"
+              "name": "constant.other.time.datetime.offset.mthds"
             }
           },
           "match": "(?<!\\w)(\\d{4}\\-\\d{2}\\-\\d{2}[T| ]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[\\+\\-]\\d{2}:\\d{2}))(?!\\w)"
@@ -595,24 +595,24 @@
         {
           "captures": {
             "1": {
-              "name": "constant.other.time.datetime.local.plx"
+              "name": "constant.other.time.datetime.local.mthds"
             }
           },
           "match": "(\\d{4}\\-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?)"
         },
         {
-          "name": "constant.other.time.date.plx",
+          "name": "constant.other.time.date.mthds",
           "match": "\\d{4}\\-\\d{2}\\-\\d{2}"
         },
         {
-          "name": "constant.other.time.time.plx",
+          "name": "constant.other.time.time.mthds",
           "match": "\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?"
         },
         {
           "match": "(?<!\\w)(true|false)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.language.boolean.plx"
+              "name": "constant.language.boolean.mthds"
             }
           }
         },
@@ -620,7 +620,7 @@
           "match": "(?<!\\w)([\\+\\-]?(0|([1-9](([0-9]|_[0-9])+)?))(?:(?:\\.([0-9]+))?[eE][\\+\\-]?[1-9]_?[0-9]*|(?:\\.[0-9_]*)))(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.float.plx"
+              "name": "constant.numeric.float.mthds"
             }
           }
         },
@@ -628,7 +628,7 @@
           "match": "(?<!\\w)((?:[\\+\\-]?(0|([1-9](([0-9]|_[0-9])+)?))))(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.integer.plx"
+              "name": "constant.numeric.integer.mthds"
             }
           }
         },
@@ -636,7 +636,7 @@
           "match": "(?<!\\w)([\\+\\-]?inf)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.inf.plx"
+              "name": "constant.numeric.inf.mthds"
             }
           }
         },
@@ -644,7 +644,7 @@
           "match": "(?<!\\w)([\\+\\-]?nan)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.nan.plx"
+              "name": "constant.numeric.nan.mthds"
             }
           }
         },
@@ -652,7 +652,7 @@
           "match": "(?<!\\w)((?:0x(([0-9a-fA-F](([0-9a-fA-F]|_[0-9a-fA-F])+)?))))(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.hex.plx"
+              "name": "constant.numeric.hex.mthds"
             }
           }
         },
@@ -660,7 +660,7 @@
           "match": "(?<!\\w)(0o[0-7](_?[0-7])*)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.oct.plx"
+              "name": "constant.numeric.oct.mthds"
             }
           }
         },
@@ -668,28 +668,28 @@
           "match": "(?<!\\w)(0b[01](_?[01])*)(?!\\w)",
           "captures": {
             "1": {
-              "name": "constant.numeric.bin.plx"
+              "name": "constant.numeric.bin.mthds"
             }
           }
         },
         {
-          "name": "meta.array.plx",
+          "name": "meta.array.mthds",
           "begin": "(?<!\\w)(\\[)\\s*",
           "end": "\\s*(\\])(?!\\w)",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.array.plx"
+              "name": "punctuation.definition.array.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.array.plx"
+              "name": "punctuation.definition.array.mthds"
             }
           },
           "patterns": [
             {
               "match": ",",
-              "name": "punctuation.separator.array.plx"
+              "name": "punctuation.separator.array.mthds"
             },
             {
               "include": "#comment"
@@ -702,15 +702,15 @@
         {
           "begin": "(\\{)",
           "end": "(\\})",
-          "name": "meta.table.inline.plx",
+          "name": "meta.table.inline.mthds",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.table.inline.plx"
+              "name": "punctuation.definition.table.inline.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.table.inline.plx"
+              "name": "punctuation.definition.table.inline.mthds"
             }
           },
           "patterns": [
@@ -719,7 +719,7 @@
             },
             {
               "match": ",",
-              "name": "punctuation.separator.table.inline.plx"
+              "name": "punctuation.separator.table.inline.mthds"
             },
             {
               "include": "#entryBegin"
@@ -735,10 +735,10 @@
       "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.data-injection.plx"
+          "name": "punctuation.definition.data-injection.mthds"
         },
         "2": {
-          "name": "variable.name.data.plx"
+          "name": "variable.name.data.mthds"
         }
       }
     },
@@ -746,33 +746,33 @@
       "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.template-variable.plx"
+          "name": "punctuation.definition.template-variable.mthds"
         },
         "2": {
-          "name": "variable.name.data.plx"
+          "name": "variable.name.data.mthds"
         }
       }
     },
     "jinjaDelimiters": {
       "match": "(\\{\\{|\\}\\}|\\{%|%\\})",
-      "name": "punctuation.definition.jinja.plx"
+      "name": "punctuation.definition.jinja.mthds"
     },
     "jinjaKeywords": {
       "match": "\\b(if|endif|else|elif|for|endfor|set|block|endblock|macro|endmacro|call|endcall|filter|endfilter|with|endwith|autoescape|endautoescape|raw|endraw)\\b",
-      "name": "keyword.control.jinja.plx"
+      "name": "keyword.control.jinja.mthds"
     },
     "jinjaVariable": {
       "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)*)\\b",
-      "name": "variable.other.jinja.plx"
+      "name": "variable.other.jinja.mthds"
     },
     "htmlTag": {
       "match": "(</?)(\\w+)([^>]*)(>)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.tag.html.plx"
+          "name": "punctuation.definition.tag.html.mthds"
         },
         "2": {
-          "name": "entity.name.tag.html.plx"
+          "name": "entity.name.tag.html.mthds"
         },
         "3": {
           "patterns": [
@@ -780,20 +780,20 @@
               "match": "(\\w+)(=)(\"[^\"]*\"|'[^']*')",
               "captures": {
                 "1": {
-                  "name": "entity.other.attribute-name.html.plx"
+                  "name": "entity.other.attribute-name.html.mthds"
                 },
                 "2": {
-                  "name": "punctuation.separator.key-value.html.plx"
+                  "name": "punctuation.separator.key-value.html.mthds"
                 },
                 "3": {
-                  "name": "string.quoted.html.plx"
+                  "name": "string.quoted.html.mthds"
                 }
               }
             }
           ]
         },
         "4": {
-          "name": "punctuation.definition.tag.html.plx"
+          "name": "punctuation.definition.tag.html.mthds"
         }
       }
     },
@@ -801,30 +801,30 @@
       "match": "(<!--)(.*?)(-->)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.comment.html.plx"
+          "name": "punctuation.definition.comment.html.mthds"
         },
         "2": {
-          "name": "comment.block.html.plx"
+          "name": "comment.block.html.mthds"
         },
         "3": {
-          "name": "punctuation.definition.comment.html.plx"
+          "name": "punctuation.definition.comment.html.mthds"
         }
       }
     },
     "jinjaTemplateContent": {
       "patterns": [
         {
-          "name": "meta.embedded.block.jinja.plx",
+          "name": "meta.embedded.block.jinja.mthds",
           "begin": "(\\{%)",
           "end": "(%\\})",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.jinja.plx"
+              "name": "punctuation.definition.jinja.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.jinja.plx"
+              "name": "punctuation.definition.jinja.mthds"
             }
           },
           "patterns": [
@@ -834,17 +834,17 @@
           ]
         },
         {
-          "name": "meta.embedded.expression.jinja.plx",
+          "name": "meta.embedded.expression.jinja.mthds",
           "begin": "(\\{\\{)",
           "end": "(\\}\\})",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.jinja.plx"
+              "name": "punctuation.definition.jinja.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.jinja.plx"
+              "name": "punctuation.definition.jinja.mthds"
             }
           },
           "patterns": [
@@ -854,17 +854,17 @@
           ]
         },
         {
-          "name": "comment.block.jinja.plx",
+          "name": "comment.block.jinja.mthds",
           "begin": "(\\{#)",
           "end": "(#\\})",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.comment.begin.jinja.plx"
+              "name": "punctuation.definition.comment.begin.jinja.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.comment.end.jinja.plx"
+              "name": "punctuation.definition.comment.end.jinja.mthds"
             }
           }
         }
@@ -874,27 +874,27 @@
       "patterns": [
         {
           "match": "\\b(if|elif|else|endif|for|endfor|set|with|endwith|block|endblock|macro|endmacro|call|endcall|filter|endfilter|autoescape|endautoescape|raw|endraw|extends|include|import|from)\\b",
-          "name": "keyword.control.jinja.plx"
+          "name": "keyword.control.jinja.mthds"
         },
         {
           "match": "\\b(and|or|not|in|is|true|false|none)\\b",
-          "name": "keyword.operator.jinja.plx"
+          "name": "keyword.operator.jinja.mthds"
         },
         {
           "match": "\\b(selectattr|rejectattr|map|select|reject|join|list|sort|reverse|length|first|last|random|min|max|sum|abs|round|int|float|string)\\b",
-          "name": "support.function.jinja.plx"
+          "name": "support.function.jinja.mthds"
         },
         {
           "match": "[a-zA-Z_][a-zA-Z0-9_]*",
-          "name": "variable.other.jinja.plx"
+          "name": "variable.other.jinja.mthds"
         },
         {
           "match": "\\.",
-          "name": "punctuation.accessor.jinja.plx"
+          "name": "punctuation.accessor.jinja.mthds"
         },
         {
           "match": "\\|",
-          "name": "punctuation.separator.filter.jinja.plx"
+          "name": "punctuation.separator.filter.jinja.mthds"
         }
       ]
     },
@@ -902,55 +902,55 @@
       "patterns": [
         {
           "match": "\\b(and|or|not|in|is|true|false|none)\\b",
-          "name": "keyword.operator.jinja.plx"
+          "name": "keyword.operator.jinja.mthds"
         },
         {
           "match": "\\b(selectattr|rejectattr|map|select|reject|join|list|sort|reverse|length|first|last|random|min|max|sum|abs|round|int|float|string|equalto)\\b",
-          "name": "support.function.jinja.plx"
+          "name": "support.function.jinja.mthds"
         },
         {
           "match": "[a-zA-Z_][a-zA-Z0-9_]*",
-          "name": "variable.other.jinja.plx"
+          "name": "variable.other.jinja.mthds"
         },
         {
           "match": "\\.",
-          "name": "punctuation.accessor.jinja.plx"
+          "name": "punctuation.accessor.jinja.mthds"
         },
         {
           "match": "\\|",
-          "name": "punctuation.separator.filter.jinja.plx"
+          "name": "punctuation.separator.filter.jinja.mthds"
         },
         {
           "match": "\"[^\"]*\"",
-          "name": "string.quoted.double.jinja.plx"
+          "name": "string.quoted.double.jinja.mthds"
         },
         {
           "match": "'[^']*'",
-          "name": "string.quoted.single.jinja.plx"
+          "name": "string.quoted.single.jinja.mthds"
         },
         {
           "match": "\\d+",
-          "name": "constant.numeric.jinja.plx"
+          "name": "constant.numeric.jinja.mthds"
         }
       ]
     },
     "htmlContent": {
       "patterns": [
         {
-          "name": "meta.tag.html.plx",
+          "name": "meta.tag.html.mthds",
           "begin": "(<)([a-zA-Z][a-zA-Z0-9]*)",
           "end": "(>)",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.tag.begin.html.plx"
+              "name": "punctuation.definition.tag.begin.html.mthds"
             },
             "2": {
-              "name": "entity.name.tag.html.plx"
+              "name": "entity.name.tag.html.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.tag.end.html.plx"
+              "name": "punctuation.definition.tag.end.html.mthds"
             }
           },
           "patterns": [
@@ -960,35 +960,35 @@
           ]
         },
         {
-          "name": "meta.tag.html.plx",
+          "name": "meta.tag.html.mthds",
           "begin": "(</)([a-zA-Z][a-zA-Z0-9]*)",
           "end": "(>)",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.tag.begin.html.plx"
+              "name": "punctuation.definition.tag.begin.html.mthds"
             },
             "2": {
-              "name": "entity.name.tag.html.plx"
+              "name": "entity.name.tag.html.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.tag.end.html.plx"
+              "name": "punctuation.definition.tag.end.html.mthds"
             }
           }
         },
         {
-          "name": "comment.block.html.plx",
+          "name": "comment.block.html.mthds",
           "begin": "(<!--)",
           "end": "(-->)",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.comment.begin.html.plx"
+              "name": "punctuation.definition.comment.begin.html.mthds"
             }
           },
           "endCaptures": {
             "1": {
-              "name": "punctuation.definition.comment.end.html.plx"
+              "name": "punctuation.definition.comment.end.html.mthds"
             }
           }
         }
@@ -1000,19 +1000,19 @@
           "match": "([a-zA-Z-]+)(=)(\"[^\"]*\"|'[^']*')",
           "captures": {
             "1": {
-              "name": "entity.other.attribute-name.html.plx"
+              "name": "entity.other.attribute-name.html.mthds"
             },
             "2": {
-              "name": "punctuation.separator.key-value.html.plx"
+              "name": "punctuation.separator.key-value.html.mthds"
             },
             "3": {
-              "name": "string.quoted.html.plx"
+              "name": "string.quoted.html.mthds"
             }
           }
         },
         {
           "match": "[a-zA-Z-]+",
-          "name": "entity.other.attribute-name.html.plx"
+          "name": "entity.other.attribute-name.html.mthds"
         }
       ]
     },
@@ -1020,11 +1020,11 @@
       "patterns": [
         {
           "match": "\\\\([btnfr\"\\\\\\n/ ]|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})",
-          "name": "constant.character.escape.plx"
+          "name": "constant.character.escape.mthds"
         },
         {
           "match": "\\\\[^btnfr/\"\\\\\\n]",
-          "name": "invalid.illegal.escape.plx"
+          "name": "invalid.illegal.escape.mthds"
         }
       ]
     },
@@ -1032,10 +1032,10 @@
       "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.data-injection.plx"
+          "name": "punctuation.definition.data-injection.mthds"
         },
         "2": {
-          "name": "variable.name.data.plx"
+          "name": "variable.name.data.mthds"
         }
       }
     },
@@ -1043,10 +1043,10 @@
       "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.template-variable.plx"
+          "name": "punctuation.definition.template-variable.mthds"
         },
         "2": {
-          "name": "variable.name.data.plx"
+          "name": "variable.name.data.mthds"
         }
       }
     }

@@ -1,16 +1,16 @@
-# Pipelex PLX Support
+# Pipelex MTHDS Support
 
-This fork of the Even Better TOML extension adds support for PLX (Pipelex Language) files alongside the existing TOML support.
+This fork of the Even Better TOML extension adds support for MTHDS (Pipelex Language) files alongside the existing TOML support.
 
 ## Features Added
 
-### PLX Language Support
-- **File Extension**: `.plx` files are recognized and highlighted
-- **Language ID**: `plx` 
-- **Aliases**: "PLX", "Pipelex Language"
+### MTHDS Language Support
+- **File Extension**: `.mthds` files are recognized and highlighted
+- **Language ID**: `mthds`
+- **Aliases**: "MTHDS", "Pipelex Language", "PLX"
 
-### PLX-Specific Syntax Highlighting
-The extension provides enhanced syntax highlighting for PLX-specific constructs:
+### MTHDS-Specific Syntax Highlighting
+The extension provides enhanced syntax highlighting for MTHDS-specific constructs:
 
 - **Concepts**: `[concept.Name]` sections and concept types
 - **Pipes**: `[pipe.name]` sections and pipe types (PipeLLM, PipeSequence, etc.)
@@ -22,37 +22,37 @@ The extension provides enhanced syntax highlighting for PLX-specific constructs:
 ### Semantic Tokens
 Custom semantic token providers for context-aware highlighting:
 
-- `plxConcept`: PascalCase concept names
-- `plxPipeType`: Pipe type identifiers (PipeLLM, etc.)
-- `plxDataVariable`: snake_case data variables
-- `plxPipeName`: snake_case pipe names
-- `plxPipeSection`: Pipe section headers
-- `plxConceptSection`: Concept section headers
+- `mthdsConcept`: PascalCase concept names
+- `mthdsPipeType`: Pipe type identifiers (PipeLLM, etc.)
+- `mthdsDataVariable`: snake_case data variables
+- `mthdsPipeName`: snake_case pipe names
+- `mthdsPipeSection`: Pipe section headers
+- `mthdsConceptSection`: Concept section headers
 
 ## Architecture
 
-The PLX support is implemented as an **additive layer** on top of the existing TOML functionality:
+The MTHDS support is implemented as an **additive layer** on top of the existing TOML functionality:
 
 ```
 editors/vscode/
 ├── src/
-│   ├── pipelex/                    # All PLX-specific code
+│   ├── pipelex/                    # All MTHDS-specific code
 │   │   ├── semanticTokenProvider.ts
 │   │   └── pipelexExtension.ts
-│   ├── extension.ts                # Minimal changes to register PLX
-│   └── client.ts                    # Added PLX to document selector
-├── plx.tmLanguage.json             # PLX TextMate grammar
-├── plx.frontmatter.tmLanguage.json
-└── plx.markdown.tmLanguage.json
+│   ├── extension.ts                # Minimal changes to register MTHDS
+│   └── client.ts                    # Added MTHDS to document selector
+├── mthds.tmLanguage.json             # MTHDS TextMate grammar
+├── mthds.frontmatter.tmLanguage.json
+└── mthds.markdown.tmLanguage.json
 ```
 
 ## Maintenance Strategy
 
 This fork is designed to minimize merge conflicts with upstream:
 
-1. **Isolated Code**: All PLX-specific code is in the `src/pipelex/` directory
+1. **Isolated Code**: All MTHDS-specific code is in the `src/pipelex/` directory
 2. **Minimal Changes**: Only essential modifications to existing files
-3. **Additive Only**: PLX support is added alongside TOML, not replacing it
+3. **Additive Only**: MTHDS support is added alongside TOML, not replacing it
 4. **Clear Separation**: Easy to identify what's original vs. what's added
 
 ## Syncing with Upstream
@@ -69,16 +69,16 @@ git merge upstream/main
 
 # Conflicts should be minimal and mostly in:
 # - package.json (language definitions)
-# - src/extension.ts (PLX registration)
+# - src/extension.ts (MTHDS registration)
 # - src/client.ts (document selector)
 ```
 
 ## Future Enhancements
 
-Potential areas for PLX-specific features:
+Potential areas for MTHDS-specific features:
 
-- PLX-specific validation rules
+- MTHDS-specific validation rules
 - Concept and pipe completion providers
-- PLX-specific code actions and quick fixes
+- MTHDS-specific code actions and quick fixes
 - Integration with Pipelex toolchain
-- PLX-specific formatting options
+- MTHDS-specific formatting options

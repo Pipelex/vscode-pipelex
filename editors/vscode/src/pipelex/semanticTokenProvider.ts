@@ -6,12 +6,12 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
     constructor() {
         // Define our custom semantic token types
         this.legend = new vscode.SemanticTokensLegend([
-            'plxConcept',
-            'plxPipeType',
-            'plxDataVariable',
-            'plxPipeName',
-            'plxPipeSection',
-            'plxConceptSection'
+            'mthdsConcept',
+            'mthdsPipeType',
+            'mthdsDataVariable',
+            'mthdsPipeName',
+            'mthdsPipeSection',
+            'mthdsConceptSection'
         ]);
     }
 
@@ -42,7 +42,7 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
         let match;
         while ((match = outputRefinesRegex.exec(line)) !== null) {
             const conceptStart = match.index + match[0].indexOf(match[3]);
-            tokensBuilder.push(lineIndex, conceptStart, match[3].length, 0); // plxConcept - full concept including namespace
+            tokensBuilder.push(lineIndex, conceptStart, match[3].length, 0); // mthdsConcept - full concept including namespace
         }
 
         // Concept types in input parameters (var_name = "ConceptType") - only in inputs = { ... } at line start
@@ -50,46 +50,46 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
         while ((match = inputParamRegex.exec(line)) !== null) {
             // Variable name (left side of =)
             const varStart = match.index + match[0].indexOf(match[2]);
-            tokensBuilder.push(lineIndex, varStart, match[2].length, 2); // plxDataVariable
+            tokensBuilder.push(lineIndex, varStart, match[2].length, 2); // mthdsDataVariable
 
             // Concept type (right side of =)
             const conceptStart = match.index + match[0].indexOf(match[3]);
-            tokensBuilder.push(lineIndex, conceptStart, match[3].length, 0); // plxConcept - full concept including namespace
+            tokensBuilder.push(lineIndex, conceptStart, match[3].length, 0); // mthdsConcept - full concept including namespace
         }
 
         // Pipe types (PipeLLM, PipeSequence, etc.) - only at start of line, not in structure definitions
         const pipeTypeRegex = /^(\s*)type\s*=\s*"(Pipe[A-Z][A-Za-z0-9]*)"\s*$/g;
         while ((match = pipeTypeRegex.exec(line)) !== null) {
             const pipeTypeStart = match.index + match[0].indexOf(match[2]);
-            tokensBuilder.push(lineIndex, pipeTypeStart, match[2].length, 1); // plxPipeType
+            tokensBuilder.push(lineIndex, pipeTypeStart, match[2].length, 1); // mthdsPipeType
         }
 
         // Pipe names in steps (pipe = "pipe_name")
         const pipeNameRegex = /\bpipe\s*=\s*"([a-z][a-z0-9_]*)"/g;
         while ((match = pipeNameRegex.exec(line)) !== null) {
             const pipeNameStart = match.index + match[0].indexOf(match[1]);
-            tokensBuilder.push(lineIndex, pipeNameStart, match[1].length, 3); // plxPipeName
+            tokensBuilder.push(lineIndex, pipeNameStart, match[1].length, 3); // mthdsPipeName
         }
 
         // Variable names in result assignments
         const resultVarRegex = /\b(result|batch_as|batch_over)\s*=\s*"([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)"/g;
         while ((match = resultVarRegex.exec(line)) !== null) {
             const varStart = match.index + match[0].indexOf(match[2]);
-            tokensBuilder.push(lineIndex, varStart, match[2].length, 2); // plxDataVariable
+            tokensBuilder.push(lineIndex, varStart, match[2].length, 2); // mthdsDataVariable
         }
 
         // Data injection (@variable_name)
         const dataInjectionRegex = /@([a-z][a-zA-Z0-9_]*(?:\.[a-z][a-zA-Z0-9_]*)*)/g;
         while ((match = dataInjectionRegex.exec(line)) !== null) {
             const varStart = match.index + 1; // Skip the @
-            tokensBuilder.push(lineIndex, varStart, match[1].length, 2); // plxDataVariable
+            tokensBuilder.push(lineIndex, varStart, match[1].length, 2); // mthdsDataVariable
         }
 
         // Template variables ($variable_name)
         const templateVarRegex = /\$([a-z][a-zA-Z0-9_]*(?:\.[a-z][a-zA-Z0-9_]*)*)/g;
         while ((match = templateVarRegex.exec(line)) !== null) {
             const varStart = match.index + 1; // Skip the $
-            tokensBuilder.push(lineIndex, varStart, match[1].length, 2); // plxDataVariable
+            tokensBuilder.push(lineIndex, varStart, match[1].length, 2); // mthdsDataVariable
         }
 
         // Section headers
@@ -99,10 +99,10 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
             const pipeMatch = pipeSectionRegex.exec(line);
             if (pipeMatch) {
                 const sectionStart = line.indexOf('[pipe');
-                tokensBuilder.push(lineIndex, sectionStart + 1, 4, 4); // "pipe" part - plxPipeSection
+                tokensBuilder.push(lineIndex, sectionStart + 1, 4, 4); // "pipe" part - mthdsPipeSection
                 if (pipeMatch[1]) {
                     const nameStart = line.indexOf(pipeMatch[1]);
-                    tokensBuilder.push(lineIndex, nameStart, pipeMatch[1].length, 3); // pipe name - plxPipeName
+                    tokensBuilder.push(lineIndex, nameStart, pipeMatch[1].length, 3); // pipe name - mthdsPipeName
                 }
             }
 
@@ -111,10 +111,10 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
             const conceptMatch = conceptSectionRegex.exec(line);
             if (conceptMatch) {
                 const sectionStart = line.indexOf('[concept');
-                tokensBuilder.push(lineIndex, sectionStart + 1, 7, 5); // "concept" part - plxConceptSection
+                tokensBuilder.push(lineIndex, sectionStart + 1, 7, 5); // "concept" part - mthdsConceptSection
                 if (conceptMatch[1]) {
                     const nameStart = line.indexOf(conceptMatch[1]);
-                    tokensBuilder.push(lineIndex, nameStart, conceptMatch[1].length, 0); // concept name - plxConcept
+                    tokensBuilder.push(lineIndex, nameStart, conceptMatch[1].length, 0); // concept name - mthdsConcept
                 }
             }
         }
