@@ -1,0 +1,32 @@
+# Test: Pipe table headers, type entries, model entries, inputs/output
+# Covers: [pipe], [pipe.name], type, output, model, inputs (single-line)
+
+[pipe]
+
+[pipe.analyze_features]
+type = "PipeLLM"
+definition = "Analyze features"
+inputs = { photo = "native.Image" }
+output = "FeatureAnalysis"
+model = "$gpt-4o"
+
+[pipe.create_prompt]
+type = "PipeLLM"
+definition = "Create a prompt for image generation"
+inputs = { opposite_concept = "OppositeConcept" }
+output = "ImagePrompt"
+model = "@my-alias"
+
+[pipe.generate_image]
+type = "PipeImgGen"
+definition = "Generate the image"
+inputs = { image_prompt = "ImagePrompt" }
+output = "images.Photo"
+model = "~waterfall"
+
+# Multi-input pipe
+[pipe.combine_data]
+type = "PipeLLM"
+definition = "Combine multiple data sources"
+inputs = { a = "TypeA", b = "TypeB", c = "native.TypeC" }
+output = "CombinedResult"

@@ -52,12 +52,18 @@ The MTHDS generator duplicates ~190 lines of TOML base rules (comments, escapes,
 | `test-data/example.mthds` | 82 | MTHDS test fixture | Reference for test writing |
 | `test-data/discord_newsletter.mthds` | 129 | MTHDS test fixture (complex) | Reference for test writing |
 
-### Files Still to Create (Phase 4)
+### Files Created in Phase 4
 
-| File | Role |
-|------|------|
-| `test-data/mthds/*.mthds` | TextMate grammar test fixtures (6 files) |
-| `editors/vscode/src/pipelex/__tests__/semanticTokenProvider.test.ts` | Semantic token provider unit tests |
+| File | Role | Status |
+|------|------|--------|
+| `test-data/mthds/concept-tables.mthds` | TextMate grammar test fixture | **DONE** |
+| `test-data/mthds/pipe-definitions.mthds` | TextMate grammar test fixture | **DONE** |
+| `test-data/mthds/jinja-templates.mthds` | TextMate grammar test fixture | **DONE** |
+| `test-data/mthds/prompt-templates.mthds` | TextMate grammar test fixture | **DONE** |
+| `test-data/mthds/false-positives.mthds` | TextMate grammar test fixture | **DONE** |
+| `test-data/mthds/steps.mthds` | TextMate grammar test fixture | **DONE** |
+| `editors/vscode/src/pipelex/__tests__/semanticTokenProvider.test.ts` | Semantic token provider unit tests (24 tests) | **DONE** |
+| `editors/vscode/vitest.config.mts` | Vitest test configuration | **DONE** |
 
 ---
 
@@ -483,9 +489,16 @@ Update `docs/pipelex/syntax-color-palette.md` to reflect the actual colors after
 
 ---
 
-## Phase 4: Add Tests
+## Phase 4: Add Tests (DONE)
 
 **Goal:** Prevent regressions.
+
+**Status:** Completed. Key changes:
+- Created 6 TextMate grammar test fixtures in `test-data/mthds/`
+- Set up vitest as test framework with vscode API mocking
+- Created 24 unit tests for semantic token provider covering all scenarios
+- Added `test` and `test:watch` scripts to `package.json`
+- All 24 tests pass
 
 ### 4a. TextMate Grammar Snapshot Tests
 
@@ -658,7 +671,7 @@ Verify every element is colored correctly per the palette:
 | 1 | DONE | `mthds/index.ts`, `mthds/comment.ts`, `mthds/table.ts`, `mthds/entry.ts`, `mthds/value.ts`, `mthds/jinja.ts`, `mthds/html.ts`, `mthds/injection.ts` | `package.json` (build:syntax script) | `mthds.tmLanguage.json` (replaced by generated) |
 | 2 | DONE | — | `semanticTokenProvider.ts` (rewrite), `pipelexExtension.ts`, `package.json` (new setting) | — |
 | 3 | DONE | — | `package.json` (textMateRules: -6 rules, color fix), `docs/pipelex/syntax-color-palette.md` | — |
-| 4 | TODO | `test-data/mthds/*.mthds` (6 fixtures), `semanticTokenProvider.test.ts` | — | — |
+| 4 | DONE | `test-data/mthds/*.mthds` (6 fixtures), `semanticTokenProvider.test.ts`, `vitest.config.mts` | `package.json` (test scripts, vitest dep) | — |
 | 5 | TODO | — | `CLAUDE.md` (optional) | `refactoring/mthds.tmLanguage.BEFORE.json` |
 
 **Upstream Taplo files modified: 0**
@@ -669,9 +682,8 @@ Verify every element is colored correctly per the palette:
 Phase 0 ──→ Phase 1 ──→ Phase 2
   DONE        DONE    ↗   DONE
                    Phase 3 ──→ Phase 4 ──→ Phase 5
-                     DONE        TODO        TODO
+                     DONE        DONE        TODO
 ```
 
-- Phases 0-3: All complete
-- **Phase 4 is next**: Both Phase 2 and Phase 3 are done, so Phase 4 can start immediately
-- Phase 5 after Phase 4 (cleanup)
+- Phases 0-4: All complete
+- **Phase 5 is next**: Final cleanup (delete snapshot, update CLAUDE.md, verify full build)
