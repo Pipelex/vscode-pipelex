@@ -344,6 +344,49 @@ describe('Multi-line inputs (state machine)', () => {
       tokenModifiers: 0,
     });
   });
+
+  it('does not enter multi-line state when closing brace is on the same line (with trailing comment)', async () => {
+    const tokens = await getTokens([
+      'inputs = { a = "TypeA" } # comment',
+      'output = "FeatureAnalysis"',
+    ]);
+
+    // inputs line: a variable + TypeA concept (matched by multi-line fallback, which parses the content)
+    // output line: FeatureAnalysis concept (must NOT be swallowed by multi-line state)
+    expect(tokens).toHaveLength(3);
+
+    expect(tokens[0].tokenType).toBe(TOKEN.mthdsDataVariable);
+    expect(tokens[0].line).toBe(0);
+
+    expect(tokens[1].tokenType).toBe(TOKEN.mthdsConcept);
+    expect(tokens[1].line).toBe(0);
+
+    expect(tokens[2]).toEqual({
+      line: 1,
+      char: 10,
+      length: 15, // "FeatureAnalysis"
+      tokenType: TOKEN.mthdsConcept,
+      tokenModifiers: 0,
+    });
+  });
+
+  it('does not enter multi-line state for empty inputs = {}', async () => {
+    const tokens = await getTokens([
+      'inputs = {}',
+      'output = "Result"',
+    ]);
+
+    // inputs = {} has no entries inside
+    // output line must still be processed
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toEqual({
+      line: 1,
+      char: 10,
+      length: 6, // "Result"
+      tokenType: TOKEN.mthdsConcept,
+      tokenModifiers: 0,
+    });
+  });
 });
 
 describe('Result variables', () => {

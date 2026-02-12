@@ -70,9 +70,13 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
                 // Check for multi-line inputs start
                 const multiLineStart = /^(\s*inputs\s*=\s*)\{(.*)$/.exec(line);
                 if (multiLineStart) {
-                    insideMultiLineInputs = true;
                     const blockOffset = multiLineStart[1].length + 1;
-                    this.analyzeInputEntries(multiLineStart[2], blockOffset, lineIndex, tokensBuilder);
+                    const rest = multiLineStart[2];
+                    this.analyzeInputEntries(rest, blockOffset, lineIndex, tokensBuilder);
+                    // Only enter multi-line state if the closing brace is NOT on this line
+                    if (!rest.includes('}')) {
+                        insideMultiLineInputs = true;
+                    }
                 }
             }
 
