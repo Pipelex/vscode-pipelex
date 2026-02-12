@@ -8,6 +8,24 @@ Read the companion files before starting:
 
 ---
 
+## Design Principle: Zero Upstream Changes
+
+This repo is a fork of [tamasfe/taplo](https://github.com/tamasfe/taplo). To minimize merge conflicts when syncing upstream, **no upstream Taplo files are modified**. All MTHDS-specific code is self-contained in dedicated directories:
+
+- `editors/vscode/src/syntax/mthds/` — MTHDS grammar generator (new)
+- `editors/vscode/src/pipelex/` — MTHDS extension code (existing)
+- `test-data/mthds/` — MTHDS test fixtures (new)
+
+The MTHDS generator duplicates ~190 lines of TOML base rules (comments, escapes, strings, numbers, booleans, datetime) with `.mthds` scope suffixes rather than extracting shared modules that would require modifying upstream files. This is a deliberate trade-off: minor duplication in exchange for clean upstream merges.
+
+**Files that must NOT be modified** (upstream Taplo):
+- `editors/vscode/src/syntax/index.ts`
+- `editors/vscode/src/syntax/comment.ts`
+- `editors/vscode/src/syntax/literal/*.ts`
+- `editors/vscode/src/syntax/composite/*.ts`
+
+---
+
 ## Current File Inventory
 
 | File | Lines | Role | Action |
@@ -19,11 +37,10 @@ Read the companion files before starting:
 | `editors/vscode/mthds.markdown.tmLanguage.json` | 44 | Markdown code block injection grammar | No change |
 | `editors/vscode/package.json` | 650 | Extension manifest | **MODIFY** (contributes section) |
 | `docs/pipelex/syntax-color-palette.md` | 55 | Color palette documentation | **UPDATE** |
-| `editors/vscode/src/syntax/index.ts` | 43 | TOML grammar generator entry point | Reference only |
-| `editors/vscode/src/syntax/comment.ts` | 26 | TOML comment rules (shared) | **MODIFY** to extract shared rules |
-| `editors/vscode/src/syntax/literal/string.ts` | 45 | TOML string rules (shared) | **MODIFY** to extract shared rules |
-| `editors/vscode/src/syntax/literal/*.ts` | ~100 | TOML literal rules (shared) | **MODIFY** to extract shared rules |
-| `editors/vscode/src/syntax/composite/*.ts` | ~100 | TOML composite rules | Reference only |
+| `editors/vscode/src/syntax/index.ts` | 43 | TOML grammar generator entry point | **No change** (upstream) |
+| `editors/vscode/src/syntax/comment.ts` | 26 | TOML comment rules | **No change** (upstream) |
+| `editors/vscode/src/syntax/literal/*.ts` | ~190 | TOML literal rules | **No change** (upstream) |
+| `editors/vscode/src/syntax/composite/*.ts` | ~200 | TOML composite rules | **No change** (upstream) |
 | `test-data/example.mthds` | 82 | MTHDS test fixture | Reference for test writing |
 | `test-data/discord_newsletter.mthds` | 129 | MTHDS test fixture (complex) | Reference for test writing |
 
@@ -32,16 +49,13 @@ Read the companion files before starting:
 | File | Role |
 |------|------|
 | `editors/vscode/src/syntax/mthds/index.ts` | MTHDS grammar generator entry point |
+| `editors/vscode/src/syntax/mthds/comment.ts` | MTHDS comment and commentDirective rules |
 | `editors/vscode/src/syntax/mthds/table.ts` | MTHDS table rules (concept, pipe, generic) |
 | `editors/vscode/src/syntax/mthds/entry.ts` | MTHDS entry rules (pipe, output, refines, model, jinja2, prompt_template) |
-| `editors/vscode/src/syntax/mthds/value.ts` | MTHDS value rule (assembles strings + MTHDS-specific patterns) |
+| `editors/vscode/src/syntax/mthds/value.ts` | MTHDS value rule (strings with MTHDS patterns, escapes, numbers, booleans, datetime) |
 | `editors/vscode/src/syntax/mthds/jinja.ts` | Jinja2 template content rules (delimiters, statements, expressions) |
 | `editors/vscode/src/syntax/mthds/html.ts` | HTML-in-template rules (tags, attributes, comments) |
 | `editors/vscode/src/syntax/mthds/injection.ts` | Data injection (@var) and template variable ($var) rules |
-| `editors/vscode/src/syntax/shared/comment.ts` | Shared comment rules (extracted from current comment.ts) |
-| `editors/vscode/src/syntax/shared/escape.ts` | Shared string escape rules |
-| `editors/vscode/src/syntax/shared/literals.ts` | Shared literal rules (numbers, booleans, datetime) |
-| `editors/vscode/src/syntax/shared/strings.ts` | Shared base string rules (basic + literal, single + block) |
 | `test-data/mthds/` | Directory for MTHDS grammar test fixtures |
 
 ---
@@ -64,7 +78,7 @@ Establish these as the source of truth. Both TextMate and semantic provider must
 
 ---
 
-## Phase 0: Preparation
+## Phase 0: Preparation (DONE)
 
 **Goal:** Set up the workspace and verify you can build.
 
@@ -86,7 +100,6 @@ Establish these as the source of truth. Both TextMate and semantic provider must
 4. **Create the directory structure:**
    ```bash
    mkdir -p editors/vscode/src/syntax/mthds
-   mkdir -p editors/vscode/src/syntax/shared
    mkdir -p test-data/mthds
    ```
 
@@ -96,123 +109,65 @@ Establish these as the source of truth. Both TextMate and semantic provider must
 
 ---
 
-## Phase 1: Extract Shared Rules
+## Phase 1: Build the MTHDS Grammar Generator
 
-**Goal:** Factor out rules that are identical between TOML and MTHDS grammars so both generators can reuse them.
-
-### What to Extract
-
-The TOML generator in `editors/vscode/src/syntax/` currently defines these rules inline. They need to become parameterized (taking a scope suffix like `"toml"` or `"mthds"`):
-
-#### 1a. `editors/vscode/src/syntax/shared/comment.ts`
-
-Extract from `editors/vscode/src/syntax/comment.ts`. The comment rules are identical between TOML and MTHDS — only the scope suffix differs (`.toml` vs `.mthds`).
-
-```typescript
-// shared/comment.ts
-export function makeComment(lang: string) {
-  return {
-    captures: {
-      1: { name: `comment.line.number-sign.${lang}` },
-      2: { name: `punctuation.definition.comment.${lang}` },
-    },
-    comment: "Comments",
-    match: "\\s*((#).*)$",
-  };
-}
-
-export function makeCommentDirective(lang: string) {
-  return {
-    captures: {
-      1: { name: `meta.preprocessor.${lang}` },
-      2: { name: `punctuation.definition.meta.preprocessor.${lang}` },
-    },
-    comment: "Comments",
-    match: "\\s*((#):.*)$",
-  };
-}
-```
-
-#### 1b. `editors/vscode/src/syntax/shared/escape.ts`
-
-Extract from `editors/vscode/src/syntax/literal/string.ts` lines 1-10:
-
-```typescript
-export function makeEscape(lang: string) {
-  return [
-    {
-      match: '\\\\([btnfr"\\\\\\n/ ]|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})',
-      name: `constant.character.escape.${lang}`,
-    },
-    {
-      match: '\\\\[^btnfr/"\\\\\\n]',
-      name: `invalid.illegal.escape.${lang}`,
-    },
-  ];
-}
-```
-
-#### 1c. `editors/vscode/src/syntax/shared/strings.ts`
-
-Extract from `editors/vscode/src/syntax/literal/string.ts`. The base string patterns (without MTHDS-specific content) are:
-
-```typescript
-export function makeStrings(lang: string, basicStringPatterns?: any[]) {
-  const escape = makeEscape(lang);
-  const basicPatterns = basicStringPatterns
-    ? [...escape, ...basicStringPatterns]
-    : escape;
-
-  return [
-    { name: `string.quoted.triple.basic.block.${lang}`, begin: '"""', end: '"""', patterns: basicPatterns },
-    { name: `string.quoted.single.basic.line.${lang}`, begin: '"', end: '"', patterns: basicPatterns },
-    { name: `string.quoted.triple.literal.block.${lang}`, begin: "'''", end: "'''" },
-    { name: `string.quoted.single.literal.line.${lang}`, begin: "'", end: "'" },
-  ];
-}
-```
-
-The MTHDS generator will pass additional patterns (`dataInjection`, `templateVariable`, `jinjaTemplateContent`, `htmlContent`) as `basicStringPatterns`.
-
-#### 1d. `editors/vscode/src/syntax/shared/literals.ts`
-
-Extract from `editors/vscode/src/syntax/literal/boolean.ts`, `number.ts`, `datetime.ts`. These are identical between TOML and MTHDS — only the scope suffix changes.
-
-#### 1e. Update TOML generator to use shared rules
-
-Modify `editors/vscode/src/syntax/comment.ts` and `literal/string.ts` etc. to import from `shared/` and call with `"toml"`. This must be a pure refactor — the generated `toml.tmLanguage.json` must be byte-identical before and after.
-
-### Verification
-
-```bash
-# Save old output
-cp editors/vscode/toml.tmLanguage.json /tmp/toml.BEFORE.json
-# Rebuild
-cd editors/vscode && yarn build:syntax
-# Verify identical
-diff /tmp/toml.BEFORE.json editors/vscode/toml.tmLanguage.json
-```
-
-Must show no differences.
-
----
-
-## Phase 2: Build the MTHDS Grammar Generator
-
-**Goal:** Create a TypeScript generator that produces a correct, deduplicated `mthds.tmLanguage.json`.
+**Goal:** Create a self-contained TypeScript generator that produces a correct, deduplicated `mthds.tmLanguage.json` — without modifying any upstream Taplo files.
 
 ### Architecture
 
 ```
 editors/vscode/src/syntax/mthds/
   index.ts          # Entry point: assembles and writes mthds.tmLanguage.json
+  comment.ts        # Comment and commentDirective rules (self-contained, .mthds scopes)
   table.ts          # [concept.X], [pipe.X], generic tables, inline tables
   entry.ts          # MTHDS-specific entries (pipe, output, refines, model, jinja2, prompt_template, generic)
-  value.ts          # Value rule: strings (with MTHDS patterns), numbers, booleans, etc.
+  value.ts          # Value rule: strings (with MTHDS patterns), escapes, numbers, booleans, datetime
   jinja.ts          # jinjaTemplateContent, jinjaStatements, jinjaExpressions
   html.ts           # htmlContent, htmlAttributes
   injection.ts      # dataInjection, templateVariable (single definition each)
 ```
+
+### Self-Contained Base Rules
+
+The MTHDS generator defines its own copies of rules that are structurally identical to TOML but use `.mthds` scope suffixes. These are small and unlikely to change upstream:
+
+#### `comment.ts` — Comment rules (~30 lines)
+
+```typescript
+// Self-contained MTHDS comment rules (parallel to upstream src/syntax/comment.ts)
+const lang = "mthds";
+
+export const comment = {
+  captures: {
+    1: { name: `comment.line.number-sign.${lang}` },
+    2: { name: `punctuation.definition.comment.${lang}` },
+  },
+  comment: "Comments",
+  match: "\\s*((#).*)$",
+};
+
+export const commentDirective = {
+  captures: {
+    1: { name: `meta.preprocessor.${lang}` },
+    2: { name: `punctuation.definition.meta.preprocessor.${lang}` },
+  },
+  comment: "Comments",
+  match: "\\s*((#):.*)$",
+};
+```
+
+#### `value.ts` — Strings, escapes, numbers, booleans, datetime (~120 lines)
+
+This file defines:
+- **Escape sequences** (valid + invalid escapes, mirroring upstream `literal/string.ts` lines 1-10)
+- **String patterns** (block + single basic strings with MTHDS-specific content patterns; literal strings with no content patterns)
+- **Numbers** (float, integer, special, leading-zero formats — mirroring upstream `literal/number.ts`)
+- **Booleans** (true/false — mirroring upstream `literal/boolean.ts`)
+- **Datetime** (offset, local datetime, date, time — mirroring upstream `literal/datetime.ts`)
+
+The key difference from TOML strings: basic (double-quoted) strings include `#jinjaTemplateContent`, `#htmlContent`, `#stringEscapes`, `#dataInjection`, `#templateVariable` as child patterns. Literal (single-quoted) strings include nothing — they are raw text per TOML spec.
+
+The value rule assembles all of these into a single `patterns` array, ordered correctly (block before single for strings, float before integer for numbers, etc.).
 
 ### Key Design Decisions
 
@@ -326,14 +281,13 @@ match: '^\\s*(\\[)\\s*(pipe(?:\\.[a-z][a-z0-9_]*)?)\\s*(\\])'
 // editors/vscode/src/syntax/mthds/index.ts
 import * as path from "path";
 import { writeFileSync } from "fs";
-import { makeComment, makeCommentDirective } from "../shared/comment";
+import { comment, commentDirective } from "./comment";
 import { table } from "./table";
 import { entryBegin } from "./entry";
-import { value } from "./value";
+import { value, stringEscapes } from "./value";
 import { jinjaTemplateContent, jinjaStatements, jinjaExpressions } from "./jinja";
 import { htmlContent, htmlAttributes } from "./html";
 import { makeDataInjection, makeTemplateVariable } from "./injection";
-import { makeEscape } from "../shared/escape";
 
 const lang = "mthds";
 
@@ -354,8 +308,8 @@ const syntax = {
     { include: "#value" },
   ],
   repository: {
-    comment: makeComment(lang),
-    commentDirective: makeCommentDirective(lang),
+    comment,
+    commentDirective,
     table,
     entryBegin,
     value,
@@ -366,7 +320,7 @@ const syntax = {
     htmlAttributes,
     dataInjection: makeDataInjection(lang),
     templateVariable: makeTemplateVariable(lang),
-    stringEscapes: { patterns: makeEscape(lang) },
+    stringEscapes,
   },
 };
 
@@ -387,12 +341,13 @@ Modify `editors/vscode/package.json` `scripts.build:syntax`:
 ### Verification
 
 1. Run `yarn build:syntax` — both `toml.tmLanguage.json` and `mthds.tmLanguage.json` are generated.
-2. Diff the generated `mthds.tmLanguage.json` against `refactoring/mthds.tmLanguage.BEFORE.json`:
+2. Verify `toml.tmLanguage.json` is **unchanged** (upstream generator untouched).
+3. Diff the generated `mthds.tmLanguage.json` against `refactoring/mthds.tmLanguage.BEFORE.json`:
    - It should be **smaller** (no duplication).
    - The top-level `patterns` should only contain 5 entries (comment, commentDirective, table, entryBegin, value).
    - The repository should contain single definitions of `dataInjection`, `templateVariable` (not `dataInjectionInString`/`templateVariableInString` duplicates).
    - No `jinjaVariable` rule at the repository top level.
-3. Open `test-data/example.mthds` and `test-data/discord_newsletter.mthds` in VS Code with the rebuilt extension. Verify:
+4. Open `test-data/example.mthds` and `test-data/discord_newsletter.mthds` in VS Code with the rebuilt extension. Verify:
    - `[concept.FeatureAnalysis]` — "concept" in teal, "FeatureAnalysis" in teal
    - `[pipe.analyze_features]` — "pipe" in red, "analyze_features" in red
    - `type = "PipeLLM"` — "PipeLLM" colored as pipe type
@@ -407,19 +362,19 @@ Modify `editors/vscode/package.json` `scripts.build:syntax`:
 
 ---
 
-## Phase 3: Rewrite the Semantic Token Provider
+## Phase 2: Rewrite the Semantic Token Provider
 
 **Goal:** Slim the provider down to only provide truly semantic information that TextMate cannot, fix all bugs.
 
 ### What the Semantic Provider Should Do (Post-Refactor)
 
-After Phase 2, the TextMate grammar handles all lexical coloring. The semantic provider should ONLY add:
+After Phase 1, the TextMate grammar handles all lexical coloring. The semantic provider should ONLY add:
 
 1. **Token modifiers** — distinguish declarations from references:
-   - `[concept.Name]` → `mthdsConcept` with modifier `declaration`
-   - `output = "Name"` → `mthdsConcept` with modifier `reference` (no modifier = default)
-   - `[pipe.name]` → `mthdsPipeName` with modifier `declaration`
-   - `pipe = "name"` → `mthdsPipeName` (reference)
+   - `[concept.Name]` -> `mthdsConcept` with modifier `declaration`
+   - `output = "Name"` -> `mthdsConcept` with modifier `reference` (no modifier = default)
+   - `[pipe.name]` -> `mthdsPipeName` with modifier `declaration`
+   - `pipe = "name"` -> `mthdsPipeName` (reference)
 
 2. **Multi-line input parameter coloring** — the TextMate grammar can only match single-line patterns for `inputs = { ... }`. The semantic provider can track state across lines for multi-line input blocks.
 
@@ -523,19 +478,19 @@ Add modifier to semantic token types:
 
 ---
 
-## Phase 4: Fix Color Configuration
+## Phase 3: Fix Color Configuration
 
 **Goal:** Unified, correct, non-aggressive color setup.
 
-### 4a. Unify the Two Reds
+### 3a. Unify the Two Reds
 
 In `package.json` `configurationDefaults.textMateRules`, change `#FF6666` to `#FF6B6B` for `support.type.property-name.pipe.mthds`. This makes all pipe-related colors consistent with the palette doc.
 
-### 4b. Remove Phantom Scope
+### 3b. Remove Phantom Scope
 
 Remove the `support.type.concept.native.mthds` rule from `configurationDefaults.textMateRules` (lines 288-293 in current package.json). It has no corresponding grammar rule.
 
-### 4c. Reduce Hardcoded Overrides
+### 3c. Reduce Hardcoded Overrides
 
 The current 15 textMateRules override user themes aggressively. Reduce to only MTHDS-custom scopes that no standard theme would color:
 
@@ -551,14 +506,14 @@ The current 15 textMateRules override user themes aggressively. Reduce to only M
 - `entity.name.model-ref.mthds`
 
 **Remove** (standard scopes that themes already handle):
-- `punctuation.definition.jinja.mthds` → falls back to theme's punctuation color
-- `keyword.control.jinja.mthds` → falls back to theme's keyword color
-- `variable.other.jinja.mthds` → falls back to theme's variable color
-- `entity.name.tag.html.mthds` → falls back to theme's HTML tag color
-- `entity.other.attribute-name.html.mthds` → falls back to theme's attribute color
-- `comment.block.html.mthds` → falls back to theme's comment color
+- `punctuation.definition.jinja.mthds` -> falls back to theme's punctuation color
+- `keyword.control.jinja.mthds` -> falls back to theme's keyword color
+- `variable.other.jinja.mthds` -> falls back to theme's variable color
+- `entity.name.tag.html.mthds` -> falls back to theme's HTML tag color
+- `entity.other.attribute-name.html.mthds` -> falls back to theme's attribute color
+- `comment.block.html.mthds` -> falls back to theme's comment color
 
-### 4d. Update Palette Doc
+### 3d. Update Palette Doc
 
 Update `docs/pipelex/syntax-color-palette.md` to reflect the actual colors after unification. Remove the `#FF6666` reference. Note that Jinja/HTML colors now inherit from the user's theme.
 
@@ -570,11 +525,11 @@ Update `docs/pipelex/syntax-color-palette.md` to reflect the actual colors after
 
 ---
 
-## Phase 5: Add Tests
+## Phase 4: Add Tests
 
 **Goal:** Prevent regressions.
 
-### 5a. TextMate Grammar Snapshot Tests
+### 4a. TextMate Grammar Snapshot Tests
 
 Create test fixtures in `test-data/mthds/` that cover edge cases. Use `vscode-tmgrammar-test` (or a similar tool) to generate scope snapshots.
 
@@ -650,7 +605,7 @@ steps = [
 ]
 ```
 
-### 5b. Semantic Token Provider Unit Tests
+### 4b. Semantic Token Provider Unit Tests
 
 Create `editors/vscode/src/pipelex/__tests__/semanticTokenProvider.test.ts`:
 
@@ -667,13 +622,13 @@ Create `editors/vscode/src/pipelex/__tests__/semanticTokenProvider.test.ts`:
 
 ---
 
-## Phase 6: Final Cleanup
+## Phase 5: Final Cleanup
 
-### 6a. Delete Dead Files
+### 5a. Delete Dead Files
 
 - Remove `refactoring/mthds.tmLanguage.BEFORE.json` (snapshot from Phase 0)
 
-### 6b. Update CLAUDE.md
+### 5b. Update CLAUDE.md
 
 The CLAUDE.md `Don't Edit` section should now include:
 ```
@@ -682,7 +637,7 @@ The CLAUDE.md `Don't Edit` section should now include:
 
 (This was already listed as `*.tmLanguage.json` in the existing CLAUDE.md, but now it's actually true for MTHDS too.)
 
-### 6c. Verify Full Build
+### 5c. Verify Full Build
 
 ```bash
 cd editors/vscode
@@ -691,7 +646,7 @@ yarn build
 
 The full build runs `build:syntax` (both TOML and MTHDS generators), then bundles the extension.
 
-### 6d. Manual Visual Verification
+### 5d. Manual Visual Verification
 
 Open both test fixtures in VS Code:
 1. `test-data/example.mthds` — photo opposite pipeline
@@ -714,23 +669,23 @@ Verify every element is colored correctly per the palette:
 | Phase | Files Created | Files Modified | Files Deleted |
 |-------|---------------|----------------|---------------|
 | 0 | `refactoring/mthds.tmLanguage.BEFORE.json`, directories | — | — |
-| 1 | `shared/comment.ts`, `shared/escape.ts`, `shared/strings.ts`, `shared/literals.ts` | `src/syntax/comment.ts`, `src/syntax/literal/string.ts`, `src/syntax/literal/number.ts`, `src/syntax/literal/boolean.ts`, `src/syntax/literal/datetime.ts`, `src/syntax/index.ts` | — |
-| 2 | `mthds/index.ts`, `mthds/table.ts`, `mthds/entry.ts`, `mthds/value.ts`, `mthds/jinja.ts`, `mthds/html.ts`, `mthds/injection.ts` | `package.json` (build:syntax script) | `mthds.tmLanguage.json` (replaced by generated) |
-| 3 | — | `semanticTokenProvider.ts` (rewrite), `pipelexExtension.ts`, `package.json` (new setting) | — |
-| 4 | — | `package.json` (textMateRules), `docs/pipelex/syntax-color-palette.md` | — |
-| 5 | `test-data/mthds/*.mthds` (6 fixtures), `semanticTokenProvider.test.ts` | — | — |
-| 6 | — | `CLAUDE.md` (optional) | `refactoring/mthds.tmLanguage.BEFORE.json` |
+| 1 | `mthds/index.ts`, `mthds/comment.ts`, `mthds/table.ts`, `mthds/entry.ts`, `mthds/value.ts`, `mthds/jinja.ts`, `mthds/html.ts`, `mthds/injection.ts` | `package.json` (build:syntax script) | `mthds.tmLanguage.json` (replaced by generated) |
+| 2 | — | `semanticTokenProvider.ts` (rewrite), `pipelexExtension.ts`, `package.json` (new setting) | — |
+| 3 | — | `package.json` (textMateRules), `docs/pipelex/syntax-color-palette.md` | — |
+| 4 | `test-data/mthds/*.mthds` (6 fixtures), `semanticTokenProvider.test.ts` | — | — |
+| 5 | — | `CLAUDE.md` (optional) | `refactoring/mthds.tmLanguage.BEFORE.json` |
+
+**Upstream Taplo files modified: 0**
 
 ## Dependencies Between Phases
 
 ```
-Phase 0 ──→ Phase 1 ──→ Phase 2 ──→ Phase 3
-                                  ↘
-                              Phase 4 ──→ Phase 5 ──→ Phase 6
+Phase 0 ──→ Phase 1 ──→ Phase 2
+                     ↘
+                  Phase 3 ──→ Phase 4 ──→ Phase 5
 ```
 
-- Phase 1 must complete before Phase 2 (shared rules needed)
-- Phase 2 must complete before Phase 3 (semantic provider slimmed based on what TextMate covers)
-- Phase 4 can start after Phase 2 (color changes are independent of semantic provider)
-- Phase 5 after both Phase 3 and Phase 4 (tests verify the final state)
-- Phase 6 after Phase 5 (cleanup)
+- Phase 1 must complete before Phase 2 (semantic provider slimmed based on what TextMate covers)
+- Phase 3 can start after Phase 1 (color changes are independent of semantic provider)
+- Phase 4 after both Phase 2 and Phase 3 (tests verify the final state)
+- Phase 5 after Phase 4 (cleanup)
