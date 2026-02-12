@@ -13,13 +13,15 @@ This document describes the semantic color palette used for syntax highlighting 
 
 ## Secondary/Supporting Colors
 
-| Semantic Role | Color | Hex Code | Usage |
-|--------------|-------|----------|-------|
-| **Control Flow** | Light Cyan | `#8BE9FD` | Jinja keywords (if, for, etc.) |
-| **Dynamic Values** | Bright Green | `#50FA7B` | Jinja variables inside templates |
-| **Structural Elements** | Orange | `#FFB86C` | HTML tags, structural markers |
-| **Metadata/Attributes** | Pale Yellow | `#F1FA8C` | Attributes, secondary properties |
-| **Comments/Inactive** | Slate Blue/Gray | `#6272A4` | Comments, disabled content |
+These elements inherit their colors from the user's VS Code theme, providing consistent integration with any color scheme:
+
+| Semantic Role | Source | Usage |
+|--------------|--------|-------|
+| **Control Flow** | Theme keyword color | Jinja keywords (if, for, etc.) |
+| **Dynamic Values** | Theme variable color | Jinja variables inside templates |
+| **Structural Elements** | Theme HTML tag color | HTML tags, structural markers |
+| **Metadata/Attributes** | Theme attribute color | HTML attributes, secondary properties |
+| **Comments/Inactive** | Theme comment color | Comments, disabled content |
 
 ## Flow-Chart Mapping Recommendations
 
@@ -40,16 +42,11 @@ The palette follows a **Dracula-inspired** vibrant dark theme aesthetic with hig
 - **Warm colors** (reds/oranges) denote structural and execution elements
 - **Cool colors** (cyans/greens) denote data and semantic elements
 
-## Color Swatches
+## Color Swatches (Hardcoded MTHDS Colors)
 
 ```
 Coral Red:    #FF6B6B  ████████
 Teal/Cyan:    #4ECDC4  ████████
 Pale Green:   #98FB98  ████████
 Magenta:      #FF79C6  ████████
-Light Cyan:   #8BE9FD  ████████
-Bright Green: #50FA7B  ████████
-Orange:       #FFB86C  ████████
-Pale Yellow:  #F1FA8C  ████████
-Slate Blue:   #6272A4  ████████
 ```

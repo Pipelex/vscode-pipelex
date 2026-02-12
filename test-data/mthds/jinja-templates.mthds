@@ -1,0 +1,41 @@
+# Test: Jinja2 templates with HTML, filters, control flow
+# Covers: jinja2 block strings, {% %}, {{ }}, {# #}, HTML tags, attributes
+
+[pipe.format]
+type = "PipeJinja2"
+definition = "Format items into HTML"
+inputs = { items = "ItemList", title = "Text" }
+output = "HtmlOutput"
+jinja2 = """
+{% for item in items %}
+  <h2>{{ item.title }}</h2>
+  <p>{{ item.body | truncate(200) }}</p>
+{% endfor %}
+<!-- end of items -->
+"""
+
+# Jinja with complex filters and conditionals
+[pipe.filter_content]
+type = "PipeJinja2"
+definition = "Filter and format content"
+inputs = { channel_summaries = "ChannelSummary" }
+output = "HtmlNewsletter"
+jinja2 = """
+{# Main content section #}
+{% set regular_channels = channel_summaries.content.items | selectattr('category', 'equalto', 'Share') | list | sort(attribute='position') %}
+{% if regular_channels %}
+  {% for channel in regular_channels %}
+    <h2>{{ channel.channel_name }}</h2>
+    <div class="summary">
+      {% for item in channel.summary_items_as_html %}
+        <p>{{ item }}</p>
+      {% endfor %}
+    </div>
+  {% endfor %}
+{% endif %}
+"""
+
+# Single-line jinja2
+[pipe.inline_format]
+type = "PipeJinja2"
+jinja2 = "{{ title | upper }}: {{ body }}"

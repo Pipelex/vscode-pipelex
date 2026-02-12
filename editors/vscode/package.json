@@ -259,7 +259,7 @@
           {
             "scope": "support.type.property-name.pipe.mthds",
             "settings": {
-              "foreground": "#FF6666",
+              "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
@@ -281,13 +281,6 @@
             "scope": "support.type.concept.mthds",
             "settings": {
               "foreground": "#4ECDC4",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.type.concept.native.mthds",
-            "settings": {
-              "foreground": "#98FB98",
               "fontStyle": "bold"
             }
           },
@@ -328,44 +321,6 @@
             "settings": {
               "foreground": "#FFB86C",
               "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "punctuation.definition.jinja.mthds",
-            "settings": {
-              "foreground": "#FF79C6",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "keyword.control.jinja.mthds",
-            "settings": {
-              "foreground": "#8BE9FD"
-            }
-          },
-          {
-            "scope": "variable.other.jinja.mthds",
-            "settings": {
-              "foreground": "#50FA7B"
-            }
-          },
-          {
-            "scope": "entity.name.tag.html.mthds",
-            "settings": {
-              "foreground": "#FFB86C"
-            }
-          },
-          {
-            "scope": "entity.other.attribute-name.html.mthds",
-            "settings": {
-              "foreground": "#F1FA8C"
-            }
-          },
-          {
-            "scope": "comment.block.html.mthds",
-            "settings": {
-              "foreground": "#6272A4",
-              "fontStyle": "italic"
             }
           }
         ]
@@ -484,6 +439,12 @@
         },
         "pipelex.syntax.semanticTokens": {
           "description": "Whether to enable semantic tokens for tables and arrays.",
+          "type": "boolean",
+          "scope": "resource",
+          "default": true
+        },
+        "pipelex.mthds.semanticTokens": {
+          "description": "Enable semantic tokens for MTHDS files (adds declaration/reference distinction).",
           "type": "boolean",
           "scope": "resource",
           "default": true
@@ -616,11 +577,13 @@
   "scripts": {
     "vscode:prepublish": "yarn build",
     "open-in-browser": "vscode-test-web --extensionDevelopmentPath=. .",
-    "build:syntax": "ts-node --project node.tsconfig.json src/syntax/index.ts",
+    "build:syntax": "ts-node --project node.tsconfig.json src/syntax/index.ts && ts-node --project node.tsconfig.json src/syntax/mthds/index.ts",
     "build:browser-extension": "rollup -c rollup.config.browser-extension.mjs",
     "build:browser-server": "rollup -c rollup.config.browser-server.mjs",
     "build:node": "rollup -c rollup.config.mjs",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@pipelex/lsp": "^0.1.34",
@@ -644,7 +607,8 @@
     "rollup": "^4.9.6",
     "rollup-plugin-esbuild": "^6.1.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.18"
   },
   "packageManager": "yarn@4.0.2"
 }
