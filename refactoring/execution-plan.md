@@ -109,9 +109,20 @@ Establish these as the source of truth. Both TextMate and semantic provider must
 
 ---
 
-## Phase 1: Build the MTHDS Grammar Generator
+## Phase 1: Build the MTHDS Grammar Generator (DONE)
 
 **Goal:** Create a self-contained TypeScript generator that produces a correct, deduplicated `mthds.tmLanguage.json` — without modifying any upstream Taplo files.
+
+**Status:** Completed. Commit `eea9ba6`. All verification checks passed:
+- `yarn build:syntax` generates both grammars
+- `toml.tmLanguage.json` is byte-identical to upstream
+- Generated `mthds.tmLanguage.json`: 938 lines (down from 1065, -12%)
+- Top-level patterns: 5 (was 12) — no jinja/html/injection leakage
+- Repository: 13 keys — 7 duplicate rules eliminated
+- `variable.other.jinja.mthds` only in `jinjaStatements`/`jinjaExpressions`
+- Concept table regex tightened to `[A-Z]` prefix; pipe table to `[a-z][a-z0-9_]*`
+- New entry patterns: `type = "PipeType"` and `pipe = "pipe_name"`
+- Zero upstream files modified
 
 ### Architecture
 
@@ -192,15 +203,13 @@ Each pattern is defined once in the repository and referenced via `#include`:
 
 ```typescript
 // injection.ts — ONE definition of dataInjection
-export function makeDataInjection(lang: string) {
-  return {
-    match: "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
-    captures: {
-      1: { name: `punctuation.definition.data-injection.${lang}` },
-      2: { name: `variable.name.data.${lang}` },
-    },
-  };
-}
+export const dataInjection = {
+  match: "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
+  captures: {
+    1: { name: "punctuation.definition.data-injection.mthds" },
+    2: { name: "variable.name.data.mthds" },
+  },
+};
 ```
 
 Both `jinja2`/`prompt_template` entry patterns and basic string patterns include `#dataInjection` — no duplication.
@@ -282,23 +291,19 @@ match: '^\\s*(\\[)\\s*(pipe(?:\\.[a-z][a-z0-9_]*)?)\\s*(\\])'
 import * as path from "path";
 import { writeFileSync } from "fs";
 import { comment, commentDirective } from "./comment";
-import { table } from "./table";
-import { entryBegin } from "./entry";
+import { dataInjection, templateVariable } from "./injection";
 import { value, stringEscapes } from "./value";
 import { jinjaTemplateContent, jinjaStatements, jinjaExpressions } from "./jinja";
 import { htmlContent, htmlAttributes } from "./html";
-import { makeDataInjection, makeTemplateVariable } from "./injection";
-
-const lang = "mthds";
+import { table } from "./table";
+import { entryBegin } from "./entry";
 
 const syntax = {
   version: "1.0.0",
   scopeName: "source.mthds",
   uuid: "8b4e5008-c50d-11ea-a91b-54ee75aeeb97",
   information_for_contributors: [
-    "Generated file — do not edit directly.",
-    "Source: editors/vscode/src/syntax/mthds/",
-    "Build: yarn build:syntax",
+    "Originally was maintained by aster (galaster@foxmail.com). This notice is only kept here for the record, please don't send e-mails about bugs and other issues.",
   ],
   patterns: [
     { include: "#commentDirective" },
@@ -318,8 +323,8 @@ const syntax = {
     jinjaExpressions,
     htmlContent,
     htmlAttributes,
-    dataInjection: makeDataInjection(lang),
-    templateVariable: makeTemplateVariable(lang),
+    dataInjection,
+    templateVariable,
     stringEscapes,
   },
 };
