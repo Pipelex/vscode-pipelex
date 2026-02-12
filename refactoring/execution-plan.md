@@ -35,7 +35,7 @@ The MTHDS generator duplicates ~190 lines of TOML base rules (comments, escapes,
 | `editors/vscode/src/pipelex/pipelexExtension.ts` | 21 | Feature registration entry point | **DONE** (Phase 2) — setting check added |
 | `editors/vscode/mthds.frontmatter.tmLanguage.json` | 22 | Frontmatter injection grammar | No change needed |
 | `editors/vscode/mthds.markdown.tmLanguage.json` | 44 | Markdown code block injection grammar | No change needed |
-| `editors/vscode/package.json` | 610 | Extension manifest | **DONE** (Phases 1-3) — build script, setting, colors |
+| `editors/vscode/package.json` | 614 | Extension manifest | **DONE** (Phases 1-4) — build script, setting, colors, test scripts, vitest dep |
 | `docs/pipelex/syntax-color-palette.md` | 49 | Color palette documentation | **DONE** (Phase 3) — theme inheritance documented |
 | `editors/vscode/src/syntax/index.ts` | 43 | TOML grammar generator entry point | No change (upstream) |
 | `editors/vscode/src/syntax/comment.ts` | 26 | TOML comment rules | No change (upstream) |
@@ -493,148 +493,115 @@ Update `docs/pipelex/syntax-color-palette.md` to reflect the actual colors after
 
 **Goal:** Prevent regressions.
 
-**Status:** Completed. Key changes:
-- Created 6 TextMate grammar test fixtures in `test-data/mthds/`
+**Status:** Completed. Commit `70128ae`. Key changes:
+- Created 6 TextMate grammar test fixtures in `test-data/mthds/` (187 lines total)
 - Set up vitest as test framework with vscode API mocking
-- Created 24 unit tests for semantic token provider covering all scenarios
+- Created 24 unit tests for semantic token provider (500 lines)
 - Added `test` and `test:watch` scripts to `package.json`
 - All 24 tests pass
 
-### 4a. TextMate Grammar Snapshot Tests
+### 4a. TextMate Grammar Test Fixtures
 
-Create test fixtures in `test-data/mthds/` that cover edge cases. Use `vscode-tmgrammar-test` (or a similar tool) to generate scope snapshots.
+Created 6 fixture files in `test-data/mthds/`, each targeting specific grammar features:
 
-**Test fixtures to create:**
+| Fixture | Lines | Covers |
+|---------|-------|--------|
+| `concept-tables.mthds` | 18 | `[concept]`, `[concept.Name]`, `[concept.Name.structure]`, `refines` with namespaced concept |
+| `pipe-definitions.mthds` | 26 | `[pipe]`, `[pipe.name]`, `type`, `output`, `model` (all 3 sigils `$@~`), single-line `inputs`, multi-input |
+| `jinja-templates.mthds` | 41 | `jinja2` block strings, `{% %}`, `{{ }}`, `{# #}`, HTML tags/attributes, filters, conditionals, single-line jinja2 |
+| `prompt-templates.mthds` | 47 | `prompt_template` block strings, `@injection`, `$template_variable`, multiple injections, dotted names, single-line |
+| `false-positives.mthds` | 26 | Literal strings (no MTHDS patterns), plain `definition` values, `type = "text"`, booleans, numbers, multiline literals |
+| `steps.mthds` | 23 | `pipe = "name"` references, `result`, `batch_over`, `batch_as`, `PipeCondition` with `pipe_map` |
 
-`test-data/mthds/concept-tables.mthds`:
-```toml
-[concept]
-Name = "Description"
-
-[concept.FeatureAnalysis]
-definition = "Analysis of features"
-
-[concept.FeatureAnalysis.structure]
-field = { type = "text", required = true }
-```
-
-`test-data/mthds/pipe-definitions.mthds`:
-```toml
-[pipe]
-
-[pipe.analyze_features]
-type = "PipeLLM"
-definition = "Analyze features"
-inputs = { photo = "native.Image" }
-output = "FeatureAnalysis"
-model = "$gpt-4o"
-```
-
-`test-data/mthds/jinja-templates.mthds`:
-```toml
-[pipe.format]
-type = "PipeJinja2"
-jinja2 = """
-{% for item in items %}
-  <h2>{{ item.title }}</h2>
-  <p>{{ item.body | truncate(200) }}</p>
-{% endfor %}
-<!-- end -->
-"""
-```
-
-`test-data/mthds/prompt-templates.mthds`:
-```toml
-[pipe.ask]
-type = "PipeLLM"
-prompt_template = """
-Analyze this:
-@input_data
-
-Using template: $template_name
-
-Be concise.
-"""
-```
-
-`test-data/mthds/false-positives.mthds`:
-```toml
-# This file tests that plain strings are NOT colored as Jinja/HTML/injections
-[concept.PlainText]
-definition = "A simple text concept with words that could false-match"
-description = "The variable foo should not be colored"
-note = 'Literal string: @not_injection $not_template {{ not_jinja }}'
-```
-
-`test-data/mthds/steps.mthds`:
-```toml
-[pipe.sequence]
-type = "PipeSequence"
-steps = [
-    { pipe = "step_one", result = "first_result" },
-    { pipe = "step_two", batch_over = "items", batch_as = "item", result = "second_result" },
-]
-```
+These serve as both visual regression fixtures (open in VS Code to verify coloring) and as inputs for potential automated TextMate grammar tests (`vscode-tmgrammar-test`) in the future.
 
 ### 4b. Semantic Token Provider Unit Tests
 
-Create `editors/vscode/src/pipelex/__tests__/semanticTokenProvider.test.ts`:
+Created `editors/vscode/src/pipelex/__tests__/semanticTokenProvider.test.ts` (500 lines, 24 tests).
 
-- Mock `vscode.TextDocument` with `lineCount`, `lineAt(n).text` returning fixed content
-- Mock `vscode.SemanticTokensBuilder` to capture pushed tokens
-- Call `provideDocumentSemanticTokens()` (public API) on the mock document
-- Assert token positions, lengths, types, and modifiers from captured pushes
+**Test framework:** vitest (config: `editors/vscode/vitest.config.mts`). Run via `yarn test` from `editors/vscode/`.
 
-**Test cases to cover:**
+**vscode API mocking:** `vi.mock('vscode')` provides `SemanticTokensLegend` and `SemanticTokensBuilder` implementations with self-contained classes inside the factory (required because `vi.mock` is hoisted). The builder captures pushed tokens as `{ line, char, length, tokenType, tokenModifiers }` objects.
 
-1. **Table headers with declaration modifier:**
-   - `[concept.FeatureAnalysis]` → `mthdsConceptSection` at "concept", `mthdsConcept` at "FeatureAnalysis", both with `declaration` flag
-   - `[pipe.analyze_features]` → `mthdsPipeSection` at "pipe", `mthdsPipeName` at "analyze_features", both with `declaration` flag
-   - `[concept]` and `[pipe]` alone (no name part)
+**Test suite structure (8 describe blocks, 24 tests):**
 
-2. **Output/refines concept references (no modifier):**
-   - `output = "FeatureAnalysis"` → `mthdsConcept` at correct offset
-   - `refines = "images.ImgGenPrompt"` → `mthdsConcept` (namespaced)
-   - `output = "FeatureAnalysis" # comment` → still matches
+1. **Table headers with declaration modifier** (5 tests):
+   `[concept.FeatureAnalysis]`, `[pipe.analyze_features]`, `[concept]` alone, `[pipe]` alone, leading whitespace
 
-3. **Single-line inputs:**
-   - `inputs = { photo = "native.Image" }` → `mthdsDataVariable` for "photo", `mthdsConcept` for "native.Image"
-   - `inputs = { a = "TypeA", b = "TypeB" }` → two variable + concept pairs
+2. **Output/refines concept references** (4 tests):
+   `output = "FeatureAnalysis"`, `refines = "images.ImgGenPrompt"` (namespaced), trailing comment, leading whitespace
 
-4. **Multi-line inputs (state machine):**
-   - Document with `inputs = {\n    photo = "native.Image",\n    text = "Text"\n}` → tokens on correct lines
+3. **Single-line inputs** (2 tests):
+   `inputs = { photo = "native.Image" }` (variable + concept), multiple entries `{ a = "TypeA", b = "TypeB" }`
 
-5. **Result variables:**
-   - `{ pipe = "step_one", result = "first_result" }` → `mthdsDataVariable` for "first_result"
-   - `{ batch_over = "items", batch_as = "item" }` → two `mthdsDataVariable` tokens
+4. **Multi-line inputs state machine** (2 tests):
+   Entries across lines with correct line numbers, closing brace stops tracking
 
-6. **False positives (should produce NO tokens):**
-   - `definition = "Some description"` — not an output/refines/inputs line
-   - `{ type = "text", required = true }` — concept structure, not inputs
-   - Lines inside template strings — semantic provider skips these
+5. **Result variables** (2 tests):
+   `result = "first_result"` offset verification, `batch_over`/`batch_as`/`result` in same line
+
+6. **False positives — zero tokens** (6 tests):
+   Plain `definition` strings, `type = "text"`, template string content, comment lines, empty lines, `[concept.Name.structure]` (too many segments)
+
+7. **Integration** (2 tests):
+   Complete pipe definition (5 tokens across 6 lines), sequence pipe with steps (9 tokens across 8 lines)
+
+8. **Legend verification** (1 test):
+   Token types and modifiers arrays match expected values
 
 ### Verification
 
-- All tests pass.
-- Run the TextMate grammar tests against the generated grammar.
-- Run the semantic provider tests.
+All 24 tests pass:
+```
+yarn test
+ ✓ src/pipelex/__tests__/semanticTokenProvider.test.ts (24 tests) 6ms
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+```
 
 ---
 
-## Phase 5: Final Cleanup
+## Phase 5: Final Cleanup (DONE)
+
+**Goal:** Clean up temporary files, update project documentation, verify everything works end-to-end.
+
+**Status:** Completed. Key changes:
+- Deleted `refactoring/mthds.tmLanguage.BEFORE.json` (Phase 0 snapshot)
+- Updated `CLAUDE.md`: added test command, grammar generator info, mthdsModelRef token, new directories
+- Full build passes (`yarn build` — 3 bundles created)
+- All 24 tests pass (`yarn test`)
 
 ### 5a. Delete Dead Files
 
-- Remove `refactoring/mthds.tmLanguage.BEFORE.json` (snapshot from Phase 0)
+Remove `refactoring/mthds.tmLanguage.BEFORE.json` — the Phase 0 snapshot used for diffing. It's no longer needed since Phase 1 is verified and committed.
+
+```bash
+rm refactoring/mthds.tmLanguage.BEFORE.json
+```
 
 ### 5b. Update CLAUDE.md
 
-The CLAUDE.md `Don't Edit` section should now include:
-```
-- `mthds.tmLanguage.json` — Generated by `src/syntax/mthds/`; run `yarn build:syntax`
-```
+The current `CLAUDE.md` needs several updates to reflect the refactoring work:
 
-(This was already listed as `*.tmLanguage.json` in the existing CLAUDE.md, but now it's actually true for MTHDS too.)
+1. **Build Commands section** — add the test command:
+   ```
+   - `cd editors/vscode && yarn test` - Run semantic token provider tests (vitest)
+   ```
+
+2. **MTHDS Language section** — add the grammar generator info:
+   ```
+   - Grammar generated by `editors/vscode/src/syntax/mthds/` (run `yarn build:syntax`)
+   - Semantic tokens: mthdsConcept, mthdsPipeType, mthdsDataVariable, mthdsPipeName, mthdsPipeSection, mthdsConceptSection, mthdsModelRef
+   ```
+   (Note: `mthdsModelRef` was added in Phase 2 but missing from existing CLAUDE.md)
+
+3. **Repository Structure section** — add the grammar generator and test directories:
+   ```
+   - `editors/vscode/src/syntax/mthds/` - MTHDS grammar generator (generates mthds.tmLanguage.json)
+   - `test-data/mthds/` - MTHDS grammar test fixtures
+   ```
+
+4. **Don't Edit section** — the `*.tmLanguage.json` entry already covers MTHDS, but it's now actually true for both TOML and MTHDS (previously MTHDS was hand-edited). No change needed.
 
 ### 5c. Verify Full Build
 
@@ -643,13 +610,26 @@ cd editors/vscode
 yarn build
 ```
 
-The full build runs `build:syntax` (both TOML and MTHDS generators), then bundles the extension.
+The full build runs `build:syntax` (both TOML and MTHDS generators), then bundles the extension. Verify it completes without errors.
+
+Also run tests:
+```bash
+yarn test
+```
 
 ### 5d. Manual Visual Verification
 
-Open both test fixtures in VS Code:
+Open both original test fixtures in VS Code:
 1. `test-data/example.mthds` — photo opposite pipeline
 2. `test-data/discord_newsletter.mthds` — newsletter with Jinja2, HTML, batch operations
+
+And the new Phase 4 fixtures:
+3. `test-data/mthds/concept-tables.mthds`
+4. `test-data/mthds/pipe-definitions.mthds`
+5. `test-data/mthds/jinja-templates.mthds`
+6. `test-data/mthds/prompt-templates.mthds`
+7. `test-data/mthds/false-positives.mthds`
+8. `test-data/mthds/steps.mthds`
 
 Verify every element is colored correctly per the palette:
 - Concept names: teal (`#4ECDC4`)
@@ -660,6 +640,7 @@ Verify every element is colored correctly per the palette:
 - HTML tags: inherit from theme
 - Plain strings: default string color, no false-positive Jinja coloring
 - Comments: inherit from theme
+- Literal strings (`'...'`): no MTHDS patterns (verify with `false-positives.mthds`)
 
 ---
 
@@ -672,7 +653,7 @@ Verify every element is colored correctly per the palette:
 | 2 | DONE | — | `semanticTokenProvider.ts` (rewrite), `pipelexExtension.ts`, `package.json` (new setting) | — |
 | 3 | DONE | — | `package.json` (textMateRules: -6 rules, color fix), `docs/pipelex/syntax-color-palette.md` | — |
 | 4 | DONE | `test-data/mthds/*.mthds` (6 fixtures), `semanticTokenProvider.test.ts`, `vitest.config.mts` | `package.json` (test scripts, vitest dep) | — |
-| 5 | TODO | — | `CLAUDE.md` (optional) | `refactoring/mthds.tmLanguage.BEFORE.json` |
+| 5 | DONE | — | `CLAUDE.md` | `refactoring/mthds.tmLanguage.BEFORE.json` |
 
 **Upstream Taplo files modified: 0**
 
@@ -682,8 +663,8 @@ Verify every element is colored correctly per the palette:
 Phase 0 ──→ Phase 1 ──→ Phase 2
   DONE        DONE    ↗   DONE
                    Phase 3 ──→ Phase 4 ──→ Phase 5
-                     DONE        DONE        TODO
+                     DONE        DONE        DONE
 ```
 
-- Phases 0-4: All complete
-- **Phase 5 is next**: Final cleanup (delete snapshot, update CLAUDE.md, verify full build)
+- **All phases complete.** The MTHDS syntax coloring refactoring is finished.
+- Manual visual verification (5d) is recommended: open the test fixtures in VS Code to confirm coloring.
