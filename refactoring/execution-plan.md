@@ -367,9 +367,20 @@ Modify `editors/vscode/package.json` `scripts.build:syntax`:
 
 ---
 
-## Phase 2: Rewrite the Semantic Token Provider
+## Phase 2: Rewrite the Semantic Token Provider (DONE)
 
 **Goal:** Slim the provider down to only provide truly semantic information that TextMate cannot, fix all bugs.
+
+**Status:** Completed. Key changes:
+- Slimmed from 121 lines to 143 lines (but with far more capability: multi-line inputs, declaration modifiers)
+- Removed TextMate-duplicated logic: `type = "PipeType"`, `model = "$ref"`, `pipe = "pipe_name"` — all now handled by grammar
+- Removed `{ type = "text" }` heuristic — regexes are now precise
+- Added `declaration` modifier (built-in VS Code modifier) to table header tokens
+- Added multi-line `inputs = { ... }` state machine for concept type + variable coloring
+- All position calculations use cumulative capture group lengths — zero `indexOf` calls
+- All regexes anchored to `^` where applicable, canonical `[a-z][a-z0-9_]*` for pipe names
+- Added `pipelex.mthds.semanticTokens` setting (default: true) to toggle provider
+- Updated `pipelexExtension.ts` to check setting before registering provider
 
 ### What the Semantic Provider Should Do (Post-Refactor)
 
@@ -483,9 +494,16 @@ Add modifier to semantic token types:
 
 ---
 
-## Phase 3: Fix Color Configuration
+## Phase 3: Fix Color Configuration (DONE)
 
 **Goal:** Unified, correct, non-aggressive color setup.
+
+**Status:** Completed. Key changes:
+- 3a: Unified pipe section color `#FF6666` -> `#FF6B6B` (now consistent with palette)
+- 3b: Removed phantom scope `support.type.concept.native.mthds` (no grammar rule existed)
+- 3c: Removed 6 theme-handleable textMateRules (Jinja punctuation, keywords, variables; HTML tags, attributes, comments) — these now inherit from user's theme
+- 3d: Updated `docs/pipelex/syntax-color-palette.md` — secondary colors section now documents theme inheritance
+- Remaining textMateRules: 10 MTHDS-specific scopes (down from 16)
 
 ### 3a. Unify the Two Reds
 

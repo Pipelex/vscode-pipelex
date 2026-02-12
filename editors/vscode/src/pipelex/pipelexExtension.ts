@@ -5,18 +5,17 @@ import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
  * Register all Pipelex-specific features for MTHDS support
  */
 export function registerPipelexFeatures(context: vscode.ExtensionContext) {
-    // Register MTHDS semantic token provider
-    const semanticTokensProvider = new PipelexSemanticTokensProvider();
-    context.subscriptions.push(
-        vscode.languages.registerDocumentSemanticTokensProvider(
-            { language: 'mthds' },
-            semanticTokensProvider,
-            semanticTokensProvider.getSemanticTokensLegend()
-        )
-    );
+    const config = vscode.workspace.getConfiguration('pipelex');
+    const semanticTokensEnabled = config.get<boolean>('mthds.semanticTokens', true);
 
-    // Future: Add more MTHDS-specific features here
-    // - MTHDS-specific validation
-    // - MTHDS-specific code actions
-    // - MTHDS-specific hover providers
+    if (semanticTokensEnabled) {
+        const provider = new PipelexSemanticTokensProvider();
+        context.subscriptions.push(
+            vscode.languages.registerDocumentSemanticTokensProvider(
+                { language: 'mthds' },
+                provider,
+                provider.getSemanticTokensLegend()
+            )
+        );
+    }
 }

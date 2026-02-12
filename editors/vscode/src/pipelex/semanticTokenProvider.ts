@@ -1,117 +1,139 @@
 import * as vscode from 'vscode';
 
+// Token type indices — must match the order in the legend array
+const TOKEN_TYPES = {
+    mthdsConcept: 0,
+    mthdsPipeType: 1,
+    mthdsDataVariable: 2,
+    mthdsPipeName: 3,
+    mthdsPipeSection: 4,
+    mthdsConceptSection: 5,
+    mthdsModelRef: 6,
+} as const;
+
+// Token modifier indices — must match the order in the legend array
+const TOKEN_MODIFIERS = {
+    declaration: 0,
+} as const;
+
+const DECLARATION_FLAG = 1 << TOKEN_MODIFIERS.declaration;
+
 export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTokensProvider {
     private readonly legend: vscode.SemanticTokensLegend;
 
     constructor() {
-        // Define our custom semantic token types
-        this.legend = new vscode.SemanticTokensLegend([
-            'mthdsConcept',
-            'mthdsPipeType',
-            'mthdsDataVariable',
-            'mthdsPipeName',
-            'mthdsPipeSection',
-            'mthdsConceptSection',
-            'mthdsModelRef'
-        ]);
+        this.legend = new vscode.SemanticTokensLegend(
+            [
+                'mthdsConcept',
+                'mthdsPipeType',
+                'mthdsDataVariable',
+                'mthdsPipeName',
+                'mthdsPipeSection',
+                'mthdsConceptSection',
+                'mthdsModelRef',
+            ],
+            ['declaration']
+        );
     }
 
     async provideDocumentSemanticTokens(
         document: vscode.TextDocument,
-        token: vscode.CancellationToken
+        _token: vscode.CancellationToken
     ): Promise<vscode.SemanticTokens> {
         const tokensBuilder = new vscode.SemanticTokensBuilder(this.legend);
-        const text = document.getText();
-        const lines = text.split('\n');
+        const lineCount = document.lineCount;
+        let insideMultiLineInputs = false;
 
-        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-            const line = lines[lineIndex];
-            this.analyzeLine(line, lineIndex, tokensBuilder);
+        for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
+            const line = document.lineAt(lineIndex).text;
+
+            if (insideMultiLineInputs) {
+                this.analyzeInputEntries(line, 0, lineIndex, tokensBuilder);
+                if (line.includes('}')) {
+                    insideMultiLineInputs = false;
+                }
+                continue;
+            }
+
+            // Table headers — add declaration modifier
+            this.analyzeTableHeaders(line, lineIndex, tokensBuilder);
+
+            // output/refines concept type references
+            this.analyzeOutputRefines(line, lineIndex, tokensBuilder);
+
+            // Single-line inputs = { ... }
+            const singleLineInputs = /^(\s*inputs\s*=\s*)\{(.+)\}\s*$/.exec(line);
+            if (singleLineInputs) {
+                const blockOffset = singleLineInputs[1].length + 1; // after '{'
+                this.analyzeInputEntries(singleLineInputs[2], blockOffset, lineIndex, tokensBuilder);
+            } else {
+                // Check for multi-line inputs start
+                const multiLineStart = /^(\s*inputs\s*=\s*)\{(.*)$/.exec(line);
+                if (multiLineStart) {
+                    insideMultiLineInputs = true;
+                    const blockOffset = multiLineStart[1].length + 1;
+                    this.analyzeInputEntries(multiLineStart[2], blockOffset, lineIndex, tokensBuilder);
+                }
+            }
+
+            // result/batch_as/batch_over variable names in step objects
+            this.analyzeResultVariables(line, lineIndex, tokensBuilder);
         }
 
         return tokensBuilder.build();
     }
 
-    private analyzeLine(line: string, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
-        // Skip lines that are concept structure definitions (contain { type = "text" })
-        if (line.includes('{ type = "text"') || line.includes('{type="text"')) {
+    private analyzeTableHeaders(line: string, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
+        // Concept sections: [concept] or [concept.Name]
+        const conceptMatch = /^(\s*)\[concept(?:\.([A-Z][A-Za-z0-9]*))?\]/.exec(line);
+        if (conceptMatch) {
+            const keywordOffset = conceptMatch[1].length + 1; // after whitespace + '['
+            tokensBuilder.push(lineIndex, keywordOffset, 7, TOKEN_TYPES.mthdsConceptSection, DECLARATION_FLAG);
+            if (conceptMatch[2]) {
+                const nameOffset = keywordOffset + 7 + 1; // after 'concept' + '.'
+                tokensBuilder.push(lineIndex, nameOffset, conceptMatch[2].length, TOKEN_TYPES.mthdsConcept, DECLARATION_FLAG);
+            }
             return;
         }
 
-        // Output and refines concept types (output = "ConceptType", refines = "ConceptType") - only at start of line
-        const outputRefinesRegex = /^(\s*)(output|refines)\s*=\s*"((?:[a-z][a-z0-9_]*\.)?[A-Z][A-Za-z0-9]*(?:\.[A-Z][A-Za-z0-9]*)*)"\s*$/g;
+        // Pipe sections: [pipe] or [pipe.name]
+        const pipeMatch = /^(\s*)\[pipe(?:\.([a-z][a-z0-9_]*))?\]/.exec(line);
+        if (pipeMatch) {
+            const keywordOffset = pipeMatch[1].length + 1;
+            tokensBuilder.push(lineIndex, keywordOffset, 4, TOKEN_TYPES.mthdsPipeSection, DECLARATION_FLAG);
+            if (pipeMatch[2]) {
+                const nameOffset = keywordOffset + 4 + 1; // after 'pipe' + '.'
+                tokensBuilder.push(lineIndex, nameOffset, pipeMatch[2].length, TOKEN_TYPES.mthdsPipeName, DECLARATION_FLAG);
+            }
+        }
+    }
+
+    private analyzeOutputRefines(line: string, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
+        const match = /^(\s*)(output|refines)(\s*=\s*")((?:[a-z][a-z0-9_]*\.)?[A-Z][A-Za-z0-9]*(?:\.[A-Z][A-Za-z0-9]*)*)"/.exec(line);
+        if (match) {
+            const conceptOffset = match[1].length + match[2].length + match[3].length;
+            tokensBuilder.push(lineIndex, conceptOffset, match[4].length, TOKEN_TYPES.mthdsConcept);
+        }
+    }
+
+    private analyzeInputEntries(content: string, baseOffset: number, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
+        const entryRegex = /([a-z][a-z0-9_]*)(\s*=\s*")((?:[a-z][a-z0-9_]*\.)?[A-Z][A-Za-z0-9]*(?:\.[A-Z][A-Za-z0-9]*)*)(")/g;
         let match;
-        while ((match = outputRefinesRegex.exec(line)) !== null) {
-            const conceptStart = match.index + match[0].indexOf(match[3]);
-            tokensBuilder.push(lineIndex, conceptStart, match[3].length, 0); // mthdsConcept - full concept including namespace
+        while ((match = entryRegex.exec(content)) !== null) {
+            const varOffset = baseOffset + match.index;
+            tokensBuilder.push(lineIndex, varOffset, match[1].length, TOKEN_TYPES.mthdsDataVariable);
+
+            const conceptOffset = baseOffset + match.index + match[1].length + match[2].length;
+            tokensBuilder.push(lineIndex, conceptOffset, match[3].length, TOKEN_TYPES.mthdsConcept);
         }
+    }
 
-        // Concept types in input parameters (var_name = "ConceptType") - only in inputs = { ... } at line start
-        const inputParamRegex = /^(\s*)inputs\s*=\s*\{[^}]*\b([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)\s*=\s*"((?:[a-z][a-z0-9_]*\.)?[A-Z][A-Za-z0-9]*(?:\.[A-Z][A-Za-z0-9]*)*)"/g;
-        while ((match = inputParamRegex.exec(line)) !== null) {
-            // Variable name (left side of =)
-            const varStart = match.index + match[0].indexOf(match[2]);
-            tokensBuilder.push(lineIndex, varStart, match[2].length, 2); // mthdsDataVariable
-
-            // Concept type (right side of =)
-            const conceptStart = match.index + match[0].indexOf(match[3]);
-            tokensBuilder.push(lineIndex, conceptStart, match[3].length, 0); // mthdsConcept - full concept including namespace
-        }
-
-        // Pipe types (PipeLLM, PipeSequence, etc.) - only at start of line, not in structure definitions
-        const pipeTypeRegex = /^(\s*)type\s*=\s*"(Pipe[A-Z][A-Za-z0-9]*)"\s*$/g;
-        while ((match = pipeTypeRegex.exec(line)) !== null) {
-            const pipeTypeStart = match.index + match[0].indexOf(match[2]);
-            tokensBuilder.push(lineIndex, pipeTypeStart, match[2].length, 1); // mthdsPipeType
-        }
-
-        // Pipe names in steps (pipe = "pipe_name")
-        const pipeNameRegex = /\bpipe\s*=\s*"([a-z][a-z0-9_]*)"/g;
-        while ((match = pipeNameRegex.exec(line)) !== null) {
-            const pipeNameStart = match.index + match[0].indexOf(match[1]);
-            tokensBuilder.push(lineIndex, pipeNameStart, match[1].length, 3); // mthdsPipeName
-        }
-
-        // Model field sigil references (model = "$preset-name", model = "@alias", model = "~waterfall")
-        const modelRefRegex = /^\s*model\s*=\s*"([$@~])([a-zA-Z][a-zA-Z0-9_-]*)"/g;
-        while ((match = modelRefRegex.exec(line)) !== null) {
-            const sigilStart = match.index + match[0].indexOf(match[1], match[0].indexOf('"') + 1);
-            tokensBuilder.push(lineIndex, sigilStart, 1, 6); // sigil - mthdsModelRef
-            tokensBuilder.push(lineIndex, sigilStart + 1, match[2].length, 6); // name - mthdsModelRef
-        }
-
-        // Variable names in result assignments
-        const resultVarRegex = /\b(result|batch_as|batch_over)\s*=\s*"([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)"/g;
-        while ((match = resultVarRegex.exec(line)) !== null) {
-            const varStart = match.index + match[0].indexOf(match[2]);
-            tokensBuilder.push(lineIndex, varStart, match[2].length, 2); // mthdsDataVariable
-        }
-
-        // Section headers
-        if (line.trim().startsWith('[')) {
-            // Pipe sections [pipe.name]
-            const pipeSectionRegex = /^\s*\[pipe(?:\.([a-z][a-z0-9_]*))?\]/;
-            const pipeMatch = pipeSectionRegex.exec(line);
-            if (pipeMatch) {
-                const sectionStart = line.indexOf('[pipe');
-                tokensBuilder.push(lineIndex, sectionStart + 1, 4, 4); // "pipe" part - mthdsPipeSection
-                if (pipeMatch[1]) {
-                    const nameStart = line.indexOf(pipeMatch[1]);
-                    tokensBuilder.push(lineIndex, nameStart, pipeMatch[1].length, 3); // pipe name - mthdsPipeName
-                }
-            }
-
-            // Concept sections [concept.Name]
-            const conceptSectionRegex = /^\s*\[concept(?:\.([A-Z][A-Za-z0-9]*))?\]/;
-            const conceptMatch = conceptSectionRegex.exec(line);
-            if (conceptMatch) {
-                const sectionStart = line.indexOf('[concept');
-                tokensBuilder.push(lineIndex, sectionStart + 1, 7, 5); // "concept" part - mthdsConceptSection
-                if (conceptMatch[1]) {
-                    const nameStart = line.indexOf(conceptMatch[1]);
-                    tokensBuilder.push(lineIndex, nameStart, conceptMatch[1].length, 0); // concept name - mthdsConcept
-                }
-            }
+    private analyzeResultVariables(line: string, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
+        const regex = /\b(result|batch_as|batch_over)(\s*=\s*")([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)(")/g;
+        let match;
+        while ((match = regex.exec(line)) !== null) {
+            const varOffset = match.index + match[1].length + match[2].length;
+            tokensBuilder.push(lineIndex, varOffset, match[3].length, TOKEN_TYPES.mthdsDataVariable);
         }
     }
 
