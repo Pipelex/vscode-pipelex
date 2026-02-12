@@ -11,7 +11,8 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
             'mthdsDataVariable',
             'mthdsPipeName',
             'mthdsPipeSection',
-            'mthdsConceptSection'
+            'mthdsConceptSection',
+            'mthdsModelRef'
         ]);
     }
 
@@ -71,25 +72,19 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
             tokensBuilder.push(lineIndex, pipeNameStart, match[1].length, 3); // mthdsPipeName
         }
 
+        // Model field sigil references (model = "$preset-name", model = "@alias", model = "~waterfall")
+        const modelRefRegex = /^\s*model\s*=\s*"([$@~])([a-zA-Z][a-zA-Z0-9_-]*)"/g;
+        while ((match = modelRefRegex.exec(line)) !== null) {
+            const sigilStart = match.index + match[0].indexOf(match[1], match[0].indexOf('"') + 1);
+            tokensBuilder.push(lineIndex, sigilStart, 1, 6); // sigil - mthdsModelRef
+            tokensBuilder.push(lineIndex, sigilStart + 1, match[2].length, 6); // name - mthdsModelRef
+        }
+
         // Variable names in result assignments
         const resultVarRegex = /\b(result|batch_as|batch_over)\s*=\s*"([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)"/g;
         while ((match = resultVarRegex.exec(line)) !== null) {
             const varStart = match.index + match[0].indexOf(match[2]);
             tokensBuilder.push(lineIndex, varStart, match[2].length, 2); // mthdsDataVariable
-        }
-
-        // Data injection (@variable_name)
-        const dataInjectionRegex = /@([a-z][a-zA-Z0-9_]*(?:\.[a-z][a-zA-Z0-9_]*)*)/g;
-        while ((match = dataInjectionRegex.exec(line)) !== null) {
-            const varStart = match.index + 1; // Skip the @
-            tokensBuilder.push(lineIndex, varStart, match[1].length, 2); // mthdsDataVariable
-        }
-
-        // Template variables ($variable_name)
-        const templateVarRegex = /\$([a-z][a-zA-Z0-9_]*(?:\.[a-z][a-zA-Z0-9_]*)*)/g;
-        while ((match = templateVarRegex.exec(line)) !== null) {
-            const varStart = match.index + 1; // Skip the $
-            tokensBuilder.push(lineIndex, varStart, match[1].length, 2); // mthdsDataVariable
         }
 
         // Section headers

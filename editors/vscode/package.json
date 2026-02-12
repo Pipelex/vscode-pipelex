@@ -212,6 +212,11 @@
         "id": "mthdsConceptSection",
         "superType": "keyword",
         "description": "Pipelex concept section headers"
+      },
+      {
+        "id": "mthdsModelRef",
+        "superType": "variable",
+        "description": "Pipelex model field references ($preset, @alias, ~waterfall)"
       }
     ],
     "semanticTokenScopes": [
@@ -240,6 +245,9 @@
           ],
           "mthdsConceptSection": [
             "support.type.property-name.concept.mthds"
+          ],
+          "mthdsModelRef": [
+            "entity.name.model-ref.mthds"
           ]
         }
       }
@@ -307,6 +315,19 @@
             "scope": "punctuation.definition.template-variable.mthds",
             "settings": {
               "foreground": "#FF79C6"
+            }
+          },
+          {
+            "scope": "punctuation.definition.model-sigil.mthds",
+            "settings": {
+              "foreground": "#FF79C6"
+            }
+          },
+          {
+            "scope": "entity.name.model-ref.mthds",
+            "settings": {
+              "foreground": "#FFB86C",
+              "fontStyle": "bold"
             }
           },
           {
