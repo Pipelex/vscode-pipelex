@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex Language (MTHDS) and TOML support",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "autoTag": {
     "enabled": true
   },
