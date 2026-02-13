@@ -586,7 +586,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@pipelex/lsp": "^0.1.34",
+    "@pipelex/lsp": "portal:../../js/lsp",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",

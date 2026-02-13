@@ -1,0 +1,28 @@
+[package]
+name         = "pipelex-lsp"
+description  = "Pipelex Language Server (wraps taplo-lsp with MTHDS support)"
+version      = "0.1.0"
+rust-version = { workspace = true }
+authors      = { workspace = true }
+edition      = { workspace = true }
+license      = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default    = ["rustls-tls"]
+native-tls = ["taplo-common/native-tls"]
+rustls-tls = ["taplo-common/rustls-tls"]
+
+[dependencies]
+pipelex-common = { version = "0.1.0", path = "../pipelex-common" }
+lsp-async-stub = { version = "0.7.0", path = "../lsp-async-stub" }
+taplo-lsp      = { version = "0.8.0", path = "../taplo-lsp", default-features = false }
+taplo-common   = { version = "0.6.0", path = "../taplo-common", features = ["schema", "reqwest"] }
+
+futures = { workspace = true }
+tracing = { workspace = true }
+
+[package.metadata.auto-tag]
+enabled = true

@@ -1,0 +1,45 @@
+[package]
+name         = "pipelex-wasm"
+version      = "0.1.0"
+publish      = false
+rust-version = { workspace = true }
+authors      = { workspace = true }
+edition      = { workspace = true }
+license      = { workspace = true }
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pipelex-common = { path = "../pipelex-common" }
+pipelex-cli    = { path = "../pipelex-cli", optional = true, default-features = false }
+taplo-lsp      = { path = "../taplo-lsp", optional = true, default-features = false }
+lsp-async-stub = { path = "../lsp-async-stub" }
+taplo          = { path = "../taplo" }
+taplo-cli      = { path = "../taplo-cli", optional = true, default-features = false }
+taplo-common   = { path = "../taplo-common", default-features = false, features = ["rustls-tls", "schema", "reqwest"] }
+
+anyhow                   = { workspace = true }
+async-trait              = { workspace = true }
+clap                     = { workspace = true, features = ["derive"] }
+console_error_panic_hook = { version = "0.1.7" }
+futures                  = { workspace = true }
+getrandom                = { workspace = true, features = ["js"] }
+indexmap                  = { workspace = true }
+serde                    = { workspace = true, features = ["derive"] }
+serde-wasm-bindgen       = { version = "0.6.5" }
+serde_json               = { workspace = true }
+time                     = { workspace = true, features = ["parsing"] }
+tokio                    = { workspace = true }
+tracing                  = { workspace = true }
+url                      = { workspace = true }
+
+# Bump all together since it's a monorepo
+js-sys               = { version = "0.3.72" }
+wasm-bindgen         = { version = "0.2.95" }
+wasm-bindgen-futures = { version = "0.4.45" }
+
+[features]
+default = ["cli", "lsp"]
+cli     = ["pipelex-cli", "taplo-cli"]
+lsp     = ["taplo-lsp"]

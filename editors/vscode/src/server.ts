@@ -2,25 +2,25 @@ import fs from "fs";
 import fsPromise from "fs/promises";
 import path from "path";
 import { exit } from "process";
-import { RpcMessage, TaploLsp } from "@pipelex/lsp";
+import { RpcMessage, PipelexLsp } from "@pipelex/lsp";
 import fetch, { Headers, Request, Response } from "node-fetch";
 import glob from "fast-glob";
 
-let taplo: TaploLsp;
+let pipelex: PipelexLsp;
 
 process.on("message", async (d: RpcMessage) => {
   if (d.method === "exit") {
     exit(0);
   }
 
-  if (typeof taplo === "undefined") {
-    taplo = await TaploLsp.initialize(
+  if (typeof pipelex === "undefined") {
+    pipelex = await PipelexLsp.initialize(
       {
         cwd: () => process.cwd(),
         envVar: name => process.env[name],
         envVars: () => Object.entries(process.env),
         findConfigFile: from => {
-          const fileNames = [".taplo.toml", "taplo.toml"];
+          const fileNames = [".pipelex.toml", "pipelex.toml", ".taplo.toml", "taplo.toml"];
 
           for (const name of fileNames) {
             try {
@@ -63,7 +63,7 @@ process.on("message", async (d: RpcMessage) => {
     );
   }
 
-  taplo.send(d);
+  pipelex.send(d);
 });
 
 // These are panics from Rust.

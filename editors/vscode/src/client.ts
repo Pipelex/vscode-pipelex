@@ -109,6 +109,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
   } else {
     const taploPath =
       vscode.workspace.getConfiguration().get("pipelex.server.path") ??
+      which.sync("plxt", { nothrow: true }) ??
       which.sync("taplo", { nothrow: true });
 
     if (typeof taploPath !== "string") {

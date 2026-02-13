@@ -3,18 +3,18 @@ import {
   BrowserMessageWriter,
 } from "vscode-languageserver-protocol/browser";
 
-import { TaploLsp, RpcMessage } from "@pipelex/lsp";
+import { PipelexLsp, RpcMessage } from "@pipelex/lsp";
 
 const worker: Worker = self as any;
 
 const writer = new BrowserMessageWriter(worker);
 const reader = new BrowserMessageReader(worker);
 
-let taplo: TaploLsp;
+let pipelex: PipelexLsp;
 
 reader.listen(async message => {
-  if (!taplo) {
-    taplo = await TaploLsp.initialize(
+  if (!pipelex) {
+    pipelex = await PipelexLsp.initialize(
       {
         cwd: () => "/",
         envVar: () => "",
@@ -44,5 +44,5 @@ reader.listen(async message => {
     );
   }
 
-  taplo.send(message as RpcMessage);
+  pipelex.send(message as RpcMessage);
 });
