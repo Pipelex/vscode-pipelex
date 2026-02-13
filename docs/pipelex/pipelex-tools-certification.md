@@ -6,7 +6,7 @@ The Pipelex wrapper crates provide **full feature parity** with the upstream tap
 
 | Verification | Status | Details |
 |---|---|---|
-| `cargo test -p pipelex-common` | **5/5 pass** | MthdsEnvironment config discovery tests |
+| `cargo test -p pipelex-common` | **4/4 pass** | MthdsEnvironment config discovery tests |
 | `cargo check -p pipelex-cli` | **OK** | All features (lint, lsp, completions) compile |
 | `cargo check -p pipelex-lsp` | **OK** | LSP server wrapper compiles |
 | `cargo check -p pipelex-wasm --target wasm32-unknown-unknown` | **OK** | WASM target compiles |
@@ -64,8 +64,8 @@ All LSP features are inherited from `taplo-lsp` via the `Server::handle_message(
 
 | Context | Search Order |
 |---|---|
-| `plxt` CLI (native) | `.pipelex.toml` > `pipelex.toml` > `.taplo.toml` > `taplo.toml` (walks up directories) |
-| VS Code extension (bundled LSP, Node) | `.pipelex.toml` > `pipelex.toml` > `.taplo.toml` > `taplo.toml` (via `server.ts` callback) |
+| `plxt` CLI (native) | `.pipelex/toml_config.toml` > `.taplo.toml` > `taplo.toml` (walks up directories) |
+| VS Code extension (bundled LSP, Node) | `.pipelex/toml_config.toml` > `.taplo.toml` > `taplo.toml` (via `server.ts` callback) |
 | VS Code extension (non-bundled, external `plxt`) | Same as CLI |
 | WASM (browser) | Delegates to JS `findConfigFile` callback |
 
@@ -90,9 +90,9 @@ The core abstraction layer. Contains the `MthdsEnvironment<E>` wrapper that make
 | `Cargo.toml` | Crate manifest | 29 |
 | `src/lib.rs` | Module declarations, re-exports `taplo_common` | 5 |
 | `src/config.rs` | `PIPELEX_CONFIG_FILE_NAMES` constant | 3 |
-| `src/environment.rs` | `MthdsEnvironment<E>` struct + `Environment` trait impl (15 delegated methods + custom `find_config_file`) + 5 unit tests | 265 |
+| `src/environment.rs` | `MthdsEnvironment<E>` struct + `Environment` trait impl (15 delegated methods + custom `find_config_file`) + 4 unit tests | 255 |
 
-**Key type**: `MthdsEnvironment<E: Environment>` - wraps any `Environment` impl, overrides `find_config_file` to search `.pipelex.toml`/`pipelex.toml` before falling back to the inner env's discovery.
+**Key type**: `MthdsEnvironment<E: Environment>` - wraps any `Environment` impl, overrides `find_config_file` to search `.pipelex/toml_config.toml` before falling back to the inner env's discovery.
 
 #### `crates/pipelex-cli/` - CLI Binary
 The `plxt` binary. Wraps `taplo-cli` with pipelex branding and the `MthdsEnvironment`.
@@ -150,7 +150,7 @@ WASM exports for browser and Node.js environments. Contains a mechanical copy of
 |---|---|---|
 | Import | `TaploLsp` | `PipelexLsp` |
 | Variable name | `taplo` | `pipelex` |
-| Config file search | `[".taplo.toml", "taplo.toml"]` | `[".pipelex.toml", "pipelex.toml", ".taplo.toml", "taplo.toml"]` |
+| Config file search | `[".taplo.toml", "taplo.toml"]` | `[".pipelex/toml_config.toml", ".taplo.toml", "taplo.toml"]` |
 
 #### `editors/vscode/src/server-worker.ts` - Browser Worker Entry
 | Change | Before | After |
@@ -236,7 +236,7 @@ WASM exports for browser and Node.js environments. Contains a mechanical copy of
 
 3. **WASM environment code duplication**: ~450 lines of `taplo-wasm` internals are mechanically copied into `pipelex-wasm` because the upstream types are `pub(crate)`. The WASM environment interface is stable, so maintenance burden is low.
 
-4. **`plxt config default`**: Prints the same default `.taplo.toml` content as `taplo config default` (delegated to `taplo_cli::execute_config`). The content could be rebranded to reference `.pipelex.toml` in the future.
+4. **`plxt config default`**: Prints the same default `.taplo.toml` content as `taplo config default` (delegated to `taplo_cli::execute_config`). The content could be rebranded to reference `.pipelex/toml_config.toml` in the future.
 
 ---
 

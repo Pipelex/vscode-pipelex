@@ -20,7 +20,7 @@ process.on("message", async (d: RpcMessage) => {
         envVar: name => process.env[name],
         envVars: () => Object.entries(process.env),
         findConfigFile: from => {
-          const fileNames = [".pipelex.toml", "pipelex.toml", ".taplo.toml", "taplo.toml"];
+          const fileNames = [".pipelex/toml_config.toml", ".taplo.toml", "taplo.toml"];
 
           for (const name of fileNames) {
             try {

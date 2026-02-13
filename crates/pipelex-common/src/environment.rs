@@ -7,7 +7,7 @@ use url::Url;
 
 use crate::config::PIPELEX_CONFIG_FILE_NAMES;
 
-/// An environment wrapper that searches for `.pipelex.toml` / `pipelex.toml`
+/// An environment wrapper that searches for `.pipelex/toml_config.toml`
 /// before falling back to the inner environment's config file discovery
 /// (which looks for `.taplo.toml` / `taplo.toml`).
 #[derive(Clone)]
@@ -213,13 +213,16 @@ mod tests {
     async fn pipelex_config_takes_priority() {
         let env = MockEnv {
             files: vec![
-                PathBuf::from("/project/.pipelex.toml"),
+                PathBuf::from("/project/.pipelex/toml_config.toml"),
                 PathBuf::from("/project/.taplo.toml"),
             ],
         };
         let mthds = MthdsEnvironment::new(env);
         let result = mthds.find_config_file(Path::new("/project")).await;
-        assert_eq!(result, Some(PathBuf::from("/project/.pipelex.toml")));
+        assert_eq!(
+            result,
+            Some(PathBuf::from("/project/.pipelex/toml_config.toml"))
+        );
     }
 
     #[tokio::test]
@@ -235,13 +238,16 @@ mod tests {
     #[tokio::test]
     async fn pipelex_config_in_parent() {
         let env = MockEnv {
-            files: vec![PathBuf::from("/project/.pipelex.toml")],
+            files: vec![PathBuf::from("/project/.pipelex/toml_config.toml")],
         };
         let mthds = MthdsEnvironment::new(env);
         let result = mthds
             .find_config_file(Path::new("/project/sub/dir"))
             .await;
-        assert_eq!(result, Some(PathBuf::from("/project/.pipelex.toml")));
+        assert_eq!(
+            result,
+            Some(PathBuf::from("/project/.pipelex/toml_config.toml"))
+        );
     }
 
     #[tokio::test]
@@ -252,13 +258,4 @@ mod tests {
         assert_eq!(result, None);
     }
 
-    #[tokio::test]
-    async fn pipelex_toml_without_dot() {
-        let env = MockEnv {
-            files: vec![PathBuf::from("/project/pipelex.toml")],
-        };
-        let mthds = MthdsEnvironment::new(env);
-        let result = mthds.find_config_file(Path::new("/project")).await;
-        assert_eq!(result, Some(PathBuf::from("/project/pipelex.toml")));
-    }
 }
