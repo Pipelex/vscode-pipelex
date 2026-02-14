@@ -4,6 +4,11 @@
 Fork of [tamasfe/taplo](https://github.com/tamasfe/taplo) (TOML toolkit) extended with Pipelex Language (MTHDS) support.
 Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packages + VitePress docs site.
 
+## Critical Rule: Preserve Upstream Taplo Behavior
+**By default, unless expressly and clearly stated otherwise, all existing taplo upstream features and behavior must be kept as-is.** Do not modify, remove, or alter any taplo functionality. Our work is exclusively focused on **adding** new features for MTHDS files and the Pipelex VS Code extension. When making changes, ensure they do not regress or interfere with existing TOML support.
+
+**Exception — bug fixes in common code:** If fixing a bug requires modifying shared/upstream taplo code (e.g. crates outside of MTHDS-specific paths), you must explicitly notify the developer before making the change, explaining what the bug is, which common code is affected, and why the fix is necessary.
+
 ## Repository Structure
 - `crates/taplo/` - Core Rust library (parser, formatter, DOM)
 - `crates/taplo-cli/` - CLI tool
