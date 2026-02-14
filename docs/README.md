@@ -1,48 +1,25 @@
-# Documentation System
+# Documentation
 
-This repository uses a documentation composition system to keep Pipelex-specific content while staying in sync with upstream Taplo documentation.
+## Project docs
 
-## How it works
+| Directory | Purpose |
+|-----------|---------|
+| [`dev/`](dev/) | Developer setup, build instructions |
+| [`design/`](design/) | Architecture decisions & plans |
+| [`features/`](features/) | Feature specs & references |
+| [`guide/`](guide/) | User-facing how-to guides |
 
-- **Header files** in `docs/pipelex/` contain Pipelex-specific content
-- **Upstream files** are pulled from the `upstream` branch into `docs/upstream/`
-- **Final docs** are composed by prepending headers to upstream content
+## Upstream doc composition
 
-## Files structure
+The repo-root `README.md`, `CONTRIBUTING.md`, and `editors/vscode/README.md` are **generated** by prepending Pipelex-specific headers to upstream Taplo content. Never edit them directly.
 
-```
-docs/
-├── pipelex/                    # Pipelex-specific headers (EDIT THESE)
-│   ├── README.header.md        # Header for root README.md
-│   ├── CONTRIBUTING.header.md  # Header for CONTRIBUTING.md
-│   └── VSCODE_README.header.md # Header for editors/vscode/README.md
-└── upstream/                   # Upstream content (AUTO-GENERATED)
-    ├── README.UPSTREAM.md
-    ├── CONTRIBUTING.UPSTREAM.md
-    └── VSCODE_README.UPSTREAM.md
-```
+| Directory | Purpose |
+|-----------|---------|
+| [`pipelex/`](pipelex/) | Pipelex-specific headers (edit these) |
+| [`upstream/`](upstream/) | Upstream content (auto-pulled) |
 
-## Usage
+To regenerate:
 
-### Update documentation
 ```bash
 ./scripts/compose-docs.sh
 ```
-
-### Edit Pipelex-specific content
-1. Edit files in `docs/pipelex/`
-2. Run `./scripts/compose-docs.sh`
-3. Review and commit changes
-
-### SourceTree Custom Action (Optional)
-Add a custom action in SourceTree:
-- **Menu Caption**: Update Docs
-- **Script to run**: `$REPO/scripts/compose-docs.sh`
-- **Parameters**: (leave empty)
-
-## Generated files
-- `README.md` - Root repository README
-- `CONTRIBUTING.md` - Contributing guidelines  
-- `editors/vscode/README.md` - VS Code extension README
-
-⚠️ **Important**: Never edit the generated files directly! Always edit the header files in `docs/pipelex/` and run the compose script.
