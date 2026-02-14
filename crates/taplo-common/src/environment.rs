@@ -81,4 +81,18 @@ pub trait Environment: Clone + Send + Sync + 'static {
     async fn find_config_file_normalized(&self, from: &Path) -> Option<PathBuf> {
         self.find_config_file(from).await.map(Normalize::normalize)
     }
+
+    /// Returns `true` if `path` looks like a configuration file for this
+    /// environment (e.g. `.taplo.toml`, `taplo.toml`).
+    ///
+    /// The default implementation checks against [`crate::config::CONFIG_FILE_NAMES`].
+    /// Environments that support additional config files (such as
+    /// `.pipelex/toml_config.toml`) should override this method.
+    fn is_config_file(&self, path: &Path) -> bool {
+        use crate::config::CONFIG_FILE_NAMES;
+        let path_str = path.to_string_lossy();
+        CONFIG_FILE_NAMES
+            .iter()
+            .any(|name| path_str.ends_with(name))
+    }
 }

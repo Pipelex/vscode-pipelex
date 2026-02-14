@@ -98,6 +98,14 @@ impl<E: Environment> Environment for MthdsEnvironment<E> {
         self.inner.cwd()
     }
 
+    fn is_config_file(&self, path: &Path) -> bool {
+        let path_str = path.to_string_lossy();
+        let is_pipelex = PIPELEX_CONFIG_FILE_NAMES
+            .iter()
+            .any(|name| path_str.ends_with(name));
+        is_pipelex || self.inner.is_config_file(path)
+    }
+
     async fn find_config_file(&self, from: &Path) -> Option<PathBuf> {
         // Walk directories upward looking for pipelex config files first.
         let mut p = from;
@@ -258,4 +266,27 @@ mod tests {
         assert_eq!(result, None);
     }
 
+    #[test]
+    fn is_config_file_pipelex() {
+        let env = MockEnv { files: vec![] };
+        let mthds = MthdsEnvironment::new(env);
+        assert!(mthds.is_config_file(Path::new("/project/.pipelex/toml_config.toml")));
+    }
+
+    #[test]
+    fn is_config_file_taplo() {
+        let env = MockEnv { files: vec![] };
+        let mthds = MthdsEnvironment::new(env);
+        assert!(mthds.is_config_file(Path::new("/project/.taplo.toml")));
+        assert!(mthds.is_config_file(Path::new("/project/taplo.toml")));
+    }
+
+    #[test]
+    fn is_config_file_rejects_regular_toml() {
+        let env = MockEnv { files: vec![] };
+        let mthds = MthdsEnvironment::new(env);
+        assert!(!mthds.is_config_file(Path::new("/project/Cargo.toml")));
+        assert!(!mthds.is_config_file(Path::new("/project/pyproject.toml")));
+        assert!(!mthds.is_config_file(Path::new("/project/config.toml")));
+    }
 }
