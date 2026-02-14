@@ -39,3 +39,6 @@ pub(crate) use rename::*;
 
 mod conversion;
 pub(crate) use conversion::*;
+
+mod goto_definition;
+pub(crate) use goto_definition::*;
