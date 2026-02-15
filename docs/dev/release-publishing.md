@@ -115,7 +115,5 @@ Manually trigger the workflow via **Actions → Releases → Run workflow** (`wo
 |------------|---------|---------|
 | `release-pipelex-0` | VS Code extension (version starts with digit) | `release-pipelex-0.4.0` |
 | `release-pipelex-cli-0` | pipelex-tools CLI (has `cli-` infix) | `release-pipelex-cli-0.2.0` |
-| `release-taplo-cli-0` | Upstream taplo CLI | `release-taplo-cli-0.9.0` |
-| `release-taplo-0` | Upstream taplo crate | `release-taplo-0.13.0` |
 
 The `release-pipelex-0` and `release-pipelex-cli-0` prefixes are unambiguous because `startsWith` checks won't overlap (the CLI tag always has `-cli-` before the version digit).
