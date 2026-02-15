@@ -3,9 +3,6 @@
   "displayName": "Pipelex",
   "description": "Pipelex Language (MTHDS) and TOML support",
   "version": "0.3.0",
-  "autoTag": {
-    "enabled": true
-  },
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },

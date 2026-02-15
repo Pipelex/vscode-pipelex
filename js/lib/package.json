@@ -15,9 +15,6 @@
     "url": "https://github.com/tamasfe"
   },
   "license": "MIT",
-  "autoTag": {
-    "enabled": true
-  },
   "dependencies": {
     "@taplo/core": "^0.2.0"
   },

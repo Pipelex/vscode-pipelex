@@ -4,10 +4,10 @@ Automated publishing for Pipelex-specific artifacts via `.github/workflows/relea
 
 | Artifact | Registry | Tag pattern | Trigger |
 |----------|----------|-------------|---------|
-| `pipelex-tools` CLI (`plxt`) | PyPI | `release-pipelex-cli-{version}` | Version bump in `crates/pipelex-cli/Cargo.toml` |
-| Pipelex VS Code extension | VS Code Marketplace + Open VSX | `release-pipelex-{version}` | Version bump in `editors/vscode/package.json` |
+| `pipelex-tools` CLI (`plxt`) | PyPI | `plxt-cli/v{version}` | Version bump in `crates/pipelex-cli/Cargo.toml` |
+| Pipelex VS Code extension | VS Code Marketplace + Open VSX | `pipelex-vscode-ext/v{version}` | Version bump in `editors/vscode/package.json` |
 
-Both use `tamasfe/auto-tag` — when a version field changes on `main`, the corresponding tag is created automatically (requires `WORKFLOW_PAT` secret).
+Inline shell in `ci.yaml` reads version fields on each push to `main` and creates the corresponding tag if it doesn't already exist (requires `WORKFLOW_PAT` secret).
 
 ---
 
@@ -45,7 +45,7 @@ OIDC trusted publishing lets GitHub Actions publish to PyPI without storing an A
 
 ### GitHub
 
-- Verify the **`WORKFLOW_PAT`** secret exists (needed by `auto-tag` to create tags that trigger the release workflow)
+- Verify the **`WORKFLOW_PAT`** secret exists (needed by the auto-tagging step to create tags that trigger the release workflow)
 
 ---
 
@@ -61,11 +61,10 @@ Currently allowed third-party actions (beyond GitHub-owned):
 |---------|--------|-----|
 | `Swatinem/rust-cache@*` | Rust build caching | Complex cache key logic, target cleanup |
 | `PyO3/maturin-action@*` | Python wheel builds from Rust | Cross-platform maturin + sccache setup |
-| `tamasfe/auto-tag@*` | Auto-create release tags | Upstream custom tagging logic |
 | `pypa/gh-action-pypi-publish@*` | Publish to PyPI via OIDC | Trusted publishing without API tokens |
 | `peaceiris/actions-gh-pages@*` | Deploy to GitHub Pages | Site deployment |
 
-All five are **SHA-pinned** in the workflow files (e.g. `Swatinem/rust-cache@779680da...  # v2.8.2`) so that no one — including the action maintainer — can silently change what code runs. The allowlist uses `@*` wildcards to permit SHA refs. The enterprise setting **"Require actions to be pinned to a full-length commit SHA"** is enabled to enforce this.
+All four are **SHA-pinned** in the workflow files (e.g. `Swatinem/rust-cache@779680da...  # v2.8.2`) so that no one — including the action maintainer — can silently change what code runs. The allowlist uses `@*` wildcards to permit SHA refs. The enterprise setting **"Require actions to be pinned to a full-length commit SHA"** is enabled to enforce this.
 
 Simple actions (`nick-fields/retry`, `lewagon/wait-on-check-action`, `docker/login-action`, `docker/setup-qemu-action`) were replaced with inline shell to avoid unnecessary trust dependencies.
 
@@ -87,19 +86,19 @@ Simple actions (`nick-fields/retry`, `lewagon/wait-on-check-action`, `docker/log
 
 1. Bump `version` in `crates/pipelex-cli/Cargo.toml`
 2. Merge to `main`
-3. `auto-tag` creates `release-pipelex-cli-{version}`
+3. The `auto_tag` job creates `plxt-cli/v{version}`
 4. `releases.yaml` runs: build wheels → test → publish to PyPI
 
 ### Pipelex VS Code extension
 
 1. Bump `version` in `editors/vscode/package.json`
 2. Merge to `main`
-3. `auto-tag` creates `release-pipelex-{version}`
+3. The `auto_tag` job creates `pipelex-vscode-ext/v{version}`
 4. `releases.yaml` runs: build extension → publish to VS Code Marketplace + Open VSX
 
 ### Both at once
 
-You can bump both versions in the same PR. `auto-tag` creates both tags, and the release workflow triggers separately for each.
+You can bump both versions in the same PR. The `auto_tag` job creates both tags, and the release workflow triggers separately for each.
 
 ---
 
@@ -113,7 +112,7 @@ Manually trigger the workflow via **Actions → Releases → Run workflow** (`wo
 
 | Tag prefix | Matches | Example |
 |------------|---------|---------|
-| `release-pipelex-0` | VS Code extension (version starts with digit) | `release-pipelex-0.4.0` |
-| `release-pipelex-cli-0` | pipelex-tools CLI (has `cli-` infix) | `release-pipelex-cli-0.2.0` |
+| `pipelex-vscode-ext/v` | VS Code extension | `pipelex-vscode-ext/v0.4.0` |
+| `plxt-cli/v` | pipelex-tools CLI | `plxt-cli/v0.2.0` |
 
-The `release-pipelex-0` and `release-pipelex-cli-0` prefixes are unambiguous because `startsWith` checks won't overlap (the CLI tag always has `-cli-` before the version digit).
+The two prefixes are unambiguous — each artifact has its own distinct tag namespace.

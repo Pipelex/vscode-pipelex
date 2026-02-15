@@ -3,7 +3,8 @@ name: Releases
 on:
   push:
     tags:
-      - release-pipelex-*
+      - plxt-cli/v*
+      - pipelex-vscode-ext/v*
   pull_request:
   workflow_dispatch:
 
@@ -44,18 +45,18 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Retrieve plxt-cli release version
-        if: startsWith(github.ref, 'refs/tags/release-pipelex-cli-0')
-        run: echo "version=$(echo ${GITHUB_REF#refs/tags/release-pipelex-cli-})" >> $GITHUB_OUTPUT
+        if: startsWith(github.ref, 'refs/tags/plxt-cli/v')
+        run: echo "version=$(echo ${GITHUB_REF#refs/tags/plxt-cli/v})" >> $GITHUB_OUTPUT
         id: plxt-cli
       - name: Retrieve vscode extension release version
-        if: startsWith(github.ref, 'refs/tags/release-pipelex-0')
-        run: echo "version=$(echo ${GITHUB_REF#refs/tags/release-pipelex-})" >> $GITHUB_OUTPUT
+        if: startsWith(github.ref, 'refs/tags/pipelex-vscode-ext/v')
+        run: echo "version=$(echo ${GITHUB_REF#refs/tags/pipelex-vscode-ext/v})" >> $GITHUB_OUTPUT
         id: vscode-ext
 
   publish_vscode_extension:
     name: Publish VSCode Extension
     needs: ["wait_for_ci", "get_version"]
-    if: startsWith(github.ref, 'refs/tags/release-pipelex-0') || contains(fromJSON('["workflow_dispatch", "pull_request"]'), github.event_name)
+    if: startsWith(github.ref, 'refs/tags/pipelex-vscode-ext/v') || contains(fromJSON('["workflow_dispatch", "pull_request"]'), github.event_name)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -100,7 +101,7 @@ jobs:
 
   pypi_build_plxt:
     name: Build plxt wheels (${{ matrix.os }}-${{ matrix.arch }})
-    if: startsWith(github.ref, 'refs/tags/release-pipelex-cli-0') || contains(fromJSON('["workflow_dispatch", "pull_request"]'), github.event_name)
+    if: startsWith(github.ref, 'refs/tags/plxt-cli/v') || contains(fromJSON('["workflow_dispatch", "pull_request"]'), github.event_name)
     needs: ["wait_for_ci"]
     runs-on: ${{ matrix.os }}-latest
     strategy:
@@ -164,7 +165,7 @@ jobs:
   pypi_publish_plxt:
     name: PyPI publish plxt
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/release-pipelex-cli-0')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/plxt-cli/v')
     needs: ["pypi_test_plxt"]
     permissions:
       id-token: write

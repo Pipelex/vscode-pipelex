@@ -27,6 +27,3 @@ tracing     = { workspace = true }
 default     = []
 tokio-stdio = ["tokio", "tokio/io-std", "tokio/io-util", "tokio/macros", "tokio/rt"]
 tokio-tcp   = ["tokio", "tokio/io-util", "tokio/macros", "tokio/net", "tokio/rt"]
-
-[package.metadata.auto-tag]
-enabled = true

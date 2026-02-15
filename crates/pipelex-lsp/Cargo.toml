@@ -23,6 +23,3 @@ taplo-common   = { version = "0.6.0", path = "../taplo-common", features = ["sch
 
 futures = { workspace = true }
 tracing = { workspace = true }
-
-[package.metadata.auto-tag]
-enabled = true

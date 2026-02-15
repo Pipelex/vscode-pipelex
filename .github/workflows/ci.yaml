@@ -5,7 +5,8 @@ on:
     branches:
       - main
     tags:
-      - release-*
+      - plxt-cli/v*
+      - pipelex-vscode-ext/v*
     paths-ignore:
       - "site/**/*"
       - schemas/**/*
@@ -25,11 +26,33 @@ jobs:
         with:
           token: ${{ secrets.WORKFLOW_PAT }}
           fetch-depth: 0
-      - uses: tamasfe/auto-tag@f7f507df92bd992ad07a73c68614ac1909739e24 # v5
-        with:
-          name: tamasfe
-          email: me@tamasfe.dev
-          token: ${{ secrets.WORKFLOW_PAT }}
+      - name: Create release tags for changed versions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          CLI_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-cli/Cargo.toml)
+          EXT_VERSION=$(jq -r '.version' editors/vscode/package.json)
+
+          CREATED=0
+
+          if [ -n "$CLI_VERSION" ] && ! git rev-parse "plxt-cli/v${CLI_VERSION}" >/dev/null 2>&1; then
+            git tag "plxt-cli/v${CLI_VERSION}"
+            echo "Created tag plxt-cli/v${CLI_VERSION}"
+            CREATED=1
+          fi
+
+          if [ -n "$EXT_VERSION" ] && ! git rev-parse "pipelex-vscode-ext/v${EXT_VERSION}" >/dev/null 2>&1; then
+            git tag "pipelex-vscode-ext/v${EXT_VERSION}"
+            echo "Created tag pipelex-vscode-ext/v${EXT_VERSION}"
+            CREATED=1
+          fi
+
+          if [ "$CREATED" -eq 1 ]; then
+            git push --tags
+          else
+            echo "No new version tags to create"
+          fi
 
   fmt:
     name: Check formatting
