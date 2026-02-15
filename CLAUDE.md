@@ -32,11 +32,21 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - `test-data/` - Test fixtures for TOML/MTHDS parsing
 - `test-data/mthds/` - MTHDS grammar test fixtures
 
-## Build Commands
+## Makefile Targets
+- `make ext` - **Full extension rebuild**: compiles Rust → WASM → JS bundle (`ext-deps`), then builds the VS Code extension. Run this after any Rust LSP change to test in the Extension Host.
+- `make cli` - Build the `plxt` CLI binary (release mode)
+- `make vsix` - Package the extension into a `.vsix` file (runs `ext` first)
+- `make ext-install` - Build, package, and install the `.vsix` into Cursor or VS Code
+- `make ext-uninstall` - Uninstall the extension from the IDE
+- `make test` - Run all tests (Rust crates + VS Code extension vitest)
+- `make check` - Quick compilation checks (CLI + WASM target)
+- `make clean` - Remove all build artifacts (cargo, JS dist, VSIX)
+- `make sync-grammar` - Copy MTHDS TextMate grammar to the website repo
+
+## Other Build Commands
 - `cargo test -p taplo` - Run core Rust tests
 - `cargo test` - Run all Rust tests
 - `cargo check -p taplo-wasm --target wasm32-unknown-unknown` - Check WASM compilation
-- `cd editors/vscode && yarn install && yarn build` - Build VS Code extension
 - `taplo fmt --check --diff` - Check TOML formatting (project dogfoods taplo)
 - `cargo run -- fmt --check` - Check formatting via built binary
 - `cd editors/vscode && yarn test` - Run semantic token provider tests (vitest)
