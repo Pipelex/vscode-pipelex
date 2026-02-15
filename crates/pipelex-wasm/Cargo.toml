@@ -11,13 +11,13 @@ license      = { workspace = true }
 crate-type = ["cdylib"]
 
 [dependencies]
-pipelex-common = { path = "../pipelex-common" }
-pipelex-cli    = { path = "../pipelex-cli", optional = true, default-features = false }
-taplo-lsp      = { path = "../taplo-lsp", optional = true, default-features = false }
 lsp-async-stub = { path = "../lsp-async-stub" }
+pipelex-cli    = { path = "../pipelex-cli", optional = true, default-features = false }
+pipelex-common = { path = "../pipelex-common" }
 taplo          = { path = "../taplo" }
 taplo-cli      = { path = "../taplo-cli", optional = true, default-features = false }
 taplo-common   = { path = "../taplo-common", default-features = false, features = ["rustls-tls", "schema", "reqwest"] }
+taplo-lsp      = { path = "../taplo-lsp", optional = true, default-features = false }
 
 anyhow                   = { workspace = true }
 async-trait              = { workspace = true }
@@ -25,7 +25,7 @@ clap                     = { workspace = true, features = ["derive"] }
 console_error_panic_hook = { version = "0.1.7" }
 futures                  = { workspace = true }
 getrandom                = { workspace = true, features = ["js"] }
-indexmap                  = { workspace = true }
+indexmap                 = { workspace = true }
 serde                    = { workspace = true, features = ["derive"] }
 serde-wasm-bindgen       = { version = "0.6.5" }
 serde_json               = { workspace = true }

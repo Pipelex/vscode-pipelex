@@ -59,6 +59,9 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - **Rust formatter**: rustfmt (config in `rustfmt.toml`)
 - **TOML formatter**: taplo (config in `taplo.toml`)
 - **No ESLint/Prettier** for TypeScript code in editors/vscode
+- **GitHub organization**: Pipelex (repo: `Pipelex/vscode-pipelex`)
+- **Upstream remote**: `tamasfe/taplo` (read-only, for syncing upstream changes only)
+- **`gh` CLI**: Always target our repo explicitly (`--repo Pipelex/vscode-pipelex` or equivalent) — do not rely on implicit repo detection, which may resolve to upstream
 
 ## MTHDS Language
 - MTHDS files use `.mthds` extension
