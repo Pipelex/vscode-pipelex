@@ -73,5 +73,7 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 
 ## CI/CD
 - GitHub Actions: `ci.yaml` (fmt check, cargo test, WASM check, MSRV tests)
-- Releases: Multi-platform builds -> crates.io, npm, PyPI, VS Code Marketplace, Docker
+- Releases: `releases.yaml` — multi-platform builds → crates.io, npm, PyPI, VS Code Marketplace, Docker
 - Auto-tagging via `tamasfe/auto-tag`
+- **Enterprise allowlist:** Pipelex Enterprise restricts third-party actions. Only 5 are allowed (`Swatinem/rust-cache`, `PyO3/maturin-action`, `tamasfe/auto-tag`, `pypa/gh-action-pypi-publish`, `peaceiris/actions-gh-pages`) — all SHA-pinned in workflows. See `docs/dev/release-publishing.md` for details and allowlist management.
+- **When adding a new third-party action:** either replace with inline shell, or add its `owner/repo@*` pattern to the enterprise allowlist at `github.com/enterprises/Pipelex/settings/actions/policies` and SHA-pin in the workflow.

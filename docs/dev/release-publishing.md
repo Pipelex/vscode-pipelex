@@ -49,6 +49,38 @@ OIDC trusted publishing lets GitHub Actions publish to PyPI without storing an A
 
 ---
 
+### GitHub Actions — Enterprise allowlist & SHA pinning
+
+The Pipelex Enterprise enforces an actions allowlist. Only GitHub-owned actions (`actions/*`) and explicitly allowed third-party actions can run.
+
+**Allowlist location:** [github.com/enterprises/Pipelex/settings/actions/policies](https://github.com/enterprises/Pipelex/settings/actions/policies) → "Allow enterprise actions, and select non-enterprise actions"
+
+Currently allowed third-party actions (beyond GitHub-owned):
+
+| Pattern | Action | Why |
+|---------|--------|-----|
+| `Swatinem/rust-cache@*` | Rust build caching | Complex cache key logic, target cleanup |
+| `PyO3/maturin-action@*` | Python wheel builds from Rust | Cross-platform maturin + sccache setup |
+| `tamasfe/auto-tag@*` | Auto-create release tags | Upstream custom tagging logic |
+| `pypa/gh-action-pypi-publish@*` | Publish to PyPI via OIDC | Trusted publishing without API tokens |
+| `peaceiris/actions-gh-pages@*` | Deploy to GitHub Pages | Site deployment |
+
+All five are **SHA-pinned** in the workflow files (e.g. `Swatinem/rust-cache@779680da...  # v2.8.2`) so that no one — including the action maintainer — can silently change what code runs. The allowlist uses `@*` wildcards to permit SHA refs. The enterprise setting **"Require actions to be pinned to a full-length commit SHA"** is enabled to enforce this.
+
+Simple actions (`nick-fields/retry`, `lewagon/wait-on-check-action`, `docker/login-action`, `docker/setup-qemu-action`) were replaced with inline shell to avoid unnecessary trust dependencies.
+
+> **TODO:** Enable [Dependabot for GitHub Actions](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#package-ecosystem) to get automatic PRs when SHA-pinned actions have newer versions. Add a `.github/dependabot.yml` with:
+> ```yaml
+> version: 2
+> updates:
+>   - package-ecosystem: "github-actions"
+>     directory: "/"
+>     schedule:
+>       interval: "weekly"
+> ```
+
+---
+
 ## How to trigger a release
 
 ### pipelex-tools CLI
