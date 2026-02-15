@@ -29,16 +29,21 @@ jobs:
     needs: ["wait_for_ci"]
     outputs:
       cli: ${{ steps.cli.outputs.version || '' }}
+      plxt-cli: ${{ steps.plxt-cli.outputs.version || '' }}
       vscode-ext: ${{ steps.vscode-ext.outputs.version || '' }}
     steps:
       - uses: actions/checkout@v4
-      - name: Retrieve release version
+      - name: Retrieve taplo-cli release version
         if: startsWith(github.ref, 'refs/tags/release-taplo-cli-0')
         run: echo "version=$(echo ${GITHUB_REF#refs/tags/release-taplo-cli-})" >> $GITHUB_OUTPUT
         id: cli
-      - name: Retrieve release version
-        if: startsWith(github.ref, 'refs/tags/release-even-better-toml-')
-        run: echo "version=$(echo ${GITHUB_REF#refs/tags/release-even-better-toml-})" >> $GITHUB_OUTPUT
+      - name: Retrieve plxt-cli release version
+        if: startsWith(github.ref, 'refs/tags/release-pipelex-cli-0')
+        run: echo "version=$(echo ${GITHUB_REF#refs/tags/release-pipelex-cli-})" >> $GITHUB_OUTPUT
+        id: plxt-cli
+      - name: Retrieve vscode extension release version
+        if: startsWith(github.ref, 'refs/tags/release-pipelex-0')
+        run: echo "version=$(echo ${GITHUB_REF#refs/tags/release-pipelex-})" >> $GITHUB_OUTPUT
         id: vscode-ext
 
   cargo_publish_taplo:
@@ -415,13 +420,14 @@ jobs:
   publish_vscode_extension:
     name: Publish VSCode Extension
     needs: ["wait_for_ci", "get_version"]
-    if: startsWith(github.ref, 'refs/tags/release-even-better-toml-') || contains(fromJSON('["workflow_dispatch", "pull_request"]'), github.event_name)
+    if: startsWith(github.ref, 'refs/tags/release-pipelex-0') || contains(fromJSON('["workflow_dispatch", "pull_request"]'), github.event_name)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install latest Rust toolchain
         run: |
           rustup update --no-self-update
+          rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -429,18 +435,20 @@ jobs:
           node-version: lts/*
       - name: Enable latest yarn
         run: corepack enable
-        working-directory: editors/vscode
+      - name: Build @pipelex/lsp WASM bundle
+        run: yarn install && yarn build
+        working-directory: js/lsp
       - name: Extension NPM Install
         run: yarn
         working-directory: editors/vscode
       - name: Install vsce
         run: npm install -g @vscode/vsce
       - name: Package Extension
-        run: vsce package --baseImagesUrl https://raw.githubusercontent.com/tamasfe/taplo/master/editors/vscode --no-yarn # Microsoft doesn't support anything other than npm and yarn@v1
+        run: vsce package --baseImagesUrl https://raw.githubusercontent.com/Pipelex/vscode-pipelex/main/editors/vscode --no-yarn # Microsoft doesn't support anything other than npm and yarn@v1
         working-directory: editors/vscode
       - name: Publish extension to microsoft marketplace
         if: github.event_name == 'push'
-        run: vsce publish --baseImagesUrl https://raw.githubusercontent.com/tamasfe/taplo/master/editors/vscode -p $VSCE_TOKEN --no-yarn
+        run: vsce publish --baseImagesUrl https://raw.githubusercontent.com/Pipelex/vscode-pipelex/main/editors/vscode -p $VSCE_TOKEN --no-yarn
         working-directory: editors/vscode
         env:
           VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
@@ -448,7 +456,7 @@ jobs:
         run: npm install -g ovsx
       - name: Publish Open VSX Extension
         if: github.event_name == 'push'
-        run: ovsx publish --baseImagesUrl https://raw.githubusercontent.com/tamasfe/taplo/master/editors/vscode -p $OPEN_VSX_TOKEN "even-better-toml-${{ needs.get_version.outputs.vscode-ext }}.vsix"
+        run: ovsx publish --baseImagesUrl https://raw.githubusercontent.com/Pipelex/vscode-pipelex/main/editors/vscode -p $OPEN_VSX_TOKEN "pipelex-${{ needs.get_version.outputs.vscode-ext }}.vsix"
         working-directory: editors/vscode
         env:
           OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
@@ -528,6 +536,87 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           pattern: wheels-*
+          path: dist
+          merge-multiple: true
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  # ── plxt (pipelex-cli) PyPI publishing ──────────────────────────────────────
+
+  pypi_build_plxt:
+    name: Build plxt wheels (${{ matrix.os }}-${{ matrix.arch }})
+    if: startsWith(github.ref, 'refs/tags/release-pipelex-cli-0') || contains(fromJSON('["workflow_dispatch", "pull_request"]'), github.event_name)
+    needs: ["wait_for_ci"]
+    runs-on: ${{ matrix.os }}-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, windows, macos]
+        arch: [x86, x64, aarch64]
+        exclude:
+          - os: windows
+            arch: aarch64
+          - os: macos
+            arch: x86
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set CFLAGS for aarch64 on Ubuntu
+        if: matrix.os == 'ubuntu' && matrix.arch == 'aarch64'
+        run: |
+          echo "CFLAGS_aarch64_unknown_linux_gnu=-D__ARM_ARCH=8" >> $GITHUB_ENV
+      - name: Build sdist
+        if: matrix.os == 'ubuntu' && matrix.arch == 'x64'
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.arch }}
+          args: --release --out dist
+          sccache: "true"
+          manylinux: auto
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: plxt-wheels-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist
+
+  pypi_test_plxt:
+    name: Test plxt wheels (${{ matrix.os }})
+    needs: ["pypi_build_plxt"]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: plxt-wheels-*
+          path: wheels
+          merge-multiple: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3"
+      - run: pip install pipelex-tools --no-index --find-links wheels/
+      - run: plxt help
+
+  pypi_publish_plxt:
+    name: PyPI publish plxt
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/release-pipelex-cli-0')
+    needs: ["pypi_test_plxt"]
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: plxt-wheels-*
           path: dist
           merge-multiple: true
       - name: Publish to PyPI

@@ -6,19 +6,19 @@
 
 ## How to consume it
 
-`plxt` is distributed as a Python package (built via maturin from Rust source). To use it as a dev dependency from the local `vscode-pipelex` repo:
+`pipelex-tools` is distributed as a Python package on PyPI (built via maturin from Rust source). It installs the `plxt` binary. To use it as a dev dependency from the local `vscode-pipelex` repo:
 
-1. Add `"plxt"` to your dev dependencies in `pyproject.toml`
+1. Add `"pipelex-tools"` to your dev dependencies in `pyproject.toml`
 2. Add a `[tool.uv.sources]` entry pointing to the local repo:
    ```toml
    [tool.uv.sources]
-   plxt = { path = "../vscode-pipelex", editable = false }
+   pipelex-tools = { path = "../vscode-pipelex", editable = false }
    ```
 3. Run `uv sync` (or `uv sync --all-extras`) — this invokes maturin to compile the Rust binary and install it into the venv.
 
 After code changes in `vscode-pipelex`, force-reinstall with:
 ```bash
-uv sync --all-extras --reinstall-package plxt
+uv sync --all-extras --reinstall-package pipelex-tools
 ```
 
 ## Key commands

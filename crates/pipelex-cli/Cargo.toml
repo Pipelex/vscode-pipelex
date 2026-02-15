@@ -46,3 +46,6 @@ optional  = true
 [[bin]]
 name = "plxt"
 path = "bin/plxt.rs"
+
+[package.metadata.auto-tag]
+enabled = true
