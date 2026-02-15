@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 
 #[async_trait(?Send)]
 pub(crate) trait Handler<W: Clone> {
+    #[allow(dead_code)]
     fn method(&self) -> &'static str;
 
     async fn handle(

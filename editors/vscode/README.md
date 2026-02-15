@@ -5,38 +5,38 @@
 
 # Pipelex Extension
 
-**Rich language support for Pipelex Language (PLX) and TOML files**
+**Rich language support for Pipelex Language (MTHDS) and TOML files**
 
-This extension provides comprehensive VS Code support for the **Pipelex Language (PLX)**, which is based on TOML syntax, along with full TOML language support. Built as a fork of the excellent [Taplo](https://github.com/tamasfe/taplo) language server, it tracks upstream closely while adding PLX-specific features like advanced syntax highlighting, semantic tokens, and intelligent language features for `.plx` files.
+This extension provides comprehensive VS Code support for the **Pipelex Language (MTHDS)**, which is based on TOML syntax, along with full TOML language support. Built as a fork of the excellent [Taplo](https://github.com/tamasfe/taplo) language server, it tracks upstream closely while adding MTHDS-specific features like advanced syntax highlighting, semantic tokens, and intelligent language features for `.mthds` files.
 
 **About Pipelex:**
 
-[Pipelex](https://github.com/Pipelex/pipelex) is an open-source language for building deterministic AI workflows. It enables agents and developers to transform natural language requirements into production-ready pipelines that process information reliably at scale. Unlike traditional workflow tools, Pipelex uses a declarative syntax that captures business logic directly, making pipelines readable by domain experts while remaining executable by any runtime. Write once, run anywhere, share with everyone.
+[Pipelex](https://github.com/Pipelex/pipelex) is an open-source language for building deterministic AI methods. It enables agents and developers to transform natural language requirements into production-ready pipelines that process information reliably at scale. Unlike traditional workflow tools, Pipelex uses a declarative syntax that captures business logic directly, making pipelines readable by domain experts while remaining executable by any runtime. Write once, run anywhere, share with everyone.
 
-## 🚀 **PLX Features**
+## 🚀 **MTHDS Features**
 
 ### 📝 **Pipelex Language Support**
-- **Rich syntax highlighting** for PLX-specific constructs
-- **Concept definitions**: `[concept.Name]` sections with specialized highlighting  
-- **Pipe definitions**: `[pipe.name]` sections for workflow steps
+- **Rich syntax highlighting** for MTHDS-specific constructs
+- **Concept definitions**: `[concept.Name]` sections with specialized highlighting
+- **Pipe definitions**: `[pipe.name]` sections for method steps
 - **Data injection**: `@variable` syntax with smart highlighting
 - **Template variables**: `$variable` support
 - **Jinja2 templates**: `{{ }}` and `{% %}` blocks with keyword highlighting
 - **HTML templates**: Basic HTML tag support within strings
 - **Semantic tokens** for context-aware highlighting
 
-### 🎨 **PLX Syntax Highlighting**
+### 🎨 **MTHDS Syntax Highlighting**
 - **🔵 Concept sections** - `[concept.Name]` in teal (`#4ECDC4`)
-- **🔴 Pipe sections** - `[pipe.name]` in red (`#FF6666`) 
+- **🔴 Pipe sections** - `[pipe.name]` in red (`#FF6666`)
 - **🟢 Data variables** - `@variable`, `$variable` in green (`#98FB98`)
 - **🟣 Template syntax** - Jinja delimiters in pink (`#FF79C6`)
 - **🟡 HTML elements** - Tags and attributes in orange/yellow
 - **🔷 Concept types** - `ConceptType` references highlighted
 - **🔶 Pipe types** - `PipeLLM`, `PipeSequence` etc. highlighted
 
-### Example PLX File
+### Example MTHDS File
 ```toml
-# Pipelex workflow definition
+# Pipelex method definition
 [concept.UserQuery]
 definition = "A user's natural language query"
 

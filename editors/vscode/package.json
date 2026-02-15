@@ -1,8 +1,8 @@
 {
   "name": "pipelex",
   "displayName": "Pipelex",
-  "description": "Pipelex Language (PLX) and TOML support",
-  "version": "0.2.1",
+  "description": "Pipelex Language (MTHDS) and TOML support",
+  "version": "0.3.0",
   "autoTag": {
     "enabled": true
   },
@@ -35,10 +35,11 @@
   "activationEvents": [
     "onStartupFinished",
     "onLanguage:cargoLock",
-    "onLanguage:plx"
+    "onLanguage:mthds"
   ],
   "keywords": [
     "pipelex",
+    "mthds",
     "plx",
     "dsl",
     "toml",
@@ -73,29 +74,29 @@
         }
       },
       {
-        "language": "plx",
-        "scopeName": "source.plx",
-        "path": "./plx.tmLanguage.json",
+        "language": "mthds",
+        "scopeName": "source.mthds",
+        "path": "./mthds.tmLanguage.json",
         "embeddedLanguages": {
-          "meta.tag.html.plx": "html",
-          "comment.block.html.plx": "html"
+          "meta.tag.html.mthds": "html",
+          "comment.block.html.mthds": "html"
         }
       },
       {
-        "scopeName": "markdown.plx.frontmatter.codeblock",
-        "path": "./plx.frontmatter.tmLanguage.json",
+        "scopeName": "markdown.mthds.frontmatter.codeblock",
+        "path": "./mthds.frontmatter.tmLanguage.json",
         "injectTo": [
           "text.html.markdown"
         ]
       },
       {
-        "scopeName": "markdown.plx.codeblock",
-        "path": "./plx.markdown.tmLanguage.json",
+        "scopeName": "markdown.mthds.codeblock",
+        "path": "./mthds.markdown.tmLanguage.json",
         "injectTo": [
           "text.html.markdown"
         ],
         "embeddedLanguages": {
-          "meta.embedded.block.plx": "plx"
+          "meta.embedded.block.mthds": "mthds"
         }
       }
     ],
@@ -115,13 +116,14 @@
         "configuration": "./language-configuration.json"
       },
       {
-        "id": "plx",
+        "id": "mthds",
         "aliases": [
-          "PLX",
-          "Pipelex Language"
+          "MTHDS",
+          "Pipelex Language",
+          "PLX"
         ],
         "extensions": [
-          ".plx"
+          ".mthds"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -182,34 +184,39 @@
         "description": "Keys of inline tables."
       },
       {
-        "id": "plxConcept",
+        "id": "mthdsConcept",
         "superType": "type",
         "description": "Pipelex concept names"
       },
       {
-        "id": "plxPipeType",
+        "id": "mthdsPipeType",
         "superType": "type",
         "description": "Pipelex pipe type identifiers"
       },
       {
-        "id": "plxDataVariable",
+        "id": "mthdsDataVariable",
         "superType": "variable",
         "description": "Pipelex data variables"
       },
       {
-        "id": "plxPipeName",
+        "id": "mthdsPipeName",
         "superType": "function",
         "description": "Pipelex pipe names"
       },
       {
-        "id": "plxPipeSection",
+        "id": "mthdsPipeSection",
         "superType": "keyword",
         "description": "Pipelex pipe section headers"
       },
       {
-        "id": "plxConceptSection",
+        "id": "mthdsConceptSection",
         "superType": "keyword",
         "description": "Pipelex concept section headers"
+      },
+      {
+        "id": "mthdsModelRef",
+        "superType": "variable",
+        "description": "Pipelex model field references ($preset, @alias, ~waterfall)"
       }
     ],
     "semanticTokenScopes": [
@@ -221,23 +228,26 @@
           "tomlTableKey": [
             "support.type.property-name.table.toml"
           ],
-          "plxConcept": [
-            "support.type.concept.plx"
+          "mthdsConcept": [
+            "support.type.concept.mthds"
           ],
-          "plxPipeType": [
-            "support.type.pipe-type.plx"
+          "mthdsPipeType": [
+            "support.type.pipe-type.mthds"
           ],
-          "plxDataVariable": [
-            "variable.name.data.plx"
+          "mthdsDataVariable": [
+            "variable.name.data.mthds"
           ],
-          "plxPipeName": [
-            "support.function.pipe-name.plx"
+          "mthdsPipeName": [
+            "support.function.pipe-name.mthds"
           ],
-          "plxPipeSection": [
-            "support.type.property-name.pipe.plx"
+          "mthdsPipeSection": [
+            "support.type.property-name.pipe.mthds"
           ],
-          "plxConceptSection": [
-            "support.type.property-name.concept.plx"
+          "mthdsConceptSection": [
+            "support.type.property-name.concept.mthds"
+          ],
+          "mthdsModelRef": [
+            "entity.name.model-ref.mthds"
           ]
         }
       }
@@ -247,102 +257,70 @@
       "editor.tokenColorCustomizations": {
         "textMateRules": [
           {
-            "scope": "support.type.property-name.pipe.plx",
-            "settings": {
-              "foreground": "#FF6666",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.type.pipe-type.plx",
+            "scope": "support.type.property-name.pipe.mthds",
             "settings": {
               "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.property-name.concept.plx",
-            "settings": {
-              "foreground": "#4ECDC4",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.type.concept.plx",
-            "settings": {
-              "foreground": "#4ECDC4",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.type.concept.native.plx",
-            "settings": {
-              "foreground": "#98FB98",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "variable.name.data.plx",
-            "settings": {
-              "foreground": "#98FB98",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "support.function.pipe-name.plx",
+            "scope": "support.type.pipe-type.mthds",
             "settings": {
               "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "punctuation.definition.data-injection.plx",
+            "scope": "support.type.property-name.concept.mthds",
             "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "punctuation.definition.template-variable.plx",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "punctuation.definition.jinja.plx",
-            "settings": {
-              "foreground": "#FF79C6",
+              "foreground": "#4ECDC4",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "keyword.control.jinja.plx",
+            "scope": "support.type.concept.mthds",
             "settings": {
-              "foreground": "#8BE9FD"
+              "foreground": "#4ECDC4",
+              "fontStyle": "bold"
             }
           },
           {
-            "scope": "variable.other.jinja.plx",
+            "scope": "variable.name.data.mthds",
             "settings": {
-              "foreground": "#50FA7B"
+              "foreground": "#98FB98",
+              "fontStyle": "bold"
             }
           },
           {
-            "scope": "entity.name.tag.html.plx",
+            "scope": "support.function.pipe-name.mthds",
             "settings": {
-              "foreground": "#FFB86C"
+              "foreground": "#FF6B6B",
+              "fontStyle": "bold"
             }
           },
           {
-            "scope": "entity.other.attribute-name.html.plx",
+            "scope": "punctuation.definition.data-injection.mthds",
             "settings": {
-              "foreground": "#F1FA8C"
+              "foreground": "#FF79C6"
             }
           },
           {
-            "scope": "comment.block.html.plx",
+            "scope": "punctuation.definition.template-variable.mthds",
             "settings": {
-              "foreground": "#6272A4",
-              "fontStyle": "italic"
+              "foreground": "#FF79C6"
+            }
+          },
+          {
+            "scope": "punctuation.definition.model-sigil.mthds",
+            "settings": {
+              "foreground": "#FF79C6"
+            }
+          },
+          {
+            "scope": "entity.name.model-ref.mthds",
+            "settings": {
+              "foreground": "#FFB86C",
+              "fontStyle": "bold"
             }
           }
         ]
@@ -461,6 +439,12 @@
         },
         "pipelex.syntax.semanticTokens": {
           "description": "Whether to enable semantic tokens for tables and arrays.",
+          "type": "boolean",
+          "scope": "resource",
+          "default": true
+        },
+        "pipelex.mthds.semanticTokens": {
+          "description": "Enable semantic tokens for MTHDS files (adds declaration/reference distinction).",
           "type": "boolean",
           "scope": "resource",
           "default": true
@@ -593,14 +577,16 @@
   "scripts": {
     "vscode:prepublish": "yarn build",
     "open-in-browser": "vscode-test-web --extensionDevelopmentPath=. .",
-    "build:syntax": "ts-node --project node.tsconfig.json src/syntax/index.ts",
+    "build:syntax": "ts-node --project node.tsconfig.json src/syntax/index.ts && ts-node --project node.tsconfig.json src/syntax/mthds/index.ts",
     "build:browser-extension": "rollup -c rollup.config.browser-extension.mjs",
     "build:browser-server": "rollup -c rollup.config.browser-server.mjs",
     "build:node": "rollup -c rollup.config.mjs",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@pipelex/lsp": "^0.1.34",
+    "@pipelex/lsp": "portal:../../js/lsp",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
@@ -621,7 +607,8 @@
     "rollup": "^4.9.6",
     "rollup-plugin-esbuild": "^6.1.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.18"
   },
   "packageManager": "yarn@4.0.2"
 }

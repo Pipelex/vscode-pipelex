@@ -96,6 +96,7 @@ pub async fn initialize<E: Environment>(
                 ]),
                 ..Default::default()
             }),
+            definition_provider: Some(OneOf::Left(true)),
             document_link_provider: Some(DocumentLinkOptions {
                 resolve_provider: None,
                 work_done_progress_options: Default::default(),

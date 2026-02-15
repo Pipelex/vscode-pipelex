@@ -20,7 +20,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Send didOpen for already-open documents
   for (const document of vscode.workspace.textDocuments) {
-    if (document.languageId === "toml" || document.languageId === "plx" || document.languageId === "cargoLock") {
+    if (document.languageId === "toml" || document.languageId === "mthds" || document.languageId === "cargoLock") {
       // Force the client to send didOpen notification
       await c.sendNotification("textDocument/didOpen", {
         textDocument: {
@@ -35,14 +35,14 @@ export async function activate(context: vscode.ExtensionContext) {
 
   if (vscode.window.activeTextEditor?.document.languageId === "toml") {
     schemaIndicator.show();
-  } else if (vscode.window.activeTextEditor?.document.languageId === "plx") {
+  } else if (vscode.window.activeTextEditor?.document.languageId === "mthds") {
     schemaIndicator.show();
   }
 
   registerCommands(context, c);
   syncExtensionSchemas(context, c);
 
-  // Register Pipelex-specific features for PLX
+  // Register Pipelex-specific features for MTHDS
   registerPipelexFeatures(context);
 
   context.subscriptions.push(
@@ -52,7 +52,7 @@ export async function activate(context: vscode.ExtensionContext) {
       showMessage(params, c)
     ),
     vscode.window.onDidChangeActiveTextEditor(editor => {
-      if (editor?.document.languageId === "toml" || editor?.document.languageId === "plx") {
+      if (editor?.document.languageId === "toml" || editor?.document.languageId === "mthds") {
         schemaIndicator.show();
       } else {
         schemaIndicator.hide();

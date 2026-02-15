@@ -1209,6 +1209,7 @@ impl<T: AsRef<str>> FormattedItem for (SyntaxElement, T, Option<T>) {
 }
 
 trait FormattedItem {
+    #[allow(dead_code)]
     fn syntax(&self) -> SyntaxElement;
     #[allow(clippy::ptr_arg)]
     fn write_to(&self, formatted: &mut String, options: &Options);

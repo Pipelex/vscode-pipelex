@@ -1,4 +1,4 @@
-import loadTaplo from "../../../crates/taplo-wasm/Cargo.toml";
+import loadPipelex from "../../../crates/pipelex-wasm/Cargo.toml";
 import { convertEnv, Environment, Lsp, prepareEnv } from "@taplo/core";
 
 export interface RpcMessage {
@@ -17,14 +17,14 @@ export interface LspInterface {
   onMessage: (message: RpcMessage) => void;
 }
 
-export class TaploLsp {
-  private static taplo: any | undefined;
+export class PipelexLsp {
+  private static pipelex: any | undefined;
   private static initializing: boolean = false;
 
   private constructor(private env: Environment, private lspInner: any) {
-    if (!TaploLsp.initializing) {
+    if (!PipelexLsp.initializing) {
       throw new Error(
-        `an instance of Taplo can only be created by calling the "initialize" static method`
+        `an instance of PipelexLsp can only be created by calling the "initialize" static method`
       );
     }
   }
@@ -32,22 +32,22 @@ export class TaploLsp {
   public static async initialize(
     env: Environment,
     lspInterface: LspInterface
-  ): Promise<TaploLsp> {
-    if (typeof TaploLsp.taplo === "undefined") {
-      TaploLsp.taplo = await loadTaplo();
+  ): Promise<PipelexLsp> {
+    if (typeof PipelexLsp.pipelex === "undefined") {
+      PipelexLsp.pipelex = await loadPipelex();
     }
-    TaploLsp.taplo.initialize();
+    PipelexLsp.pipelex.initialize();
 
     prepareEnv(env);
 
-    TaploLsp.initializing = true;
-    const t = new TaploLsp(
+    PipelexLsp.initializing = true;
+    const t = new PipelexLsp(
       env,
-      TaploLsp.taplo.create_lsp(convertEnv(env), {
+      PipelexLsp.pipelex.create_lsp(convertEnv(env), {
         js_on_message: lspInterface.onMessage,
       })
     );
-    TaploLsp.initializing = false;
+    PipelexLsp.initializing = false;
 
     return t;
   }

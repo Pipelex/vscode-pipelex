@@ -3,17 +3,26 @@
 
 # Pipelex Extension Changelog
 
+## [0.3.0] - 2026-02-12
+
+### Changed
+- **MTHDS Standard Migration**: File extension changed from `.plx` to `.mthds`
+- Language ID changed from `plx` to `mthds`
+- Semantic token IDs renamed from `plx*` to `mthds*` prefix
+- TextMate grammar files renamed from `plx.*` to `mthds.*`
+- User-facing terminology: "workflow" → "method" for MTHDS concepts
+
 ## [0.2.1] - 2025-09-05
 
 ### Fixed
 
-- Extension activation on language = "plx", enabling the extension to work in BlackBoxAI IDE
+- Extension activation on language = "mthds", enabling the extension to work in BlackBoxAI IDE
 
 ## [0.2.0] - 2025-09-02
 
 ### Changed
 
-- Set file extension to `.plx` for Pipelex Language files
+- Set file extension to `.mthds` for Pipelex Language files
 
 ### Removed
 
@@ -36,25 +45,25 @@
 ### Added
 - Documentation composition system for maintaining Pipelex docs alongside Taplo upstream now also manages the Changelog
 
-## [0.1.0] - 2025-08-21 (Initial Fork 🎉)
+## [0.1.0] - 2025-08-21 (Initial Fork)
 
 ### Added
 - Documentation composition system for maintaining Pipelex docs alongside Taplo upstream
-- **PLX Language Support**: Full support for `.plx` files (Pipelex Language)
-- **Semantic Token Provider**: Context-aware highlighting for PLX constructs
+- **MTHDS Language Support**: Full support for `.mthds` files (Pipelex Language)
+- **Semantic Token Provider**: Context-aware highlighting for MTHDS constructs
   - Concept definitions: `[concept.Name]` sections
   - Pipe definitions: `[pipe.name]` sections
   - Variable injection: `$variable` syntax
   - Template support: Jinja2 `{{ }}` and `{% %}` blocks
-- **TextMate Grammars**: 
-  - `plx.tmLanguage.json` - Main PLX grammar
-  - `plx.frontmatter.tmLanguage.json` - Frontmatter support
-  - `plx.markdown.tmLanguage.json` - Markdown code block support
-- **File Associations**: Automatic recognition of `.plx` files
-- **Example Files**: `test-data/example.plx` demonstrating PLX syntax
+- **TextMate Grammars**:
+  - `mthds.tmLanguage.json` - Main MTHDS grammar
+  - `mthds.frontmatter.tmLanguage.json` - Frontmatter support
+  - `mthds.markdown.tmLanguage.json` - Markdown code block support
+- **File Associations**: Automatic recognition of `.mthds` files
+- **Example Files**: `test-data/example.mthds` demonstrating MTHDS syntax
 
 ### Technical Implementation
-- Created isolated `src/pipelex/` directory for all PLX-specific code
+- Created isolated `src/pipelex/` directory for all MTHDS-specific code
 - Minimal modifications to existing Taplo files
 - Additive-only approach preserving all TOML functionality
 

@@ -25,10 +25,10 @@ code . # Open in VS Code
 # Press F5 to launch Extension Development Host
 ```
 
-## Testing PLX features
-- Create `.plx` test files in `test-data/`
+## Testing MTHDS features
+- Create `.mthds` test files in `test-data/`
 - Test syntax highlighting, semantic tokens, and language features
-- Verify both PLX and TOML functionality work correctly
+- Verify both MTHDS and TOML functionality work correctly
 
 ---
 

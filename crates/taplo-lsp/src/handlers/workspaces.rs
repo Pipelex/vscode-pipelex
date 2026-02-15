@@ -47,12 +47,71 @@ pub async fn watched_files_change<E: Environment>(
         Some(p) => p,
     };
 
-    // For each changed file, trigger diagnostics update
+    // First pass: detect config file changes and reinitialize affected workspaces.
+    let mut reinitialized_ws: Vec<lsp_types::Url> = Vec::new();
+
+    for change in &p.changes {
+        if let Some(path) = context.env.to_file_path_normalized(&change.uri) {
+            if context.env.is_config_file(&path) {
+                tracing::info!(?path, "config file changed, reloading workspace");
+
+                let mut workspaces = context.workspaces.write().await;
+
+                // Find workspaces whose root is a prefix of the config file URI.
+                let ws_urls: Vec<_> = workspaces
+                    .iter()
+                    .filter(|(url, _)| {
+                        change.uri.as_str().starts_with(url.as_str())
+                            && !reinitialized_ws.contains(url)
+                    })
+                    .map(|(url, _)| url.clone())
+                    .collect();
+
+                for ws_url in ws_urls {
+                    if let Some(ws) = workspaces.get_mut(&ws_url) {
+                        if let Err(error) = ws.initialize(context.clone(), &context.env).await {
+                            tracing::error!(?error, "failed to reinitialize workspace after config change");
+                        }
+                        reinitialized_ws.push(ws_url);
+                    }
+                }
+            }
+        }
+    }
+
+    // Re-publish diagnostics for all open documents in reinitialized workspaces.
+    if !reinitialized_ws.is_empty() {
+        let workspaces = context.workspaces.read().await;
+        let doc_urls: Vec<_> = reinitialized_ws
+            .iter()
+            .filter_map(|ws_url| workspaces.get(ws_url))
+            .flat_map(|ws| ws.documents.keys().cloned())
+            .collect();
+        drop(workspaces);
+
+        for (ws_url, doc_url) in reinitialized_ws
+            .iter()
+            .flat_map(|ws_url| {
+                doc_urls
+                    .iter()
+                    .filter(|d| d.as_str().starts_with(ws_url.as_str()))
+                    .map(move |d| (ws_url.clone(), d.clone()))
+            })
+        {
+            crate::diagnostics::publish_diagnostics(context.clone(), ws_url, doc_url).await;
+        }
+    }
+
+    // Second pass: handle regular document changes (skip config files).
     for change in p.changes {
         if let Some(path) = context.env.to_file_path_normalized(&change.uri) {
+            if context.env.is_config_file(&path) {
+                continue;
+            }
+
             let workspaces = context.workspaces.read().await;
             let ws = workspaces.by_document(&change.uri);
-            
+
             // Check if this file is included in our configuration
             if ws.taplo_config.is_included(&path) {
                 let workspace_uri = ws.root.clone();

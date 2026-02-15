@@ -1,0 +1,51 @@
+[package]
+name         = "pipelex-cli"
+description  = "Pipelex Tools CLI (plxt) - wraps taplo-cli with MTHDS support"
+version      = "0.1.0"
+rust-version = { workspace = true }
+authors      = { workspace = true }
+edition      = { workspace = true }
+license      = { workspace = true }
+
+[features]
+default     = ["completions", "lint", "lsp", "rustls-tls"]
+lint        = ["reqwest", "taplo-common/reqwest", "taplo-common/schema", "taplo-cli/lint"]
+lsp         = ["async-ctrlc", "lint", "taplo-lsp", "taplo-cli/lsp"]
+native-tls  = ["taplo-common/native-tls", "taplo-lsp?/native-tls"]
+rustls-tls  = ["taplo-common/rustls-tls", "taplo-lsp?/rustls-tls"]
+completions = ["dep:clap_complete"]
+
+[dependencies]
+pipelex-common = { version = "0.1.0", path = "../pipelex-common" }
+taplo-cli      = { version = "0.10.0", path = "../taplo-cli", default-features = false }
+taplo-common   = { version = "0.6.0", path = "../taplo-common" }
+taplo-lsp      = { version = "0.8.0", path = "../taplo-lsp", default-features = false, optional = true }
+
+anyhow   = { workspace = true }
+clap     = { workspace = true, features = ["derive", "cargo", "env", "default"] }
+toml     = { version = "0.7" }
+tracing  = { workspace = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+lsp-async-stub = { version = "0.7.0", path = "../lsp-async-stub", features = ["tokio-tcp", "tokio-stdio"] }
+
+async-ctrlc   = { version = "1.2.0", features = ["stream"], optional = true }
+clap_complete = { version = "4.4.18", optional = true }
+
+tokio = { workspace = true, features = ["sync", "fs", "time", "io-std", "rt-multi-thread", "parking_lot"] }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+tokio   = { workspace = true, features = ["sync", "parking_lot", "io-util"] }
+reqwest = { workspace = true, features = ["json"], optional = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies.reqwest]
+workspace = true
+features  = ["json"]
+optional  = true
+
+[[bin]]
+name = "plxt"
+path = "bin/plxt.rs"
+
+[package.metadata.auto-tag]
+enabled = true
