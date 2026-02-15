@@ -3,7 +3,7 @@ name: Deploy Site
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - "site/**/*"
   workflow_dispatch: {}

@@ -3,7 +3,7 @@ name: Continuous integration
 on:
   push:
     branches:
-      - master
+      - main
     tags:
       - release-*
     paths-ignore:
@@ -13,7 +13,7 @@ on:
   workflow_dispatch: {}
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   auto_tag:

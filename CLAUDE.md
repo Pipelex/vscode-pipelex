@@ -55,7 +55,7 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - **Rust MSRV**: 1.74 (CI tests against this)
 - **VS Code engine**: ^1.90.0
 - **Package manager**: Yarn 4 (via corepack)
-- **Main branch**: `master` (not main)
+- **Main branch**: `main`
 - **Rust formatter**: rustfmt (config in `rustfmt.toml`)
 - **TOML formatter**: taplo (config in `taplo.toml`)
 - **No ESLint/Prettier** for TypeScript code in editors/vscode
