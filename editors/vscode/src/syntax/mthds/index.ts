@@ -1,3 +1,18 @@
+/**
+ * MTHDS TextMate grammar generator.
+ *
+ * This script produces only `mthds.tmLanguage.json` (the core grammar).
+ *
+ * The sibling files `mthds.frontmatter.tmLanguage.json` and
+ * `mthds.markdown.tmLanguage.json` are static injection wrappers — they
+ * contain no grammar rules of their own and simply delegate to
+ * `source.mthds`. They are hand-edited and do not need generation.
+ * This mirrors the upstream TOML pattern (`toml.frontmatter.tmLanguage.json`,
+ * `toml.markdown.tmLanguage.json` are also static, hand-edited files).
+ *
+ * Run: `yarn build:syntax` (or `npx tsx src/syntax/mthds/index.ts`)
+ */
+
 import * as path from "path";
 import { writeFileSync } from "fs";
 import { comment, commentDirective } from "./comment";
