@@ -1,0 +1,28 @@
+[package]
+name         = "pipelex-common"
+description  = "Shared code for Pipelex tools (wraps taplo-common with MTHDS environment)."
+version      = "0.1.0"
+rust-version = { workspace = true }
+authors      = { workspace = true }
+edition      = { workspace = true }
+license      = { workspace = true }
+
+[dependencies]
+taplo-common = { version = "0.6.0", path = "../taplo-common" }
+taplo        = { version = "0.14.0", path = "../taplo", features = ["serde"] }
+
+anyhow      = { workspace = true }
+async-trait = { workspace = true }
+futures     = { workspace = true }
+time        = { workspace = true }
+tracing     = { workspace = true }
+url         = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "io-std", "io-util", "parking_lot", "rt", "sync", "time"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { workspace = true, features = ["io-util", "parking_lot", "sync"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

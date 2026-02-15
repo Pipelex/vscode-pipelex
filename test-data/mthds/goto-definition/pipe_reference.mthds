@@ -1,0 +1,5 @@
+[pipe.my_pipe]
+description = "A pipe"
+
+[pipe.other]
+pipe = "my_pipe"

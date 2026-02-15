@@ -1,0 +1,5 @@
+[concept.DocumentAnalysis]
+description = "Analysis"
+
+[pipe.analyze]
+output = "DocumentAnalysis"

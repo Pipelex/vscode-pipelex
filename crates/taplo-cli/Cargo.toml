@@ -57,9 +57,6 @@ tokio = { workspace = true, features = ["sync", "fs", "time", "io-std", "rt-mult
 [target.'cfg(target_family = "wasm")'.dependencies]
 tokio = { workspace = true, features = ["sync", "parking_lot", "io-util"] }
 
-[package.metadata.auto-tag]
-enabled = true
-
 [[bin]]
 name = "taplo"
 path = "bin/taplo.rs"

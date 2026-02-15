@@ -44,9 +44,6 @@ toml             = { version = "0.7" }
 [package.metadata.docs.rs]
 features = ["serde", "schema"]
 
-[package.metadata.auto-tag]
-enabled = true
-
 [[bench]]
 harness = false
 name    = "taplo"

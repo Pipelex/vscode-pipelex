@@ -1,0 +1,5 @@
+[concept.Base]
+description = "Base concept"
+
+[concept.Child]
+refines = "Base"

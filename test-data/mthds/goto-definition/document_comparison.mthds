@@ -1,0 +1,47 @@
+domain      = "document_comparison"
+description = "Extract and compare two PDF documents, producing a structured comparison report"
+main_pipe   = "compare_documents"
+
+[concept.DocumentAnalysis]
+description = "Structured analysis of a document's key content"
+
+[concept.DocumentAnalysis.structure]
+title      = { type = "text", description = "Document title or identifier", required = true }
+key_points = { type = "text", description = "Main points and arguments", required = true }
+structure  = { type = "text", description = "Document structure and organization", required = true }
+tone       = { type = "text", description = "Writing tone and style" }
+
+[concept.ComparisonReport]
+description = "Detailed comparison between two documents"
+
+[concept.ComparisonReport.structure]
+similarities     = { type = "text", description = "Key similarities between the documents", required = true }
+differences      = { type = "text", description = "Key differences between the documents", required = true }
+unique_to_first  = { type = "text", description = "Points unique to the first document", required = true }
+unique_to_second = { type = "text", description = "Points unique to the second document", required = true }
+recommendation   = { type = "text", description = "Overall assessment and recommendation", required = true }
+
+[pipe.compare_documents]
+type = "PipeSequence"
+description = "Main pipeline: extract both documents in parallel, analyze them, compare, and produce a report"
+inputs = { doc_a = "Document", doc_b = "Document" }
+output = "Html"
+steps = [
+  { pipe = "extract_both", result = "extracted" },
+  { pipe = "analyze_both", result = "analyzed" },
+  { pipe = "compare_analyses", result = "comparison" },
+  { pipe = "render_comparison_report", result = "report_html" },
+]
+
+[pipe.analyze_doc_a]
+type = "PipeLLM"
+description = "Analyze the first document's content"
+inputs = { pages_a = "Page" }
+output = "DocumentAnalysis"
+model = "$retrieval"
+system_prompt = "You are a document analysis expert. Extract structured information from documents."
+prompt = """
+Analyze the following document and extract its key information:
+
+@pages_a
+"""

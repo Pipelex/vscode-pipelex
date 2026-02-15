@@ -3,9 +3,10 @@ name: Continuous integration
 on:
   push:
     branches:
-      - master
+      - main
     tags:
-      - release-*
+      - plxt-cli/v*
+      - pipelex-vscode-ext/v*
     paths-ignore:
       - "site/**/*"
       - schemas/**/*
@@ -13,7 +14,7 @@ on:
   workflow_dispatch: {}
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   auto_tag:
@@ -21,21 +22,43 @@ jobs:
     if: (github.event_name == 'push' && github.ref_type == 'branch') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           token: ${{ secrets.WORKFLOW_PAT }}
           fetch-depth: 0
-      - uses: tamasfe/auto-tag@v5
-        with:
-          name: tamasfe
-          email: me@tamasfe.dev
-          token: ${{ secrets.WORKFLOW_PAT }}
+      - name: Create release tags for changed versions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          CLI_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-cli/Cargo.toml)
+          EXT_VERSION=$(jq -r '.version' editors/vscode/package.json)
+
+          CREATED=0
+
+          if [ -n "$CLI_VERSION" ] && ! git rev-parse "plxt-cli/v${CLI_VERSION}" >/dev/null 2>&1; then
+            git tag "plxt-cli/v${CLI_VERSION}"
+            echo "Created tag plxt-cli/v${CLI_VERSION}"
+            CREATED=1
+          fi
+
+          if [ -n "$EXT_VERSION" ] && ! git rev-parse "pipelex-vscode-ext/v${EXT_VERSION}" >/dev/null 2>&1; then
+            git tag "pipelex-vscode-ext/v${EXT_VERSION}"
+            echo "Created tag pipelex-vscode-ext/v${EXT_VERSION}"
+            CREATED=1
+          fi
+
+          if [ "$CREATED" -eq 1 ]; then
+            git push --tags
+          else
+            echo "No new version tags to create"
+          fi
 
   fmt:
     name: Check formatting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - uses: docker://docker.io/tamasfe/taplo:latest
         with:
           args: fmt --check --diff
@@ -44,10 +67,10 @@ jobs:
     name: Test on Rust stable
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install latest Rust toolchain
         run: rustup update --no-self-update
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Test Taplo
         run: cargo test -p taplo
       - name: Check formatting regression
@@ -59,24 +82,24 @@ jobs:
     name: Check on WASM
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install latest Rust toolchain
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
-      - working-directory: crates/taplo-wasm
-        run: cargo check --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Check WASM crates (locked)
+        run: cargo check -p taplo-wasm -p pipelex-wasm --target wasm32-unknown-unknown --locked
 
   toml_test:
     name: Run toml-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install latest Rust toolchain
         run: |
           rustup update --no-self-update
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Retrieve toml-test
         run: |
           wget https://github.com/BurntSushi/toml-test/releases/download/v1.1.0/toml-test-v1.1.0-linux-amd64.gz
@@ -92,12 +115,12 @@ jobs:
     name: Test libraries with MSRV
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install latest Rust toolchain
         run: |
           rustup update --no-self-update
           rustup default 1.74
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Test MSRV for taplo
         run: |
           cargo check -p lsp-async-stub -p taplo-common -p taplo-lsp -p taplo
@@ -107,12 +130,12 @@ jobs:
     name: Test binaries with MSRV
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install latest Rust toolchain
         run: |
           rustup update --no-self-update
           rustup default 1.74
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Test taplo-cli
         run: |
           cargo check -p taplo-cli
@@ -122,13 +145,13 @@ jobs:
     name: Test WASM with MSRV
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install latest Rust toolchain
         run: |
           rustup update --no-self-update
           rustup default 1.74
           rustup target install wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Test taplo-wasm
         working-directory: crates/taplo-wasm
         run: |

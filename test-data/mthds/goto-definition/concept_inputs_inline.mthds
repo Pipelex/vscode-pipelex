@@ -1,0 +1,5 @@
+[concept.FeatureAnalysis]
+description = "Feature analysis"
+
+[pipe.my_pipe]
+inputs = { photo = "FeatureAnalysis" }

@@ -16,9 +16,6 @@
     "url": "https://github.com/tamasfe"
   },
   "license": "MIT",
-  "autoTag": {
-    "enabled": true
-  },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",

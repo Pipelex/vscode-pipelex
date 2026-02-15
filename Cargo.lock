@@ -1573,6 +1573,82 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
+name = "pipelex-cli"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "async-ctrlc",
+ "clap",
+ "clap_complete",
+ "lsp-async-stub",
+ "pipelex-common",
+ "reqwest",
+ "taplo-cli",
+ "taplo-common",
+ "taplo-lsp",
+ "tokio",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "pipelex-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "taplo",
+ "taplo-common",
+ "time",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "pipelex-lsp"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "lsp-async-stub",
+ "pipelex-common",
+ "taplo-common",
+ "taplo-lsp",
+ "tracing",
+]
+
+[[package]]
+name = "pipelex-wasm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "console_error_panic_hook",
+ "futures",
+ "getrandom",
+ "indexmap",
+ "js-sys",
+ "lsp-async-stub",
+ "pipelex-cli",
+ "pipelex-common",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "taplo",
+ "taplo-cli",
+ "taplo-common",
+ "taplo-lsp",
+ "time",
+ "tokio",
+ "tracing",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "pkg-config"
 version = "0.3.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
