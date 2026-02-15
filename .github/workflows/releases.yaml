@@ -6,6 +6,8 @@ on:
       - plxt-cli/v*
       - pipelex-vscode-ext/v*
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
