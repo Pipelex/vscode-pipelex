@@ -10,12 +10,20 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 **Exception — bug fixes in common code:** If fixing a bug requires modifying shared/upstream taplo code (e.g. crates outside of MTHDS-specific paths), you must explicitly notify the developer before making the change, explaining what the bug is, which common code is affected, and why the fix is necessary.
 
 ## Repository Structure
+
+### Upstream Taplo crates
 - `crates/taplo/` - Core Rust library (parser, formatter, DOM)
-- `crates/taplo-cli/` - CLI tool
+- `crates/taplo-cli/` - Upstream CLI tool (binary: `taplo`)
 - `crates/taplo-lsp/` - Language server (IDE-agnostic)
 - `crates/taplo-common/` - Shared utilities (schemas, config)
 - `crates/taplo-wasm/` - WASM bindings (target: wasm32-unknown-unknown)
 - `crates/lsp-async-stub/` - Async LSP framework
+
+### Pipelex-specific crates
+- `crates/pipelex-cli/` - **Our CLI** (binary: `plxt`). Thin wrapper around `taplo-cli` that adds Pipelex config discovery (`.pipelex/toml_config.toml` first, then `.taplo.toml` fallback), `PIPELEX_CONFIG` env var, and wraps LSP with `MthdsEnvironment`. Delegates all standard commands (format, lint, get) to taplo-cli unchanged.
+- `crates/pipelex-common/` - Pipelex shared utilities (includes `MthdsEnvironment` for config discovery)
+
+### VS Code extension & other
 - `editors/vscode/` - VS Code extension (TypeScript)
 - `editors/vscode/src/pipelex/` - MTHDS-specific extension code
 - `editors/vscode/src/syntax/mthds/` - MTHDS grammar generator (generates mthds.tmLanguage.json)
