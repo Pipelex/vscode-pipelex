@@ -65,8 +65,8 @@ jobs:
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      - working-directory: crates/taplo-wasm
-        run: cargo check --target wasm32-unknown-unknown
+      - name: Check WASM crates (locked)
+        run: cargo check -p taplo-wasm -p pipelex-wasm --target wasm32-unknown-unknown --locked
 
   toml_test:
     name: Run toml-test

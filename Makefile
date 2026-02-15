@@ -68,9 +68,9 @@ test: ## Run all tests (Rust + VS Code extension)
 	cargo test -p taplo
 	cd $(EXT_DIR) && yarn test
 
-check: ## Quick compilation checks (CLI + WASM)
-	cargo check -p pipelex-cli
-	cargo check -p pipelex-wasm --target wasm32-unknown-unknown
+check: ## Quick compilation checks (CLI + WASM, locked)
+	cargo check -p pipelex-cli --locked
+	cargo check -p pipelex-wasm --target wasm32-unknown-unknown --locked
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
 
