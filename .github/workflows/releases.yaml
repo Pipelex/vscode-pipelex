@@ -79,11 +79,11 @@ jobs:
       - name: Install vsce
         run: npm install -g @vscode/vsce
       - name: Package Extension
-        run: vsce package --baseImagesUrl https://raw.githubusercontent.com/Pipelex/vscode-pipelex/main/editors/vscode --no-yarn # Microsoft doesn't support anything other than npm and yarn@v1
+        run: vsce package --baseImagesUrl https://raw.githubusercontent.com/Pipelex/vscode-pipelex/main/editors/vscode --no-dependencies
         working-directory: editors/vscode
       - name: Publish extension to microsoft marketplace
         if: github.event_name == 'push'
-        run: vsce publish --baseImagesUrl https://raw.githubusercontent.com/Pipelex/vscode-pipelex/main/editors/vscode -p $VSCE_TOKEN --no-yarn
+        run: vsce publish --baseImagesUrl https://raw.githubusercontent.com/Pipelex/vscode-pipelex/main/editors/vscode -p $VSCE_TOKEN --no-dependencies
         working-directory: editors/vscode
         env:
           VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
