@@ -16,7 +16,7 @@ VSIX              := $(EXT_DIR)/pipelex.vsix
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s
-.PHONY: cli ext ext-deps ext-install ext-uninstall vsix clean test check
+.PHONY: cli ext ext-deps ext-install ext-uninstall vsix clean test check docs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -73,6 +73,9 @@ check: ## Quick compilation checks (CLI + WASM, locked)
 	cargo check -p pipelex-wasm --target wasm32-unknown-unknown --locked
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
+
+docs: ## Compose README/CONTRIBUTING from headers + upstream
+	./scripts/compose-docs.sh
 
 sync-grammar: $(GRAMMAR_DST) ## Copy the MTHDS TextMate grammar to the website
 s: sync-grammar

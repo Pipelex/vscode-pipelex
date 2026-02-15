@@ -5,56 +5,63 @@
 
 # Pipelex Extension
 
-**Rich language support for Pipelex Language (MTHDS) and TOML files**
+**Define, compose, and run AI methods in `.mthds` files — with full TOML support**
 
-This extension provides comprehensive VS Code support for the **Pipelex Language (MTHDS)**, which is based on TOML syntax, along with full TOML language support. Built as a fork of the excellent [Taplo](https://github.com/tamasfe/taplo) language server, it tracks upstream closely while adding MTHDS-specific features like advanced syntax highlighting, semantic tokens, and intelligent language features for `.mthds` files.
+A VS Code and Cursor extension that brings first-class editing support for [MTHDS](https://docs.pipelex.com) files and TOML. Rich syntax highlighting, semantic tokens, formatting, schema validation, completions, and more — built on [Taplo](https://github.com/tamasfe/taplo) and tracking upstream.
 
-**About Pipelex:**
+> **What is MTHDS?** — An open standard for defining AI methods as typed, composable, human-readable files. A `.mthds` file describes what an AI should do — its inputs, outputs, logic, and data types — in plain TOML that both people and machines can read. [Pipelex](https://github.com/Pipelex/pipelex) is the runtime that executes them. Learn more at [docs.pipelex.com](https://docs.pipelex.com).
 
-[Pipelex](https://github.com/Pipelex/pipelex) is an open-source language for building deterministic AI methods. It enables agents and developers to transform natural language requirements into production-ready pipelines that process information reliably at scale. Unlike traditional workflow tools, Pipelex uses a declarative syntax that captures business logic directly, making pipelines readable by domain experts while remaining executable by any runtime. Write once, run anywhere, share with everyone.
+## 🚀 MTHDS Language Support
 
-## 🚀 **MTHDS Features**
+Context-aware highlighting and semantic tokens for every MTHDS construct — concepts, pipes, typed inputs and outputs, model references, Jinja2 templates, data injection, and more. Each construct gets its own distinct color so you can read a `.mthds` file at a glance.
 
-### 📝 **Pipelex Language Support**
-- **Rich syntax highlighting** for MTHDS-specific constructs
-- **Concept definitions**: `[concept.Name]` sections with specialized highlighting
-- **Pipe definitions**: `[pipe.name]` sections for method steps
-- **Data injection**: `@variable` syntax with smart highlighting
-- **Template variables**: `$variable` support
-- **Jinja2 templates**: `{{ }}` and `{% %}` blocks with keyword highlighting
-- **HTML templates**: Basic HTML tag support within strings
-- **Semantic tokens** for context-aware highlighting
-
-### 🎨 **MTHDS Syntax Highlighting**
-- **🔵 Concept sections** - `[concept.Name]` in teal (`#4ECDC4`)
-- **🔴 Pipe sections** - `[pipe.name]` in red (`#FF6666`)
-- **🟢 Data variables** - `@variable`, `$variable` in green (`#98FB98`)
-- **🟣 Template syntax** - Jinja delimiters in pink (`#FF79C6`)
-- **🟡 HTML elements** - Tags and attributes in orange/yellow
-- **🔷 Concept types** - `ConceptType` references highlighted
-- **🔶 Pipe types** - `PipeLLM`, `PipeSequence` etc. highlighted
-
-### Example MTHDS File
 ```toml
-# Pipelex method definition
-[concept.UserQuery]
-definition = "A user's natural language query"
+domain = "hr_screening"
+description = "Analyze a job offer to build a scorecard, batch process CVs"
+main_pipe = "screen_candidates"
 
-[pipe.analyze_query]
+[concept.Scorecard]
+description = "Evaluation scorecard built from a job offer"
+
+[concept.Scorecard.structure]
+job_title = { type = "text", required = true }
+company = { type = "text" }
+required_skills = { type = "list", item_type = "text" }
+criteria = { type = "list", item_type = "concept", item_concept_ref = "hr_screening.Criterion" }
+
+[pipe.screen_candidates]
+type = "PipeSequence"
+inputs = { job_offer = "Document", cvs = "Document[]" }
+output = "CvResult[]"
+steps = [
+    { pipe = "extract_job_offer", result = "job_pages" },
+    { pipe = "build_scorecard", result = "scorecard" },
+    { pipe = "evaluate_cv", batch_over = "cvs", result = "results" },
+]
+
+[pipe.build_scorecard]
 type = "PipeLLM"
-definition = "Analyzes a user's natural language query"
-inputs = { query = "UserQuery" }
-output = "QueryAnalysis"
-prompt_template = """
-Analyze this user query: $query
-Extract the key information and intent.
-"""
+inputs = { job_pages = "Page[]" }
+output = "Scorecard"
+model = "claude-4.6-opus"
+prompt = """Analyze this job offer and build a scorecard..."""
 ```
 
-## 📦 **Installation**
-1. **From extensions marketplace**: Search for "Pipelex" in the Extensions view
-2. **From Command Line**: `code --install-extension Pipelex.pipelex` or `cursor --install-extension Pipelex.pipelex`
-3. **Manual Installation**: Download `.vsix` from [releases](https://github.com/Pipelex/vscode-pipelex/releases)
+See the [MTHDS language reference](https://docs.pipelex.com) for the full standard.
+
+## 🔧 Full TOML Support
+
+Beyond MTHDS, this extension replaces your TOML extension with complete language support — formatting, completions, hover documentation, go-to-definition, rename, diagnostics, schema validation via [JSON Schema Store](https://www.schemastore.org/json/).
+
+## ⚙️ Configuration
+
+The extension looks for a settings file at **`.pipelex/toml_config.toml`** in your project root. The format is the same as a standard [Taplo configuration file](https://taplo.tamasfe.dev/configuration/file.html) — use it to configure formatting rules, schema associations, and linting options for both `.mthds` and `.toml` files.
+
+## 📦 Installation
+
+1. **Extensions marketplace** — Search for "Pipelex" in the Extensions view
+2. **Command line** — `code --install-extension Pipelex.pipelex` or `cursor --install-extension Pipelex.pipelex`
+3. **Manual** — Download `.vsix` from [releases](https://github.com/Pipelex/vscode-pipelex/releases)
 
 ---
 
