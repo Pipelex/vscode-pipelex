@@ -23,7 +23,7 @@ jobs:
           echo "Waiting for 'Test on Rust stable' check on ${{ github.sha }}..."
           for i in $(seq 1 180); do
             result=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs \
-              --jq '.check_runs[] | select(.name == "Test on Rust stable")')
+              --jq 'first(.check_runs[] | select(.name == "Test on Rust stable"))')
             status=$(echo "$result" | jq -r '.status')
             conclusion=$(echo "$result" | jq -r '.conclusion')
             if [ "$status" = "completed" ]; then
