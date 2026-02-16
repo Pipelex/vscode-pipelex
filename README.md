@@ -5,40 +5,93 @@
 
 # vscode-pipelex
 
-This repo provides VS Code support for the **Pipelex Language (MTHDS)** which is based on TOML syntax. The repo is a fork of [Taplo](https://github.com/tamasfe/taplo) and it tracks Taplo upstream closely.
+This repo is a fork of [Taplo](https://github.com/tamasfe/taplo) extended with MTHDS support. It ships a **VS Code / Cursor extension**, the **`plxt` CLI**, and the **`pipelex-tools` PyPI package**.
 
-**About Pipelex:**
+> **What is MTHDS?** — An open standard for defining AI methods as typed, composable, human-readable files. A `.mthds` file describes what an AI should do — its inputs, outputs, logic, and data types — in plain TOML that both people and machines can read. [Pipelex](https://github.com/Pipelex/pipelex) is the runtime that executes them. Learn more at [docs.pipelex.com](https://docs.pipelex.com).
 
-[Pipelex](https://github.com/Pipelex/pipelex) is an open-source language for building deterministic AI methods. It enables agents and developers to transform natural language requirements into production-ready pipelines that process information reliably at scale. Unlike traditional workflow tools, Pipelex uses a declarative syntax that captures business logic directly, making pipelines readable by domain experts while remaining executable by any runtime. Write once, run anywhere, share with everyone.
+## `plxt` CLI
+
+A drop-in replacement for the `taplo` CLI with Pipelex config discovery. Install via PyPI:
+
+```bash
+pip install pipelex-tools
+# or
+uv add pipelex-tools
+```
+
+| Command | Description |
+|---------|-------------|
+| `plxt fmt` | Format TOML and MTHDS documents |
+| `plxt lint` | Lint TOML and MTHDS documents |
+| `plxt lsp stdio` | Start the language server (stdio transport) |
+| `plxt get` | Extract a value from a TOML document |
+| `plxt config` | Print default config or its JSON schema |
+| `plxt completions` | Generate shell completions |
+
+**Configuration:** `plxt` looks for `.pipelex/toml_config.toml` in your project root (falls back to `.taplo.toml`). Override with the `PIPELEX_CONFIG` environment variable.
+
+## VS Code / Cursor Extension
+
+First-class editing support for `.mthds` files and TOML — syntax highlighting, semantic tokens, formatting, completions, schema validation, and more.
+
+```bash
+code --install-extension Pipelex.pipelex
+# or
+cursor --install-extension Pipelex.pipelex
+```
+
+See [`editors/vscode/README.md`](editors/vscode/README.md) for full details.
 
 ## What we offer in addition to Taplo
+
 - **MTHDS language support**: Rich syntax highlighting, semantic tokens, and language features for `.mthds` files
 - **Concept definitions**: `[concept.Name]` sections with specialized highlighting
 - **Pipe definitions**: `[pipe.name]` sections for method steps
 - **Data injection**: `@variable` syntax with smart highlighting
 - **Template variables**: `$variable` support with Jinja2 templates
+- **Pipelex config discovery**: `.pipelex/toml_config.toml` with `PIPELEX_CONFIG` env var
 - **All Taplo features retained**: Complete TOML 1.0.0 support and tooling
 
 ## Where to file issues
+
 - **Taplo behavior/bugs** → [upstream Taplo project](https://github.com/tamasfe/taplo)
 - **MTHDS-specific issues** → [this repository](https://github.com/Pipelex/vscode-pipelex/issues)
 
-## Quick Start with MTHDS
-```toml
-# example.mthds - Pipelex method definition
-[concept.UserQuery]
-definition = "A user's natural language query"
+## MTHDS Example
 
-[pipe.analyze_query]
+```toml
+domain = "hr_screening"
+description = "Analyze a job offer to build a scorecard, batch process CVs"
+main_pipe = "screen_candidates"
+
+[concept.Scorecard]
+description = "Evaluation scorecard built from a job offer"
+
+[concept.Scorecard.structure]
+job_title = { type = "text", required = true }
+company = { type = "text" }
+required_skills = { type = "list", item_type = "text" }
+criteria = { type = "list", item_type = "concept", item_concept_ref = "hr_screening.Criterion" }
+
+[pipe.screen_candidates]
+type = "PipeSequence"
+inputs = { job_offer = "Document", cvs = "Document[]" }
+output = "CvResult[]"
+steps = [
+    { pipe = "extract_job_offer", result = "job_pages" },
+    { pipe = "build_scorecard", result = "scorecard" },
+    { pipe = "evaluate_cv", batch_over = "cvs", result = "results" },
+]
+
+[pipe.build_scorecard]
 type = "PipeLLM"
-definition = "Analyzes a user's natural language query"
-inputs = { query = "UserQuery" }
-output = "QueryAnalysis"
-prompt_template = """
-Analyze this user query: $query
-Extract the key information and intent.
-"""
+inputs = { job_pages = "Page[]" }
+output = "Scorecard"
+model = "claude-4.6-opus"
+prompt = """Analyze this job offer and build a scorecard..."""
 ```
+
+See the [MTHDS language reference](https://docs.pipelex.com) for the full standard.
 
 ---
 

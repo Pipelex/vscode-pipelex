@@ -5,7 +5,6 @@ set -euo pipefail
 UPSTREAM_BRANCH="${UPSTREAM_BRANCH:-upstream}"   # your local mirror branch of Taplo/main
 ROOT_README_PATH="README.md"
 CONTRIB_PATH="CONTRIBUTING.md"
-VSCODE_README_PATH="editors/vscode/README.md"
 VSCODE_CHANGELOG_PATH="editors/vscode/CHANGELOG.md"
 
 mkdir -p docs/upstream
@@ -28,7 +27,6 @@ echo "Using upstream branch: ${UPSTREAM_BRANCH}"
 # 1) Grab upstream docs (exact copies)
 pull_from_upstream "README.md" "docs/upstream/README.UPSTREAM.md"
 pull_from_upstream "CONTRIBUTING.md" "docs/upstream/CONTRIBUTING.UPSTREAM.md"
-pull_from_upstream "editors/vscode/README.md" "docs/upstream/VSCODE_README.UPSTREAM.md"
 pull_from_upstream "editors/vscode/CHANGELOG.md" "docs/upstream/VSCODE_CHANGELOG.UPSTREAM.md"
 
 # 2) Compose final files by prepending headers
@@ -55,8 +53,6 @@ compose () {
 
 compose "docs/pipelex/README.header.md" "docs/upstream/README.UPSTREAM.md" "$ROOT_README_PATH" "docs/pipelex/README.header.md"
 compose "docs/pipelex/CONTRIBUTING.header.md" "docs/upstream/CONTRIBUTING.UPSTREAM.md" "$CONTRIB_PATH" "docs/pipelex/CONTRIBUTING.header.md"
-compose "docs/pipelex/VSCODE_README.header.md" "docs/upstream/VSCODE_README.UPSTREAM.md" "$VSCODE_README_PATH" "docs/pipelex/VSCODE_README.header.md"
-
 # Handle VS Code CHANGELOG if header exists
 if [[ -f "docs/pipelex/CHANGELOG.header.md" ]]; then
   echo "📝 Composing ${VSCODE_CHANGELOG_PATH}"
@@ -87,14 +83,13 @@ echo
 echo "✅ Docs composed successfully!"
 echo "📋 Files updated:"
 echo "   - $ROOT_README_PATH"
-echo "   - $CONTRIB_PATH" 
-echo "   - $VSCODE_README_PATH"
+echo "   - $CONTRIB_PATH"
 if [[ -f "docs/pipelex/CHANGELOG.header.md" ]]; then
   echo "   - $VSCODE_CHANGELOG_PATH"
 fi
 echo
 echo "🔍 Review changes and commit:"
-echo "   git add $ROOT_README_PATH $CONTRIB_PATH $VSCODE_README_PATH docs/upstream/*"
+echo "   git add $ROOT_README_PATH $CONTRIB_PATH docs/upstream/*"
 echo "   git commit -m \"docs: sync upstream docs and prepend Pipelex overlay\""
 echo
 echo "💡 To update documentation in the future, simply run:"

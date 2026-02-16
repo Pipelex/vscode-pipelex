@@ -16,7 +16,7 @@ VSIX              := $(EXT_DIR)/pipelex.vsix
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s
-.PHONY: cli ext ext-deps ext-install ext-uninstall vsix clean test check docs
+.PHONY: cli lock ext ext-deps ext-install ext-uninstall vsix clean test check docs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -27,6 +27,9 @@ help: ## Show this help
 cli: ## Build the plxt CLI (release mode)
 	cargo build -p pipelex-cli --release
 	@echo "Binary: target/release/plxt"
+
+lock: ## Update Cargo.lock after version bumps
+	cargo update --workspace
 
 ext-deps: ## Build the @pipelex/lsp WASM bundle (prerequisite for ext)
 	cd $(JS_LSP_DIR) && yarn install && yarn build
