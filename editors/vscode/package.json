@@ -1,8 +1,8 @@
 {
   "name": "pipelex",
   "displayName": "Pipelex",
-  "description": "Pipelex Language (MTHDS) and TOML support",
-  "version": "0.3.0",
+  "description": "Pipelex extension for the MTHDS language and TOML support",
+  "version": "0.3.1",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -31,8 +31,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onLanguage:cargoLock",
-    "onLanguage:mthds"
+    "onLanguage:cargoLock"
   ],
   "keywords": [
     "pipelex",
