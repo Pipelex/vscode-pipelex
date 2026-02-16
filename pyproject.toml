@@ -49,3 +49,4 @@ build-backend = "maturin"
 [tool.maturin]
 bindings      = "bin"
 manifest-path = "crates/pipelex-cli/Cargo.toml"
+include       = ["LICENSE"]
