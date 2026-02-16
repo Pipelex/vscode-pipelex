@@ -5,12 +5,12 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-authors      = ["tamasfe"]
+authors      = ["Evotis S.A.S. <oss@pipelex.com>", "tamasfe"]
 edition      = "2021"
 license      = "MIT"
 rust-version = "1.74"
-homepage     = "https://taplo.tamasfe.dev"
-repository   = "https://github.com/tamasfe/taplo"
+homepage     = "https://docs.pipelex.com/"
+repository   = "https://github.com/Pipelex/vscode-pipelex"
 
 [workspace.dependencies]
 ahash              = { version = "0.8.4" }

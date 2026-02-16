@@ -1,11 +1,7 @@
-[build-system]
-requires      = ["maturin>=1.4"]
-build-backend = "maturin"
-
 [project]
 name            = "pipelex-tools"
-description     = "Pipelex Tools CLI — TOML/MTHDS formatter, linter, and LSP"
-authors         = [{ name = "tamasfe" }, { name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
+description     = "Pipelex Tools CLI — MTHDS/TOML formatter, linter, and LSP"
+authors         = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }, { name = "tamasfe" }]
 maintainers     = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
 license         = "MIT"
 readme          = "README.md"
@@ -43,6 +39,10 @@ Homepage      = "https://github.com/Pipelex/vscode-pipelex"
 Repository    = "https://github.com/Pipelex/vscode-pipelex.git"
 Documentation = "https://docs.pipelex.com/"
 Tracker       = "https://github.com/Pipelex/vscode-pipelex/issues"
+
+[build-system]
+requires      = ["maturin>=1.4"]
+build-backend = "maturin"
 
 [tool.maturin]
 bindings      = "bin"
