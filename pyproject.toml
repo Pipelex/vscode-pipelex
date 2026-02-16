@@ -5,7 +5,7 @@ authors         = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }, { name
 maintainers     = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
 license         = "MIT"
 readme          = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.8,<3.15"
 dynamic         = ["version"]
 
 keywords = [
@@ -27,6 +27,8 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
   "Programming Language :: Python",
