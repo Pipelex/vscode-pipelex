@@ -16,13 +16,15 @@ VSIX              := $(EXT_DIR)/pipelex.vsix
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s
-.PHONY: cli lock ext ext-deps ext-install ext-uninstall vsix clean test check docs
+.PHONY: build cli lock ext ext-deps ext-install ext-uninstall vsix clean test check docs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # ── Build ────────────────────────────────────────────────────────────────────
+
+build: cli ext ## Build everything (CLI + VS Code extension)
 
 cli: ## Build the plxt CLI (release mode)
 	cargo build -p pipelex-cli --release
