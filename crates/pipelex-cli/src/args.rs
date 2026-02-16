@@ -67,11 +67,11 @@ pub enum PlxtConfigCommand {
     Schema,
 }
 
-/// Pipelex-specific GeneralArgs that looks for PIPELEX_CONFIG env var.
+/// Pipelex-specific GeneralArgs.
 #[derive(Clone, clap::Args)]
 pub struct PlxtGeneralArgs {
     /// Path to the Pipelex configuration file.
-    #[clap(long, short, env = "PIPELEX_CONFIG")]
+    #[clap(long, short)]
     pub config: Option<PathBuf>,
 
     /// Set a cache path.

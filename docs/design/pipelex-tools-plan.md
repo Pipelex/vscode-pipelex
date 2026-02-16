@@ -126,7 +126,7 @@ async fn main() {
 
 ### 2.2 Rebranded Args
 
-Define `PlxtArgs` — same structure as `TaploArgs` but with `#[clap(name = "plxt")]` and `env = "PIPELEX_CONFIG"` for the config flag.
+Define `PlxtArgs` — same structure as `TaploArgs` but with `#[clap(name = "plxt")]`.
 
 All inner command structs (`FormatCommand`, `LintCommand`, etc.) from `taplo-cli` are `pub` and can be reused directly.
 

@@ -25,7 +25,7 @@ uv add pipelex-tools
 | `plxt config` | Print default config or its JSON schema |
 | `plxt completions` | Generate shell completions |
 
-**Configuration:** `plxt` looks for `.pipelex/toml_config.toml` in your project root (falls back to `.taplo.toml`). Override with the `PIPELEX_CONFIG` environment variable.
+**Configuration:** `plxt` looks for `.pipelex/plxt.toml` (preferred) or `plxt.toml` in your project root (falls back to `.taplo.toml`).
 
 ## VS Code / Cursor Extension
 
@@ -46,7 +46,7 @@ See [`editors/vscode/README.md`](editors/vscode/README.md) for full details.
 - **Pipe definitions**: `[pipe.name]` sections for method steps
 - **Data injection**: `@variable` syntax with smart highlighting
 - **Template variables**: `$variable` support with Jinja2 templates
-- **Pipelex config discovery**: `.pipelex/toml_config.toml` with `PIPELEX_CONFIG` env var
+- **Pipelex config discovery**: `.pipelex/plxt.toml` or `plxt.toml`
 - **All Taplo features retained**: Complete TOML 1.0.0 support and tooling
 
 ## Where to file issues

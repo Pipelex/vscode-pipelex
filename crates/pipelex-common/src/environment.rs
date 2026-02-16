@@ -7,7 +7,7 @@ use url::Url;
 
 use crate::config::PIPELEX_CONFIG_FILE_NAMES;
 
-/// An environment wrapper that searches for `.pipelex/toml_config.toml`
+/// An environment wrapper that searches for `.pipelex/plxt.toml` or `plxt.toml`
 /// before falling back to the inner environment's config file discovery
 /// (which looks for `.taplo.toml` / `taplo.toml`).
 #[derive(Clone)]
@@ -221,7 +221,7 @@ mod tests {
     async fn pipelex_config_takes_priority() {
         let env = MockEnv {
             files: vec![
-                PathBuf::from("/project/.pipelex/toml_config.toml"),
+                PathBuf::from("/project/.pipelex/plxt.toml"),
                 PathBuf::from("/project/.taplo.toml"),
             ],
         };
@@ -229,7 +229,7 @@ mod tests {
         let result = mthds.find_config_file(Path::new("/project")).await;
         assert_eq!(
             result,
-            Some(PathBuf::from("/project/.pipelex/toml_config.toml"))
+            Some(PathBuf::from("/project/.pipelex/plxt.toml"))
         );
     }
 
@@ -246,7 +246,7 @@ mod tests {
     #[tokio::test]
     async fn pipelex_config_in_parent() {
         let env = MockEnv {
-            files: vec![PathBuf::from("/project/.pipelex/toml_config.toml")],
+            files: vec![PathBuf::from("/project/.pipelex/plxt.toml")],
         };
         let mthds = MthdsEnvironment::new(env);
         let result = mthds
@@ -254,7 +254,7 @@ mod tests {
             .await;
         assert_eq!(
             result,
-            Some(PathBuf::from("/project/.pipelex/toml_config.toml"))
+            Some(PathBuf::from("/project/.pipelex/plxt.toml"))
         );
     }
 
@@ -270,7 +270,7 @@ mod tests {
     fn is_config_file_pipelex() {
         let env = MockEnv { files: vec![] };
         let mthds = MthdsEnvironment::new(env);
-        assert!(mthds.is_config_file(Path::new("/project/.pipelex/toml_config.toml")));
+        assert!(mthds.is_config_file(Path::new("/project/.pipelex/plxt.toml")));
     }
 
     #[test]
@@ -288,5 +288,31 @@ mod tests {
         assert!(!mthds.is_config_file(Path::new("/project/Cargo.toml")));
         assert!(!mthds.is_config_file(Path::new("/project/pyproject.toml")));
         assert!(!mthds.is_config_file(Path::new("/project/config.toml")));
+    }
+
+    #[tokio::test]
+    async fn plxt_config_at_root() {
+        let env = MockEnv {
+            files: vec![PathBuf::from("/project/plxt.toml")],
+        };
+        let mthds = MthdsEnvironment::new(env);
+        let result = mthds.find_config_file(Path::new("/project")).await;
+        assert_eq!(result, Some(PathBuf::from("/project/plxt.toml")));
+    }
+
+    #[tokio::test]
+    async fn plxt_in_subdir_takes_priority() {
+        let env = MockEnv {
+            files: vec![
+                PathBuf::from("/project/.pipelex/plxt.toml"),
+                PathBuf::from("/project/plxt.toml"),
+            ],
+        };
+        let mthds = MthdsEnvironment::new(env);
+        let result = mthds.find_config_file(Path::new("/project")).await;
+        assert_eq!(
+            result,
+            Some(PathBuf::from("/project/.pipelex/plxt.toml"))
+        );
     }
 }
