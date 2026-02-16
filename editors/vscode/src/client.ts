@@ -175,7 +175,8 @@ async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
       // Notify the server about file changes to '.toml' and '.mthds' files contained in the workspace
       fileEvents: [
         vscode.workspace.createFileSystemWatcher('**/*.toml'),
-        vscode.workspace.createFileSystemWatcher('**/*.mthds')
+        vscode.workspace.createFileSystemWatcher('**/*.mthds'),
+        vscode.workspace.createFileSystemWatcher('**/*.plx')
       ]
     },
   };
