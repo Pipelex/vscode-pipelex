@@ -26,7 +26,7 @@ pub(crate) async fn goto_definition<E: Environment>(
     let document_uri = p.text_document_position_params.text_document.uri;
 
     // Only handle MTHDS files — no behavior change for TOML files.
-    if !document_uri.as_str().ends_with(".mthds") {
+    if !document_uri.as_str().ends_with(".mthds") && !document_uri.as_str().ends_with(".plx") {
         return Ok(None);
     }
 

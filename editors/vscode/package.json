@@ -120,7 +120,8 @@
           "PLX"
         ],
         "extensions": [
-          ".mthds"
+          ".mthds",
+          ".plx"
         ],
         "configuration": "./language-configuration.json"
       }

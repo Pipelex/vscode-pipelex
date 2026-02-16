@@ -1,8 +1,8 @@
 use crate::world::{DocumentState, WorkspaceState, World};
 use lsp_async_stub::{util::LspExt, Context, RequestWriter};
 use lsp_types::{
-    notification, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, Location,
-    PublishDiagnosticsParams, Url,
+    notification, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
+    Location, PublishDiagnosticsParams, Url,
 };
 use taplo::dom::Node;
 use taplo_common::environment::Environment;
@@ -14,6 +14,21 @@ pub(crate) async fn publish_diagnostics<E: Environment>(
     document_url: Url,
 ) {
     let mut diags = Vec::new();
+
+    if document_url.as_str().ends_with(".plx") {
+        diags.push(Diagnostic {
+            range: Default::default(),
+            severity: Some(DiagnosticSeverity::HINT),
+            code: None,
+            code_description: None,
+            source: Some("Pipelex".into()),
+            message: "The .plx file extension is deprecated. Rename this file to .mthds instead."
+                .into(),
+            related_information: None,
+            tags: Some(vec![DiagnosticTag::DEPRECATED]),
+            data: None,
+        });
+    }
 
     let workspaces = context.workspaces.read().await;
     let Some(ws) = workspaces.get(&ws_url) else {
