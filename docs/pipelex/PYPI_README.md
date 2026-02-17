@@ -1,6 +1,6 @@
 # pipelex-tools
 
-CLI for formatting, linting, and language-server support for MTHDS and TOML files. Built on a fork of [Taplo](https://github.com/tamasfe/taplo).
+CLI for formatting, linting, and language-server support for MTHDS and TOML files.
 
 > **What is MTHDS?** — An open standard for defining AI methods as typed, composable, human-readable files. A `.mthds` file describes what an AI should do — its inputs, outputs, logic, and data types — in plain TOML that both people and machines can read. [Pipelex](https://github.com/Pipelex/pipelex) is the runtime that executes them. Learn more at [docs.pipelex.com](https://docs.pipelex.com).
 
@@ -85,5 +85,7 @@ For rich editor support (syntax highlighting, semantic tokens, formatting, compl
 - [Issues](https://github.com/Pipelex/vscode-pipelex/issues)
 
 ---
+
+TOML support built on [Taplo](https://github.com/tamasfe/taplo).
 
 "Pipelex" is a trademark of Evotis S.A.S.
