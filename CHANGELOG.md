@@ -1,13 +1,48 @@
-# Pipelex Extension Changelog
+# Pipelex IDE Extension and `plxt` CLI Changelog
+
+## [Unreleased]
+
+### Fixed
+- Fix suffix-based false positives in `is_config_file` for `plxt.toml` (plxt ≥0.1.5)
+
+### Changed
+- Dedicated PyPI README for pipelex-tools
+- README branding improvements (screenshot image)
+
+## [0.3.2] - 2026-02-14
+
+### Added
+- `x-plxt` schema extension support
+
+### Changed
+- Removed `PIPELEX_CONFIG` environment variable — use `plxt.toml` / `.pipelex/plxt.toml` instead (plxt 0.1.4)
+
+## [0.3.1] - 2026-02-13
+
+### Added
+- `.plx` legacy file extension support with deprecation warnings
+
+### Changed
+- CI hardening: enterprise action allowlist, SHA-pinned actions, streamlined release workflows
+- Rewritten extension README
 
 ## [0.3.0] - 2026-02-12
 
+### Added
+- Go-to-definition for pipe references in MTHDS files
+- Programmatic TextMate grammar generator (replaces hand-edited `mthds.tmLanguage.json`)
+- Dedicated syntax coloring for model field sigil references (`$`, `@`, `~`)
+- Hot-reload config file changes for formatting without window restart
+- `plxt` CLI wrapper crates with Pipelex config discovery (plxt 0.1.0)
+- Release publishing pipelines for PyPI, VS Code Marketplace, and Open VSX
+- Semantic token provider unit tests
+
 ### Changed
-- **MTHDS Standard Migration**: File extension changed from `.plx` to `.mthds`
-- Language ID changed from `plx` to `mthds`
+- **MTHDS Standard Migration**: File extension `.plx` → `.mthds`, language ID `plx` → `mthds`
 - Semantic token IDs renamed from `plx*` to `mthds*` prefix
 - TextMate grammar files renamed from `plx.*` to `mthds.*`
-- User-facing terminology: "workflow" → "method" for MTHDS concepts
+- User-facing terminology: "workflow" → "method"
+- Rewrote semantic token provider with improved color configuration
 
 ## [0.2.1] - 2025-09-05
 

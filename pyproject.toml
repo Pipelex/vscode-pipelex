@@ -40,6 +40,7 @@ classifiers = [
 Homepage      = "https://github.com/Pipelex/vscode-pipelex"
 Repository    = "https://github.com/Pipelex/vscode-pipelex.git"
 Documentation = "https://docs.pipelex.com/"
+Changelog     = "https://github.com/Pipelex/vscode-pipelex/blob/main/CHANGELOG.md"
 Tracker       = "https://github.com/Pipelex/vscode-pipelex/issues"
 
 [build-system]
