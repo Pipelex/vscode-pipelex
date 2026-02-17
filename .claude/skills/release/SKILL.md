@@ -1,6 +1,6 @@
 ---
 name: release
-description: Prepare a Pipelex release by detecting changed components (VS Code extension, plxt CLI, or both), bumping versions in all relevant files, and updating CHANGELOG.md with proper annotations. Invoke with /release when ready to cut a release.
+description: Prepare a release for the Pipelex IDE extension and/or plxt CLI — detect changed components, bump versions in all relevant files, and update CHANGELOG.md with proper annotations. Invoke with /release when ready to cut a release.
 ---
 
 # Release Workflow
