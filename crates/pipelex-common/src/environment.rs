@@ -100,9 +100,14 @@ impl<E: Environment> Environment for MthdsEnvironment<E> {
 
     fn is_config_file(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy();
-        let is_pipelex = PIPELEX_CONFIG_FILE_NAMES
-            .iter()
-            .any(|name| path_str.ends_with(name));
+        let is_pipelex = PIPELEX_CONFIG_FILE_NAMES.iter().any(|name| {
+            path_str.ends_with(name)
+                && (path_str.len() == name.len()
+                    || matches!(
+                        path_str.as_bytes()[path_str.len() - name.len() - 1],
+                        b'/' | b'\\'
+                    ))
+        });
         is_pipelex || self.inner.is_config_file(path)
     }
 
@@ -288,6 +293,15 @@ mod tests {
         assert!(!mthds.is_config_file(Path::new("/project/Cargo.toml")));
         assert!(!mthds.is_config_file(Path::new("/project/pyproject.toml")));
         assert!(!mthds.is_config_file(Path::new("/project/config.toml")));
+    }
+
+    #[test]
+    fn is_config_file_rejects_suffix_collisions() {
+        let env = MockEnv { files: vec![] };
+        let mthds = MthdsEnvironment::new(env);
+        assert!(!mthds.is_config_file(Path::new("/project/myplxt.toml")));
+        assert!(!mthds.is_config_file(Path::new("/project/notplxt.toml")));
+        assert!(!mthds.is_config_file(Path::new("/project/test-plxt.toml")));
     }
 
     #[tokio::test]
