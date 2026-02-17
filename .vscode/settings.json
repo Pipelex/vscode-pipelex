@@ -1,0 +1,45 @@
+{
+  "workbench.colorCustomizations": {
+    "activityBar.background": "#0a1a14",
+    "activityBar.foreground": "#00e676",
+    "activityBar.inactiveForeground": "#00a85480",
+    "editor.background": "#0d1f18",
+    "editor.foreground": "#e2e8f0",
+    "sideBar.background": "#0a1a14",
+    "sideBar.foreground": "#94a3b8",
+    "titleBar.activeBackground": "#0a1a14",
+    "titleBar.activeForeground": "#00e676",
+    "titleBar.inactiveBackground": "#0a1a14",
+    "titleBar.inactiveForeground": "#00a85480",
+    "statusBar.background": "#006633",
+    "statusBar.foreground": "#ffffff",
+    "statusBar.noFolderBackground": "#006633",
+    "statusBar.debuggingBackground": "#00e676",
+    "statusBar.debuggingForeground": "#0a1a14",
+    "editorGroupHeader.tabsBackground": "#0a1a14",
+    "tab.activeBackground": "#0d1f18",
+    "tab.activeForeground": "#e2e8f0",
+    "tab.inactiveBackground": "#0a1a14",
+    "tab.inactiveForeground": "#94a3b8",
+    "panel.background": "#0a1a14",
+    "panel.border": "#00a85440",
+    "focusBorder": "#00e676",
+    "selection.background": "#00e67640",
+    "list.activeSelectionBackground": "#00e67630",
+    "list.activeSelectionForeground": "#00e676",
+    "list.hoverBackground": "#00a85420",
+    "list.inactiveSelectionBackground": "#00a85420",
+    "scrollbarSlider.background": "#00e67640",
+    "scrollbarSlider.hoverBackground": "#00e67660",
+    "scrollbarSlider.activeBackground": "#00e67680"
+  },
+  "editor.formatOnSave": true,
+  "[toml]": {
+    "editor.defaultFormatter": "Pipelex.pipelex",
+    "editor.formatOnSave": true
+  },
+  "[mthds]": {
+    "editor.defaultFormatter": "Pipelex.pipelex",
+    "editor.formatOnSave": true
+  }
+}
