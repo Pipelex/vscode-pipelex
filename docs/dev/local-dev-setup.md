@@ -31,6 +31,7 @@ Run `make help` to see all targets. Here are the key ones:
 
 | Target | Description |
 |---|---|
+| `make build` | Build everything (CLI + VS Code extension) |
 | `make cli` | Build the `plxt` CLI binary (release mode) |
 | `make ext` | Build the VS Code extension (includes WASM bundle) |
 | `make vsix` | Package the extension into `editors/vscode/pipelex.vsix` |

@@ -87,7 +87,7 @@ pub trait Environment: Clone + Send + Sync + 'static {
     ///
     /// The default implementation checks against [`crate::config::CONFIG_FILE_NAMES`].
     /// Environments that support additional config files (such as
-    /// `.pipelex/toml_config.toml`) should override this method.
+    /// `.pipelex/plxt.toml`) should override this method.
     fn is_config_file(&self, path: &Path) -> bool {
         use crate::config::CONFIG_FILE_NAMES;
         let path_str = path.to_string_lossy();

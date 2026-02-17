@@ -4,7 +4,7 @@
 
 **Define, compose, and run AI methods in `.mthds` files — with full TOML support**
 
-A VS Code and Cursor extension that brings first-class editing support for [MTHDS](https://docs.pipelex.com) files and TOML. Rich syntax highlighting, semantic tokens, formatting, schema validation, completions, and more — built on [Taplo](https://github.com/tamasfe/taplo) and tracking upstream.
+A VS Code and Cursor extension that brings first-class editing support for [MTHDS](https://docs.pipelex.com) files and TOML. Rich syntax highlighting, semantic tokens, formatting, schema validation, completions, and more — powered by a Rust-based TOML engine for speed and reliability.
 
 > **What is MTHDS?** — An open standard for defining AI methods as typed, composable, human-readable files. A `.mthds` file describes what an AI should do — its inputs, outputs, logic, and data types — in plain TOML that both people and machines can read. [Pipelex](https://github.com/Pipelex/pipelex) is the runtime that executes them. Learn more at [docs.pipelex.com](https://docs.pipelex.com).
 
@@ -52,7 +52,7 @@ Beyond MTHDS, this extension replaces your TOML extension with complete language
 
 ## ⚙️ Configuration
 
-The extension looks for a settings file at **`.pipelex/toml_config.toml`** in your project root. The format is the same as a standard [Taplo configuration file](https://taplo.tamasfe.dev/configuration/file.html) — use it to configure formatting rules, schema associations, and linting options for both `.mthds` and `.toml` files.
+The extension looks for a settings file at **`.pipelex/plxt.toml`** (preferred) or **`plxt.toml`** in your project root. The format is the same as a standard [Taplo configuration file](https://taplo.tamasfe.dev/configuration/file.html) — use it to configure formatting rules, schema associations, and linting options for both `.mthds` and `.toml` files.
 
 ## 📦 Installation
 
@@ -66,6 +66,6 @@ The extension looks for a settings file at **`.pipelex/toml_config.toml`** in yo
 
 ---
 
-## Original Taplo VS Code README (kept in sync)
+## Original Taplo VS Code README
 
-Everything below is the original Taplo README, kept in sync with upstream for your reference.
+Everything below is the original Taplo README for your reference.

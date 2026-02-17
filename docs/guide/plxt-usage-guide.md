@@ -1,66 +1,52 @@
-# Taplo Usage Guide for External Repos
+# Pipelex Tools Guide
 
-How to use Taplo to lint and format `.toml` and `.mthds` files in your projects.
+How to use the Pipelex toolchain to lint and format `.mthds` and `.toml` files in your projects.
 
-## Architecture Overview
+## Overview
 
-The **Pipelex VS Code extension** is a fork of [Taplo](https://github.com/tamasfe/taplo), a TOML toolkit written in Rust. On top of Taplo's TOML support, it adds an MTHDS syntax-coloring and semantic-token layer for the Pipelex language.
-
-There are three ways to use Taplo:
+The Pipelex toolchain provides formatting, linting, and language-server support for `.mthds` and `.toml` files. It is built on the [Taplo](https://github.com/tamasfe/taplo) TOML toolkit.
 
 | Method | Use case |
 |--------|----------|
 | **VS Code extension** (bundled LSP) | Editor experience: diagnostics, formatting, completions, hover |
-| **Standalone CLI** | CI checks, scripting, pre-commit hooks |
-| **LSP protocol** | Any editor (Neovim, Helix, Zed, etc.) via `taplo lsp` |
+| **`plxt` CLI** | CI checks, scripting, pre-commit hooks |
+| **LSP protocol** | Any editor (Neovim, Helix, Zed, etc.) via `plxt lsp` |
 
 ---
 
-## Installation Methods
+## Installation
 
-### VS Code Extension (already installed)
-
-The Pipelex extension bundles its own JavaScript-based LSP — no extra install needed. It communicates with VS Code via Node IPC.
-
-### CLI via Cargo
+### CLI via pip (recommended)
 
 ```sh
-cargo install taplo-cli --features lsp
+pip install pipelex-tools
+# or
+uv add pipelex-tools
 ```
 
-The `--features lsp` flag includes the language server subcommand. Omit it if you only need `fmt` and `lint`.
+This installs the `plxt` binary.
 
-### CLI via npm
+### VS Code Extension
 
-```sh
-npx @taplo/cli fmt .
-npx @taplo/cli lint .
-```
-
-### CLI via pip
+The Pipelex extension bundles its own WASM-based LSP — no extra install needed.
 
 ```sh
-pip install taplo
-```
-
-This PyPI package wraps the Rust binary.
-
-### CLI via Homebrew
-
-```sh
-brew install taplo
+code --install-extension Pipelex.pipelex
+# or
+cursor --install-extension Pipelex.pipelex
 ```
 
 ### CLI Commands at a Glance
 
 | Command | Aliases | Description |
 |---------|---------|-------------|
-| `taplo fmt` | `taplo format` | Format TOML files in-place |
-| `taplo lint` | `taplo check`, `taplo validate` | Lint/validate TOML files |
-| `taplo get` | — | Extract a value from a TOML document |
-| `taplo lsp` | — | Start the language server (stdio or tcp) |
-| `taplo config default` | `taplo cfg default` | Print a default `.taplo.toml` |
-| `taplo config schema` | `taplo cfg schema` | Print JSON schema for `.taplo.toml` |
+| `plxt fmt` | `plxt format` | Format TOML and MTHDS files in-place |
+| `plxt lint` | `plxt check`, `plxt validate` | Lint/validate TOML and MTHDS files |
+| `plxt get` | — | Extract a value from a TOML document |
+| `plxt lsp` | — | Start the language server (stdio or tcp) |
+| `plxt config default` | `plxt cfg default` | Print a default config file |
+| `plxt config schema` | `plxt cfg schema` | Print JSON schema for the config file |
+| `plxt completions` | — | Generate shell completions |
 
 ---
 
@@ -68,7 +54,7 @@ brew install taplo
 
 ### Bundled LSP (default)
 
-The VS Code extension ships with a JavaScript-based LSP (`@pipelex/lsp`) that runs automatically via Node IPC. No configuration required.
+The VS Code extension ships with a WASM-based LSP (`@pipelex/lsp`) that runs automatically via Node IPC. No configuration required.
 
 The LSP provides:
 - **Diagnostics** — syntax errors, DOM validation, schema validation
@@ -80,46 +66,47 @@ The LSP provides:
 
 ### External LSP
 
-To use a standalone `taplo` binary as the language server instead of the bundled one:
+To use the native `plxt` binary as the language server instead of the bundled one:
 
 1. Set `pipelex.server.bundled` to `false`
 2. Either:
-   - Set `pipelex.server.path` to the absolute path of your `taplo` binary, **or**
-   - Ensure `taplo` is on your `PATH`
+   - Set `pipelex.server.path` to the absolute path of your `plxt` binary, **or**
+   - Ensure `plxt` is on your `PATH`
 
 ### LSP for Other Editors
 
 ```sh
 # stdio mode (Neovim, Helix, etc.)
-taplo lsp stdio
+plxt lsp stdio
 
 # TCP mode (default: 0.0.0.0:9181)
-taplo lsp tcp
-taplo lsp tcp --address 127.0.0.1:9999
+plxt lsp tcp
+plxt lsp tcp --address 127.0.0.1:9999
 ```
 
 ---
 
-## Configuration: Where to Put Settings
+## Configuration
 
 ### Config File Discovery
 
-Taplo automatically looks for a config file at your project root:
+`plxt` searches for a config file in this order:
 
-- `.taplo.toml` (preferred)
-- `taplo.toml`
+1. `.pipelex/plxt.toml` (preferred)
+2. `plxt.toml`
+3. `.taplo.toml` (fallback)
+4. `taplo.toml`
 
 You can override this with:
 
 | Method | Example |
 |--------|---------|
-| CLI flag | `taplo fmt --config path/to/.taplo.toml` |
-| Environment variable | `TAPLO_CONFIG=path/to/.taplo.toml` |
+| CLI flag | `plxt fmt --config path/to/plxt.toml` |
 | VS Code setting | `pipelex.server.configFile.path` (absolute or workspace-relative) |
 
 Set `pipelex.server.configFile.enabled` to `false` to disable config file usage entirely.
 
-### Annotated Example `.taplo.toml`
+### Annotated Example `plxt.toml`
 
 Based on how this repository dogfoods its own config:
 
@@ -189,7 +176,7 @@ path = "./schemas/mthds-schema.json"
 | `[[rule]].include` | Glob patterns this rule applies to |
 | `[[rule]].exclude` | Glob patterns this rule skips |
 | `[[rule]].keys` | Dotted key patterns (e.g., `"dependencies"`, `"package.*"`) |
-| `[[rule]].name` | Optional name, usable in `taplo::<name>` comments |
+| `[[rule]].name` | Optional name, usable in `plxt::<name>` comments |
 | `[rule.formatting]` | Formatting overrides for this rule |
 | `[rule.options.schema]` | Schema association for this rule |
 
@@ -197,9 +184,9 @@ path = "./schemas/mthds-schema.json"
 
 ## Formatting Options Reference
 
-All options are available in both `.taplo.toml` (snake_case) and VS Code settings (camelCase with `pipelex.formatter.` prefix).
+All options are available in both `plxt.toml` (snake_case) and VS Code settings (camelCase with `pipelex.formatter.` prefix).
 
-| `.taplo.toml` key | VS Code setting | Type | Default | Description |
+| `plxt.toml` key | VS Code setting | Type | Default | Description |
 |--------------------|-----------------|------|---------|-------------|
 | `align_entries` | `pipelex.formatter.alignEntries` | bool | `false` | Align entries vertically |
 | `align_comments` | `pipelex.formatter.alignComments` | bool | `true` | Align consecutive comments after entries |
@@ -225,9 +212,9 @@ All options are available in both `.taplo.toml` (snake_case) and VS Code setting
 
 ## Schema Validation for MTHDS Files
 
-Taplo supports JSON Schema validation for TOML files. There are three ways to associate a schema with your files:
+`plxt` supports JSON Schema validation for TOML and MTHDS files. There are three ways to associate a schema with your files:
 
-### 1. In `.taplo.toml` (recommended for repos)
+### 1. In `plxt.toml` (recommended for repos)
 
 ```toml
 [[rule]]
@@ -240,6 +227,8 @@ path = "./schemas/mthds-schema.json"
 # Or an absolute URL:
 # url = "https://example.com/mthds-schema.json"
 ```
+
+Schema authors can use the `x-plxt` extension key to embed Pipelex-specific metadata (docs, links, init keys) directly in JSON Schema files. When both `x-plxt` and `x-taplo` are present, `x-plxt` takes priority.
 
 ### 2. In VS Code settings
 
@@ -291,7 +280,7 @@ The extension uses the [JSON Schema Store](https://www.schemastore.org/) catalog
 
 ### Note on MTHDS Schemas
 
-Currently, no MTHDS JSON Schema exists in this repo. The MTHDS layer provides **syntax coloring and semantic tokens only**, not structural validation. Creating a JSON Schema for MTHDS would be a separate effort. If you create one, place it in a `schemas/` directory and reference it from `.taplo.toml` as shown above.
+Currently, no MTHDS JSON Schema exists in this repo. The MTHDS layer provides **syntax coloring and semantic tokens only**, not structural validation. Creating a JSON Schema for MTHDS would be a separate effort. If you create one, place it in a `schemas/` directory and reference it from your `plxt.toml` as shown above.
 
 ---
 
@@ -301,35 +290,35 @@ Currently, no MTHDS JSON Schema exists in this repo. The MTHDS layer provides **
 
 ```sh
 # Dry-run: exits non-zero if any file is not correctly formatted
-taplo fmt --check
+plxt fmt --check
 
 # With diff output (shows what would change)
-taplo fmt --check --diff
+plxt fmt --check --diff
 
 # With explicit config
-taplo fmt --check --config .taplo.toml
+plxt fmt --check --config plxt.toml
 ```
 
 ### Linting / Validation
 
 ```sh
 # Basic lint (syntax + structure)
-taplo lint
+plxt lint
 
 # Lint with schema validation
-taplo lint --schema https://example.com/schema.json
+plxt lint --schema https://example.com/schema.json
 
 # Lint using default schema catalogs (Schema Store)
-taplo lint --default-schema-catalogs
+plxt lint --default-schema-catalogs
 
 # Disable schema validation
-taplo lint --no-schema
+plxt lint --no-schema
 ```
 
 ### GitHub Actions Example
 
 ```yaml
-name: TOML
+name: TOML & MTHDS
 on: [push, pull_request]
 
 jobs:
@@ -338,38 +327,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Taplo
-        run: |
-          curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz \
-            | gzip -d > /usr/local/bin/taplo
-          chmod +x /usr/local/bin/taplo
+      - name: Install plxt
+        run: pip install pipelex-tools
 
       - name: Check formatting
-        run: taplo fmt --check --diff
+        run: plxt fmt --check --diff
 
       - name: Lint
-        run: taplo lint
+        run: plxt lint
 ```
 
 ### Pre-commit Hook
 
-Add to `.pre-commit-config.yaml`:
-
-```yaml
-repos:
-  - repo: https://github.com/ComPWA/taplo-pre-commit
-    rev: v0.9.3
-    hooks:
-      - id: taplo-format
-      - id: taplo-lint
-```
-
-Or as a simple git hook (`.git/hooks/pre-commit`):
+As a simple git hook (`.git/hooks/pre-commit`):
 
 ```sh
 #!/bin/sh
-taplo fmt --check --diff || {
-  echo "TOML formatting check failed. Run 'taplo fmt' to fix."
+plxt fmt --check --diff || {
+  echo "Formatting check failed. Run 'plxt fmt' to fix."
   exit 1
 }
 ```
@@ -383,10 +358,10 @@ Beyond formatting (covered above), these settings control the extension behavior
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `pipelex.server.bundled` | bool | `true` | Use the bundled LSP |
-| `pipelex.server.path` | string | `null` | Absolute path to external `taplo` binary |
+| `pipelex.server.path` | string | `null` | Absolute path to external `plxt` binary |
 | `pipelex.server.extraArgs` | string[] | `[]` | Additional args for external LSP |
 | `pipelex.server.environment` | object | `{}` | Environment variables for the LSP |
-| `pipelex.server.configFile.path` | string | `null` | Path to `.taplo.toml` |
+| `pipelex.server.configFile.path` | string | `null` | Path to config file |
 | `pipelex.server.configFile.enabled` | bool | `true` | Enable config file usage |
 | `pipelex.schema.enabled` | bool | `true` | Enable JSON Schema validation |
 | `pipelex.schema.links` | bool | `false` | Show clickable links for keys |
@@ -398,4 +373,4 @@ Beyond formatting (covered above), these settings control the extension behavior
 | `pipelex.syntax.semanticTokens` | bool | `true` | Semantic tokens for tables and arrays |
 | `pipelex.mthds.semanticTokens` | bool | `true` | MTHDS-specific semantic tokens |
 | `pipelex.completion.maxKeys` | int | `5` | Max dotted-key segments in completions |
-| `pipelex.rules` | array | `[]` | Additional Taplo rules in JSON format |
+| `pipelex.rules` | array | `[]` | Additional rules in JSON format |

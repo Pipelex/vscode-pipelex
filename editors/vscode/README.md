@@ -52,7 +52,7 @@ Beyond MTHDS, this extension replaces your TOML extension with complete language
 
 ## ⚙️ Configuration
 
-The extension looks for a settings file at **`.pipelex/toml_config.toml`** in your project root. The format is the same as a standard [Taplo configuration file](https://taplo.tamasfe.dev/configuration/file.html) — use it to configure formatting rules, schema associations, and linting options for both `.mthds` and `.toml` files.
+The extension looks for a settings file at **`.pipelex/plxt.toml`** (preferred) or **`plxt.toml`** in your project root. The format is the same as a standard [Taplo configuration file](https://taplo.tamasfe.dev/configuration/file.html) — use it to configure formatting rules, schema associations, and linting options for both `.mthds` and `.toml` files.
 
 ## 📦 Installation
 

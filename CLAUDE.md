@@ -20,7 +20,7 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - `crates/lsp-async-stub/` - Async LSP framework
 
 ### Pipelex-specific crates
-- `crates/pipelex-cli/` - **Our CLI** (binary: `plxt`). Thin wrapper around `taplo-cli` that adds Pipelex config discovery (`.pipelex/toml_config.toml` first, then `.taplo.toml` fallback), `PIPELEX_CONFIG` env var, and wraps LSP with `MthdsEnvironment`. Delegates all standard commands (format, lint, get) to taplo-cli unchanged.
+- `crates/pipelex-cli/` - **Our CLI** (binary: `plxt`). Thin wrapper around `taplo-cli` that adds Pipelex config discovery (`.pipelex/plxt.toml` or `plxt.toml` first, then `.taplo.toml` fallback) and wraps LSP with `MthdsEnvironment`. Delegates all standard commands (format, lint, get) to taplo-cli unchanged.
 - `crates/pipelex-common/` - Pipelex shared utilities (includes `MthdsEnvironment` for config discovery)
 
 ### VS Code extension & other
