@@ -32,4 +32,4 @@ code . # Open in VS Code
 
 ---
 
-## Original Taplo CONTRIBUTING (kept in sync)
+## Original Taplo CONTRIBUTING

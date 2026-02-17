@@ -2,7 +2,7 @@
 
 ## What is `plxt`?
 
-`plxt` is the Pipelex Tools CLI — a Rust binary built from `vscode-pipelex/crates/pipelex-cli/`. It wraps upstream `taplo` (the standard TOML toolkit) and adds Pipelex-specific config discovery (`.pipelex/plxt.toml` or `plxt.toml`) and MTHDS file support. It handles formatting and linting for both `.toml` and `.mthds` files.
+`plxt` is the Pipelex Tools CLI — a Rust binary built from `vscode-pipelex/crates/pipelex-cli/`. It extends the `taplo` TOML toolkit with Pipelex-specific config discovery (`.pipelex/plxt.toml` or `plxt.toml`) and MTHDS file support. It handles formatting and linting for both `.toml` and `.mthds` files.
 
 ## How to consume it
 

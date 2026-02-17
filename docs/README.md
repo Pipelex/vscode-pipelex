@@ -5,7 +5,7 @@
 | Directory | Purpose |
 |-----------|---------|
 | [`dev/`](dev/) | Developer setup, build instructions |
-| [`design/`](design/) | Architecture decisions & plans |
+| [`design/`](design/) | Architecture reference |
 | [`features/`](features/) | Feature specs & references |
 | [`guide/`](guide/) | User-facing how-to guides |
 
