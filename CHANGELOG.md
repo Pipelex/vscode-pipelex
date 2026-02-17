@@ -2,9 +2,6 @@
 
 ## [Unreleased]
 
-### Fixed
-- Fix suffix-based false positives in `is_config_file` for `plxt.toml` (plxt ≥0.1.5)
-
 ### Changed
 - Dedicated PyPI README for pipelex-tools
 - README branding improvements (screenshot image)
@@ -13,6 +10,9 @@
 
 ### Added
 - `x-plxt` schema extension support
+
+### Fixed
+- Fix suffix-based false positives in `is_config_file` for `plxt.toml` (plxt 0.1.4)
 
 ### Changed
 - Removed `PIPELEX_CONFIG` environment variable — use `plxt.toml` / `.pipelex/plxt.toml` instead (plxt 0.1.4)
