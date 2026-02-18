@@ -41,13 +41,13 @@ export class MethodGraphPanel implements vscode.Disposable {
 
         if (this.panel) {
             this.panel.title = `Method Graph — ${filename}`;
-            this.panel.reveal(vscode.ViewColumn.Beside, true);
+            this.panel.reveal(undefined, true);
         } else {
             this.panel = vscode.window.createWebviewPanel(
                 'pipelexMethodGraph',
                 `Method Graph — ${filename}`,
                 { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-                { enableScripts: true }
+                { enableScripts: true, retainContextWhenHidden: true }
             );
             this.panel.onDidDispose(() => {
                 this.panel = undefined;
