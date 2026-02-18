@@ -23,8 +23,24 @@ export class MethodGraphPanel implements vscode.Disposable {
         );
 
         this.disposables.push(
-            vscode.window.onDidChangeActiveTextEditor(editor => {
+            vscode.window.onDidChangeActiveTextEditor(async editor => {
                 if (!this.panel || !editor) return;
+
+                // If a file opened in the panel's column (e.g. user clicked
+                // explorer while the graph had focus), close it there and
+                // re-open it in the main editor column.
+                const panelCol = this.panel.viewColumn;
+                if (panelCol && editor.viewColumn === panelCol) {
+                    const doc = editor.document;
+                    const targetCol = panelCol > 1 ? panelCol - 1 : vscode.ViewColumn.One;
+                    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                    vscode.window.showTextDocument(doc, {
+                        viewColumn: targetCol,
+                        preserveFocus: false,
+                    });
+                    return;
+                }
+
                 if (editor.document.languageId === 'mthds' && editor.document.uri.scheme === 'file') {
                     const newUri = editor.document.uri;
                     if (!this.currentUri || newUri.toString() !== this.currentUri.toString()) {
