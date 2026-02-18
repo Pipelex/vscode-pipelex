@@ -142,6 +142,10 @@
         },
         {
           "command": "pipelex.pasteAsToml"
+        },
+        {
+          "command": "pipelex.showMethodGraph",
+          "when": "editorLangId == mthds"
         }
       ]
     },
@@ -167,6 +171,10 @@
       {
         "command": "pipelex.pasteAsToml",
         "title": "TOML: Paste as TOML"
+      },
+      {
+        "command": "pipelex.showMethodGraph",
+        "title": "Pipelex: Show Method Graph"
       }
     ],
     "semanticTokenTypes": [
@@ -445,6 +453,27 @@
           "type": "boolean",
           "scope": "resource",
           "default": true
+        },
+        "pipelex.validation.enabled": {
+          "description": "Run pipelex-agent validation on save for MTHDS files.",
+          "type": "boolean",
+          "scope": "resource",
+          "default": true
+        },
+        "pipelex.validation.agentCliPath": {
+          "description": "Absolute path to the pipelex-agent executable. When null, auto-detection is used.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "scope": "resource",
+          "default": null
+        },
+        "pipelex.validation.timeout": {
+          "description": "Timeout in milliseconds for pipelex-agent validation.",
+          "type": "number",
+          "scope": "resource",
+          "default": 30000
         },
         "pipelex.formatter.alignEntries": {
           "scope": "resource",
