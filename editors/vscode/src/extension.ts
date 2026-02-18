@@ -43,7 +43,7 @@ export async function activate(context: vscode.ExtensionContext) {
   syncExtensionSchemas(context, c);
 
   // Register Pipelex-specific features for MTHDS
-  registerPipelexFeatures(context);
+  await registerPipelexFeatures(context);
 
   context.subscriptions.push(
     getOutput(),

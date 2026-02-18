@@ -5,7 +5,7 @@ import { getOutput } from '../util';
 /**
  * Register all Pipelex-specific features for MTHDS support
  */
-export function registerPipelexFeatures(context: vscode.ExtensionContext) {
+export async function registerPipelexFeatures(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('pipelex');
     const semanticTokensEnabled = config.get<boolean>('mthds.semanticTokens', true);
 
@@ -21,7 +21,15 @@ export function registerPipelexFeatures(context: vscode.ExtensionContext) {
     }
 
     // Validator and graph panel require child_process (Node host only)
-    registerNodeFeatures(context, config);
+    try {
+        await registerNodeFeatures(context, config);
+    } catch (err: any) {
+        const output = getOutput();
+        output.appendLine(`Pipelex: failed to register Node features: ${err.message ?? err}`);
+        vscode.window.showWarningMessage(
+            'Pipelex: some features could not be loaded. Check the output panel for details.'
+        );
+    }
 
     const PLX_DISMISSED_KEY = 'pipelex.plxDeprecationDismissed';
     if (!context.globalState.get<boolean>(PLX_DISMISSED_KEY)) {

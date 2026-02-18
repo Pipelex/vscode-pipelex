@@ -56,7 +56,7 @@ export class MethodGraphPanel implements vscode.Disposable {
 
     show(uri: vscode.Uri) {
         this.currentUri = uri;
-        const filename = uri.fsPath.split('/').pop() ?? 'unknown';
+        const filename = uri.fsPath.replace(/^.*[\\/]/, '');
 
         if (this.panel) {
             this.panel.title = `Method Graph — ${filename}`;
@@ -140,6 +140,8 @@ export class MethodGraphPanel implements vscode.Disposable {
             }
 
             const htmlContent = await fs.promises.readFile(htmlPath, 'utf-8');
+            if (controller.signal.aborted) return;
+            if (this.currentUri?.toString() !== uri.toString()) return;
             this.setHtml(htmlContent);
         } catch (err: any) {
             if (controller.signal.aborted) return;
