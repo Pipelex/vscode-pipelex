@@ -1,6 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---------- vscode mock ----------
+// Shared mock workspace object so tests can mutate workspaceFolders / getConfiguration.
+// vi.hoisted ensures this is available when vi.mock factory runs (both are hoisted).
+const mockWorkspace = vi.hoisted(() => ({
+    workspaceFolders: undefined as any,
+    getConfiguration: (() => ({
+        get: () => null as any,
+    })) as any,
+}));
+
 vi.mock('vscode', () => {
     class Range {
         start: { line: number; character: number };
@@ -14,12 +23,7 @@ vi.mock('vscode', () => {
     return {
         Range,
         DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
-        workspace: {
-            workspaceFolders: undefined,
-            getConfiguration: () => ({
-                get: () => null,
-            }),
-        },
+        workspace: mockWorkspace,
         languages: {
             getDiagnostics: () => [],
         },
@@ -197,5 +201,95 @@ describe('locateError', () => {
         // output = is in [pipe.second], not [pipe.first], so should fall back to header line
         const range = locateError(error, doc);
         expect(range.start.line).toBe(0);
+    });
+});
+
+// ---------- cliResolver tests ----------
+
+vi.mock('fs', () => ({
+    default: { existsSync: vi.fn(() => false), promises: {} },
+    existsSync: vi.fn(() => false),
+}));
+
+vi.mock('which', () => ({
+    default: { sync: vi.fn(() => null) },
+}));
+
+import * as fs from 'fs';
+import which from 'which';
+import { resolveCli } from '../validation/cliResolver';
+
+describe('cliResolver', () => {
+    beforeEach(() => {
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+        vi.mocked(which.sync).mockReturnValue(null);
+        mockWorkspace.workspaceFolders = undefined;
+        mockWorkspace.getConfiguration = () => ({ get: () => null });
+    });
+
+    it('finds pipelex-agent in .venv/bin on unix', () => {
+        const originalPlatform = process.platform;
+        Object.defineProperty(process, 'platform', { value: 'darwin' });
+        try {
+            mockWorkspace.workspaceFolders = [
+                { uri: { fsPath: '/workspace' } },
+            ];
+            vi.mocked(fs.existsSync).mockImplementation((p: any) => {
+                return String(p).includes('.venv/bin/pipelex-agent');
+            });
+
+            const result = resolveCli();
+            expect(result).not.toBeNull();
+            expect(result!.command).toContain('.venv/bin/pipelex-agent');
+        } finally {
+            Object.defineProperty(process, 'platform', { value: originalPlatform });
+        }
+    });
+
+    it('finds pipelex-agent in .venv/Scripts on win32', () => {
+        const originalPlatform = process.platform;
+        Object.defineProperty(process, 'platform', { value: 'win32' });
+        try {
+            mockWorkspace.workspaceFolders = [
+                { uri: { fsPath: 'C:\\workspace' } },
+            ];
+            vi.mocked(fs.existsSync).mockImplementation((p: any) => {
+                return String(p).includes('Scripts');
+            });
+
+            const result = resolveCli();
+            expect(result).not.toBeNull();
+            expect(result!.command).toContain('Scripts');
+            expect(result!.command).toContain('pipelex-agent.exe');
+        } finally {
+            Object.defineProperty(process, 'platform', { value: originalPlatform });
+        }
+    });
+
+    it('falls back to which on PATH', () => {
+        vi.mocked(which.sync).mockImplementation(((cmd: string, opts?: any) => {
+            if (cmd === 'pipelex-agent') return '/usr/local/bin/pipelex-agent';
+            return null;
+        }) as any);
+
+        const result = resolveCli();
+        expect(result).not.toBeNull();
+        expect(result!.command).toBe('/usr/local/bin/pipelex-agent');
+    });
+
+    it('falls back to uv run', () => {
+        vi.mocked(which.sync).mockImplementation(((cmd: string, opts?: any) => {
+            if (cmd === 'uv') return '/usr/local/bin/uv';
+            return null;
+        }) as any);
+
+        const result = resolveCli();
+        expect(result).not.toBeNull();
+        expect(result!.command).toBe('/usr/local/bin/uv');
+        expect(result!.args).toEqual(['run', 'pipelex-agent']);
+    });
+
+    it('returns null when nothing found', () => {
+        expect(resolveCli()).toBeNull();
     });
 });

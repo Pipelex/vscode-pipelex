@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { execFile } from 'child_process';
 import { resolveCli } from './cliResolver';
 import { locateError } from './sourceLocator';
+import { spawnCli, cancelInflightByKey } from './processUtils';
 import type { ValidationFailure, ValidationErrorItem } from './types';
 
 const DIAGNOSTIC_SOURCE = 'pipelex-agent';
@@ -23,7 +23,7 @@ export class PipelexValidator implements vscode.Disposable {
         this.disposables.push(
             vscode.workspace.onDidCloseTextDocument(doc => {
                 this.diagnostics.delete(doc.uri);
-                this.cancelInflight(doc.uri.toString());
+                cancelInflightByKey(this.inflight, doc.uri.toString());
             })
         );
     }
@@ -69,7 +69,7 @@ export class PipelexValidator implements vscode.Disposable {
         }
 
         const uriKey = document.uri.toString();
-        this.cancelInflight(uriKey);
+        cancelInflightByKey(this.inflight, uriKey);
 
         const controller = new AbortController();
         this.inflight.set(uriKey, controller);
@@ -81,7 +81,7 @@ export class PipelexValidator implements vscode.Disposable {
         const cwd = workspaceFolder?.uri.fsPath;
 
         try {
-            const stderr = await this.spawn(resolved.command, args, timeout, controller.signal, cwd);
+            const { stderr } = await spawnCli(resolved.command, args, timeout, controller.signal, cwd);
             // exit 0 → clear diagnostics
             this.diagnostics.set(document.uri, []);
         } catch (err: any) {
@@ -139,30 +139,6 @@ export class PipelexValidator implements vscode.Disposable {
         return diag;
     }
 
-    private cancelInflight(uriKey: string) {
-        const existing = this.inflight.get(uriKey);
-        if (existing) {
-            existing.abort();
-            this.inflight.delete(uriKey);
-        }
-    }
-
-    private spawn(command: string, args: string[], timeout: number, signal: AbortSignal, cwd?: string): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const proc = execFile(command, args, { timeout, maxBuffer: 1024 * 1024, cwd }, (err, _stdout, stderr) => {
-                if (err) {
-                    reject({ exitCode: (err as any).code ?? err.code, stderr, message: err.message });
-                } else {
-                    resolve(stderr);
-                }
-            });
-
-            const onAbort = () => {
-                proc.kill();
-            };
-            signal.addEventListener('abort', onAbort, { once: true });
-        });
-    }
 }
 
 /**

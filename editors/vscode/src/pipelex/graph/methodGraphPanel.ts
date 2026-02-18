@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { execFile } from 'child_process';
 import { resolveCli } from '../validation/cliResolver';
+import { spawnCli, cancelAllInflight } from '../validation/processUtils';
 
 export class MethodGraphPanel implements vscode.Disposable {
     private panel: vscode.WebviewPanel | undefined;
@@ -33,6 +33,9 @@ export class MethodGraphPanel implements vscode.Disposable {
                 if (panelCol && editor.viewColumn === panelCol) {
                     const doc = editor.document;
                     const targetCol = panelCol > 1 ? panelCol - 1 : vscode.ViewColumn.One;
+                    // Guard: if panel is already in column 1, targetCol === panelCol,
+                    // re-opening would trigger this handler again → infinite loop.
+                    if (targetCol === panelCol) return;
                     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
                     vscode.window.showTextDocument(doc, {
                         viewColumn: targetCol,
@@ -75,10 +78,7 @@ export class MethodGraphPanel implements vscode.Disposable {
     }
 
     dispose() {
-        for (const controller of this.inflight.values()) {
-            controller.abort();
-        }
-        this.inflight.clear();
+        cancelAllInflight(this.inflight);
         this.panel?.dispose();
         for (const d of this.disposables) {
             d.dispose();
@@ -92,6 +92,10 @@ export class MethodGraphPanel implements vscode.Disposable {
         if (!resolved) {
             if (!this.cliWarningShown) {
                 this.cliWarningShown = true;
+                vscode.window.showWarningMessage(
+                    'Pipelex graph: could not find pipelex-agent. ' +
+                    'Install it or set pipelex.validation.agentCliPath in settings.'
+                );
             }
             this.setHtml(messageHtml(
                 'CLI Not Found',
@@ -101,10 +105,11 @@ export class MethodGraphPanel implements vscode.Disposable {
             return;
         }
 
-        const uriKey = uri.toString();
-        this.cancelInflight(uriKey);
+        // Cancel ALL inflight jobs — the panel only serves one URI at a time
+        cancelAllInflight(this.inflight);
 
         const controller = new AbortController();
+        const uriKey = uri.toString();
         this.inflight.set(uriKey, controller);
 
         this.setHtml(loadingHtml());
@@ -117,9 +122,12 @@ export class MethodGraphPanel implements vscode.Disposable {
         const cwd = workspaceFolder?.uri.fsPath;
 
         try {
-            const stdout = await this.spawn(resolved.command, args, timeout, controller.signal, cwd);
+            const { stdout } = await spawnCli(resolved.command, args, timeout, controller.signal, cwd);
 
             if (controller.signal.aborted) return;
+            // Staleness check: if the user switched files while we were waiting,
+            // discard this result so it doesn't overwrite the new file's graph.
+            if (this.currentUri?.toString() !== uri.toString()) return;
 
             const result = JSON.parse(stdout);
             const htmlPath: string | undefined = result?.graph_files?.reactflow_html;
@@ -135,6 +143,7 @@ export class MethodGraphPanel implements vscode.Disposable {
             this.setHtml(htmlContent);
         } catch (err: any) {
             if (controller.signal.aborted) return;
+            if (this.currentUri?.toString() !== uri.toString()) return;
 
             if (err.exitCode === 1 && err.stderr) {
                 const stderr = err.stderr as string;
@@ -171,31 +180,6 @@ export class MethodGraphPanel implements vscode.Disposable {
         if (this.panel) {
             this.panel.webview.html = html;
         }
-    }
-
-    private cancelInflight(uriKey: string) {
-        const existing = this.inflight.get(uriKey);
-        if (existing) {
-            existing.abort();
-            this.inflight.delete(uriKey);
-        }
-    }
-
-    private spawn(command: string, args: string[], timeout: number, signal: AbortSignal, cwd?: string): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const proc = execFile(command, args, { timeout, maxBuffer: 1024 * 1024, cwd }, (err, stdout, stderr) => {
-                if (err) {
-                    reject({ exitCode: (err as any).code ?? err.code, stderr, stdout, message: err.message });
-                } else {
-                    resolve(stdout);
-                }
-            });
-
-            const onAbort = () => {
-                proc.kill();
-            };
-            signal.addEventListener('abort', onAbort, { once: true });
-        });
     }
 }
 

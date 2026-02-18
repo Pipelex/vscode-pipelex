@@ -18,7 +18,10 @@ export function resolveCli(): ResolvedCli | null {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
         for (const folder of workspaceFolders) {
-            const venvPath = path.join(folder.uri.fsPath, '.venv', 'bin', 'pipelex-agent');
+            const venvBin = process.platform === 'win32'
+                ? path.join('.venv', 'Scripts', 'pipelex-agent.exe')
+                : path.join('.venv', 'bin', 'pipelex-agent');
+            const venvPath = path.join(folder.uri.fsPath, venvBin);
             if (fs.existsSync(venvPath)) {
                 return { command: venvPath, args: [] };
             }

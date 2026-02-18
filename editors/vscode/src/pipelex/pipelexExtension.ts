@@ -1,7 +1,5 @@
 import * as vscode from 'vscode';
 import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
-import { PipelexValidator } from './validation/pipelexValidator';
-import { MethodGraphPanel } from './graph/methodGraphPanel';
 import { getOutput } from '../util';
 
 /**
@@ -22,26 +20,8 @@ export function registerPipelexFeatures(context: vscode.ExtensionContext) {
         );
     }
 
-    // Pipelex-agent validation on save
-    const validationEnabled = config.get<boolean>('validation.enabled', true);
-    if (validationEnabled) {
-        const validator = new PipelexValidator(getOutput());
-        context.subscriptions.push(validator);
-    }
-
-    // Method graph webview panel
-    const graphPanel = new MethodGraphPanel(getOutput());
-    context.subscriptions.push(graphPanel);
-    context.subscriptions.push(
-        vscode.commands.registerCommand('pipelex.showMethodGraph', () => {
-            const editor = vscode.window.activeTextEditor;
-            if (!editor || editor.document.languageId !== 'mthds') {
-                vscode.window.showWarningMessage('Open an MTHDS file to view the method graph.');
-                return;
-            }
-            graphPanel.show(editor.document.uri);
-        })
-    );
+    // Validator and graph panel require child_process (Node host only)
+    registerNodeFeatures(context, config);
 
     const PLX_DISMISSED_KEY = 'pipelex.plxDeprecationDismissed';
     if (!context.globalState.get<boolean>(PLX_DISMISSED_KEY)) {
@@ -61,4 +41,43 @@ export function registerPipelexFeatures(context: vscode.ExtensionContext) {
             })
         );
     }
+}
+
+/**
+ * Register features that depend on Node.js APIs (child_process).
+ * Skipped when running in a browser host (e.g. vscode.dev).
+ */
+async function registerNodeFeatures(
+    context: vscode.ExtensionContext,
+    config: vscode.WorkspaceConfiguration,
+) {
+    // In browser environments, child_process is unavailable
+    try {
+        require('child_process');
+    } catch {
+        return;
+    }
+
+    // Pipelex-agent validation on save
+    const validationEnabled = config.get<boolean>('validation.enabled', true);
+    if (validationEnabled) {
+        const { PipelexValidator } = await import('./validation/pipelexValidator');
+        const validator = new PipelexValidator(getOutput());
+        context.subscriptions.push(validator);
+    }
+
+    // Method graph webview panel
+    const { MethodGraphPanel } = await import('./graph/methodGraphPanel');
+    const graphPanel = new MethodGraphPanel(getOutput());
+    context.subscriptions.push(graphPanel);
+    context.subscriptions.push(
+        vscode.commands.registerCommand('pipelex.showMethodGraph', () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.languageId !== 'mthds') {
+                vscode.window.showWarningMessage('Open an MTHDS file to view the method graph.');
+                return;
+            }
+            graphPanel.show(editor.document.uri);
+        })
+    );
 }
