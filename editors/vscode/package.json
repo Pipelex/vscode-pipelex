@@ -475,6 +475,20 @@
           "scope": "resource",
           "default": 30000
         },
+        "pipelex.graph.direction": {
+          "description": "Layout direction for the method graph.",
+          "type": "string",
+          "enum": [
+            "top_down",
+            "left_to_right"
+          ],
+          "enumDescriptions": [
+            "Top to bottom layout",
+            "Left to right layout"
+          ],
+          "scope": "resource",
+          "default": "top_down"
+        },
         "pipelex.formatter.alignEntries": {
           "scope": "resource",
           "type": "boolean",

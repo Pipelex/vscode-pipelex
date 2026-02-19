@@ -116,8 +116,9 @@ export class MethodGraphPanel implements vscode.Disposable {
 
         const config = vscode.workspace.getConfiguration('pipelex');
         const timeout = config.get<number>('validation.timeout', 30000);
+        const direction = config.get<string>('graph.direction', 'top_down');
         const filePath = uri.fsPath;
-        const args = [...resolved.args, 'validate', filePath, '--graph'];
+        const args = [...resolved.args, 'validate', filePath, '--graph', '--direction', direction];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
         const cwd = workspaceFolder?.uri.fsPath;
 
