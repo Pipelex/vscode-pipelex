@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-19
+
+### Added
+- Graph direction setting (`pipelex.graph.direction`): choose between top-down and left-to-right layout for the method graph
+- Method graph webview panel for visualizing method dependencies
+- On-save validation via `pipelex-agent` CLI with inline diagnostics and source location mapping
+
 ### Changed
 - Dedicated PyPI README for pipelex-tools
 - README branding improvements (screenshot image)
