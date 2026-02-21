@@ -28,6 +28,7 @@ impl<E: Environment> Taplo<E> {
                         meta: json!({"source": "command-line"}),
                         url: schema_url,
                         priority: 999,
+                        fallback_urls: vec![],
                     },
                 );
             } else {
@@ -142,9 +143,20 @@ impl<E: Environment> Taplo<E> {
                 "using schema"
             );
 
+            let schema_url = if schema_association.fallback_urls.is_empty() {
+                schema_association.url.clone()
+            } else {
+                match self.schemas.resolve_association(&schema_association).await {
+                    Ok((url, _)) => url,
+                    Err(error) => {
+                        return Err(error.context("schema waterfall resolution failed"));
+                    }
+                }
+            };
+
             let errors = self
                 .schemas
-                .validate_root(&schema_association.url, &dom)
+                .validate_root(&schema_url, &dom)
                 .await?;
 
             if !errors.is_empty() {

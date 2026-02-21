@@ -50,6 +50,18 @@ pub async fn completion<E: Environment>(
         return Ok(None);
     };
 
+    let schema_url = if schema_association.fallback_urls.is_empty() {
+        schema_association.url.clone()
+    } else {
+        match ws.schemas.resolve_association(&schema_association).await {
+            Ok((url, _)) => url,
+            Err(error) => {
+                tracing::warn!(%error, "schema waterfall resolution failed");
+                return Ok(None);
+            }
+        }
+    };
+
     let position = p.text_document_position.position;
     let Some(offset) = doc.mapper.offset(Position::from_lsp(position)) else {
         tracing::error!(?position, "document position not found");
@@ -72,7 +84,7 @@ pub async fn completion<E: Environment>(
         let object_schemas = match ws
             .schemas
             .possible_schemas_from(
-                &schema_association.url,
+                &schema_url,
                 &value,
                 &Keys::empty(),
                 key_count + ws.config.completion.max_keys + 1,
@@ -138,7 +150,7 @@ pub async fn completion<E: Environment>(
         let array_of_objects_schemas = match ws
             .schemas
             .possible_schemas_from(
-                &schema_association.url,
+                &schema_url,
                 &value,
                 &Keys::empty(),
                 key_count + ws.config.completion.max_keys + 1,
@@ -189,7 +201,7 @@ pub async fn completion<E: Environment>(
         let schemas = match ws
             .schemas
             .possible_schemas_from(
-                &schema_association.url,
+                &schema_url,
                 &value,
                 &lookup_keys(doc.dom.clone(), &parent_table.0),
                 ws.config.completion.max_keys + 1,
@@ -237,7 +249,7 @@ pub async fn completion<E: Environment>(
         let schemas = match ws
             .schemas
             .possible_schemas_from(
-                &schema_association.url,
+                &schema_url,
                 &value,
                 &lookup_keys(doc.dom.clone(), &parent_keys),
                 entry_keys.len() + ws.config.completion.max_keys + 1,
@@ -296,7 +308,7 @@ pub async fn completion<E: Environment>(
             let schemas = match ws
                 .schemas
                 .possible_schemas_from(
-                    &schema_association.url,
+                    &schema_url,
                     &value,
                     &lookup_keys(doc.dom.clone(), path),
                     ws.config.completion.max_keys + 1,
@@ -341,7 +353,7 @@ pub async fn completion<E: Environment>(
         let schemas = match ws
             .schemas
             .possible_schemas_from(
-                &schema_association.url,
+                &schema_url,
                 &value,
                 &path,
                 ws.config.completion.max_keys + 1,
@@ -394,7 +406,7 @@ pub async fn completion<E: Environment>(
     let schemas = match ws
         .schemas
         .possible_schemas_from(
-            &schema_association.url,
+            &schema_url,
             &value,
             &lookup_keys(doc.dom.clone(), &parent_keys),
             ws.config.completion.max_keys + 1,

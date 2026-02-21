@@ -20,9 +20,30 @@ process.on("message", async (d: RpcMessage) => {
         envVar: name => process.env[name],
         envVars: () => Object.entries(process.env),
         findConfigFile: from => {
-          const fileNames = [".pipelex/plxt.toml", "plxt.toml", ".taplo.toml", "taplo.toml"];
+          const projectNames = [".pipelex/plxt.toml", "plxt.toml"];
+          const taploNames = [".taplo.toml", "taplo.toml"];
 
-          for (const name of fileNames) {
+          // 1. Project-level pipelex configs
+          for (const name of projectNames) {
+            try {
+              const fullPath = path.join(from, name);
+              fs.accessSync(fullPath);
+              return fullPath;
+            } catch { }
+          }
+
+          // 2. User-level config at ~/.pipelex/plxt.toml
+          const home = process.env.HOME || process.env.USERPROFILE;
+          if (home) {
+            try {
+              const homeCfg = path.join(home, ".pipelex", "plxt.toml");
+              fs.accessSync(homeCfg);
+              return homeCfg;
+            } catch { }
+          }
+
+          // 3. Taplo fallback configs
+          for (const name of taploNames) {
             try {
               const fullPath = path.join(from, name);
               fs.accessSync(fullPath);

@@ -54,3 +54,6 @@ tokio = { workspace = true, features = ["fs", "io-std", "io-util", "parking_lot"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 tokio = { workspace = true, features = ["io-util", "parking_lot", "sync"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

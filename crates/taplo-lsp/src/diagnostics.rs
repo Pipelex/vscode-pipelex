@@ -312,7 +312,19 @@ async fn collect_schema_errors<E: Environment>(
             "using schema"
         );
 
-        let errors = match ws.schemas.validate_root(&schema_association.url, dom).await {
+        let schema_url = if schema_association.fallback_urls.is_empty() {
+            schema_association.url.clone()
+        } else {
+            match ws.schemas.resolve_association(&schema_association).await {
+                Ok((url, _)) => url,
+                Err(error) => {
+                    tracing::warn!(%error, "schema waterfall resolution failed");
+                    return;
+                }
+            }
+        };
+
+        let errors = match ws.schemas.validate_root(&schema_url, dom).await {
             Ok(errors) => errors,
             Err(error) => {
                 tracing::error!(?error, "schema validation failed");
