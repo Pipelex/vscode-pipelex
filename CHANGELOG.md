@@ -2,16 +2,22 @@
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-02-19
+## [0.4.0] - 2026-02-21
 
 ### Added
 - Graph direction setting (`pipelex.graph.direction`): choose between top-down and left-to-right layout for the method graph
 - Method graph webview panel for visualizing method dependencies
 - On-save validation via `pipelex-agent` CLI with inline diagnostics and source location mapping
+- `plxt config which` command to print the resolved config file path (plxt 0.2.0)
+- Schema association improvements: stricter matching and better error propagation in LSP handlers (plxt 0.2.0)
+
+### Fixed
+- Graph panel now handles JSON result parsing more robustly
 
 ### Changed
 - Dedicated PyPI README for pipelex-tools
 - README branding improvements (screenshot image)
+- `pipelex-tools` Makefile target for Python package builds
 
 ## [0.3.2] - 2026-02-14
 
