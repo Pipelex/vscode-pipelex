@@ -199,7 +199,7 @@ export class MethodGraphPanel implements vscode.Disposable {
             // Replace all sentinel occurrences with the real nonce
             html = html.replace(new RegExp(MethodGraphPanel.CSP_NONCE_SENTINEL, 'g'), nonce);
             // Inject full CSP meta tag into <head>
-            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; connect-src https:;">`;
+            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' https://unpkg.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; connect-src 'none';">`;
             html = html.replace('<head>', `<head>\n${cspMeta}`);
         } else {
             // Simple HTML (loading/message): add nonce to <style> tags, minimal CSP

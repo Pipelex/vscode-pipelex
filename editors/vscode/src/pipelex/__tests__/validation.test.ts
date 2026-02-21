@@ -61,6 +61,11 @@ describe('extractJson', () => {
         expect(extractJson('')).toBeNull();
     });
 
+    it('skips WARNING lines containing braces', () => {
+        const stderr = 'WARNING: bad config {"foo": 1}\n{"error": true}';
+        expect(extractJson(stderr)).toBe('{"error": true}');
+    });
+
     it('handles multiple WARNING lines with whitespace', () => {
         const stderr = 'WARNING: line1\n  WARNING: line2\n  {"error":true}';
         const result = extractJson(stderr);

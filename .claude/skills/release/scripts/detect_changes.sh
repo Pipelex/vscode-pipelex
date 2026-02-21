@@ -121,7 +121,7 @@ UNRELEASED_HAS_CONTENT="false"
 UNRELEASED_LINES=0
 if [[ -n "$UNRELEASED_CONTENT" ]]; then
   UNRELEASED_HAS_CONTENT="true"
-  UNRELEASED_LINES=$(echo "$UNRELEASED_CONTENT" | wc -l | tr -d ' ')
+  UNRELEASED_LINES=$(printf '%s' "$UNRELEASED_CONTENT" | wc -l | tr -d ' ')
 fi
 
 # --- Output ---

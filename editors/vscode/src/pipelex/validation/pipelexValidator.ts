@@ -147,9 +147,12 @@ export class PipelexValidator implements vscode.Disposable {
  * The pipelex-agent may emit WARNING: lines before the JSON payload.
  */
 export function extractJson(stderr: string): string | null {
-    const idx = stderr.indexOf('{');
+    // Strip WARNING lines that may contain braces
+    const lines = stderr.split('\n');
+    const filtered = lines.filter(l => !l.trimStart().startsWith('WARNING:')).join('\n');
+    const idx = filtered.indexOf('{');
     if (idx === -1) return null;
-    const lastIdx = stderr.lastIndexOf('}');
+    const lastIdx = filtered.lastIndexOf('}');
     if (lastIdx === -1) return null;
-    return stderr.slice(idx, lastIdx + 1);
+    return filtered.slice(idx, lastIdx + 1);
 }
