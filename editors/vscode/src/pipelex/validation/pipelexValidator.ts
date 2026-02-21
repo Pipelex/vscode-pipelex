@@ -56,7 +56,7 @@ export class PipelexValidator implements vscode.Disposable {
             return;
         }
 
-        const resolved = resolveCli();
+        const resolved = resolveCli(document.uri);
         if (!resolved) {
             if (!this.cliWarningShown) {
                 this.cliWarningShown = true;
@@ -121,6 +121,7 @@ export class PipelexValidator implements vscode.Disposable {
             }
 
             // Other errors (timeout, spawn failure, etc.)
+            this.diagnostics.delete(document.uri);
             this.output.appendLine(`pipelex-agent error: ${err.message ?? err}`);
         } finally {
             if (this.inflight.get(uriKey) === controller) {

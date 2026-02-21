@@ -294,7 +294,7 @@ impl Options {
 
 fn expand_tilde(e: &impl Environment, s: &str) -> String {
     if let Some(rest) = s.strip_prefix('~') {
-        if let Some(home) = e.env_var("HOME") {
+        if let Some(home) = e.env_var("HOME").or_else(|| e.env_var("USERPROFILE")) {
             return format!("{home}{rest}");
         }
     }
@@ -435,6 +435,30 @@ mod tests {
     #[derive(Clone)]
     struct MockEnv {
         home: Option<String>,
+        userprofile: Option<String>,
+    }
+
+    impl MockEnv {
+        fn with_home(home: &str) -> Self {
+            Self {
+                home: Some(home.into()),
+                userprofile: None,
+            }
+        }
+
+        fn with_userprofile(userprofile: &str) -> Self {
+            Self {
+                home: None,
+                userprofile: Some(userprofile.into()),
+            }
+        }
+
+        fn empty() -> Self {
+            Self {
+                home: None,
+                userprofile: None,
+            }
+        }
     }
 
     #[async_trait(?Send)]
@@ -458,10 +482,10 @@ mod tests {
         {
         }
         fn env_var(&self, name: &str) -> Option<String> {
-            if name == "HOME" {
-                self.home.clone()
-            } else {
-                None
+            match name {
+                "HOME" => self.home.clone(),
+                "USERPROFILE" => self.userprofile.clone(),
+                _ => None,
             }
         }
         fn env_vars(&self) -> Vec<(String, String)> {
@@ -504,9 +528,7 @@ mod tests {
 
     #[test]
     fn expand_tilde_with_home() {
-        let env = MockEnv {
-            home: Some("/Users/alice".into()),
-        };
+        let env = MockEnv::with_home("/Users/alice");
         assert_eq!(
             expand_tilde(&env, "~/.pipelex/schema.json"),
             "/Users/alice/.pipelex/schema.json"
@@ -515,7 +537,7 @@ mod tests {
 
     #[test]
     fn expand_tilde_without_home() {
-        let env = MockEnv { home: None };
+        let env = MockEnv::empty();
         assert_eq!(
             expand_tilde(&env, "~/.pipelex/schema.json"),
             "~/.pipelex/schema.json"
@@ -524,9 +546,7 @@ mod tests {
 
     #[test]
     fn expand_tilde_no_tilde() {
-        let env = MockEnv {
-            home: Some("/Users/alice".into()),
-        };
+        let env = MockEnv::with_home("/Users/alice");
         assert_eq!(
             expand_tilde(&env, "/absolute/path.json"),
             "/absolute/path.json"
@@ -534,10 +554,17 @@ mod tests {
     }
 
     #[test]
+    fn expand_tilde_with_userprofile() {
+        let env = MockEnv::with_userprofile(r"C:\Users\alice");
+        assert_eq!(
+            expand_tilde(&env, "~/.pipelex/schema.json"),
+            r"C:\Users\alice/.pipelex/schema.json"
+        );
+    }
+
+    #[test]
     fn prepare_sources_resolves_mixed_entries() {
-        let env = MockEnv {
-            home: Some("/Users/alice".into()),
-        };
+        let env = MockEnv::with_home("/Users/alice");
         let base = Path::new("/project");
 
         let mut opts = Options {
@@ -573,7 +600,7 @@ mod tests {
 
     #[test]
     fn prepare_sources_skips_legacy_path_url() {
-        let env = MockEnv { home: None };
+        let env = MockEnv::empty();
         let base = Path::new("/project");
 
         let mut opts = Options {
@@ -598,7 +625,7 @@ mod tests {
 
     #[test]
     fn prepare_without_sources_uses_legacy_path() {
-        let env = MockEnv { home: None };
+        let env = MockEnv::empty();
         let base = Path::new("/project");
 
         let mut opts = Options {
@@ -624,7 +651,7 @@ mod tests {
 
     #[test]
     fn prepare_sources_absolute_path() {
-        let env = MockEnv { home: None };
+        let env = MockEnv::empty();
         let base = Path::new("/project");
 
         let mut opts = Options {

@@ -89,7 +89,7 @@ export class MethodGraphPanel implements vscode.Disposable {
     private async refresh(uri: vscode.Uri) {
         if (!this.panel) return;
 
-        const resolved = resolveCli();
+        const resolved = resolveCli(uri);
         if (!resolved) {
             if (!this.cliWarningShown) {
                 this.cliWarningShown = true;

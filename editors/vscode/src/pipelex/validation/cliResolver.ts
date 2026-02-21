@@ -13,14 +13,27 @@ import type { ResolvedCli } from './types';
  * 3. `pipelex-agent` on PATH
  * 4. `uv run pipelex-agent` fallback
  */
-export function resolveCli(): ResolvedCli | null {
-    // 1. .venv in workspace root
+export function resolveCli(documentUri?: vscode.Uri): ResolvedCli | null {
+    // 1. .venv in workspace root (prefer the folder owning documentUri)
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
+        const venvBin = process.platform === 'win32'
+            ? path.join('.venv', 'Scripts', 'pipelex-agent.exe')
+            : path.join('.venv', 'bin', 'pipelex-agent');
+
+        // If a document URI is provided, check its owning workspace folder first
+        if (documentUri) {
+            const owningFolder = vscode.workspace.getWorkspaceFolder(documentUri);
+            if (owningFolder) {
+                const venvPath = path.join(owningFolder.uri.fsPath, venvBin);
+                if (fs.existsSync(venvPath)) {
+                    return { command: venvPath, args: [] };
+                }
+            }
+        }
+
+        // Fall back to iterating all folders
         for (const folder of workspaceFolders) {
-            const venvBin = process.platform === 'win32'
-                ? path.join('.venv', 'Scripts', 'pipelex-agent.exe')
-                : path.join('.venv', 'bin', 'pipelex-agent');
             const venvPath = path.join(folder.uri.fsPath, venvBin);
             if (fs.existsSync(venvPath)) {
                 return { command: venvPath, args: [] };

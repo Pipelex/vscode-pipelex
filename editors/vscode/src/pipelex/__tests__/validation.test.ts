@@ -8,6 +8,15 @@ const mockWorkspace = vi.hoisted(() => ({
     getConfiguration: (() => ({
         get: () => null as any,
     })) as any,
+    getWorkspaceFolder: ((uri: any) => {
+        const folders = mockWorkspace.workspaceFolders;
+        if (!folders || !uri) return undefined;
+        // Match by checking if the URI fsPath starts with the folder fsPath
+        return folders.find((f: any) => {
+            const uriPath = typeof uri.fsPath === 'string' ? uri.fsPath : '';
+            return uriPath.startsWith(f.uri.fsPath);
+        });
+    }) as any,
 }));
 
 vi.mock('vscode', () => {
@@ -291,5 +300,29 @@ describe('cliResolver', () => {
 
     it('returns null when nothing found', () => {
         expect(resolveCli()).toBeNull();
+    });
+
+    it('prefers .venv from the workspace folder matching documentUri', () => {
+        const originalPlatform = process.platform;
+        Object.defineProperty(process, 'platform', { value: 'darwin' });
+        try {
+            mockWorkspace.workspaceFolders = [
+                { uri: { fsPath: '/workspace-a' } },
+                { uri: { fsPath: '/workspace-b' } },
+            ];
+            // Both folders have .venv
+            vi.mocked(fs.existsSync).mockImplementation((p: any) => {
+                const s = String(p);
+                return s.includes('.venv/bin/pipelex-agent');
+            });
+
+            const docUri = { fsPath: '/workspace-b/src/file.mthds' };
+            const result = resolveCli(docUri as any);
+            expect(result).not.toBeNull();
+            // Should pick workspace-b's .venv, not workspace-a's
+            expect(result!.command).toContain('/workspace-b/');
+        } finally {
+            Object.defineProperty(process, 'platform', { value: originalPlatform });
+        }
     });
 });
