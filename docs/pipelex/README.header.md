@@ -55,37 +55,7 @@ File all issues at [this repository](https://github.com/Pipelex/vscode-pipelex/i
 
 ## MTHDS Example
 
-```toml
-domain = "hr_screening"
-description = "Analyze a job offer to build a scorecard, batch process CVs"
-main_pipe = "screen_candidates"
-
-[concept.Scorecard]
-description = "Evaluation scorecard built from a job offer"
-
-[concept.Scorecard.structure]
-job_title = { type = "text", required = true }
-company = { type = "text" }
-required_skills = { type = "list", item_type = "text" }
-criteria = { type = "list", item_type = "concept", item_concept_ref = "hr_screening.Criterion" }
-
-[pipe.screen_candidates]
-type = "PipeSequence"
-inputs = { job_offer = "Document", cvs = "Document[]" }
-output = "CvResult[]"
-steps = [
-    { pipe = "extract_job_offer", result = "job_pages" },
-    { pipe = "build_scorecard", result = "scorecard" },
-    { pipe = "evaluate_cv", batch_over = "cvs", result = "results" },
-]
-
-[pipe.build_scorecard]
-type = "PipeLLM"
-inputs = { job_pages = "Page[]" }
-output = "Scorecard"
-model = "claude-4.6-opus"
-prompt = """Analyze this job offer and build a scorecard..."""
-```
+<img src="https://d2cinlfp2qnig1.cloudfront.net/images/mthds-sample-code.png" alt="MTHDS sample code" width="800" style="max-width: 100%; height: auto;">
 
 See the [MTHDS language reference](https://docs.pipelex.com) for the full standard.
 

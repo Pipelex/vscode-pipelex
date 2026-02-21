@@ -217,6 +217,32 @@ impl<E: Environment> Schemas<E> {
         Ok(schema)
     }
 
+    /// Try loading a schema from an ordered list of URLs (waterfall).
+    /// Returns the first successfully loaded schema and the URL it was loaded from.
+    pub async fn load_schema_waterfall(&self, urls: &[&Url]) -> Result<(Url, Arc<Value>), anyhow::Error> {
+        let mut last_error = None;
+        for url in urls {
+            match self.load_schema(url).await {
+                Ok(schema) => return Ok(((*url).clone(), schema)),
+                Err(err) => {
+                    tracing::debug!(%url, %err, "waterfall: source failed, trying next");
+                    last_error = Some(err);
+                }
+            }
+        }
+        Err(last_error.unwrap_or_else(|| anyhow!("no schema sources provided")))
+    }
+
+    /// Resolve the effective schema URL from an association (handles waterfall).
+    /// Returns the URL of the first source that loads, plus the loaded schema.
+    pub async fn resolve_association(
+        &self,
+        assoc: &associations::SchemaAssociation,
+    ) -> Result<(Url, Arc<Value>), anyhow::Error> {
+        let all = assoc.all_urls();
+        self.load_schema_waterfall(&all).await
+    }
+
     fn get_validator(&self, schema_url: &Url) -> Option<Arc<JSONSchema>> {
         if self.cache().lru_expired() {
             self.validators.lock().clear();
@@ -745,5 +771,197 @@ mod formats {
 
     pub(super) fn semver_req(value: &str) -> bool {
         semver::VersionReq::parse(value).is_ok()
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
+mod tests {
+    use super::associations::SchemaAssociation;
+    use crate::environment::Environment;
+    use async_trait::async_trait;
+    use serde_json::json;
+    use std::path::{Path, PathBuf};
+    use time::OffsetDateTime;
+    use url::Url;
+
+    /// Minimal mock environment that controls which file:// paths "exist".
+    #[derive(Clone)]
+    struct MockEnv {
+        /// Map from file path -> file contents (as JSON bytes).
+        files: std::collections::HashMap<PathBuf, Vec<u8>>,
+    }
+
+    #[async_trait(?Send)]
+    impl Environment for MockEnv {
+        type Stdin = tokio::io::Empty;
+        type Stdout = tokio::io::Sink;
+        type Stderr = tokio::io::Sink;
+
+        fn now(&self) -> OffsetDateTime {
+            OffsetDateTime::now_utc()
+        }
+        fn spawn<F>(&self, _fut: F)
+        where
+            F: futures::Future + Send + 'static,
+            F::Output: Send,
+        {
+        }
+        fn spawn_local<F>(&self, _fut: F)
+        where
+            F: futures::Future + 'static,
+        {
+        }
+        fn env_var(&self, _name: &str) -> Option<String> {
+            None
+        }
+        fn env_vars(&self) -> Vec<(String, String)> {
+            vec![]
+        }
+        fn atty_stderr(&self) -> bool {
+            false
+        }
+        fn stdin(&self) -> Self::Stdin {
+            tokio::io::empty()
+        }
+        fn stdout(&self) -> Self::Stdout {
+            tokio::io::sink()
+        }
+        fn stderr(&self) -> Self::Stderr {
+            tokio::io::sink()
+        }
+        fn glob_files(&self, _glob: &str) -> Result<Vec<PathBuf>, anyhow::Error> {
+            Ok(vec![])
+        }
+        async fn read_file(&self, path: &Path) -> Result<Vec<u8>, anyhow::Error> {
+            self.files
+                .get(path)
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("file not found: {}", path.display()))
+        }
+        async fn write_file(&self, _path: &Path, _bytes: &[u8]) -> Result<(), anyhow::Error> {
+            Ok(())
+        }
+        fn to_file_path(&self, url: &Url) -> Option<PathBuf> {
+            url.to_file_path().ok()
+        }
+        fn is_absolute(&self, path: &Path) -> bool {
+            path.is_absolute()
+        }
+        fn cwd(&self) -> Option<PathBuf> {
+            Some(PathBuf::from("/"))
+        }
+        async fn find_config_file(&self, _from: &Path) -> Option<PathBuf> {
+            None
+        }
+    }
+
+    fn minimal_schema_json() -> Vec<u8> {
+        serde_json::to_vec(&json!({"type": "object"})).unwrap()
+    }
+
+    #[tokio::test]
+    async fn resolve_association_single_url_success() {
+        let mut files = std::collections::HashMap::new();
+        files.insert(PathBuf::from("/schemas/good.json"), minimal_schema_json());
+        let env = MockEnv { files };
+        let http = reqwest::Client::new();
+        let schemas = super::Schemas::new(env, http);
+
+        let assoc = SchemaAssociation {
+            url: "file:///schemas/good.json".parse().unwrap(),
+            meta: json!({}),
+            priority: 50,
+            fallback_urls: vec![],
+        };
+
+        let (resolved_url, _schema) = schemas.resolve_association(&assoc).await.unwrap();
+        assert_eq!(resolved_url.as_str(), "file:///schemas/good.json");
+    }
+
+    #[tokio::test]
+    async fn resolve_association_single_url_failure() {
+        let env = MockEnv {
+            files: std::collections::HashMap::new(),
+        };
+        let http = reqwest::Client::new();
+        let schemas = super::Schemas::new(env, http);
+
+        let assoc = SchemaAssociation {
+            url: "file:///schemas/missing.json".parse().unwrap(),
+            meta: json!({}),
+            priority: 50,
+            fallback_urls: vec![],
+        };
+
+        assert!(schemas.resolve_association(&assoc).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn resolve_association_waterfall_first_fails_second_succeeds() {
+        let mut files = std::collections::HashMap::new();
+        // First source doesn't exist, second does.
+        files.insert(
+            PathBuf::from("/schemas/fallback.json"),
+            minimal_schema_json(),
+        );
+        let env = MockEnv { files };
+        let http = reqwest::Client::new();
+        let schemas = super::Schemas::new(env, http);
+
+        let assoc = SchemaAssociation {
+            url: "file:///schemas/missing.json".parse().unwrap(),
+            meta: json!({}),
+            priority: 50,
+            fallback_urls: vec!["file:///schemas/fallback.json".parse().unwrap()],
+        };
+
+        let (resolved_url, _schema) = schemas.resolve_association(&assoc).await.unwrap();
+        assert_eq!(resolved_url.as_str(), "file:///schemas/fallback.json");
+    }
+
+    #[tokio::test]
+    async fn resolve_association_waterfall_first_succeeds() {
+        let mut files = std::collections::HashMap::new();
+        files.insert(PathBuf::from("/schemas/first.json"), minimal_schema_json());
+        files.insert(
+            PathBuf::from("/schemas/second.json"),
+            minimal_schema_json(),
+        );
+        let env = MockEnv { files };
+        let http = reqwest::Client::new();
+        let schemas = super::Schemas::new(env, http);
+
+        let assoc = SchemaAssociation {
+            url: "file:///schemas/first.json".parse().unwrap(),
+            meta: json!({}),
+            priority: 50,
+            fallback_urls: vec!["file:///schemas/second.json".parse().unwrap()],
+        };
+
+        let (resolved_url, _schema) = schemas.resolve_association(&assoc).await.unwrap();
+        // Should pick the first one since it exists.
+        assert_eq!(resolved_url.as_str(), "file:///schemas/first.json");
+    }
+
+    #[tokio::test]
+    async fn resolve_association_waterfall_all_fail() {
+        let env = MockEnv {
+            files: std::collections::HashMap::new(),
+        };
+        let http = reqwest::Client::new();
+        let schemas = super::Schemas::new(env, http);
+
+        let assoc = SchemaAssociation {
+            url: "file:///schemas/a.json".parse().unwrap(),
+            meta: json!({}),
+            priority: 50,
+            fallback_urls: vec![
+                "file:///schemas/b.json".parse().unwrap(),
+                "file:///schemas/c.json".parse().unwrap(),
+            ],
+        };
+
+        assert!(schemas.resolve_association(&assoc).await.is_err());
     }
 }

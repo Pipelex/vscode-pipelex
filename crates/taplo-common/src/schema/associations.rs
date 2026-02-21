@@ -95,6 +95,7 @@ impl<E: Environment> SchemaAssociations<E> {
                     "source": source::BUILTIN
                 }),
                 priority: priority::BUILTIN,
+                fallback_urls: vec![],
             },
         ));
     }
@@ -117,6 +118,7 @@ impl<E: Environment> SchemaAssociations<E> {
                                         "catalog_url": url,
                                     }),
                                     priority: priority::CATALOG,
+                                    fallback_urls: vec![],
                                 },
                             ));
                         }
@@ -158,6 +160,7 @@ impl<E: Environment> SchemaAssociations<E> {
                                     "catalog_url": url,
                                 }),
                                 priority: priority::CATALOG,
+                                fallback_urls: vec![],
                             },
                         ));
                     }
@@ -218,6 +221,7 @@ impl<E: Environment> SchemaAssociations<E> {
                         url: schema_url,
                         priority: priority::DIRECTIVE,
                         meta: json!({ "source": source::DIRECTIVE }),
+                        fallback_urls: vec![],
                     },
                 ));
                 break;
@@ -249,6 +253,7 @@ impl<E: Environment> SchemaAssociations<E> {
                     url: schema_url,
                     priority: priority::SCHEMA_FIELD,
                     meta: json!({ "source": source::SCHEMA_FIELD }),
+                    fallback_urls: vec![],
                 },
             ));
         }
@@ -261,18 +266,13 @@ impl<E: Environment> SchemaAssociations<E> {
             };
 
             if let Some(schema_opts) = &rule.options.schema {
-                if let Some(url) = &schema_opts.url {
-                    if schema_opts.enabled.unwrap_or(true) {
-                        self.associations.write().push((
-                            file_rule.into(),
-                            SchemaAssociation {
-                                url: url.clone(),
-                                meta: json!({
-                                    "source": source::CONFIG,
-                                }),
-                                priority: priority::CONFIG_RULE,
-                            },
-                        ));
+                if schema_opts.enabled.unwrap_or(true) {
+                    if let Some(assoc) =
+                        schema_association_from_opts(schema_opts, priority::CONFIG_RULE)
+                    {
+                        self.associations
+                            .write()
+                            .push((file_rule.into(), assoc));
                     }
                 }
             }
@@ -283,18 +283,13 @@ impl<E: Environment> SchemaAssociations<E> {
         };
 
         if let Some(schema_opts) = &config.global_options.schema {
-            if let Some(url) = &schema_opts.url {
-                if schema_opts.enabled.unwrap_or(true) {
-                    self.associations.write().push((
-                        file_rule.into(),
-                        SchemaAssociation {
-                            url: url.clone(),
-                            meta: json!({
-                                "source": source::CONFIG,
-                            }),
-                            priority: priority::CONFIG,
-                        },
-                    ));
+            if schema_opts.enabled.unwrap_or(true) {
+                if let Some(assoc) =
+                    schema_association_from_opts(schema_opts, priority::CONFIG)
+                {
+                    self.associations
+                        .write()
+                        .push((file_rule.into(), assoc));
                 }
             }
         }
@@ -378,6 +373,33 @@ impl<E: Environment> SchemaAssociations<E> {
             )?),
             scheme => Err(anyhow!("the scheme `{scheme}` is not supported")),
         }
+    }
+}
+
+/// Build a `SchemaAssociation` from `SchemaOptions`, preferring `resolved_sources` (waterfall)
+/// over the legacy single `url`.
+fn schema_association_from_opts(
+    opts: &crate::config::SchemaOptions,
+    prio: usize,
+) -> Option<SchemaAssociation> {
+    if let Some(resolved) = &opts.resolved_sources {
+        if resolved.is_empty() {
+            return None;
+        }
+        let (primary, fallbacks) = resolved.split_first().unwrap();
+        Some(SchemaAssociation {
+            url: primary.clone(),
+            meta: json!({ "source": source::CONFIG }),
+            priority: prio,
+            fallback_urls: fallbacks.to_vec(),
+        })
+    } else {
+        opts.url.as_ref().map(|url| SchemaAssociation {
+            url: url.clone(),
+            meta: json!({ "source": source::CONFIG }),
+            priority: prio,
+            fallback_urls: vec![],
+        })
     }
 }
 
@@ -540,4 +562,146 @@ pub struct SchemaAssociation {
     pub meta: Value,
     pub url: Url,
     pub priority: usize,
+    /// Additional fallback URLs for waterfall resolution (empty = single-URL mode).
+    pub fallback_urls: Vec<Url>,
+}
+
+impl SchemaAssociation {
+    pub fn all_urls(&self) -> Vec<&Url> {
+        std::iter::once(&self.url)
+            .chain(self.fallback_urls.iter())
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::SchemaOptions;
+
+    #[test]
+    fn all_urls_single_url() {
+        let assoc = SchemaAssociation {
+            url: "https://a.example.com/schema.json".parse().unwrap(),
+            meta: json!({}),
+            priority: 50,
+            fallback_urls: vec![],
+        };
+        let urls = assoc.all_urls();
+        assert_eq!(urls.len(), 1);
+        assert_eq!(urls[0].as_str(), "https://a.example.com/schema.json");
+    }
+
+    #[test]
+    fn all_urls_with_fallbacks() {
+        let assoc = SchemaAssociation {
+            url: "https://a.example.com/schema.json".parse().unwrap(),
+            meta: json!({}),
+            priority: 50,
+            fallback_urls: vec![
+                "https://b.example.com/schema.json".parse().unwrap(),
+                "https://c.example.com/schema.json".parse().unwrap(),
+            ],
+        };
+        let urls = assoc.all_urls();
+        assert_eq!(urls.len(), 3);
+        assert_eq!(urls[0].as_str(), "https://a.example.com/schema.json");
+        assert_eq!(urls[1].as_str(), "https://b.example.com/schema.json");
+        assert_eq!(urls[2].as_str(), "https://c.example.com/schema.json");
+    }
+
+    #[test]
+    fn from_opts_with_resolved_sources() {
+        let opts = SchemaOptions {
+            enabled: None,
+            path: None,
+            url: None,
+            sources: None,
+            resolved_sources: Some(vec![
+                "file:///first/schema.json".parse().unwrap(),
+                "file:///second/schema.json".parse().unwrap(),
+                "https://remote.example.com/schema.json".parse().unwrap(),
+            ]),
+        };
+
+        let assoc =
+            schema_association_from_opts(
+                &opts,
+                priority::CONFIG,
+            )
+            .unwrap();
+
+        assert_eq!(assoc.url.as_str(), "file:///first/schema.json");
+        assert_eq!(assoc.fallback_urls.len(), 2);
+        assert_eq!(
+            assoc.fallback_urls[0].as_str(),
+            "file:///second/schema.json"
+        );
+        assert_eq!(
+            assoc.fallback_urls[1].as_str(),
+            "https://remote.example.com/schema.json"
+        );
+    }
+
+    #[test]
+    fn from_opts_with_empty_resolved_sources() {
+        let opts = SchemaOptions {
+            enabled: None,
+            path: None,
+            url: None,
+            sources: None,
+            resolved_sources: Some(vec![]),
+        };
+
+        let assoc =
+            schema_association_from_opts(
+                &opts,
+                priority::CONFIG,
+            );
+
+        assert!(assoc.is_none());
+    }
+
+    #[test]
+    fn from_opts_legacy_url() {
+        let opts = SchemaOptions {
+            enabled: None,
+            path: None,
+            url: Some("https://legacy.example.com/schema.json".parse().unwrap()),
+            sources: None,
+            resolved_sources: None,
+        };
+
+        let assoc =
+            schema_association_from_opts(
+                &opts,
+                priority::CONFIG,
+            )
+            .unwrap();
+
+        assert_eq!(
+            assoc.url.as_str(),
+            "https://legacy.example.com/schema.json"
+        );
+        assert!(assoc.fallback_urls.is_empty());
+    }
+
+    #[test]
+    fn from_opts_no_url_no_sources() {
+        let opts = SchemaOptions {
+            enabled: None,
+            path: None,
+            url: None,
+            sources: None,
+            resolved_sources: None,
+        };
+
+        let assoc =
+            schema_association_from_opts(
+                &opts,
+                priority::CONFIG,
+            );
+
+        assert!(assoc.is_none());
+    }
 }

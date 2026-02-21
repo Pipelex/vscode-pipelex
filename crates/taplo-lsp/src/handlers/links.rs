@@ -43,6 +43,18 @@ pub async fn links<E: Environment>(
             "using schema"
         );
 
+        let schema_url = if schema_association.fallback_urls.is_empty() {
+            schema_association.url.clone()
+        } else {
+            match ws.schemas.resolve_association(&schema_association).await {
+                Ok((url, _)) => url,
+                Err(error) => {
+                    tracing::warn!(%error, "schema waterfall resolution failed");
+                    return Ok(Some(links));
+                }
+            }
+        };
+
         for (keys, last_key, node) in doc.dom.flat_iter().filter_map(|(k, n)| {
             if let Some(KeyOrIndex::Key(last_key)) = k.iter().last().cloned() {
                 Some((k, last_key, n))
@@ -60,7 +72,7 @@ pub async fn links<E: Environment>(
 
             let schemas = match ws
                 .schemas
-                .schemas_at_path(&schema_association.url, &value, &keys)
+                .schemas_at_path(&schema_url, &value, &keys)
                 .await
             {
                 Ok(s) => s,

@@ -75,6 +75,18 @@ pub(crate) async fn hover<E: Environment>(
             "using schema"
         );
 
+        let schema_url = if schema_association.fallback_urls.is_empty() {
+            schema_association.url.clone()
+        } else {
+            match ws.schemas.resolve_association(&schema_association).await {
+                Ok((url, _)) => url,
+                Err(error) => {
+                    tracing::warn!(%error, "schema waterfall resolution failed");
+                    return Ok(None);
+                }
+            }
+        };
+
         let value = match serde_json::to_value(&doc.dom) {
             Ok(v) => v,
             Err(error) => {
@@ -118,7 +130,7 @@ pub(crate) async fn hover<E: Environment>(
 
             let schemas = match ws
                 .schemas
-                .schemas_at_path(&schema_association.url, &value, &keys)
+                .schemas_at_path(&schema_url, &value, &keys)
                 .await
             {
                 Ok(s) => s,
@@ -173,7 +185,7 @@ pub(crate) async fn hover<E: Environment>(
         } else if is_primitive(position_info.syntax.kind()) {
             let schemas = match ws
                 .schemas
-                .schemas_at_path(&schema_association.url, &value, &keys)
+                .schemas_at_path(&schema_url, &value, &keys)
                 .await
             {
                 Ok(s) => s,

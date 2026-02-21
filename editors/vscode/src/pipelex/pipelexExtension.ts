@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
+import { getOutput } from '../util';
 
 /**
  * Register all Pipelex-specific features for MTHDS support
  */
-export function registerPipelexFeatures(context: vscode.ExtensionContext) {
+export async function registerPipelexFeatures(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('pipelex');
     const semanticTokensEnabled = config.get<boolean>('mthds.semanticTokens', true);
 
@@ -16,6 +17,17 @@ export function registerPipelexFeatures(context: vscode.ExtensionContext) {
                 provider,
                 provider.getSemanticTokensLegend()
             )
+        );
+    }
+
+    // Validator and graph panel require child_process (Node host only)
+    try {
+        await registerNodeFeatures(context, config);
+    } catch (err: any) {
+        const output = getOutput();
+        output.appendLine(`Pipelex: failed to register Node features: ${err.message ?? err}`);
+        vscode.window.showWarningMessage(
+            'Pipelex: some features could not be loaded. Check the output panel for details.'
         );
     }
 
@@ -37,4 +49,43 @@ export function registerPipelexFeatures(context: vscode.ExtensionContext) {
             })
         );
     }
+}
+
+/**
+ * Register features that depend on Node.js APIs (child_process).
+ * Skipped when running in a browser host (e.g. vscode.dev).
+ */
+async function registerNodeFeatures(
+    context: vscode.ExtensionContext,
+    config: vscode.WorkspaceConfiguration,
+) {
+    // In browser environments, child_process is unavailable
+    try {
+        require('child_process');
+    } catch {
+        return;
+    }
+
+    // Pipelex-agent validation on save
+    const validationEnabled = config.get<boolean>('validation.enabled', true);
+    if (validationEnabled) {
+        const { PipelexValidator } = await import('./validation/pipelexValidator');
+        const validator = new PipelexValidator(getOutput());
+        context.subscriptions.push(validator);
+    }
+
+    // Method graph webview panel
+    const { MethodGraphPanel } = await import('./graph/methodGraphPanel');
+    const graphPanel = new MethodGraphPanel(getOutput());
+    context.subscriptions.push(graphPanel);
+    context.subscriptions.push(
+        vscode.commands.registerCommand('pipelex.showMethodGraph', () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.languageId !== 'mthds') {
+                vscode.window.showWarningMessage('Open an MTHDS file to view the method graph.');
+                return;
+            }
+            graphPanel.show(editor.document.uri);
+        })
+    );
 }

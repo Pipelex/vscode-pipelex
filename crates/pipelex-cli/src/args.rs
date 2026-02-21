@@ -61,10 +61,12 @@ pub enum PlxtCommand {
 /// Rebranded config subcommand with Pipelex naming.
 #[derive(Clone, Subcommand)]
 pub enum PlxtConfigCommand {
-    /// Print the default `.pipelex.toml` configuration file.
+    /// Print the default `plxt.toml` configuration file.
     Default,
-    /// Print the JSON schema of the `.pipelex.toml` configuration file.
+    /// Print the JSON schema of the `plxt.toml` configuration file.
     Schema,
+    /// Print the path of the resolved configuration file.
+    Which,
 }
 
 /// Pipelex-specific GeneralArgs.

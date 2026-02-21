@@ -12,11 +12,13 @@ GRAMMAR_DST       := $(WEBSITE_SHIKI_DIR)/mthds.tmLanguage.json
 EXT_DIR           := editors/vscode
 JS_LSP_DIR        := js/lsp
 VSIX              := $(EXT_DIR)/pipelex.vsix
+VIRTUAL_ENV       := $(CURDIR)/.venv
+PYTHON_VERSION    ?= 3.13
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s
-.PHONY: build cli lock ext ext-deps ext-install ext-uninstall vsix clean test check docs
+.PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check docs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -24,11 +26,25 @@ help: ## Show this help
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
-build: cli ext ## Build everything (CLI + VS Code extension)
+build: cli pipelex-tools ext ## Build everything (CLI + Python package + VS Code extension)
 
 cli: ## Build the plxt CLI (release mode)
 	cargo build -p pipelex-cli --release
 	@echo "Binary: target/release/plxt"
+
+env: ## Create Python virtual env (if missing)
+	@command -v uv >/dev/null 2>&1 || { \
+		echo "uv not found – installing latest …"; \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	} && \
+	export PATH="$$HOME/.local/bin:$$PATH" && \
+	if [ ! -d "$(VIRTUAL_ENV)" ]; then \
+		echo "Creating Python virtual env in \`$(VIRTUAL_ENV)\`"; \
+		uv venv "$(VIRTUAL_ENV)" --python $(PYTHON_VERSION); \
+	fi
+
+pipelex-tools: env ## Build and install the pipelex-tools Python package (dev)
+	@. "$(VIRTUAL_ENV)/bin/activate" && maturin develop --release
 
 lock: ## Update Cargo.lock after version bumps
 	cargo update --workspace
@@ -73,7 +89,7 @@ test: ## Run all tests (Rust + VS Code extension)
 	cargo test -p taplo
 	cd $(EXT_DIR) && yarn test
 
-check: ## Quick compilation checks (CLI + WASM, locked)
+check: test ## Quick compilation checks (CLI + WASM, locked) + tests
 	cargo check -p pipelex-cli --locked
 	cargo check -p pipelex-wasm --target wasm32-unknown-unknown --locked
 

@@ -63,6 +63,7 @@ pub async fn associate_schema<E: Environment>(
             meta["source"] = source::MANUAL.into();
             meta
         },
+        fallback_urls: vec![],
     };
 
     for (_, ws) in workspaces.iter() {

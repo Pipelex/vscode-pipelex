@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -142,6 +142,10 @@
         },
         {
           "command": "pipelex.pasteAsToml"
+        },
+        {
+          "command": "pipelex.showMethodGraph",
+          "when": "editorLangId == mthds"
         }
       ]
     },
@@ -167,6 +171,10 @@
       {
         "command": "pipelex.pasteAsToml",
         "title": "TOML: Paste as TOML"
+      },
+      {
+        "command": "pipelex.showMethodGraph",
+        "title": "Pipelex: Show Method Graph"
       }
     ],
     "semanticTokenTypes": [
@@ -445,6 +453,42 @@
           "type": "boolean",
           "scope": "resource",
           "default": true
+        },
+        "pipelex.validation.enabled": {
+          "description": "Run pipelex-agent validation on save for MTHDS files.",
+          "type": "boolean",
+          "scope": "resource",
+          "default": true
+        },
+        "pipelex.validation.agentCliPath": {
+          "description": "Absolute path to the pipelex-agent executable. When null, auto-detection is used.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "scope": "resource",
+          "default": null
+        },
+        "pipelex.validation.timeout": {
+          "description": "Timeout in milliseconds for pipelex-agent validation.",
+          "type": "integer",
+          "minimum": 1000,
+          "scope": "resource",
+          "default": 30000
+        },
+        "pipelex.graph.direction": {
+          "description": "Layout direction for the method graph.",
+          "type": "string",
+          "enum": [
+            "top_down",
+            "left_to_right"
+          ],
+          "enumDescriptions": [
+            "Top to bottom layout",
+            "Left to right layout"
+          ],
+          "scope": "resource",
+          "default": "top_down"
         },
         "pipelex.formatter.alignEntries": {
           "scope": "resource",
