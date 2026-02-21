@@ -201,6 +201,7 @@ impl<E: Environment> WorkspaceState<E> {
                         "source": source::LSP_CONFIG,
                     }),
                     priority: priority::LSP_CONFIG,
+                    fallback_urls: vec![],
                 },
             );
         }

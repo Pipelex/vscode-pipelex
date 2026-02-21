@@ -241,30 +241,64 @@ pub struct Options {
 impl Options {
     fn prepare(&mut self, e: &impl Environment, base: &Path) -> Result<(), anyhow::Error> {
         if let Some(schema_opts) = &mut self.schema {
-            let url = match schema_opts.path.take() {
-                Some(p) => {
-                    if let Ok(url) = p.parse() {
-                        Some(url)
+            // When `sources` is set, resolve each entry to a URL and skip legacy path/url logic.
+            if let Some(sources) = &schema_opts.sources {
+                let mut resolved = Vec::with_capacity(sources.len());
+                for src in sources {
+                    let expanded = expand_tilde(e, src);
+                    let url = if let Ok(url) = expanded.parse::<Url>() {
+                        url
                     } else {
-                        let p = if e.is_absolute(Path::new(&p)) {
-                            PathBuf::from(p)
+                        let p = if e.is_absolute(Path::new(&expanded)) {
+                            PathBuf::from(&expanded)
                         } else {
-                            base.join(p).normalize()
+                            base.join(&expanded).normalize()
                         };
-
                         let s = p.to_string_lossy();
-
-                        Some(Url::parse(&format!("file://{s}")).context("invalid schema path")?)
-                    }
+                        Url::parse(&format!("file://{s}"))
+                            .with_context(|| format!("invalid schema source path: {src}"))?
+                    };
+                    resolved.push(url);
                 }
-                None => schema_opts.url.take(),
-            };
+                schema_opts.resolved_sources = Some(resolved);
+            } else {
+                let url = match schema_opts.path.take() {
+                    Some(p) => {
+                        if let Ok(url) = p.parse() {
+                            Some(url)
+                        } else {
+                            let p = if e.is_absolute(Path::new(&p)) {
+                                PathBuf::from(p)
+                            } else {
+                                base.join(p).normalize()
+                            };
 
-            schema_opts.url = url;
+                            let s = p.to_string_lossy();
+
+                            Some(
+                                Url::parse(&format!("file://{s}"))
+                                    .context("invalid schema path")?,
+                            )
+                        }
+                    }
+                    None => schema_opts.url.take(),
+                };
+
+                schema_opts.url = url;
+            }
         }
 
         Ok(())
     }
+}
+
+fn expand_tilde(e: &impl Environment, s: &str) -> String {
+    if let Some(rest) = s.strip_prefix('~') {
+        if let Some(home) = e.env_var("HOME") {
+            return format!("{home}{rest}");
+        }
+    }
+    s.to_string()
 }
 
 /// A rule to override options by either name or file.
@@ -354,7 +388,6 @@ impl Rule {
 ///
 /// Schemas in rules with defined keys are ignored.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SchemaOptions {
     /// Whether the schema should be enabled or not.
     ///
@@ -372,6 +405,15 @@ pub struct SchemaOptions {
     ///
     /// The url of the schema, supported schemes are `http`, `https`, `file` and `taplo`.
     pub url: Option<Url>,
+
+    /// Ordered list of schema sources (paths or URLs), tried in waterfall order.
+    /// Takes precedence over `path`/`url` when set.
+    pub sources: Option<Vec<String>>,
+
+    /// Resolved URLs from `sources`, populated by `prepare()`. Not part of config format.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub resolved_sources: Option<Vec<Url>>,
 }
 
 /// A plugin to extend Taplo's capabilities.
@@ -380,4 +422,224 @@ pub struct Plugin {
     /// Optional settings for the plugin.
     #[serde(default)]
     pub settings: Option<Value>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::environment::Environment;
+    use async_trait::async_trait;
+    use time::OffsetDateTime;
+
+    /// Minimal mock environment for config tests.
+    #[derive(Clone)]
+    struct MockEnv {
+        home: Option<String>,
+    }
+
+    #[async_trait(?Send)]
+    impl Environment for MockEnv {
+        type Stdin = tokio::io::Empty;
+        type Stdout = tokio::io::Sink;
+        type Stderr = tokio::io::Sink;
+
+        fn now(&self) -> OffsetDateTime {
+            OffsetDateTime::now_utc()
+        }
+        fn spawn<F>(&self, _fut: F)
+        where
+            F: futures::Future + Send + 'static,
+            F::Output: Send,
+        {
+        }
+        fn spawn_local<F>(&self, _fut: F)
+        where
+            F: futures::Future + 'static,
+        {
+        }
+        fn env_var(&self, name: &str) -> Option<String> {
+            if name == "HOME" {
+                self.home.clone()
+            } else {
+                None
+            }
+        }
+        fn env_vars(&self) -> Vec<(String, String)> {
+            vec![]
+        }
+        fn atty_stderr(&self) -> bool {
+            false
+        }
+        fn stdin(&self) -> Self::Stdin {
+            tokio::io::empty()
+        }
+        fn stdout(&self) -> Self::Stdout {
+            tokio::io::sink()
+        }
+        fn stderr(&self) -> Self::Stderr {
+            tokio::io::sink()
+        }
+        fn glob_files(&self, _glob: &str) -> Result<Vec<PathBuf>, anyhow::Error> {
+            Ok(vec![])
+        }
+        async fn read_file(&self, _path: &Path) -> Result<Vec<u8>, anyhow::Error> {
+            Err(anyhow::anyhow!("not implemented"))
+        }
+        async fn write_file(&self, _path: &Path, _bytes: &[u8]) -> Result<(), anyhow::Error> {
+            Ok(())
+        }
+        fn to_file_path(&self, url: &Url) -> Option<PathBuf> {
+            url.to_file_path().ok()
+        }
+        fn is_absolute(&self, path: &Path) -> bool {
+            path.is_absolute()
+        }
+        fn cwd(&self) -> Option<PathBuf> {
+            Some(PathBuf::from("/"))
+        }
+        async fn find_config_file(&self, _from: &Path) -> Option<PathBuf> {
+            None
+        }
+    }
+
+    #[test]
+    fn expand_tilde_with_home() {
+        let env = MockEnv {
+            home: Some("/Users/alice".into()),
+        };
+        assert_eq!(
+            expand_tilde(&env, "~/.pipelex/schema.json"),
+            "/Users/alice/.pipelex/schema.json"
+        );
+    }
+
+    #[test]
+    fn expand_tilde_without_home() {
+        let env = MockEnv { home: None };
+        assert_eq!(
+            expand_tilde(&env, "~/.pipelex/schema.json"),
+            "~/.pipelex/schema.json"
+        );
+    }
+
+    #[test]
+    fn expand_tilde_no_tilde() {
+        let env = MockEnv {
+            home: Some("/Users/alice".into()),
+        };
+        assert_eq!(
+            expand_tilde(&env, "/absolute/path.json"),
+            "/absolute/path.json"
+        );
+    }
+
+    #[test]
+    fn prepare_sources_resolves_mixed_entries() {
+        let env = MockEnv {
+            home: Some("/Users/alice".into()),
+        };
+        let base = Path::new("/project");
+
+        let mut opts = Options {
+            schema: Some(SchemaOptions {
+                enabled: None,
+                path: None,
+                url: None,
+                sources: Some(vec![
+                    ".pipelex/schema.json".into(),
+                    "~/.pipelex/schema.json".into(),
+                    "https://example.com/schema.json".into(),
+                ]),
+                resolved_sources: None,
+            }),
+            formatting: None,
+        };
+
+        opts.prepare(&env, base).unwrap();
+        let schema = opts.schema.unwrap();
+        let resolved = schema.resolved_sources.unwrap();
+
+        assert_eq!(resolved.len(), 3);
+        assert_eq!(
+            resolved[0].as_str(),
+            "file:///project/.pipelex/schema.json"
+        );
+        assert_eq!(
+            resolved[1].as_str(),
+            "file:///Users/alice/.pipelex/schema.json"
+        );
+        assert_eq!(resolved[2].as_str(), "https://example.com/schema.json");
+    }
+
+    #[test]
+    fn prepare_sources_skips_legacy_path_url() {
+        let env = MockEnv { home: None };
+        let base = Path::new("/project");
+
+        let mut opts = Options {
+            schema: Some(SchemaOptions {
+                enabled: None,
+                path: Some("legacy.json".into()),
+                url: Some("https://legacy.example.com/schema.json".parse().unwrap()),
+                sources: Some(vec!["https://new.example.com/schema.json".into()]),
+                resolved_sources: None,
+            }),
+            formatting: None,
+        };
+
+        opts.prepare(&env, base).unwrap();
+        let schema = opts.schema.unwrap();
+
+        // sources takes precedence: resolved_sources is set, url stays untouched
+        let resolved = schema.resolved_sources.unwrap();
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].as_str(), "https://new.example.com/schema.json");
+    }
+
+    #[test]
+    fn prepare_without_sources_uses_legacy_path() {
+        let env = MockEnv { home: None };
+        let base = Path::new("/project");
+
+        let mut opts = Options {
+            schema: Some(SchemaOptions {
+                enabled: None,
+                path: Some("schema.json".into()),
+                url: None,
+                sources: None,
+                resolved_sources: None,
+            }),
+            formatting: None,
+        };
+
+        opts.prepare(&env, base).unwrap();
+        let schema = opts.schema.unwrap();
+
+        assert!(schema.resolved_sources.is_none());
+        assert_eq!(
+            schema.url.unwrap().as_str(),
+            "file:///project/schema.json"
+        );
+    }
+
+    #[test]
+    fn prepare_sources_absolute_path() {
+        let env = MockEnv { home: None };
+        let base = Path::new("/project");
+
+        let mut opts = Options {
+            schema: Some(SchemaOptions {
+                enabled: None,
+                path: None,
+                url: None,
+                sources: Some(vec!["/absolute/schema.json".into()]),
+                resolved_sources: None,
+            }),
+            formatting: None,
+        };
+
+        opts.prepare(&env, base).unwrap();
+        let resolved = opts.schema.unwrap().resolved_sources.unwrap();
+        assert_eq!(resolved[0].as_str(), "file:///absolute/schema.json");
+    }
 }
