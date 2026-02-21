@@ -388,6 +388,7 @@ impl Rule {
 ///
 /// Schemas in rules with defined keys are ignored.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SchemaOptions {
     /// Whether the schema should be enabled or not.
     ///
@@ -668,5 +669,15 @@ mod tests {
         opts.prepare(&env, base).unwrap();
         let resolved = opts.schema.unwrap().resolved_sources.unwrap();
         assert_eq!(resolved[0].as_str(), "file:///absolute/schema.json");
+    }
+
+    #[test]
+    fn schema_options_deny_unknown_fields() {
+        let input = r#"{ "enabled": true, "bogus_field": 42 }"#;
+        let result = serde_json::from_str::<SchemaOptions>(input);
+        assert!(
+            result.is_err(),
+            "SchemaOptions should reject unknown fields"
+        );
     }
 }

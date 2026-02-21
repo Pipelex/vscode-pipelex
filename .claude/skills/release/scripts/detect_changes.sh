@@ -52,7 +52,7 @@ count_category() {
   local base="$1" category="$2" count=0
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    [[ "$(categorize "$file")" == "$category" ]] && ((count++))
+    [[ "$(categorize "$file")" == "$category" ]] && ((++count))
   done < <(git diff --name-only "$base"..HEAD 2>/dev/null)
   echo "$count"
 }
