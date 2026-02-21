@@ -10,7 +10,6 @@ const mockState = vi.hoisted(() => ({
     childProcessAvailable: true,
     validatorConstructed: false,
     graphPanelConstructed: false,
-    importShouldFail: false,
 }));
 
 // ---------- Mocks ----------
@@ -42,9 +41,6 @@ vi.mock('../../util', () => ({
 }));
 
 vi.mock('../validation/pipelexValidator', () => {
-    if (mockState.importShouldFail) {
-        throw new Error('Simulated import failure');
-    }
     return {
         PipelexValidator: class {
             constructor() { mockState.validatorConstructed = true; }
@@ -54,9 +50,6 @@ vi.mock('../validation/pipelexValidator', () => {
 });
 
 vi.mock('../graph/methodGraphPanel', () => {
-    if (mockState.importShouldFail) {
-        throw new Error('Simulated import failure');
-    }
     return {
         MethodGraphPanel: class {
             constructor() { mockState.graphPanelConstructed = true; }
@@ -87,15 +80,12 @@ describe('registerPipelexFeatures', () => {
         mockState.globalState.clear();
         mockState.validatorConstructed = false;
         mockState.graphPanelConstructed = false;
-        mockState.importShouldFail = false;
         mockState.childProcessAvailable = true;
     });
 
     it('returns a promise that resolves after commands are registered', async () => {
         const context = makeContext();
 
-        // Bug A: current code returns void (fire-and-forget async).
-        // The function should return a promise so the caller can await it.
         const result = registerPipelexFeatures(context);
 
         // If the function is synchronous (returns void), the command
