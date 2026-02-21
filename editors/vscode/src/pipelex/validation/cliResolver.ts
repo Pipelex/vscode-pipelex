@@ -8,13 +8,19 @@ import type { ResolvedCli } from './types';
  * Resolve the pipelex-agent CLI binary.
  *
  * Resolution order:
- * 1. `.venv/bin/pipelex-agent` in workspace root
- * 2. User setting `pipelex.validation.agentCliPath`
+ * 1. User setting `pipelex.validation.agentCliPath` (explicit override wins)
+ * 2. `.venv/bin/pipelex-agent` in workspace root
  * 3. `pipelex-agent` on PATH
  * 4. `uv run pipelex-agent` fallback
  */
 export function resolveCli(documentUri?: vscode.Uri): ResolvedCli | null {
-    // 1. .venv in workspace root (prefer the folder owning documentUri)
+    // 1. User setting (explicit override wins)
+    const configPath = vscode.workspace.getConfiguration('pipelex').get<string | null>('validation.agentCliPath', null);
+    if (configPath) {
+        return { command: configPath, args: [] };
+    }
+
+    // 2. .venv in workspace root (prefer the folder owning documentUri)
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
         const venvBin = process.platform === 'win32'
@@ -39,12 +45,6 @@ export function resolveCli(documentUri?: vscode.Uri): ResolvedCli | null {
                 return { command: venvPath, args: [] };
             }
         }
-    }
-
-    // 2. User setting
-    const configPath = vscode.workspace.getConfiguration('pipelex').get<string | null>('validation.agentCliPath', null);
-    if (configPath) {
-        return { command: configPath, args: [] };
     }
 
     // 3. pipelex-agent on PATH

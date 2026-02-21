@@ -302,6 +302,30 @@ describe('cliResolver', () => {
         expect(resolveCli()).toBeNull();
     });
 
+    it('user setting takes priority over .venv', () => {
+        const originalPlatform = process.platform;
+        Object.defineProperty(process, 'platform', { value: 'darwin' });
+        try {
+            mockWorkspace.workspaceFolders = [
+                { uri: { fsPath: '/workspace' } },
+            ];
+            // .venv exists
+            vi.mocked(fs.existsSync).mockImplementation((p: any) => {
+                return String(p).includes('.venv/bin/pipelex-agent');
+            });
+            // User setting is also configured
+            mockWorkspace.getConfiguration = () => ({
+                get: () => '/custom/path/pipelex-agent',
+            });
+
+            const result = resolveCli();
+            expect(result).not.toBeNull();
+            expect(result!.command).toBe('/custom/path/pipelex-agent');
+        } finally {
+            Object.defineProperty(process, 'platform', { value: originalPlatform });
+        }
+    });
+
     it('prefers .venv from the workspace folder matching documentUri', () => {
         const originalPlatform = process.platform;
         Object.defineProperty(process, 'platform', { value: 'darwin' });

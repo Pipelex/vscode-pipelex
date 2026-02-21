@@ -39,8 +39,8 @@ categorize() {
   local file="$1"
   case "$file" in
     editors/vscode/*|js/*) echo "extension" ;;
-    crates/pipelex-cli/*) echo "cli" ;;
-    crates/pipelex-common/*|crates/pipelex-lsp/*|crates/pipelex-wasm/*|crates/taplo-lsp/*|crates/taplo-common/*) echo "common" ;;
+    crates/pipelex-cli/*|crates/taplo-cli/*) echo "cli" ;;
+    crates/pipelex-common/*|crates/pipelex-lsp/*|crates/pipelex-wasm/*|crates/taplo-lsp/*|crates/taplo-common/*|crates/taplo/*|crates/taplo-wasm/*|crates/lsp-async-stub/*) echo "common" ;;
     .github/*|docs/*|site/*|scripts/*) echo "ci_docs" ;;
     test-data/*) echo "test_data" ;;
     *.md) echo "ci_docs" ;;
