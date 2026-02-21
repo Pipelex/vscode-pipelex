@@ -19,13 +19,13 @@ impl<E: Environment> PlxtCli<E> {
                 if let Some(cwd) = self.env.cwd_normalized() {
                     if let Some(path) = self.env.find_config_file_normalized(&cwd).await {
                         println!("{}", path.display());
+                        Ok(())
                     } else {
-                        eprintln!("no config file found");
+                        Err(anyhow::anyhow!("no config file found"))
                     }
                 } else {
-                    eprintln!("no config file found");
+                    Err(anyhow::anyhow!("unable to determine current working directory"))
                 }
-                Ok(())
             }
         }
     }

@@ -36,8 +36,9 @@ env: ## Create Python virtual env (if missing)
 	@command -v uv >/dev/null 2>&1 || { \
 		echo "uv not found – installing latest …"; \
 		curl -LsSf https://astral.sh/uv/install.sh | sh; \
-	}
-	@if [ ! -d "$(VIRTUAL_ENV)" ]; then \
+	} && \
+	export PATH="$$HOME/.local/bin:$$PATH" && \
+	if [ ! -d "$(VIRTUAL_ENV)" ]; then \
 		echo "Creating Python virtual env in \`$(VIRTUAL_ENV)\`"; \
 		uv venv "$(VIRTUAL_ENV)" --python $(PYTHON_VERSION); \
 	fi

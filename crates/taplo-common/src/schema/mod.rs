@@ -218,12 +218,12 @@ impl<E: Environment> Schemas<E> {
     }
 
     /// Try loading a schema from an ordered list of URLs (waterfall).
-    /// Returns the first successfully loaded schema.
-    pub async fn load_schema_waterfall(&self, urls: &[&Url]) -> Result<Arc<Value>, anyhow::Error> {
+    /// Returns the first successfully loaded schema and the URL it was loaded from.
+    pub async fn load_schema_waterfall(&self, urls: &[&Url]) -> Result<(Url, Arc<Value>), anyhow::Error> {
         let mut last_error = None;
         for url in urls {
             match self.load_schema(url).await {
-                Ok(schema) => return Ok(schema),
+                Ok(schema) => return Ok(((*url).clone(), schema)),
                 Err(err) => {
                     tracing::debug!(%url, %err, "waterfall: source failed, trying next");
                     last_error = Some(err);
@@ -239,23 +239,8 @@ impl<E: Environment> Schemas<E> {
         &self,
         assoc: &associations::SchemaAssociation,
     ) -> Result<(Url, Arc<Value>), anyhow::Error> {
-        if assoc.fallback_urls.is_empty() {
-            let schema = self.load_schema(&assoc.url).await?;
-            Ok((assoc.url.clone(), schema))
-        } else {
-            let all = assoc.all_urls();
-            let mut last_error = None;
-            for url in all {
-                match self.load_schema(url).await {
-                    Ok(schema) => return Ok((url.clone(), schema)),
-                    Err(err) => {
-                        tracing::debug!(%url, %err, "waterfall: source failed, trying next");
-                        last_error = Some(err);
-                    }
-                }
-            }
-            Err(last_error.unwrap_or_else(|| anyhow!("all schema sources failed")))
-        }
+        let all = assoc.all_urls();
+        self.load_schema_waterfall(&all).await
     }
 
     fn get_validator(&self, schema_url: &Url) -> Option<Arc<JSONSchema>> {

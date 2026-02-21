@@ -471,7 +471,8 @@
         },
         "pipelex.validation.timeout": {
           "description": "Timeout in milliseconds for pipelex-agent validation.",
-          "type": "number",
+          "type": "integer",
+          "minimum": 1000,
           "scope": "resource",
           "default": 30000
         },

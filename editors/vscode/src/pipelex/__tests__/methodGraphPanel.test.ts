@@ -198,6 +198,10 @@ describe('MethodGraphPanel', () => {
     // --- Regression: staleness after spawnCli (previous Bug 1) ---
 
     it('refresh() discards spawnCli result when file switched during spawn', async () => {
+        // Set readFileResult to contain 'stale' so that if the staleness guard
+        // were removed, the webview would contain 'stale' and this test would fail.
+        mockState.readFileResult = '<html>stale content from old file</html>';
+
         let resolveSpawn: ((v: any) => void) | null = null;
         const processUtils = await import('../validation/processUtils');
         vi.mocked(processUtils.spawnCli).mockImplementation(() => {
@@ -226,10 +230,8 @@ describe('MethodGraphPanel', () => {
         });
         await new Promise(r => setTimeout(r, 10));
 
-        // Should not attempt to read the stale file's graph
-        const fs = await import('fs');
-        // readFile should not have been called for the stale result
-        // (the staleness check after spawnCli should prevent it)
+        // readFile would return 'stale content' but the staleness check
+        // after spawnCli should prevent it from being set on the webview.
         expect(mockState.mockWebview.html).not.toContain('stale');
 
         panel.dispose();

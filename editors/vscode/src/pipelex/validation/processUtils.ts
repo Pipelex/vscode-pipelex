@@ -17,17 +17,18 @@ export function spawnCli(
     cwd?: string,
 ): Promise<SpawnResult> {
     return new Promise((resolve, reject) => {
+        const onAbort = () => {
+            proc.kill();
+        };
         const proc = execFile(command, args, { timeout, maxBuffer: 1024 * 1024, cwd }, (err, stdout, stderr) => {
+            signal.removeEventListener('abort', onAbort);
             if (err) {
-                reject({ exitCode: (err as any).code ?? err.code, stderr, stdout, message: err.message });
+                reject({ exitCode: (err as NodeJS.ErrnoException).code, stderr, stdout, message: err.message });
             } else {
                 resolve({ stdout, stderr });
             }
         });
 
-        const onAbort = () => {
-            proc.kill();
-        };
         signal.addEventListener('abort', onAbort, { once: true });
     });
 }

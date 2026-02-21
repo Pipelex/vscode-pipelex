@@ -149,5 +149,7 @@ export class PipelexValidator implements vscode.Disposable {
 export function extractJson(stderr: string): string | null {
     const idx = stderr.indexOf('{');
     if (idx === -1) return null;
-    return stderr.slice(idx);
+    const lastIdx = stderr.lastIndexOf('}');
+    if (lastIdx === -1) return null;
+    return stderr.slice(idx, lastIdx + 1);
 }

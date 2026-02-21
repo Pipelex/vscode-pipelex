@@ -293,9 +293,13 @@ impl Options {
 }
 
 fn expand_tilde(e: &impl Environment, s: &str) -> String {
-    if let Some(rest) = s.strip_prefix('~') {
+    if s == "~" {
         if let Some(home) = e.env_var("HOME").or_else(|| e.env_var("USERPROFILE")) {
-            return format!("{home}{rest}");
+            return home;
+        }
+    } else if let Some(rest) = s.strip_prefix("~/") {
+        if let Some(home) = e.env_var("HOME").or_else(|| e.env_var("USERPROFILE")) {
+            return format!("{home}/{rest}");
         }
     }
     s.to_string()
@@ -561,6 +565,19 @@ mod tests {
             expand_tilde(&env, "~/.pipelex/schema.json"),
             r"C:\Users\alice/.pipelex/schema.json"
         );
+    }
+
+    #[test]
+    fn expand_tilde_bare() {
+        let env = MockEnv::with_home("/Users/alice");
+        assert_eq!(expand_tilde(&env, "~"), "/Users/alice");
+    }
+
+    #[test]
+    fn expand_tilde_username_path_not_expanded() {
+        let env = MockEnv::with_home("/Users/alice");
+        // ~bob/foo should NOT be expanded — only ~/... and bare ~ are supported
+        assert_eq!(expand_tilde(&env, "~bob/foo"), "~bob/foo");
     }
 
     #[test]
