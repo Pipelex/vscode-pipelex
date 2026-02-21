@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { resolveCli } from '../validation/cliResolver';
 import { spawnCli, cancelAllInflight } from '../validation/processUtils';
+import { extractJson } from '../validation/pipelexValidator';
 
 export class MethodGraphPanel implements vscode.Disposable {
     private panel: vscode.WebviewPanel | undefined;
@@ -130,7 +131,12 @@ export class MethodGraphPanel implements vscode.Disposable {
             // discard this result so it doesn't overwrite the new file's graph.
             if (this.currentUri?.toString() !== uri.toString()) return;
 
-            const result = JSON.parse(stdout);
+            const json = extractJson(stdout);
+            if (!json) {
+                this.setHtml(messageHtml('No Output', 'The CLI did not return valid JSON.'));
+                return;
+            }
+            const result = JSON.parse(json);
             const htmlPath: string | undefined = result?.graph_files?.reactflow_html;
             if (!htmlPath) {
                 this.setHtml(messageHtml(
