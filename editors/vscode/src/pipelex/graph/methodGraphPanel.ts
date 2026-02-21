@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { resolveCli } from '../validation/cliResolver';
 import { spawnCli, cancelAllInflight } from '../validation/processUtils';
 import { extractJson } from '../validation/pipelexValidator';
 
 export class MethodGraphPanel implements vscode.Disposable {
+    private static readonly CSP_NONCE_SENTINEL = 'PIPELEX_CSP_NONCE';
+
     private panel: vscode.WebviewPanel | undefined;
     private currentUri: vscode.Uri | undefined;
     private readonly disposables: vscode.Disposable[] = [];
@@ -186,15 +189,34 @@ export class MethodGraphPanel implements vscode.Disposable {
     }
 
     private setHtml(html: string) {
-        if (this.panel) {
-            this.panel.webview.html = html;
+        if (!this.panel) return;
+
+        const nonce = crypto.randomBytes(16).toString('base64');
+        const cspSource = this.panel.webview.cspSource;
+        const isPipelexHtml = html.includes(MethodGraphPanel.CSP_NONCE_SENTINEL);
+
+        if (isPipelexHtml) {
+            // Replace all sentinel occurrences with the real nonce
+            html = html.replace(new RegExp(MethodGraphPanel.CSP_NONCE_SENTINEL, 'g'), nonce);
+            // Inject full CSP meta tag into <head>
+            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; connect-src https:;">`;
+            html = html.replace('<head>', `<head>\n${cspMeta}`);
+        } else {
+            // Simple HTML (loading/message): add nonce to <style> tags, minimal CSP
+            html = html.replace(/<style>/g, `<style nonce="${nonce}">`);
+            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';">`;
+            html = html.replace('<head>', `<head>\n${cspMeta}`);
         }
+
+        this.panel.webview.html = html;
     }
 }
 
 function loadingHtml(): string {
     return `<!DOCTYPE html>
-<html><head><style>
+<html>
+<head>
+<style>
 body { display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;
        font-family: var(--vscode-font-family, sans-serif); color: var(--vscode-foreground, #ccc);
        background: var(--vscode-editor-background, #1e1e1e); }
@@ -203,7 +225,9 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 
 function messageHtml(title: string, body: string): string {
     return `<!DOCTYPE html>
-<html><head><style>
+<html>
+<head>
+<style>
 body { display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;
        font-family: var(--vscode-font-family, sans-serif); color: var(--vscode-foreground, #ccc);
        background: var(--vscode-editor-background, #1e1e1e); }
