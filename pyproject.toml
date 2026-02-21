@@ -4,7 +4,7 @@ description     = "Pipelex Tools CLI — MTHDS/TOML formatter, linter, and LSP"
 authors         = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }, { name = "tamasfe" }]
 maintainers     = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
 license         = "MIT"
-readme          = "README.md"
+readme          = "docs/pipelex/PYPI_README.md"
 requires-python = ">=3.8,<3.15"
 dynamic         = ["version"]
 
@@ -40,6 +40,7 @@ classifiers = [
 Homepage      = "https://github.com/Pipelex/vscode-pipelex"
 Repository    = "https://github.com/Pipelex/vscode-pipelex.git"
 Documentation = "https://docs.pipelex.com/"
+Changelog     = "https://github.com/Pipelex/vscode-pipelex/blob/main/CHANGELOG.md"
 Tracker       = "https://github.com/Pipelex/vscode-pipelex/issues"
 
 [build-system]
