@@ -166,10 +166,13 @@ impl<E: Environment> WorkspaceState<E> {
         self.schemas.clear_caches();
 
         // Clear config/catalog/LSP associations but keep document-level ones
-        // (directives, $schema) to avoid re-parsing all open documents.
+        // (directives, $schema) and manual associations to avoid re-parsing
+        // all open documents and losing programmatic schema bindings.
         self.schemas.associations().retain(|(_, assoc)| {
             let source_val = assoc.meta["source"].as_str().unwrap_or("");
-            source_val == source::DIRECTIVE || source_val == source::SCHEMA_FIELD
+            source_val == source::DIRECTIVE
+                || source_val == source::SCHEMA_FIELD
+                || source_val == source::MANUAL
         });
         self.schemas.associations().add_builtins();
 
@@ -309,4 +312,55 @@ pub struct DocumentState {
     pub(crate) parse: Parse,
     pub(crate) dom: Node,
     pub(crate) mapper: Mapper,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper that mimics the retain filter used in `WorldState::initialize`
+    /// to clear transient schema associations while preserving persistent ones.
+    fn retain_persistent(associations: &mut Vec<(AssociationRule, SchemaAssociation)>) {
+        associations.retain(|(_, assoc)| {
+            let source_val = assoc.meta["source"].as_str().unwrap_or("");
+            source_val == source::DIRECTIVE
+                || source_val == source::SCHEMA_FIELD
+                || source_val == source::MANUAL
+        });
+    }
+
+    fn make_assoc(src: &str) -> (AssociationRule, SchemaAssociation) {
+        (
+            AssociationRule::Regex(Regex::new(".*").unwrap()),
+            SchemaAssociation {
+                url: Url::parse("https://example.com/schema.json").unwrap(),
+                priority: priority::CONFIG,
+                meta: json!({ "source": src }),
+                fallback_urls: vec![],
+            },
+        )
+    }
+
+    #[test]
+    fn retain_keeps_manual_directive_and_schema_field() {
+        let mut associations = vec![
+            make_assoc(source::MANUAL),
+            make_assoc(source::DIRECTIVE),
+            make_assoc(source::SCHEMA_FIELD),
+            make_assoc(source::LSP_CONFIG),
+            make_assoc(source::CATALOG),
+        ];
+
+        retain_persistent(&mut associations);
+
+        let remaining_sources: Vec<&str> = associations
+            .iter()
+            .map(|(_, a)| a.meta["source"].as_str().unwrap())
+            .collect();
+
+        assert_eq!(
+            remaining_sources,
+            vec![source::MANUAL, source::DIRECTIVE, source::SCHEMA_FIELD]
+        );
+    }
 }
