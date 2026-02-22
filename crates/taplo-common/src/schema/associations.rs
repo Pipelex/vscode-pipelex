@@ -98,6 +98,20 @@ impl<E: Environment> SchemaAssociations<E> {
                 fallback_urls: vec![],
             },
         ));
+
+        self.associations.write().push((
+            AssociationRule::Regex(Regex::new(r".*\.mthds$").unwrap()),
+            SchemaAssociation {
+                url: builtins::MTHDS_SCHEMA_URL.parse().unwrap(),
+                meta: json!({
+                    "name": "MTHDS",
+                    "description": "Pipelex MTHDS file.",
+                    "source": source::BUILTIN
+                }),
+                priority: priority::BUILTIN,
+                fallback_urls: vec![],
+            },
+        ));
     }
 
     pub async fn add_from_catalog(&self, url: &Url) -> Result<(), anyhow::Error> {

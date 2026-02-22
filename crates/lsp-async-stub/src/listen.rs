@@ -66,17 +66,28 @@ impl<W: Clone + 'static> Server<W> {
                                     break;
                                 }
 
+                                // Process document sync notifications sequentially
+                                // to prevent race conditions with concurrent handlers
+                                // (e.g. didChange racing with formatting).
+                                let is_sync = is_document_sync_method(msg.method.as_deref());
+
                                 let task_fut = self.handle_message(
                                     world.clone(),
                                     msg,
                                     output.clone().sink_map_err(|e| panic!("{}", e)),
                                 );
 
-                                tokio::task::spawn_local(async move {
+                                if is_sync {
                                     if let Err(e) = task_fut.await {
                                         tracing::error!(error = %e, "handler returned error");
                                     }
-                                });
+                                } else {
+                                    tokio::task::spawn_local(async move {
+                                        if let Err(e) = task_fut.await {
+                                            tracing::error!(error = %e, "handler returned error");
+                                        }
+                                    });
+                                }
                             }
                             None => break 'l,
                         }
@@ -157,6 +168,21 @@ pub(crate) fn create_input(
     });
 
     receiver
+}
+
+/// Returns `true` for LSP document sync notification methods that must
+/// be processed sequentially to avoid race conditions with concurrent
+/// handlers (e.g. formatting reading stale document state).
+fn is_document_sync_method(method: Option<&str>) -> bool {
+    matches!(
+        method,
+        Some(
+            "textDocument/didOpen"
+                | "textDocument/didChange"
+                | "textDocument/didClose"
+                | "textDocument/didSave"
+        )
+    )
 }
 
 pub(crate) async fn read_message<R: tokio::io::AsyncBufRead + Unpin>(
