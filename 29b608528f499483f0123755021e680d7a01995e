@@ -1,0 +1,29 @@
+crates/lsp-async-stub/src/listen.rs
+  ff36d08ea76ae410 69-73,80,84-90,173-187
+crates/taplo-common/src/schema/cache.rs
+  ff36d08ea76ae410 42-47
+crates/taplo-common/src/schema/mod.rs
+  ff36d08ea76ae410 87-93
+crates/taplo-lsp/src/world.rs
+  ff36d08ea76ae410 164-175
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "29b608528f499483f0123755021e680d7a01995e",
+  "prompts": {
+    "ff36d08ea76ae410": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c6d5735d-3924-4c92-b4e5-01f29f174890",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 59,
+      "total_deletions": 8,
+      "accepted_lines": 54,
+      "overriden_lines": 0
+    }
+  }
+}
