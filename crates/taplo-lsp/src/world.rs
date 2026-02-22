@@ -161,6 +161,18 @@ impl<E: Environment> WorkspaceState<E> {
             return Ok(());
         }
 
+        // Clear caches so stale schemas and validators are not reused
+        // after config changes.
+        self.schemas.clear_caches();
+
+        // Clear config/catalog/LSP associations but keep document-level ones
+        // (directives, $schema) to avoid re-parsing all open documents.
+        self.schemas.associations().retain(|(_, assoc)| {
+            let source_val = assoc.meta["source"].as_str().unwrap_or("");
+            source_val == source::DIRECTIVE || source_val == source::SCHEMA_FIELD
+        });
+        self.schemas.associations().add_builtins();
+
         self.schemas.cache().set_expiration_times(
             Duration::from_secs(self.config.schema.cache.memory_expiration),
             Duration::from_secs(self.config.schema.cache.disk_expiration),

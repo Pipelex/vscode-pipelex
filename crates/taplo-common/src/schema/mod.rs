@@ -84,6 +84,13 @@ impl<E: Environment> Schemas<E> {
     pub fn env(&self) -> &E {
         &self.env
     }
+
+    /// Clear all in-memory schema caches (LRU cache and compiled validators).
+    /// Call this when configuration changes to ensure stale schemas are not reused.
+    pub fn clear_caches(&self) {
+        self.cache.clear();
+        self.validators.lock().clear();
+    }
 }
 
 impl<E: Environment> Schemas<E> {
