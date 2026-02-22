@@ -9,6 +9,9 @@ WEBSITE_DIR       := ../pipelex-website-2
 WEBSITE_SHIKI_DIR := $(WEBSITE_DIR)/src/lib/shiki
 GRAMMAR_DST       := $(WEBSITE_SHIKI_DIR)/mthds.tmLanguage.json
 
+MTHDS_SCHEMA_URL  := https://pipelex-config.s3.amazonaws.com/mthds_schema_latest.json
+MTHDS_SCHEMA_FILE := schemas/mthds_schema.json
+
 EXT_DIR           := editors/vscode
 JS_LSP_DIR        := js/lsp
 VSIX              := $(EXT_DIR)/pipelex.vsix
@@ -17,7 +20,7 @@ PYTHON_VERSION    ?= 3.13
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help sync-grammar s
+.PHONY: help sync-grammar s update-schema up
 .PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check docs
 
 help: ## Show this help
@@ -105,6 +108,13 @@ clean: ## Remove build artifacts
 	cargo clean
 	rm -rf $(JS_LSP_DIR)/dist
 	rm -rf $(EXT_DIR)/dist $(VSIX)
+
+update-schema: ## Download the latest MTHDS JSON Schema
+	@mkdir -p $(dir $(MTHDS_SCHEMA_FILE))
+	curl -fsSL $(MTHDS_SCHEMA_URL) -o $(MTHDS_SCHEMA_FILE)
+	@echo "Downloaded MTHDS schema -> $(MTHDS_SCHEMA_FILE)"
+
+up: update-schema
 
 $(GRAMMAR_DST): $(GRAMMAR_SRC)
 	@mkdir -p $(WEBSITE_SHIKI_DIR)

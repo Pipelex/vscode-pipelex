@@ -29,17 +29,26 @@ pub mod builtins {
 
     pub const TAPLO_CONFIG_URL: &str = "taplo://taplo.toml";
 
+    pub const MTHDS_SCHEMA_URL: &str = "pipelex://mthds.schema.json";
+
+    const MTHDS_SCHEMA_JSON: &str = include_str!("../../../../schemas/mthds_schema.json");
+
     #[must_use]
     pub fn taplo_config_schema() -> Arc<Value> {
         Arc::new(serde_json::to_value(schemars::schema_for!(crate::config::Config)).unwrap())
     }
 
     #[must_use]
+    pub fn mthds_schema() -> Arc<Value> {
+        Arc::new(serde_json::from_str(MTHDS_SCHEMA_JSON).expect("embedded MTHDS schema is invalid JSON"))
+    }
+
+    #[must_use]
     pub fn builtin_schema(url: &Url) -> Option<Arc<Value>> {
-        if url.as_str() == TAPLO_CONFIG_URL {
-            Some(taplo_config_schema())
-        } else {
-            None
+        match url.as_str() {
+            TAPLO_CONFIG_URL => Some(taplo_config_schema()),
+            MTHDS_SCHEMA_URL => Some(mthds_schema()),
+            _ => None,
         }
     }
 }
