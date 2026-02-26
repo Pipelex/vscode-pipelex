@@ -1,0 +1,25 @@
+CHANGELOG.md
+  f5325637e6554829 5-9
+editors/vscode/package.json
+  f5325637e6554829 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "6e24deaa69c601bd7b23e9420d8da301f66c2fbb",
+  "prompts": {
+    "f5325637e6554829": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fdab320b-29b1-4257-a1de-02ae2d41f675",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 1,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
