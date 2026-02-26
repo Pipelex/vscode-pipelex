@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-02-25
+
+### Fixed
+- Fix validate CLI calls to use `validate pipe` subcommand for graph and diagnostics
+
 ## [0.4.0] - 2026-02-21
 
 ### Added
