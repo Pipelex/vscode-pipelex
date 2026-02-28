@@ -1,0 +1,41 @@
+test-data/example.mthds
+  11f24b0a6fe344f2 2
+Makefile
+  11f24b0a6fe344f2 24,90-103,109
+crates/taplo-lsp/src/handlers/tests/hover.rs
+  11f24b0a6fe344f2 44,71
+plxt.toml
+  11f24b0a6fe344f2 2,27-29
+crates/taplo-lsp/src/lib.rs
+  11f24b0a6fe344f2 12-20
+Cargo.toml
+  11f24b0a6fe344f2 48-50
+.github/workflows/ci.yaml
+  11f24b0a6fe344f2 57-58,63,65,67-68,71-72,82-83,88-95
+crates/taplo-common/src/schema/associations.rs
+  11f24b0a6fe344f2 578
+crates/taplo-lsp/src/handlers/tests/goto_definition.rs
+  11f24b0a6fe344f2 179
+test-data/discord_newsletter.mthds
+  11f24b0a6fe344f2 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "37d5c4afd39628a89f2dbfb0630e718da00a3341",
+  "prompts": {
+    "11f24b0a6fe344f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1bdec40-db3f-4deb-8b7e-a8a9910ad233",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 112,
+      "total_deletions": 68,
+      "accepted_lines": 56,
+      "overriden_lines": 1
+    }
+  }
+}
