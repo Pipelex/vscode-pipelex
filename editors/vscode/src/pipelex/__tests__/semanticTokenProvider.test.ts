@@ -188,14 +188,40 @@ describe('Output/refines concept references (no modifier)', () => {
     });
   });
 
-  it('colors refines = "images.ImgGenPrompt" (namespaced)', async () => {
+  it('colors refines = "images.ImgGenPrompt" — concept only (domain handled by grammar)', async () => {
     const tokens = await getTokens(['refines = "images.ImgGenPrompt"']);
 
     expect(tokens).toHaveLength(1);
     expect(tokens[0]).toEqual({
       line: 0,
-      char: 11, // len('refines = "')
-      length: 19, // "images.ImgGenPrompt"
+      char: 18, // len('refines = "images.')
+      length: 12, // "ImgGenPrompt"
+      tokenType: TOKEN.mthdsConcept,
+      tokenModifiers: 0,
+    });
+  });
+
+  it('colors output = "Text[]" — concept only, ignores multiplicity', async () => {
+    const tokens = await getTokens(['output = "Text[]"']);
+
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toEqual({
+      line: 0,
+      char: 10, // len('output = "')
+      length: 4, // "Text"
+      tokenType: TOKEN.mthdsConcept,
+      tokenModifiers: 0,
+    });
+  });
+
+  it('colors output = "legal.Contract" — concept only (domain handled by grammar)', async () => {
+    const tokens = await getTokens(['output = "legal.Contract"']);
+
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toEqual({
+      line: 0,
+      char: 16, // len('output = "legal.')
+      length: 8, // "Contract"
       tokenType: TOKEN.mthdsConcept,
       tokenModifiers: 0,
     });
@@ -243,11 +269,59 @@ describe('Single-line inputs', () => {
       tokenModifiers: 0,
     });
 
-    // "native.Image" concept type
+    // "Image" concept type (domain "native" handled by grammar)
     expect(tokens[1]).toEqual({
       line: 0,
-      char: 20, // after 'inputs = { photo = "'
-      length: 12, // "native.Image"
+      char: 27, // after 'inputs = { photo = "native.'
+      length: 5, // "Image"
+      tokenType: TOKEN.mthdsConcept,
+      tokenModifiers: 0,
+    });
+  });
+
+  it('colors inputs = { names = "Text[]" } — variable + concept only', async () => {
+    const tokens = await getTokens(['inputs = { names = "Text[]" }']);
+
+    expect(tokens).toHaveLength(2);
+
+    // "names" variable
+    expect(tokens[0]).toEqual({
+      line: 0,
+      char: 11, // after 'inputs = { '
+      length: 5, // "names"
+      tokenType: TOKEN.mthdsDataVariable,
+      tokenModifiers: 0,
+    });
+
+    // "Text" concept (not "Text[]")
+    expect(tokens[1]).toEqual({
+      line: 0,
+      char: 20, // after 'inputs = { names = "'
+      length: 4, // "Text"
+      tokenType: TOKEN.mthdsConcept,
+      tokenModifiers: 0,
+    });
+  });
+
+  it('colors inputs = { contract = "legal.Contract" } — variable + concept only', async () => {
+    const tokens = await getTokens(['inputs = { contract = "legal.Contract" }']);
+
+    expect(tokens).toHaveLength(2);
+
+    // "contract" variable
+    expect(tokens[0]).toEqual({
+      line: 0,
+      char: 11, // after 'inputs = { '
+      length: 8, // "contract"
+      tokenType: TOKEN.mthdsDataVariable,
+      tokenModifiers: 0,
+    });
+
+    // "Contract" concept only (domain "legal" handled by grammar)
+    expect(tokens[1]).toEqual({
+      line: 0,
+      char: 29, // after 'inputs = { contract = "legal.'
+      length: 8, // "Contract"
       tokenType: TOKEN.mthdsConcept,
       tokenModifiers: 0,
     });
@@ -296,11 +370,11 @@ describe('Multi-line inputs (state machine)', () => {
       tokenModifiers: 0,
     });
 
-    // Line 1: "native.Image" concept
+    // Line 1: "Image" concept (domain "native" handled by grammar)
     expect(tokens[1]).toEqual({
       line: 1,
       char: expect.any(Number),
-      length: 12,
+      length: 5, // "Image" only
       tokenType: TOKEN.mthdsConcept,
       tokenModifiers: 0,
     });

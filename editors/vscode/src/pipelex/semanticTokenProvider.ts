@@ -113,22 +113,28 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
     }
 
     private analyzeOutputRefines(line: string, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
-        const match = /^(\s*)(output|refines)(\s*=\s*")((?:[a-z][a-z0-9_]*\.)?[A-Z][A-Za-z0-9]*(?:\.[A-Z][A-Za-z0-9]*)*)"/.exec(line);
+        const match = /^(\s*)(output|refines)(\s*=\s*")(?:[a-z][a-z0-9_]*\.)?([A-Z][A-Za-z0-9]*)(?:\[\])?"/.exec(line);
         if (match) {
-            const conceptOffset = match[1].length + match[2].length + match[3].length;
-            tokensBuilder.push(lineIndex, conceptOffset, match[4].length, TOKEN_TYPES.mthdsConcept);
+            const valueStart = match[1].length + match[2].length + match[3].length;
+            // Find where the concept name starts within the value
+            const fullValue = line.substring(valueStart);
+            const conceptStart = fullValue.indexOf(match[4]);
+            tokensBuilder.push(lineIndex, valueStart + conceptStart, match[4].length, TOKEN_TYPES.mthdsConcept);
         }
     }
 
     private analyzeInputEntries(content: string, baseOffset: number, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
-        const entryRegex = /([a-z][a-z0-9_]*)(\s*=\s*")((?:[a-z][a-z0-9_]*\.)?[A-Z][A-Za-z0-9]*(?:\.[A-Z][A-Za-z0-9]*)*)(")/g;
+        const entryRegex = /([a-z][a-z0-9_]*)(\s*=\s*")((?:[a-z][a-z0-9_]*\.)?([A-Z][A-Za-z0-9]*))(?:\[\])?(")/g;
         let match;
         while ((match = entryRegex.exec(content)) !== null) {
             const varOffset = baseOffset + match.index;
             tokensBuilder.push(lineIndex, varOffset, match[1].length, TOKEN_TYPES.mthdsDataVariable);
 
-            const conceptOffset = baseOffset + match.index + match[1].length + match[2].length;
-            tokensBuilder.push(lineIndex, conceptOffset, match[3].length, TOKEN_TYPES.mthdsConcept);
+            // Push concept token only for the ConceptName part (match[4]), not the domain
+            const valueOffset = baseOffset + match.index + match[1].length + match[2].length;
+            const conceptName = match[4];
+            const conceptStart = match[3].indexOf(conceptName);
+            tokensBuilder.push(lineIndex, valueOffset + conceptStart, conceptName.length, TOKEN_TYPES.mthdsConcept);
         }
     }
 

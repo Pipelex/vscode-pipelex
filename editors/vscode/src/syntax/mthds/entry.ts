@@ -29,31 +29,45 @@ const pipeEntry = {
   },
 };
 
-// 2. output = "ConceptType"
+// 2. output = "ConceptType" or "domain.ConceptType" or "ConceptType[]"
 const outputEntry = {
   name: "meta.entry.output-type.mthds",
   match:
-    '\\s*(output)\\s*(=)\\s*(")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(")',
+    '\\s*(output)\\s*(=)\\s*(")'
+    + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
+    + '([A-Z][A-Za-z0-9]*)'         // ConceptName
+    + '(\\[\\])?'                    // multiplicity [] (optional)
+    + '(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "support.type.concept.mthds" },
-    5: { name: "punctuation.definition.string.end.mthds" },
+    4: { name: "entity.other.pipe-domain.mthds" },
+    5: { name: "punctuation.separator.dot.mthds" },
+    6: { name: "support.type.concept.mthds" },
+    7: { name: "punctuation.definition.multiplicity.mthds" },
+    8: { name: "punctuation.definition.string.end.mthds" },
   },
 };
 
-// 3. refines = "ConceptType"
+// 3. refines = "ConceptType" or "domain.ConceptType" or "ConceptType[]"
 const refinesEntry = {
   name: "meta.entry.refines-type.mthds",
   match:
-    '\\s*(refines)\\s*(=)\\s*(")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(")',
+    '\\s*(refines)\\s*(=)\\s*(")'
+    + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
+    + '([A-Z][A-Za-z0-9]*)'         // ConceptName
+    + '(\\[\\])?'                    // multiplicity [] (optional)
+    + '(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "support.type.concept.mthds" },
-    5: { name: "punctuation.definition.string.end.mthds" },
+    4: { name: "entity.other.pipe-domain.mthds" },
+    5: { name: "punctuation.separator.dot.mthds" },
+    6: { name: "support.type.concept.mthds" },
+    7: { name: "punctuation.definition.multiplicity.mthds" },
+    8: { name: "punctuation.definition.string.end.mthds" },
   },
 };
 
@@ -213,7 +227,30 @@ const pipeRefEntry = {
   },
 };
 
-// 11. Generic entry (fallback)
+// 11. key = "domain.ConceptType[]" (concept-type value, catch-all for inputs etc.)
+// Matches any lowercase key whose value looks like a concept type reference.
+// Placed before genericEntry so it wins when the value is PascalCase.
+const conceptValueEntry = {
+  name: "meta.entry.concept-value.mthds",
+  match:
+    '\\s*([a-z][a-z0-9_]*)\\s*(=)\\s*(")'
+    + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
+    + '([A-Z][A-Za-z0-9]*)'         // ConceptName
+    + '(\\[\\])?'                    // multiplicity [] (optional)
+    + '(")',
+  captures: {
+    1: { name: "support.type.property-name.mthds" },
+    2: { name: "punctuation.eq.mthds" },
+    3: { name: "punctuation.definition.string.begin.mthds" },
+    4: { name: "entity.other.pipe-domain.mthds" },
+    5: { name: "punctuation.separator.dot.mthds" },
+    6: { name: "support.type.concept.mthds" },
+    7: { name: "punctuation.definition.multiplicity.mthds" },
+    8: { name: "punctuation.definition.string.end.mthds" },
+  },
+};
+
+// 12. Generic entry (fallback)
 const genericEntry = {
   name: "meta.entry.mthds",
   match: `\\s*((?:(?:${ANY_KEY})\\s*\\.?\\s*)+)\\s*(=)`,
@@ -252,6 +289,7 @@ export const entryBegin = {
     jinja2Line,
     promptBlock,
     promptLine,
+    conceptValueEntry,
     genericEntry,
   ],
 };

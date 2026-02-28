@@ -130,7 +130,7 @@ describe('MTHDS TextMate grammar — pipe ref patterns', () => {
     expect(pipeName[0].text).toBe('extract_page_contents_and_views');
   });
 
-  // 4. Package ref without domain
+  // 4. Bare pipe ref (no domain)
   it('tokenizes a package pipe ref without domain', () => {
     const line =
       'pipe = "github.com/Pipelex/methods/documents->extract_invoice"';
@@ -144,5 +144,123 @@ describe('MTHDS TextMate grammar — pipe ref patterns', () => {
     const pipeName = findTokensByScope(line, 'support.function.pipe-name.mthds');
     expect(pipeName.length).toBe(1);
     expect(pipeName[0].text).toBe('extract_invoice');
+  });
+});
+
+describe('MTHDS TextMate grammar — output/refines concept patterns', () => {
+  it('tokenizes output = "Text" (simple concept)', () => {
+    const line = 'output = "Text"';
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(1);
+    expect(concept[0].text).toBe('Text');
+
+    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    expect(domain.length).toBe(0);
+  });
+
+  it('tokenizes output = "Text[]" (multiplicity)', () => {
+    const line = 'output = "Text[]"';
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(1);
+    expect(concept[0].text).toBe('Text');
+
+    const multiplicity = findTokensByScope(line, 'punctuation.definition.multiplicity.mthds');
+    expect(multiplicity.length).toBe(1);
+    expect(multiplicity[0].text).toBe('[]');
+  });
+
+  it('tokenizes output = "legal.Contract" (domain prefix)', () => {
+    const line = 'output = "legal.Contract"';
+
+    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    expect(domain.length).toBe(1);
+    expect(domain[0].text).toBe('legal');
+
+    const dot = findTokensByScope(line, 'punctuation.separator.dot.mthds');
+    expect(dot.length).toBe(1);
+    expect(dot[0].text).toBe('.');
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(1);
+    expect(concept[0].text).toBe('Contract');
+  });
+
+  it('tokenizes output = "legal.Contract[]" (domain + multiplicity)', () => {
+    const line = 'output = "legal.Contract[]"';
+
+    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    expect(domain.length).toBe(1);
+    expect(domain[0].text).toBe('legal');
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(1);
+    expect(concept[0].text).toBe('Contract');
+
+    const multiplicity = findTokensByScope(line, 'punctuation.definition.multiplicity.mthds');
+    expect(multiplicity.length).toBe(1);
+    expect(multiplicity[0].text).toBe('[]');
+  });
+
+  it('tokenizes refines = "images.ImgGenPrompt" (domain prefix)', () => {
+    const line = 'refines = "images.ImgGenPrompt"';
+
+    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    expect(domain.length).toBe(1);
+    expect(domain[0].text).toBe('images');
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(1);
+    expect(concept[0].text).toBe('ImgGenPrompt');
+  });
+});
+
+describe('MTHDS TextMate grammar — concept-value entry patterns (inputs etc.)', () => {
+  it('tokenizes bar = "foo.Bar" with domain coloring', () => {
+    const line = 'bar = "foo.Bar"';
+
+    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    expect(domain.length).toBe(1);
+    expect(domain[0].text).toBe('foo');
+
+    const dot = findTokensByScope(line, 'punctuation.separator.dot.mthds');
+    expect(dot.length).toBe(1);
+    expect(dot[0].text).toBe('.');
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(1);
+    expect(concept[0].text).toBe('Bar');
+  });
+
+  it('tokenizes names = "Text[]" with concept and multiplicity', () => {
+    const line = 'names = "Text[]"';
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(1);
+    expect(concept[0].text).toBe('Text');
+
+    const multiplicity = findTokensByScope(line, 'punctuation.definition.multiplicity.mthds');
+    expect(multiplicity.length).toBe(1);
+    expect(multiplicity[0].text).toBe('[]');
+
+    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    expect(domain.length).toBe(0);
+  });
+
+  it('tokenizes contract = "legal.Contract[]" with all parts', () => {
+    const line = 'contract = "legal.Contract[]"';
+
+    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    expect(domain.length).toBe(1);
+    expect(domain[0].text).toBe('legal');
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(1);
+    expect(concept[0].text).toBe('Contract');
+
+    const multiplicity = findTokensByScope(line, 'punctuation.definition.multiplicity.mthds');
+    expect(multiplicity.length).toBe(1);
+    expect(multiplicity[0].text).toBe('[]');
   });
 });
