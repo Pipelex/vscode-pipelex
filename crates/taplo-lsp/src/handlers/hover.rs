@@ -206,6 +206,8 @@ pub(crate) async fn hover<E: Environment>(
 
                     s
                 })
+                .filter(|s| !s.trim().is_empty())
+                .unique()
                 .join("\n\n");
 
             if content.is_empty() {
@@ -306,6 +308,8 @@ pub(crate) async fn hover<E: Environment>(
                         String::new()
                     }
                 })
+                .filter(|s| !s.trim().is_empty())
+                .unique()
                 .join("\n");
 
             if content.is_empty() {
