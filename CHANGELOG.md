@@ -12,7 +12,11 @@
 - Fix format-on-save race condition where formatting could read stale document state, causing content to revert (plxt 0.2.1)
 - Fix schema association accumulation on every config save by clearing caches before re-initialization (plxt 0.2.1)
 - Preserve MANUAL schema associations across config reloads (plxt 0.2.1)
-- Update extension to use refactored `pipelex-agent validate bundle` subcommand
+
+## [0.4.1] - 2026-02-25
+
+### Fixed
+- Fix validate CLI calls to use `validate pipe` subcommand for graph and diagnostics
 
 ## [0.4.0] - 2026-02-21
 
