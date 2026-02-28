@@ -169,16 +169,47 @@ const promptLine = {
   patterns: promptIncludes,
 };
 
-// 10. pipe = "pipe_name" (NEW — colorize pipe name value in step objects)
-const pipeRefEntry = {
-  name: "meta.entry.pipe-ref.mthds",
-  match: '\\s*(pipe)\\s*(=)\\s*(")((?:[a-z][a-z0-9_]*)(?:\\.[a-z][a-z0-9_]*)*)(")',
+// 10a. pipe = "host/Owner/repo/package->domain.pipe_code" (full package ref)
+const pipeRefPackageEntry = {
+  name: "meta.entry.pipe-ref-package.mthds",
+  match:
+    '\\s*(pipe)\\s*(=)\\s*(")'
+    + '([a-z][a-z0-9.-]*(?:/[A-Za-z][A-Za-z0-9_-]*){2})' // repo: host/owner/repo
+    + '(/[a-z][a-z0-9_]*)'                                 // /package
+    + '(->)'                                                // arrow
+    + '(?:([a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)*)(\\.))?'  // domain + dot (optional)
+    + '([a-z][a-z0-9_]*)'                                      // pipe_code
+    + '(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "support.function.pipe-name.mthds" },
-    5: { name: "punctuation.definition.string.end.mthds" },
+    4: { name: "entity.name.package-address.mthds" },          // muted slate
+    5: { name: "entity.name.package-address.mthds" },          // muted slate
+    6: { name: "punctuation.separator.pipe-ref-arrow.mthds" }, // pink
+    7: { name: "entity.other.pipe-domain.mthds" },             // mid-gray
+    8: { name: "punctuation.separator.dot.mthds" },            // dot before pipe_code
+    9: { name: "support.function.pipe-name.mthds" },           // coral bold
+    10: { name: "punctuation.definition.string.end.mthds" },
+  },
+};
+
+// 10b. pipe = "domain.pipe_code" or pipe = "pipe_code" (local ref)
+const pipeRefEntry = {
+  name: "meta.entry.pipe-ref.mthds",
+  match:
+    '\\s*(pipe)\\s*(=)\\s*(")'
+    + '(?:([a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)*)(\\.))?'  // domain + dot (optional)
+    + '([a-z][a-z0-9_]*)'                                     // pipe_code
+    + '(")',
+  captures: {
+    1: { name: "support.type.property-name.mthds" },
+    2: { name: "punctuation.eq.mthds" },
+    3: { name: "punctuation.definition.string.begin.mthds" },
+    4: { name: "entity.other.pipe-domain.mthds" },             // mid-gray (optional)
+    5: { name: "punctuation.separator.dot.mthds" },             // dot before pipe_code
+    6: { name: "support.function.pipe-name.mthds" },           // coral bold
+    7: { name: "punctuation.definition.string.end.mthds" },
   },
 };
 
@@ -205,9 +236,13 @@ const genericEntry = {
   },
 };
 
-// Order matters — first match wins
+// Order matters — first match wins.
+// Pipe ref entries must come before pipeEntry: they match the full
+// `pipe = "value"` (more specific), while pipeEntry only matches `pipe =`.
 export const entryBegin = {
   patterns: [
+    pipeRefPackageEntry,
+    pipeRefEntry,
     pipeEntry,
     outputEntry,
     refinesEntry,
@@ -217,7 +252,6 @@ export const entryBegin = {
     jinja2Line,
     promptBlock,
     promptLine,
-    pipeRefEntry,
     genericEntry,
   ],
 };
