@@ -54,16 +54,22 @@ jobs:
             echo "No new version tags to create"
           fi
 
-  fmt:
-    name: Check formatting
+  fmt-lint:
+    name: Check formatting and lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install latest Rust toolchain
-        run: rustup update --no-self-update
+        run: |
+          rustup update --no-self-update
+          rustup component add rustfmt clippy
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Check Rust formatting
+        run: cargo fmt --check
       - name: Check TOML formatting
         run: cargo run --bin plxt -- fmt --check --diff
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
     name: Test on Rust stable
@@ -73,12 +79,20 @@ jobs:
       - name: Install latest Rust toolchain
         run: rustup update --no-self-update
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      - name: Test Taplo
-        run: cargo test -p taplo
+      - name: Test Rust crates
+        run: cargo test -p taplo -p taplo-lsp -p pipelex-common
       - name: Check formatting regression
         run: cargo run --bin plxt -- fmt --check
       - name: Check if git index is clean
         run: git diff-index --quiet HEAD --
+      - name: Install Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+      - name: Test VS Code extension
+        run: |
+          corepack enable
+          cd editors/vscode && yarn install && yarn test
 
   check_wasm32:
     name: Check on WASM

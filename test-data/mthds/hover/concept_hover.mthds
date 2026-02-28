@@ -6,7 +6,7 @@ description = "A base concept"
 
 [concept.Analysis]
 description = "Structured analysis output"
-refines = "Base"
+refines     = "Base"
 
 [concept.Analysis.structure]
 summary = { type = "text", required = true }
@@ -14,7 +14,7 @@ details = { type = "text" }
 score   = { type = "number" }
 
 [pipe.analyze]
-type = "PipeLLM"
+type        = "PipeLLM"
 description = "Run analysis"
-output = "Analysis"
-prompt = "Analyze this."
+output      = "Analysis"
+prompt      = "Analyze this."

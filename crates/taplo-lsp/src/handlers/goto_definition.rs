@@ -1,8 +1,4 @@
-use crate::{
-    handlers::mthds_resolution::resolve_reference,
-    query::Query,
-    world::World,
-};
+use crate::{handlers::mthds_resolution::resolve_reference, query::Query, world::World};
 use lsp_async_stub::{
     rpc::Error,
     util::{LspExt, Position},

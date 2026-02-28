@@ -8,10 +8,7 @@ use crate::handlers::{
 
 macro_rules! fixture {
     ($name:literal) => {
-        include_str!(concat!(
-            "../../../../../test-data/mthds/hover/",
-            $name
-        ))
+        include_str!(concat!("../../../../../test-data/mthds/hover/", $name))
     };
 }
 
@@ -24,26 +21,44 @@ fn test_hover_pipe_with_full_properties() {
     let resolved = resolve_reference(&dom, &query).expect("should resolve pipe reference");
     let content = build_mthds_hover_content(&resolved);
 
-    assert!(content.contains("**run_analysis** `PipeLLM`"), "header should show name and type, got: {content}");
-    assert!(content.contains("Analyze input and produce a report"), "should contain description");
+    assert!(
+        content.contains("**run_analysis** `PipeLLM`"),
+        "header should show name and type, got: {content}"
+    );
+    assert!(
+        content.contains("Analyze input and produce a report"),
+        "should contain description"
+    );
     assert!(content.contains("**Inputs:**"), "should show inputs");
     assert!(content.contains("`doc`: Document"), "should list doc input");
     assert!(content.contains("`query`: Text"), "should list query input");
-    assert!(content.contains("**Output:** `Report`"), "should show output");
+    assert!(
+        content.contains("**Output:** `Report`"),
+        "should show output"
+    );
 }
 
 #[test]
 fn test_hover_concept_with_description_and_structure() {
     let src = fixture!("concept_hover.mthds");
-    let offset = offset_inside_string_after(src, "[pipe.analyze]", r#"output = "Analysis""#);
+    let offset = offset_inside_string_after(src, "[pipe.analyze]", r#"output      = "Analysis""#);
 
     let (dom, query) = parse_and_query(src, offset);
     let resolved = resolve_reference(&dom, &query).expect("should resolve concept reference");
     let content = build_mthds_hover_content(&resolved);
 
-    assert!(content.contains("**Analysis**"), "header should show concept name, got: {content}");
-    assert!(content.contains("Structured analysis output"), "should contain description");
-    assert!(content.contains("**Refines:** `Base`"), "should show refines");
+    assert!(
+        content.contains("**Analysis**"),
+        "header should show concept name, got: {content}"
+    );
+    assert!(
+        content.contains("Structured analysis output"),
+        "should contain description"
+    );
+    assert!(
+        content.contains("**Refines:** `Base`"),
+        "should show refines"
+    );
     assert!(content.contains("**Fields:**"), "should show fields");
     assert!(content.contains("`summary`"), "should list summary field");
     assert!(content.contains("`details`"), "should list details field");
@@ -53,16 +68,25 @@ fn test_hover_concept_with_description_and_structure() {
 #[test]
 fn test_hover_concept_with_refines() {
     let src = fixture!("concept_hover.mthds");
-    let offset = offset_inside_string(src, r#"refines = "Base""#);
+    let offset = offset_inside_string(src, r#"refines     = "Base""#);
 
     let (dom, query) = parse_and_query(src, offset);
     let resolved = resolve_reference(&dom, &query).expect("should resolve refines reference");
     let content = build_mthds_hover_content(&resolved);
 
-    assert!(content.contains("**Base**"), "header should show concept name, got: {content}");
-    assert!(content.contains("A base concept"), "should contain description");
+    assert!(
+        content.contains("**Base**"),
+        "header should show concept name, got: {content}"
+    );
+    assert!(
+        content.contains("A base concept"),
+        "should contain description"
+    );
     assert!(!content.contains("**Fields:**"), "Base has no fields");
-    assert!(!content.contains("**Refines:**"), "Base does not refine anything");
+    assert!(
+        !content.contains("**Refines:**"),
+        "Base does not refine anything"
+    );
 }
 
 #[test]
@@ -89,7 +113,10 @@ prompt = "hello"
 
     let (dom, query) = parse_and_query(src, offset);
     let resolved = resolve_reference(&dom, &query);
-    assert!(resolved.is_none(), "reference to nonexistent concept should return None");
+    assert!(
+        resolved.is_none(),
+        "reference to nonexistent concept should return None"
+    );
 }
 
 #[test]
@@ -112,11 +139,18 @@ prompt = "Extract slides."
     let offset = offset_inside_string(src, r#"output = "Slide[]""#);
 
     let (dom, query) = parse_and_query(src, offset);
-    let resolved = resolve_reference(&dom, &query).expect("should resolve Slide[] to concept.Slide");
+    let resolved =
+        resolve_reference(&dom, &query).expect("should resolve Slide[] to concept.Slide");
     let content = build_mthds_hover_content(&resolved);
 
-    assert!(content.contains("**Slide**"), "header should show concept name, got: {content}");
-    assert!(content.contains("A single slide"), "should contain description");
+    assert!(
+        content.contains("**Slide**"),
+        "header should show concept name, got: {content}"
+    );
+    assert!(
+        content.contains("A single slide"),
+        "should contain description"
+    );
     assert!(content.contains("`title`"), "should list title field");
     assert!(content.contains("`content`"), "should list content field");
 }
@@ -140,8 +174,14 @@ prompt = "Extract 5 pages."
     let resolved = resolve_reference(&dom, &query).expect("should resolve Page[5] to concept.Page");
     let content = build_mthds_hover_content(&resolved);
 
-    assert!(content.contains("**Page**"), "header should show concept name, got: {content}");
-    assert!(content.contains("A document page"), "should contain description");
+    assert!(
+        content.contains("**Page**"),
+        "header should show concept name, got: {content}"
+    );
+    assert!(
+        content.contains("A document page"),
+        "should contain description"
+    );
 }
 
 #[test]
@@ -164,7 +204,10 @@ prompt = "Process items."
     let resolved = resolve_reference(&dom, &query).expect("should resolve Item[] in inputs");
     let content = build_mthds_hover_content(&resolved);
 
-    assert!(content.contains("**Item**"), "header should show concept name, got: {content}");
+    assert!(
+        content.contains("**Item**"),
+        "header should show concept name, got: {content}"
+    );
     assert!(content.contains("An item"), "should contain description");
 }
 
@@ -184,7 +227,10 @@ prompt = "Process."
 
     let (dom, query) = parse_and_query(src, offset);
     let resolved = resolve_reference(&dom, &query);
-    assert!(resolved.is_none(), "domain-prefixed concept not in local file should return None");
+    assert!(
+        resolved.is_none(),
+        "domain-prefixed concept not in local file should return None"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -215,8 +261,14 @@ prompt = "hello"
     let native = find_native_concept(&classified.ref_name).expect("Text is a native concept");
     let content = build_native_concept_hover(native);
 
-    assert!(content.contains("**Text** *(native)*"), "header should show name with native tag, got: {content}");
-    assert!(content.contains("Plain text content"), "should contain description");
+    assert!(
+        content.contains("**Text** *(native)*"),
+        "header should show name with native tag, got: {content}"
+    );
+    assert!(
+        content.contains("Plain text content"),
+        "should contain description"
+    );
     assert!(content.contains("**Fields:**"), "should show fields");
     assert!(content.contains("`text`: str"), "should list text field");
 }
@@ -241,9 +293,18 @@ output = "Page[]"
     let content = build_native_concept_hover(native);
 
     assert!(content.contains("**Page** *(native)*"), "got: {content}");
-    assert!(content.contains("single page extracted from a document"), "should contain description");
-    assert!(content.contains("`text_and_images`"), "should list text_and_images field");
-    assert!(content.contains("`page_view`"), "should list page_view field");
+    assert!(
+        content.contains("single page extracted from a document"),
+        "should contain description"
+    );
+    assert!(
+        content.contains("`text_and_images`"),
+        "should list text_and_images field"
+    );
+    assert!(
+        content.contains("`page_view`"),
+        "should list page_view field"
+    );
 }
 
 #[test]
@@ -269,7 +330,10 @@ prompt = "Analyze."
     let native = find_native_concept(&classified.ref_name).expect("Document is native");
     let content = build_native_concept_hover(native);
 
-    assert!(content.contains("**Document** *(native)*"), "got: {content}");
+    assert!(
+        content.contains("**Document** *(native)*"),
+        "got: {content}"
+    );
     assert!(content.contains("`url`: str"), "should list url field");
     assert!(content.contains("`filename`"), "should list filename field");
 }
@@ -290,13 +354,19 @@ prompt = "Process."
     assert!(resolve_reference(&dom, &query).is_none());
 
     let classified = classify_reference(&query).expect("should classify");
-    assert_eq!(classified.ref_name, "Image", "domain prefix should be stripped");
+    assert_eq!(
+        classified.ref_name, "Image",
+        "domain prefix should be stripped"
+    );
 
     let native = find_native_concept(&classified.ref_name).expect("Image is native");
     let content = build_native_concept_hover(native);
 
     assert!(content.contains("**Image** *(native)*"), "got: {content}");
-    assert!(content.contains("image with URL"), "should contain description");
+    assert!(
+        content.contains("image with URL"),
+        "should contain description"
+    );
     assert!(content.contains("`url`: str"), "should list url field");
     assert!(content.contains("`caption`"), "should list caption field");
 }
@@ -318,8 +388,14 @@ prompt = "Pass."
     let native = find_native_concept(&classified.ref_name).expect("Anything is native");
     let content = build_native_concept_hover(native);
 
-    assert!(content.contains("**Anything** *(native)*"), "got: {content}");
-    assert!(content.contains("Accepts any content type"), "should contain description");
+    assert!(
+        content.contains("**Anything** *(native)*"),
+        "got: {content}"
+    );
+    assert!(
+        content.contains("Accepts any content type"),
+        "should contain description"
+    );
     assert!(!content.contains("**Fields:**"), "Anything has no fields");
 }
 
@@ -358,7 +434,10 @@ prompt = "hello"
     let offset = offset_inside_string(src, r#"output = "Text""#);
 
     let (_dom, query) = parse_and_query(src, offset);
-    assert!(!is_model_field(&query), "output field should not be detected as model");
+    assert!(
+        !is_model_field(&query),
+        "output field should not be detected as model"
+    );
 }
 
 #[test]
@@ -376,7 +455,10 @@ fn test_build_model_hover_without_pipe_type() {
 #[test]
 fn test_build_model_hover_alias() {
     let content = build_model_hover("@my-alias", Some("PipeExtract"));
-    assert_eq!(content, "**my-alias** — Extract model alias", "got: {content}");
+    assert_eq!(
+        content, "**my-alias** — Extract model alias",
+        "got: {content}"
+    );
 }
 
 #[test]

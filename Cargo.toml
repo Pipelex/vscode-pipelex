@@ -45,6 +45,9 @@ tracing            = { version = "0.1.30" }
 tracing-subscriber = { version = "0.3.7" }
 url                = { version = "2.2.2" }
 
+[workspace.lints.clippy]
+arc_with_non_send_sync = "allow"
+
 [profile.release]
 codegen-units = 1
 lto           = "thin"

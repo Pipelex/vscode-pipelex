@@ -104,8 +104,7 @@ pub(crate) async fn hover<E: Environment>(
                             .get("type")
                             .and_then(|n| n.as_str().map(|s| s.value().to_string()))
                     });
-                    let content =
-                        build_model_hover(&value, pipe_type.as_deref());
+                    let content = build_model_hover(&value, pipe_type.as_deref());
                     return Ok(Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
@@ -199,11 +198,7 @@ pub(crate) async fn hover<E: Environment>(
                 keys = keys.skip_right(1);
             }
 
-            let schemas = match ws
-                .schemas
-                .schemas_at_path(&schema_url, &value, &keys)
-                .await
-            {
+            let schemas = match ws.schemas.schemas_at_path(&schema_url, &value, &keys).await {
                 Ok(s) => s,
                 Err(error) => {
                     tracing::error!(?error, "schema resolution failed");
@@ -256,11 +251,7 @@ pub(crate) async fn hover<E: Environment>(
                 ),
             }));
         } else if is_primitive(position_info.syntax.kind()) {
-            let schemas = match ws
-                .schemas
-                .schemas_at_path(&schema_url, &value, &keys)
-                .await
-            {
+            let schemas = match ws.schemas.schemas_at_path(&schema_url, &value, &keys).await {
                 Ok(s) => s,
                 Err(error) => {
                     tracing::error!(?error, "schema resolution failed");
@@ -452,8 +443,10 @@ pub(crate) fn build_mthds_hover_content(resolved: &ResolvedReference) -> String 
             if let Some(structure_node) = table.get("structure") {
                 if let Some(structure_table) = structure_node.as_table() {
                     let entries = structure_table.entries().read();
-                    let field_names: Vec<String> =
-                        entries.iter().map(|(k, _)| format!("`{}`", k.value())).collect();
+                    let field_names: Vec<String> = entries
+                        .iter()
+                        .map(|(k, _)| format!("`{}`", k.value()))
+                        .collect();
                     if !field_names.is_empty() {
                         parts.push(format!("**Fields:** {}", field_names.join(", ")));
                     }

@@ -45,7 +45,10 @@ fn simulate_handler(toml: &str, offset: u32) -> Option<(String, String)> {
         .collect::<Vec<_>>()
         .join(".");
 
-    let kind = if matches!(key_text.as_str(), "pipe" | "main_pipe" | "default_pipe_code") {
+    let kind = if matches!(
+        key_text.as_str(),
+        "pipe" | "main_pipe" | "default_pipe_code"
+    ) {
         ReferenceKind::Pipe
     } else if matches!(key_text.as_str(), "output" | "refines") {
         ReferenceKind::Concept
@@ -116,10 +119,7 @@ fn test_concept_refines_reference() {
     let offset = offset_inside_string(mthds_code, r#"refines = "Base""#);
 
     let result = simulate_handler(mthds_code, offset);
-    assert_eq!(
-        result,
-        Some(("concept".to_string(), "Base".to_string()))
-    );
+    assert_eq!(result, Some(("concept".to_string(), "Base".to_string())));
 }
 
 #[test]
@@ -176,7 +176,7 @@ fn test_with_bare_table_headers() {
 
     // Test main_pipe = "extract_slides"
     {
-        let offset = offset_inside_string(mthds_code, r#"main_pipe = "extract_slides""#);
+        let offset = offset_inside_string(mthds_code, r#"main_pipe   = "extract_slides""#);
         let result = simulate_handler(mthds_code, offset);
         assert_eq!(
             result,
@@ -201,7 +201,7 @@ fn test_with_bare_table_headers() {
         let offset = offset_inside_string_after(
             mthds_code,
             "[pipe.describe_slide]",
-            r#"output = "Slide""#,
+            r#"output      = "Slide""#,
         );
         let result = simulate_handler(mthds_code, offset);
         assert_eq!(

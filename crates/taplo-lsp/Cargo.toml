@@ -19,8 +19,11 @@ rustls-tls = ["taplo-common/rustls-tls"]
 
 [dependencies]
 lsp-async-stub = { version = "0.7.0", path = "../lsp-async-stub" }
-taplo          = { version = "0.14.0", path = "../taplo", features = ["serde"] }
-taplo-common   = { version = "0.6.0", path = "../taplo-common", features = ["schema", "reqwest"] }
+taplo = { version = "0.14.0", path = "../taplo", features = ["serde"] }
+taplo-common = { version = "0.6.0", path = "../taplo-common", features = [
+  "schema",
+  "reqwest",
+] }
 
 anyhow      = { workspace = true }
 arc-swap    = { workspace = true }
@@ -41,3 +44,6 @@ tap         = { workspace = true }
 time        = { workspace = true, features = ["formatting", "parsing"] }
 toml        = { workspace = true }
 tracing     = { workspace = true }
+
+[lints]
+workspace = true

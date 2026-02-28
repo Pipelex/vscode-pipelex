@@ -66,11 +66,7 @@ static NATIVE_CONCEPTS: &[NativeConcept] = &[
     NativeConcept {
         name: "Document",
         description: "A document file (e.g. PDF) with URL and metadata.",
-        fields: &[
-            ("url", "str"),
-            ("filename", "str?"),
-            ("mime_type", "str?"),
-        ],
+        fields: &[("url", "str"), ("filename", "str?"), ("mime_type", "str?")],
     },
     NativeConcept {
         name: "Html",
@@ -179,7 +175,10 @@ pub(crate) fn classify_reference(query: &Query) -> Option<ClassifiedReference> {
         .collect::<Vec<_>>()
         .join(".");
 
-    let kind = if matches!(key_text.as_str(), "pipe" | "main_pipe" | "default_pipe_code") {
+    let kind = if matches!(
+        key_text.as_str(),
+        "pipe" | "main_pipe" | "default_pipe_code"
+    ) {
         ReferenceKind::Pipe
     } else if matches!(key_text.as_str(), "output" | "refines") {
         ReferenceKind::Concept

@@ -18,8 +18,14 @@ rustls-tls = ["taplo-common/rustls-tls"]
 [dependencies]
 lsp-async-stub = { version = "0.7.0", path = "../lsp-async-stub" }
 pipelex-common = { version = "0.1.0", path = "../pipelex-common" }
-taplo-common   = { version = "0.6.0", path = "../taplo-common", features = ["schema", "reqwest"] }
-taplo-lsp      = { version = "0.8.0", path = "../taplo-lsp", default-features = false }
+taplo-common = { version = "0.6.0", path = "../taplo-common", features = [
+  "schema",
+  "reqwest",
+] }
+taplo-lsp = { version = "0.8.0", path = "../taplo-lsp", default-features = false }
 
 futures = { workspace = true }
 tracing = { workspace = true }
+
+[lints]
+workspace = true
