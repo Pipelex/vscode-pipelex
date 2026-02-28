@@ -1,0 +1,20 @@
+domain      = "hover_test"
+description = "Test fixture for concept hover"
+
+[concept.Base]
+description = "A base concept"
+
+[concept.Analysis]
+description = "Structured analysis output"
+refines = "Base"
+
+[concept.Analysis.structure]
+summary = { type = "text", required = true }
+details = { type = "text" }
+score   = { type = "number" }
+
+[pipe.analyze]
+type = "PipeLLM"
+description = "Run analysis"
+output = "Analysis"
+prompt = "Analyze this."

@@ -1,5 +1,5 @@
 use super::parse_and_query;
-use crate::handlers::{is_inside_inputs_inline_table, ReferenceKind};
+use crate::handlers::mthds_resolution::{is_inside_inputs_inline_table, ReferenceKind};
 use taplo::{
     dom::{KeyOrIndex, Keys},
     syntax::SyntaxKind::{IDENT, STRING, STRING_LITERAL},
@@ -87,22 +87,7 @@ fn simulate_handler(toml: &str, offset: u32) -> Option<(String, String)> {
     Some((root_key.to_string(), ref_name))
 }
 
-/// Helper: find the byte offset one character past the opening quote of `target`
-/// within `source`. Panics if `target` is not found.
-fn offset_inside_string(source: &str, target: &str) -> u32 {
-    let line_start = source.find(target).unwrap();
-    let quote_pos = line_start + target.find('"').unwrap();
-    (quote_pos + 1) as u32
-}
-
-/// Like [`offset_inside_string`] but searches only after `section_header` first
-/// appears in `source`. Useful when `target` occurs multiple times.
-fn offset_inside_string_after(source: &str, section_header: &str, target: &str) -> u32 {
-    let section = source.find(section_header).unwrap();
-    let pos = source[section..].find(target).unwrap() + section;
-    let quote_pos = pos + target.find('"').unwrap();
-    (quote_pos + 1) as u32
-}
+use super::{offset_inside_string, offset_inside_string_after};
 
 #[test]
 fn test_pipe_reference() {

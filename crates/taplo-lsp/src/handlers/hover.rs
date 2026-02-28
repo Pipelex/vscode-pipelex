@@ -1,4 +1,7 @@
 use crate::{
+    handlers::mthds_resolution::{
+        find_string_position_info, resolve_reference, ReferenceKind, ResolvedReference,
+    },
     query::{lookup_keys, Query},
     world::World,
 };
@@ -46,6 +49,28 @@ pub(crate) async fn hover<E: Environment>(
     };
 
     let query = Query::at(&doc.dom, offset);
+
+    // MTHDS semantic hover: if the cursor is on a reference field (pipe, output,
+    // refines, inputs value), resolve it and show rich hover content.
+    let is_mthds_file =
+        document_uri.as_str().ends_with(".mthds") || document_uri.as_str().ends_with(".plx");
+    if is_mthds_file {
+        if let Some(resolved) = resolve_reference(&doc.dom, &query) {
+            let hover_range = find_string_position_info(&query)
+                .and_then(|pi| doc.mapper.range(pi.syntax.text_range()))
+                .map(|r| r.into_lsp());
+            let content = build_mthds_hover_content(&resolved);
+            if !content.is_empty() {
+                return Ok(Some(Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: content,
+                    }),
+                    range: hover_range,
+                }));
+            }
+        }
+    }
 
     let position_info = match query.before.clone().and_then(|p| {
         if p.syntax.kind() == IDENT || is_primitive(p.syntax.kind()) {
@@ -286,6 +311,108 @@ pub(crate) async fn hover<E: Environment>(
     }
 
     Ok(None)
+}
+
+/// Build rich Markdown hover content for a resolved MTHDS reference.
+pub(crate) fn build_mthds_hover_content(resolved: &ResolvedReference) -> String {
+    let table = match resolved.target_node.as_table() {
+        Some(t) => t,
+        None => return String::new(),
+    };
+
+    let mut parts: Vec<String> = Vec::new();
+
+    match resolved.kind {
+        ReferenceKind::Pipe => {
+            // Header: **pipe_name** `PipeType`
+            let type_str = table
+                .get("type")
+                .and_then(|n| n.as_str().map(|s| s.value().to_string()));
+            let header = match &type_str {
+                Some(t) => format!("**{}** `{}`", resolved.ref_name, t),
+                None => format!("**{}**", resolved.ref_name),
+            };
+            parts.push(header);
+
+            // Description
+            if let Some(desc) = table
+                .get("description")
+                .and_then(|n| n.as_str().map(|s| s.value().to_string()))
+            {
+                if !desc.is_empty() {
+                    parts.push(desc);
+                }
+            }
+
+            // Inputs
+            if let Some(inputs_node) = table.get("inputs") {
+                if let Some(inputs_table) = inputs_node.as_table() {
+                    let entries = inputs_table.entries().read();
+                    let input_strs: Vec<String> = entries
+                        .iter()
+                        .map(|(k, v)| {
+                            let concept = v
+                                .as_str()
+                                .map(|s| s.value().to_string())
+                                .unwrap_or_else(|| "?".to_string());
+                            format!("`{}`: {}", k.value(), concept)
+                        })
+                        .collect();
+                    if !input_strs.is_empty() {
+                        parts.push(format!("**Inputs:** {}", input_strs.join(", ")));
+                    }
+                }
+            }
+
+            // Output
+            if let Some(output) = table
+                .get("output")
+                .and_then(|n| n.as_str().map(|s| s.value().to_string()))
+            {
+                if !output.is_empty() {
+                    parts.push(format!("**Output:** `{}`", output));
+                }
+            }
+        }
+        ReferenceKind::Concept => {
+            // Header: **ConceptName**
+            parts.push(format!("**{}**", resolved.ref_name));
+
+            // Description
+            if let Some(desc) = table
+                .get("description")
+                .and_then(|n| n.as_str().map(|s| s.value().to_string()))
+            {
+                if !desc.is_empty() {
+                    parts.push(desc);
+                }
+            }
+
+            // Refines
+            if let Some(refines) = table
+                .get("refines")
+                .and_then(|n| n.as_str().map(|s| s.value().to_string()))
+            {
+                if !refines.is_empty() {
+                    parts.push(format!("**Refines:** `{}`", refines));
+                }
+            }
+
+            // Structure fields
+            if let Some(structure_node) = table.get("structure") {
+                if let Some(structure_table) = structure_node.as_table() {
+                    let entries = structure_table.entries().read();
+                    let field_names: Vec<String> =
+                        entries.iter().map(|(k, _)| format!("`{}`", k.value())).collect();
+                    if !field_names.is_empty() {
+                        parts.push(format!("**Fields:** {}", field_names.join(", ")));
+                    }
+                }
+            }
+        }
+    }
+
+    parts.join("\n\n")
 }
 
 fn is_primitive(kind: SyntaxKind) -> bool {
