@@ -9,8 +9,8 @@ WEBSITE_DIR       := ../pipelex-website-2
 WEBSITE_SHIKI_DIR := $(WEBSITE_DIR)/src/lib/shiki
 GRAMMAR_DST       := $(WEBSITE_SHIKI_DIR)/mthds.tmLanguage.json
 
-MTHDS_SCHEMA_URL  := https://pipelex-config.s3.amazonaws.com/mthds_schema_latest.json
-MTHDS_SCHEMA_FILE := schemas/mthds_schema.json
+MTHDS_SCHEMA_URL  := https://mthds.ai/mthds_schema.json
+MTHDS_SCHEMA_FILE := crates/taplo-common/schemas/mthds_schema.json
 
 EXT_DIR           := editors/vscode
 JS_LSP_DIR        := js/lsp

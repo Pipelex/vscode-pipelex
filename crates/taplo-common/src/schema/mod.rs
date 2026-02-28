@@ -31,7 +31,7 @@ pub mod builtins {
 
     pub const MTHDS_SCHEMA_URL: &str = "pipelex://mthds.schema.json";
 
-    const MTHDS_SCHEMA_JSON: &str = include_str!("../../../../schemas/mthds_schema.json");
+    const MTHDS_SCHEMA_JSON: &str = include_str!("../../schemas/mthds_schema.json");
 
     #[must_use]
     pub fn taplo_config_schema() -> Arc<Value> {
@@ -874,6 +874,17 @@ mod tests {
 
     fn minimal_schema_json() -> Vec<u8> {
         serde_json::to_vec(&json!({"type": "object"})).unwrap()
+    }
+
+    #[test]
+    fn embedded_mthds_schema_parses_as_valid_json() {
+        let schema = super::builtins::mthds_schema();
+        assert!(schema.is_object(), "MTHDS schema should be a JSON object");
+        // Verify it has expected top-level keys
+        assert!(
+            schema.get("type").is_some() || schema.get("$schema").is_some(),
+            "MTHDS schema should have a 'type' or '$schema' key"
+        );
     }
 
     #[tokio::test]
