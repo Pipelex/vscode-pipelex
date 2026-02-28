@@ -1,0 +1,61 @@
+editors/vscode/src/syntax/mthds/entry.ts
+  6a6d5ab910a79f0a 74,85-97,285
+crates/taplo-lsp/src/handlers/tests/hover.rs
+  fb2421435e28713c 3,363-384,386-393
+  9b78363a476a61a0 5,325-362
+  6a6d5ab910a79f0a 385
+crates/taplo-lsp/src/handlers/hover.rs
+  6a6d5ab910a79f0a 481,486-490
+  9b78363a476a61a0 3-4,90-96,109-118,468-471,476-480,482,492-493
+  fb2421435e28713c 97-108,472-475,483-485,491
+crates/taplo-lsp/src/handlers/mthds_resolution.rs
+  9b78363a476a61a0 146-163
+test-data/mthds/pipe-definitions.mthds
+  6a6d5ab910a79f0a 27-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "5496a8efb6e904a6f43076885af9909feb324460",
+  "prompts": {
+    "6a6d5ab910a79f0a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5ea2e73-2894-4bd7-a622-e3615677ad0e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 28,
+      "total_deletions": 6,
+      "accepted_lines": 28,
+      "overriden_lines": 0
+    },
+    "9b78363a476a61a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "80156e4c-6091-4f7e-9d21-29e395672f9a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 94,
+      "total_deletions": 3,
+      "accepted_lines": 88,
+      "overriden_lines": 0
+    },
+    "fb2421435e28713c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0b9e0bae-50ce-437b-94b2-94226a63ded1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 56,
+      "total_deletions": 5,
+      "accepted_lines": 51,
+      "overriden_lines": 0
+    }
+  }
+}
