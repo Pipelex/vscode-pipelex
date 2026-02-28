@@ -1,0 +1,42 @@
+editors/vscode/src/syntax/mthds/entry.ts
+  535960a0967e868c 4,33-36,38,41,54-56,223
+editors/vscode/src/pipelex/__tests__/semanticTokenProvider.test.ts
+  d6660e18e0c1ab33 230-264
+editors/vscode/src/syntax/__tests__/mthdsGrammar.test.ts
+  d6660e18e0c1ab33 190-201
+editors/vscode/src/pipelex/semanticTokenProvider.ts
+  d6660e18e0c1ab33 116,127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "2fdcbc8cf14cf797130d87db4b04c62d8be35859",
+  "prompts": {
+    "535960a0967e868c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c57c6e54-07af-4e20-826c-9c4744d9bb3f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 26,
+      "total_deletions": 42,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "d6660e18e0c1ab33": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d8dacac9-3044-4466-bb51-369c1b17c84e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 52,
+      "total_deletions": 5,
+      "accepted_lines": 49,
+      "overriden_lines": 0
+    }
+  }
+}
