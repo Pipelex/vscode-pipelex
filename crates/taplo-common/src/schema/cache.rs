@@ -39,6 +39,12 @@ impl<E: Environment> Cache<E> {
         }
     }
 
+    /// Clear all in-memory cached schemas and reset the LRU expiration timer.
+    pub fn clear(&self) {
+        self.schemas.lock().clear();
+        *(self.lru_expires_by.lock()) = self.env.now() + self.expiration_times.load().0;
+    }
+
     pub fn get_schema(&self, url: &Url) -> Option<Arc<Value>> {
         self.schemas.lock().get(url).cloned()
     }

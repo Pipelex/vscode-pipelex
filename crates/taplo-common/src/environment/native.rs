@@ -84,7 +84,10 @@ impl Environment for NativeEnvironment {
                 ..Default::default()
             },
         )?;
-        Ok(paths.filter_map(Result::ok).collect())
+        Ok(paths
+            .filter_map(Result::ok)
+            .filter(|path| path.is_file())
+            .collect())
     }
 
     async fn read_file(&self, path: &Path) -> Result<Vec<u8>, anyhow::Error> {

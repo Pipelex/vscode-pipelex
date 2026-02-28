@@ -29,17 +29,26 @@ pub mod builtins {
 
     pub const TAPLO_CONFIG_URL: &str = "taplo://taplo.toml";
 
+    pub const MTHDS_SCHEMA_URL: &str = "pipelex://mthds.schema.json";
+
+    const MTHDS_SCHEMA_JSON: &str = include_str!("../../schemas/mthds_schema.json");
+
     #[must_use]
     pub fn taplo_config_schema() -> Arc<Value> {
         Arc::new(serde_json::to_value(schemars::schema_for!(crate::config::Config)).unwrap())
     }
 
     #[must_use]
+    pub fn mthds_schema() -> Arc<Value> {
+        Arc::new(serde_json::from_str(MTHDS_SCHEMA_JSON).expect("embedded MTHDS schema is invalid JSON"))
+    }
+
+    #[must_use]
     pub fn builtin_schema(url: &Url) -> Option<Arc<Value>> {
-        if url.as_str() == TAPLO_CONFIG_URL {
-            Some(taplo_config_schema())
-        } else {
-            None
+        match url.as_str() {
+            TAPLO_CONFIG_URL => Some(taplo_config_schema()),
+            MTHDS_SCHEMA_URL => Some(mthds_schema()),
+            _ => None,
         }
     }
 }
@@ -83,6 +92,13 @@ impl<E: Environment> Schemas<E> {
 
     pub fn env(&self) -> &E {
         &self.env
+    }
+
+    /// Clear all in-memory schema caches (LRU cache and compiled validators).
+    /// Call this when configuration changes to ensure stale schemas are not reused.
+    pub fn clear_caches(&self) {
+        self.cache.clear();
+        self.validators.lock().clear();
     }
 }
 
@@ -858,6 +874,17 @@ mod tests {
 
     fn minimal_schema_json() -> Vec<u8> {
         serde_json::to_vec(&json!({"type": "object"})).unwrap()
+    }
+
+    #[test]
+    fn embedded_mthds_schema_parses_as_valid_json() {
+        let schema = super::builtins::mthds_schema();
+        assert!(schema.is_object(), "MTHDS schema should be a JSON object");
+        // Verify it has expected top-level keys
+        assert!(
+            schema.get("type").is_some() || schema.get("$schema").is_some(),
+            "MTHDS schema should have a 'type' or '$schema' key"
+        );
     }
 
     #[tokio::test]

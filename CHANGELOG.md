@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-02-27
+
+### Added
+- Built-in MTHDS schema bundled into the binary for automatic `.mthds` file validation (plxt 0.2.1)
+
+### Fixed
+- Fix `plxt fmt`/`plxt lint` crash when glob patterns match directories (e.g. `.mthds/`) (plxt 0.2.1)
+- Fix format-on-save race condition where formatting could read stale document state, causing content to revert (plxt 0.2.1)
+- Fix schema association accumulation on every config save by clearing caches before re-initialization (plxt 0.2.1)
+- Preserve MANUAL schema associations across config reloads (plxt 0.2.1)
+
 ## [0.4.1] - 2026-02-25
 
 ### Fixed
