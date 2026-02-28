@@ -1,0 +1,41 @@
+editors/vscode/package.json
+  586db8663e90066a 330-347
+editors/vscode/src/syntax/mthds/entry.ts
+  8f2596eba31ff4aa 180,191-193,239-241,244-245
+  586db8663e90066a 172-179,181-190,194-197,201-204,209-212
+editors/vscode/src/syntax/__tests__/mthdsGrammar.test.ts
+  8f2596eba31ff4aa 1-148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "92db697b4d0d682aed8bbef7c97a9e41752aca3e",
+  "prompts": {
+    "586db8663e90066a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3ce967d4-7741-42bc-b767-e1851fbe88ed",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 53,
+      "total_deletions": 4,
+      "accepted_lines": 48,
+      "overriden_lines": 0
+    },
+    "8f2596eba31ff4aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "52764709-f29f-41e9-b2b0-5f400dee9206",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 160,
+      "total_deletions": 9,
+      "accepted_lines": 157,
+      "overriden_lines": 0
+    }
+  }
+}
