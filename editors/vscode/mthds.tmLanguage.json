@@ -277,7 +277,7 @@
         },
         {
           "name": "meta.entry.output-type.mthds",
-          "match": "\\s*(output)\\s*(=)\\s*(\")(?:([a-z][a-z0-9_]*)(\\.))?([A-Z][A-Za-z0-9]*)(\\[\\])?(\")",
+          "match": "\\s*(output)\\s*(=)\\s*(\")(?:([a-z][a-z0-9_]*)(\\.))?([A-Z][A-Za-z0-9]*)(\\[\\d*\\])?(\")",
           "captures": {
             "1": {
               "name": "support.type.property-name.mthds"
@@ -307,7 +307,7 @@
         },
         {
           "name": "meta.entry.refines-type.mthds",
-          "match": "\\s*(refines)\\s*(=)\\s*(\")(?:([a-z][a-z0-9_]*)(\\.))?([A-Z][A-Za-z0-9]*)(\\[\\])?(\")",
+          "match": "\\s*(refines)\\s*(=)\\s*(\")(?:([a-z][a-z0-9_]*)(\\.))?([A-Z][A-Za-z0-9]*)(\\[\\d*\\])?(\")",
           "captures": {
             "1": {
               "name": "support.type.property-name.mthds"
@@ -532,7 +532,7 @@
         },
         {
           "name": "meta.entry.concept-value.mthds",
-          "match": "\\s*([a-z][a-z0-9_]*)\\s*(=)\\s*(\")(?:([a-z][a-z0-9_]*)(\\.))?([A-Z][A-Za-z0-9]*)(\\[\\])?(\")",
+          "match": "\\s*([a-z][a-z0-9_]*)\\s*(=)\\s*(\")(?:([a-z][a-z0-9_]*)(\\.))?([A-Z][A-Za-z0-9]*)(\\[\\d*\\])?(\")",
           "captures": {
             "1": {
               "name": "support.type.property-name.mthds"

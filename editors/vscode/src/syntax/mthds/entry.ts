@@ -1,6 +1,7 @@
 const BARE_KEY = `(?:[A-Za-z0-9_+-]+)`;
 const QUOTED_KEY = `(?:"[^"]+")|(?:'[^']+')`;
 const ANY_KEY = `(?:${BARE_KEY})|${QUOTED_KEY}`;
+const MULTIPLICITY = '(\\[\\d*\\])?'; // multiplicity []/[N] (optional)
 
 // 1. pipe.name = (pipe entry)
 const pipeEntry = {
@@ -29,47 +30,30 @@ const pipeEntry = {
   },
 };
 
-// 2. output = "ConceptType" or "domain.ConceptType" or "ConceptType[]"
-const outputEntry = {
-  name: "meta.entry.output-type.mthds",
-  match:
-    '\\s*(output)\\s*(=)\\s*(")'
-    + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
-    + '([A-Z][A-Za-z0-9]*)'         // ConceptName
-    + '(\\[\\])?'                    // multiplicity [] (optional)
-    + '(")',
-  captures: {
-    1: { name: "support.type.property-name.mthds" },
-    2: { name: "punctuation.eq.mthds" },
-    3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "entity.other.pipe-domain.mthds" },
-    5: { name: "punctuation.separator.dot.mthds" },
-    6: { name: "support.type.concept.mthds" },
-    7: { name: "punctuation.definition.multiplicity.mthds" },
-    8: { name: "punctuation.definition.string.end.mthds" },
-  },
-};
-
-// 3. refines = "ConceptType" or "domain.ConceptType" or "ConceptType[]"
-const refinesEntry = {
-  name: "meta.entry.refines-type.mthds",
-  match:
-    '\\s*(refines)\\s*(=)\\s*(")'
-    + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
-    + '([A-Z][A-Za-z0-9]*)'         // ConceptName
-    + '(\\[\\])?'                    // multiplicity [] (optional)
-    + '(")',
-  captures: {
-    1: { name: "support.type.property-name.mthds" },
-    2: { name: "punctuation.eq.mthds" },
-    3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "entity.other.pipe-domain.mthds" },
-    5: { name: "punctuation.separator.dot.mthds" },
-    6: { name: "support.type.concept.mthds" },
-    7: { name: "punctuation.definition.multiplicity.mthds" },
-    8: { name: "punctuation.definition.string.end.mthds" },
-  },
-};
+// 2–3. output/refines = "ConceptType" or "domain.ConceptType" or "ConceptType[]"
+function makeConceptRefEntry(keyword: 'output' | 'refines') {
+  return {
+    name: `meta.entry.${keyword}-type.mthds`,
+    match:
+      `\\s*(${keyword})\\s*(=)\\s*(")`
+      + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
+      + '([A-Z][A-Za-z0-9]*)'         // ConceptName
+      + MULTIPLICITY
+      + '(")',
+    captures: {
+      1: { name: "support.type.property-name.mthds" },
+      2: { name: "punctuation.eq.mthds" },
+      3: { name: "punctuation.definition.string.begin.mthds" },
+      4: { name: "entity.other.pipe-domain.mthds" },
+      5: { name: "punctuation.separator.dot.mthds" },
+      6: { name: "support.type.concept.mthds" },
+      7: { name: "punctuation.definition.multiplicity.mthds" },
+      8: { name: "punctuation.definition.string.end.mthds" },
+    },
+  };
+}
+const outputEntry = makeConceptRefEntry('output');
+const refinesEntry = makeConceptRefEntry('refines');
 
 // 4. type = "PipeType" (NEW)
 const typeEntry = {
@@ -236,7 +220,7 @@ const conceptValueEntry = {
     '\\s*([a-z][a-z0-9_]*)\\s*(=)\\s*(")'
     + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
     + '([A-Z][A-Za-z0-9]*)'         // ConceptName
-    + '(\\[\\])?'                    // multiplicity [] (optional)
+    + MULTIPLICITY
     + '(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },

@@ -227,6 +227,41 @@ describe('Output/refines concept references (no modifier)', () => {
     });
   });
 
+  it('colors output = "InvoiceDetails[5]" — concept only, ignores specific multiplicity', async () => {
+    const tokens = await getTokens(['output = "InvoiceDetails[5]"']);
+
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toEqual({
+      line: 0,
+      char: 10, // len('output = "')
+      length: 14, // "InvoiceDetails"
+      tokenType: TOKEN.mthdsConcept,
+      tokenModifiers: 0,
+    });
+  });
+
+  it('colors inputs = { page = "Page[4]" } — concept only, ignores specific multiplicity', async () => {
+    const tokens = await getTokens(['inputs = { page = "Page[4]" }']);
+
+    expect(tokens).toHaveLength(2);
+
+    expect(tokens[0]).toEqual({
+      line: 0,
+      char: 11, // after 'inputs = { '
+      length: 4, // "page"
+      tokenType: TOKEN.mthdsDataVariable,
+      tokenModifiers: 0,
+    });
+
+    expect(tokens[1]).toEqual({
+      line: 0,
+      char: 19, // after 'inputs = { page = "'
+      length: 4, // "Page"
+      tokenType: TOKEN.mthdsConcept,
+      tokenModifiers: 0,
+    });
+  });
+
   it('colors output with trailing comment', async () => {
     const tokens = await getTokens(['output = "FeatureAnalysis" # comment']);
 

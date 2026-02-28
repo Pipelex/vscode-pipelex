@@ -113,7 +113,7 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
     }
 
     private analyzeOutputRefines(line: string, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
-        const match = /^(\s*)(output|refines)(\s*=\s*")(?:[a-z][a-z0-9_]*\.)?([A-Z][A-Za-z0-9]*)(?:\[\])?"/.exec(line);
+        const match = /^(\s*)(output|refines)(\s*=\s*")(?:[a-z][a-z0-9_]*\.)?([A-Z][A-Za-z0-9]*)(?:\[\d*\])?"/.exec(line);
         if (match) {
             const valueStart = match[1].length + match[2].length + match[3].length;
             // Find where the concept name starts within the value
@@ -124,7 +124,7 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
     }
 
     private analyzeInputEntries(content: string, baseOffset: number, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
-        const entryRegex = /([a-z][a-z0-9_]*)(\s*=\s*")((?:[a-z][a-z0-9_]*\.)?([A-Z][A-Za-z0-9]*))(?:\[\])?(")/g;
+        const entryRegex = /([a-z][a-z0-9_]*)(\s*=\s*")((?:[a-z][a-z0-9_]*\.)?([A-Z][A-Za-z0-9]*))(?:\[\d*\])?(")/g;
         let match;
         while ((match = entryRegex.exec(content)) !== null) {
             const varOffset = baseOffset + match.index;

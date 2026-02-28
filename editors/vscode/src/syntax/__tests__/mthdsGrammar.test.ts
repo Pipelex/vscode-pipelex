@@ -187,6 +187,18 @@ describe('MTHDS TextMate grammar — output/refines concept patterns', () => {
     expect(concept[0].text).toBe('Contract');
   });
 
+  it('tokenizes output = "InvoiceDetails[5]" (specific multiplicity)', () => {
+    const line = 'output = "InvoiceDetails[5]"';
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(1);
+    expect(concept[0].text).toBe('InvoiceDetails');
+
+    const multiplicity = findTokensByScope(line, 'punctuation.definition.multiplicity.mthds');
+    expect(multiplicity.length).toBe(1);
+    expect(multiplicity[0].text).toBe('[5]');
+  });
+
   it('tokenizes output = "legal.Contract[]" (domain + multiplicity)', () => {
     const line = 'output = "legal.Contract[]"';
 
