@@ -358,7 +358,7 @@
         },
         {
           "name": "meta.entry.model.mthds",
-          "match": "\\s*(model)\\s*(=)\\s*(\")([$@~])([a-zA-Z][a-zA-Z0-9_-]*)(\")",
+          "match": "\\s*(model)\\s*(=)\\s*(\")([$@~#])([a-zA-Z][a-zA-Z0-9_-]*)(\")",
           "captures": {
             "1": {
               "name": "support.type.property-name.mthds"
@@ -376,6 +376,27 @@
               "name": "entity.name.model-ref.mthds"
             },
             "6": {
+              "name": "punctuation.definition.string.end.mthds"
+            }
+          }
+        },
+        {
+          "name": "meta.entry.model.mthds",
+          "match": "\\s*(model)\\s*(=)\\s*(\")([a-zA-Z][a-zA-Z0-9_.:-]*)(\")",
+          "captures": {
+            "1": {
+              "name": "support.type.property-name.mthds"
+            },
+            "2": {
+              "name": "punctuation.eq.mthds"
+            },
+            "3": {
+              "name": "punctuation.definition.string.begin.mthds"
+            },
+            "4": {
+              "name": "entity.name.model-ref.mthds"
+            },
+            "5": {
               "name": "punctuation.definition.string.end.mthds"
             }
           }

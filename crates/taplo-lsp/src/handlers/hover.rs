@@ -1,7 +1,7 @@
 use crate::{
     handlers::mthds_resolution::{
-        classify_reference, find_native_concept, find_string_position_info, resolve_reference,
-        NativeConcept, ReferenceKind, ResolvedReference,
+        classify_reference, extract_string_value, find_native_concept, find_string_position_info,
+        is_model_field, resolve_reference, NativeConcept, ReferenceKind, ResolvedReference,
     },
     query::{lookup_keys, Query},
     world::World,
@@ -77,6 +77,35 @@ pub(crate) async fn hover<E: Environment>(
             if matches!(classified.kind, ReferenceKind::Concept) {
                 if let Some(native) = find_native_concept(&classified.ref_name) {
                     let content = build_native_concept_hover(native);
+                    return Ok(Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: content,
+                        }),
+                        range: hover_range(),
+                    }));
+                }
+            }
+        }
+
+        // TODO: Improve model hover with model deck data (preset descriptions,
+        // resolved model names, etc.) once model deck access is available.
+        if is_model_field(&query) {
+            if let Some(pi) = find_string_position_info(&query) {
+                let value = extract_string_value(pi);
+                if !value.is_empty() {
+                    // Look up the pipe type from the parent table's "type" field.
+                    let pipe_type = pi.dom_node.as_ref().and_then(|(keys, _)| {
+                        // keys points to e.g. pipe.xyz.model — skip last to get pipe.xyz
+                        let parent_keys = keys.skip_right(1);
+                        let parent = doc.dom.path(&parent_keys)?;
+                        let table = parent.as_table()?;
+                        table
+                            .get("type")
+                            .and_then(|n| n.as_str().map(|s| s.value().to_string()))
+                    });
+                    let content =
+                        build_model_hover(&value, pipe_type.as_deref());
                     return Ok(Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
@@ -434,6 +463,32 @@ pub(crate) fn build_mthds_hover_content(resolved: &ResolvedReference) -> String 
     }
 
     parts.join("\n\n")
+}
+
+/// Build a simple hover for a model field value.
+///
+/// Recognizes the prefix convention (`$` preset, `@` alias, `~` waterfall,
+/// `#` handle) and shows a short, readable label.
+///
+/// When `pipe_type` is provided (e.g. `"PipeLLM"`), strips the `"Pipe"` prefix
+/// and prepends it to give context: `**gpt-4o** — LLM model preset`.
+pub(crate) fn build_model_hover(value: &str, pipe_type: Option<&str>) -> String {
+    let (kind, name) = match value.chars().next() {
+        Some('$') => ("preset", &value[1..]),
+        Some('@') => ("alias", &value[1..]),
+        Some('~') => ("waterfall", &value[1..]),
+        Some('#') => ("handle", &value[1..]),
+        _ => ("", value),
+    };
+    let type_prefix = pipe_type
+        .and_then(|t| t.strip_prefix("Pipe"))
+        .filter(|s| !s.is_empty());
+    match (type_prefix, kind) {
+        (Some(prefix), "") => format!("**{}** — {} model", name, prefix),
+        (Some(prefix), _) => format!("**{}** — {} model {}", name, prefix, kind),
+        (_, "") => format!("**{}** — model", name),
+        (_, _) => format!("**{}** — model {}", name, kind),
+    }
 }
 
 /// Build Markdown hover content for a native (built-in) concept.

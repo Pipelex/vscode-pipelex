@@ -1,7 +1,9 @@
 use super::{offset_inside_string, offset_inside_string_after, parse_and_query};
 use crate::handlers::{
-    hover::{build_mthds_hover_content, build_native_concept_hover},
-    mthds_resolution::{classify_reference, find_native_concept, resolve_reference, ReferenceKind},
+    hover::{build_model_hover, build_mthds_hover_content, build_native_concept_hover},
+    mthds_resolution::{
+        classify_reference, find_native_concept, is_model_field, resolve_reference, ReferenceKind,
+    },
 };
 
 macro_rules! fixture {
@@ -319,4 +321,73 @@ prompt = "Pass."
     assert!(content.contains("**Anything** *(native)*"), "got: {content}");
     assert!(content.contains("Accepts any content type"), "should contain description");
     assert!(!content.contains("**Fields:**"), "Anything has no fields");
+}
+
+// ---------------------------------------------------------------------------
+// Model field hover tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_hover_model_field_detected() {
+    let src = r#"
+domain = "test"
+
+[pipe.my_pipe]
+type = "PipeLLM"
+model = "$gpt-4o"
+output = "Text"
+prompt = "hello"
+"#;
+    let offset = offset_inside_string(src, r#"model = "$gpt-4o""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    assert!(is_model_field(&query), "model field should be detected");
+}
+
+#[test]
+fn test_hover_model_field_not_on_other_fields() {
+    let src = r#"
+domain = "test"
+
+[pipe.my_pipe]
+type = "PipeLLM"
+model = "$gpt-4o"
+output = "Text"
+prompt = "hello"
+"#;
+    let offset = offset_inside_string(src, r#"output = "Text""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    assert!(!is_model_field(&query), "output field should not be detected as model");
+}
+
+#[test]
+fn test_build_model_hover_with_pipe_type() {
+    let content = build_model_hover("$gpt-4o", Some("PipeLLM"));
+    assert_eq!(content, "**gpt-4o** — LLM model preset", "got: {content}");
+}
+
+#[test]
+fn test_build_model_hover_without_pipe_type() {
+    let content = build_model_hover("$gpt-4o", None);
+    assert_eq!(content, "**gpt-4o** — model preset", "got: {content}");
+}
+
+#[test]
+fn test_build_model_hover_alias() {
+    let content = build_model_hover("@my-alias", Some("PipeExtract"));
+    assert_eq!(content, "**my-alias** — Extract model alias", "got: {content}");
+}
+
+#[test]
+fn test_build_model_hover_bare_model() {
+    let content = build_model_hover("claude-3-opus", Some("PipeLLM"));
+    assert_eq!(content, "**claude-3-opus** — LLM model", "got: {content}");
+}
+
+#[test]
+fn test_build_model_hover_pipe_type_without_prefix() {
+    // If type doesn't start with "Pipe", no prefix is shown
+    let content = build_model_hover("$gpt-4o", Some("SomethingElse"));
+    assert_eq!(content, "**gpt-4o** — model preset", "got: {content}");
 }

@@ -143,6 +143,24 @@ pub(crate) fn extract_string_value(position_info: &PositionInfo) -> String {
         })
 }
 
+/// Check whether the cursor is on a `model` or `model_to_structure` string value.
+pub(crate) fn is_model_field(query: &Query) -> bool {
+    if find_string_position_info(query).is_none() {
+        return false;
+    }
+    let Some(entry_key_node) = query.entry_key() else {
+        return false;
+    };
+    let key_text: String = entry_key_node
+        .descendants_with_tokens()
+        .filter_map(|t| t.into_token())
+        .filter(|t| t.kind() == IDENT)
+        .map(|t| t.text().to_string())
+        .collect::<Vec<_>>()
+        .join(".");
+    matches!(key_text.as_str(), "model" | "model_to_structure")
+}
+
 /// Classify a reference at the cursor position without resolving it in the DOM.
 ///
 /// Determines the reference kind (pipe or concept) and extracts the bare

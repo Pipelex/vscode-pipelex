@@ -71,7 +71,7 @@ const typeEntry = {
 // 5. model = "$sigil-ref"
 const modelEntry = {
   name: "meta.entry.model.mthds",
-  match: '\\s*(model)\\s*(=)\\s*(")([$@~])([a-zA-Z][a-zA-Z0-9_-]*)(")',
+  match: '\\s*(model)\\s*(=)\\s*(")([$@~#])([a-zA-Z][a-zA-Z0-9_-]*)(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
@@ -79,6 +79,19 @@ const modelEntry = {
     4: { name: "punctuation.definition.model-sigil.mthds" },
     5: { name: "entity.name.model-ref.mthds" },
     6: { name: "punctuation.definition.string.end.mthds" },
+  },
+};
+
+// 5b. model = "bare-model-name" (no sigil)
+const modelBareEntry = {
+  name: "meta.entry.model.mthds",
+  match: '\\s*(model)\\s*(=)\\s*(")([a-zA-Z][a-zA-Z0-9_.:-]*)(")',
+  captures: {
+    1: { name: "support.type.property-name.mthds" },
+    2: { name: "punctuation.eq.mthds" },
+    3: { name: "punctuation.definition.string.begin.mthds" },
+    4: { name: "entity.name.model-ref.mthds" },
+    5: { name: "punctuation.definition.string.end.mthds" },
   },
 };
 
@@ -269,6 +282,7 @@ export const entryBegin = {
     refinesEntry,
     typeEntry,
     modelEntry,
+    modelBareEntry,
     jinja2Block,
     jinja2Line,
     promptBlock,

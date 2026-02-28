@@ -24,6 +24,12 @@ inputs = { image_prompt = "ImagePrompt" }
 output = "images.Photo"
 model = "~waterfall"
 
+[pipe.simple_gen]
+type = "PipeLLM"
+definition = "Simple generation"
+output = "Text"
+model = "claude-3-opus"
+
 # Multi-input pipe
 [pipe.combine_data]
 type = "PipeLLM"
