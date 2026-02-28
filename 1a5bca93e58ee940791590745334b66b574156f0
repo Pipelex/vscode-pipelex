@@ -1,0 +1,23 @@
+crates/taplo-lsp/src/handlers/hover.rs
+  9b78363a476a61a0 209-210,311-312
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "1a5bca93e58ee940791590745334b66b574156f0",
+  "prompts": {
+    "9b78363a476a61a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "80156e4c-6091-4f7e-9d21-29e395672f9a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
