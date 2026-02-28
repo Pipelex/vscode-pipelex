@@ -1,0 +1,41 @@
+crates/taplo-lsp/src/handlers/mthds_resolution.rs
+  e8430fbfdc186507 1-170
+CLAUDE.md
+  e8430fbfdc186507 68,75-79
+test-data/mthds/hover/pipe_hover.mthds
+  e8430fbfdc186507 1-23
+crates/taplo-lsp/src/handlers/goto_definition.rs
+  e8430fbfdc186507 2,4,49-50,54-57,60,71-72
+crates/taplo-lsp/src/handlers/hover.rs
+  e8430fbfdc186507 2-4,53-74,316-417
+crates/taplo-lsp/src/handlers.rs
+  e8430fbfdc186507 43-44
+test-data/mthds/hover/concept_hover.mthds
+  e8430fbfdc186507 1-20
+crates/taplo-lsp/src/handlers/tests/hover.rs
+  e8430fbfdc186507 1-183
+crates/taplo-lsp/src/handlers/tests/mod.rs
+  e8430fbfdc186507 2,15-21,23-29,33
+crates/taplo-lsp/src/handlers/tests/goto_definition.rs
+  e8430fbfdc186507 2,90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "9e69157cd74dacbb0721a749d84e86282b5f2335",
+  "prompts": {
+    "e8430fbfdc186507": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0f294cd-8a78-49ea-b240-be62666d4210",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 633,
+      "total_deletions": 236,
+      "accepted_lines": 561,
+      "overriden_lines": 0
+    }
+  }
+}
