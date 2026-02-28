@@ -15,6 +15,14 @@ pub(crate) struct ResolvedReference {
     pub(crate) target_node: Node,
 }
 
+/// A reference that has been classified (kind + stripped name) but not yet
+/// resolved against the DOM. Useful for the native-concept fallback path
+/// where there is no DOM node to resolve to.
+pub(crate) struct ClassifiedReference {
+    pub(crate) kind: ReferenceKind,
+    pub(crate) ref_name: String,
+}
+
 impl ReferenceKind {
     pub(crate) fn root_key(&self) -> &'static str {
         match self {
@@ -22,6 +30,90 @@ impl ReferenceKind {
             ReferenceKind::Concept => "concept",
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Native concept registry
+// ---------------------------------------------------------------------------
+
+pub(crate) struct NativeConcept {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub fields: &'static [(&'static str, &'static str)],
+}
+
+static NATIVE_CONCEPTS: &[NativeConcept] = &[
+    NativeConcept {
+        name: "Text",
+        description: "Plain text content.",
+        fields: &[("text", "str")],
+    },
+    NativeConcept {
+        name: "Number",
+        description: "A numeric value (integer or float).",
+        fields: &[("number", "int | float")],
+    },
+    NativeConcept {
+        name: "Image",
+        description: "An image with URL and optional metadata.",
+        fields: &[
+            ("url", "str"),
+            ("filename", "str?"),
+            ("caption", "str?"),
+            ("mime_type", "str?"),
+        ],
+    },
+    NativeConcept {
+        name: "Document",
+        description: "A document file (e.g. PDF) with URL and metadata.",
+        fields: &[
+            ("url", "str"),
+            ("filename", "str?"),
+            ("mime_type", "str?"),
+        ],
+    },
+    NativeConcept {
+        name: "Html",
+        description: "HTML content with an inner HTML string and CSS class.",
+        fields: &[("inner_html", "str"), ("css_class", "str")],
+    },
+    NativeConcept {
+        name: "TextAndImages",
+        description: "Composite content holding text and associated images.",
+        fields: &[("text", "TextContent?"), ("images", "list[ImageContent]?")],
+    },
+    NativeConcept {
+        name: "Page",
+        description: "A single page extracted from a document.",
+        fields: &[
+            ("text_and_images", "TextAndImagesContent"),
+            ("page_view", "ImageContent?"),
+        ],
+    },
+    NativeConcept {
+        name: "JSON",
+        description: "A JSON object.",
+        fields: &[("json_obj", "dict")],
+    },
+    NativeConcept {
+        name: "ImgGenPrompt",
+        description: "A prompt for image generation. Refines Text.",
+        fields: &[("text", "str")],
+    },
+    NativeConcept {
+        name: "Anything",
+        description: "Accepts any content type.",
+        fields: &[],
+    },
+    NativeConcept {
+        name: "Dynamic",
+        description: "Dynamic content with user-defined fields.",
+        fields: &[],
+    },
+];
+
+pub(crate) fn find_native_concept(name: &str) -> Option<&'static NativeConcept> {
+    NATIVE_CONCEPTS.iter().find(|c| c.name == name)
 }
 
 /// Find a STRING or STRING_LITERAL `PositionInfo` from the query's before/after.
@@ -51,13 +143,12 @@ pub(crate) fn extract_string_value(position_info: &PositionInfo) -> String {
         })
 }
 
-/// Resolve a reference at the cursor position in the DOM.
+/// Classify a reference at the cursor position without resolving it in the DOM.
 ///
-/// Checks if the cursor is on a STRING token inside a reference field
-/// (`pipe`, `main_pipe`, `default_pipe_code`, `output`, `refines`, or an
-/// `inputs = { ... }` inline table value), extracts the reference name,
-/// and looks up the corresponding `pipe.<name>` or `concept.<name>` in the DOM.
-pub(crate) fn resolve_reference(dom: &Node, query: &Query) -> Option<ResolvedReference> {
+/// Determines the reference kind (pipe or concept) and extracts the bare
+/// reference name (stripping domain prefix and multiplicity for concepts).
+/// Returns `None` if the cursor is not on a reference field.
+pub(crate) fn classify_reference(query: &Query) -> Option<ClassifiedReference> {
     let position_info = find_string_position_info(query)?;
 
     let entry_key_node = query.entry_key()?;
@@ -93,12 +184,24 @@ pub(crate) fn resolve_reference(dom: &Node, query: &Query) -> Option<ResolvedRef
         ReferenceKind::Pipe => raw_ref_name,
     };
 
-    let root_key = kind.root_key();
+    Some(ClassifiedReference { kind, ref_name })
+}
+
+/// Resolve a reference at the cursor position in the DOM.
+///
+/// Checks if the cursor is on a STRING token inside a reference field
+/// (`pipe`, `main_pipe`, `default_pipe_code`, `output`, `refines`, or an
+/// `inputs = { ... }` inline table value), extracts the reference name,
+/// and looks up the corresponding `pipe.<name>` or `concept.<name>` in the DOM.
+pub(crate) fn resolve_reference(dom: &Node, query: &Query) -> Option<ResolvedReference> {
+    let classified = classify_reference(query)?;
+
+    let root_key = classified.kind.root_key();
 
     let target_keys = Keys::new(
         [
             KeyOrIndex::Key(taplo::dom::node::Key::new(root_key)),
-            KeyOrIndex::Key(taplo::dom::node::Key::new(&ref_name)),
+            KeyOrIndex::Key(taplo::dom::node::Key::new(&classified.ref_name)),
         ]
         .into_iter(),
     );
@@ -106,8 +209,8 @@ pub(crate) fn resolve_reference(dom: &Node, query: &Query) -> Option<ResolvedRef
     let target_node = dom.path(&target_keys)?;
 
     Some(ResolvedReference {
-        kind,
-        ref_name,
+        kind: classified.kind,
+        ref_name: classified.ref_name,
         target_node,
     })
 }

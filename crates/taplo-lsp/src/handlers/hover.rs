@@ -1,6 +1,7 @@
 use crate::{
     handlers::mthds_resolution::{
-        find_string_position_info, resolve_reference, ReferenceKind, ResolvedReference,
+        classify_reference, find_native_concept, find_string_position_info, resolve_reference,
+        NativeConcept, ReferenceKind, ResolvedReference,
     },
     query::{lookup_keys, Query},
     world::World,
@@ -55,10 +56,13 @@ pub(crate) async fn hover<E: Environment>(
     let is_mthds_file =
         document_uri.as_str().ends_with(".mthds") || document_uri.as_str().ends_with(".plx");
     if is_mthds_file {
-        if let Some(resolved) = resolve_reference(&doc.dom, &query) {
-            let hover_range = find_string_position_info(&query)
+        let hover_range = || {
+            find_string_position_info(&query)
                 .and_then(|pi| doc.mapper.range(pi.syntax.text_range()))
-                .map(|r| r.into_lsp());
+                .map(|r| r.into_lsp())
+        };
+
+        if let Some(resolved) = resolve_reference(&doc.dom, &query) {
             let content = build_mthds_hover_content(&resolved);
             if !content.is_empty() {
                 return Ok(Some(Hover {
@@ -66,8 +70,21 @@ pub(crate) async fn hover<E: Environment>(
                         kind: MarkupKind::Markdown,
                         value: content,
                     }),
-                    range: hover_range,
+                    range: hover_range(),
                 }));
+            }
+        } else if let Some(classified) = classify_reference(&query) {
+            if matches!(classified.kind, ReferenceKind::Concept) {
+                if let Some(native) = find_native_concept(&classified.ref_name) {
+                    let content = build_native_concept_hover(native);
+                    return Ok(Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: content,
+                        }),
+                        range: hover_range(),
+                    }));
+                }
             }
         }
     }
@@ -410,6 +427,25 @@ pub(crate) fn build_mthds_hover_content(resolved: &ResolvedReference) -> String 
                 }
             }
         }
+    }
+
+    parts.join("\n\n")
+}
+
+/// Build Markdown hover content for a native (built-in) concept.
+pub(crate) fn build_native_concept_hover(concept: &NativeConcept) -> String {
+    let mut parts: Vec<String> = Vec::new();
+
+    parts.push(format!("**{}** *(native)*", concept.name));
+    parts.push(concept.description.to_string());
+
+    if !concept.fields.is_empty() {
+        let field_strs: Vec<String> = concept
+            .fields
+            .iter()
+            .map(|(name, ty)| format!("`{}`: {}", name, ty))
+            .collect();
+        parts.push(format!("**Fields:** {}", field_strs.join(", ")));
     }
 
     parts.join("\n\n")

@@ -1,5 +1,8 @@
 use super::{offset_inside_string, offset_inside_string_after, parse_and_query};
-use crate::handlers::{hover::build_mthds_hover_content, mthds_resolution::resolve_reference};
+use crate::handlers::{
+    hover::{build_mthds_hover_content, build_native_concept_hover},
+    mthds_resolution::{classify_reference, find_native_concept, resolve_reference, ReferenceKind},
+};
 
 macro_rules! fixture {
     ($name:literal) => {
@@ -180,4 +183,140 @@ prompt = "Process."
     let (dom, query) = parse_and_query(src, offset);
     let resolved = resolve_reference(&dom, &query);
     assert!(resolved.is_none(), "domain-prefixed concept not in local file should return None");
+}
+
+// ---------------------------------------------------------------------------
+// Native concept hover tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_hover_native_concept_text() {
+    let src = r#"
+domain = "test"
+
+[pipe.my_pipe]
+type = "PipeLLM"
+output = "Text"
+prompt = "hello"
+"#;
+    let offset = offset_inside_string(src, r#"output = "Text""#);
+
+    let (dom, query) = parse_and_query(src, offset);
+    // Should NOT resolve in DOM (no concept.Text defined)
+    assert!(resolve_reference(&dom, &query).is_none());
+
+    // Should classify and find native concept
+    let classified = classify_reference(&query).expect("should classify as concept reference");
+    assert!(matches!(classified.kind, ReferenceKind::Concept));
+    assert_eq!(classified.ref_name, "Text");
+
+    let native = find_native_concept(&classified.ref_name).expect("Text is a native concept");
+    let content = build_native_concept_hover(native);
+
+    assert!(content.contains("**Text** *(native)*"), "header should show name with native tag, got: {content}");
+    assert!(content.contains("Plain text content"), "should contain description");
+    assert!(content.contains("**Fields:**"), "should show fields");
+    assert!(content.contains("`text`: str"), "should list text field");
+}
+
+#[test]
+fn test_hover_native_concept_with_multiplicity() {
+    let src = r#"
+domain = "test"
+
+[pipe.extract]
+type = "PipeExtract"
+inputs = { document = "Document" }
+output = "Page[]"
+"#;
+    let offset = offset_inside_string(src, r#"output = "Page[]""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    let classified = classify_reference(&query).expect("should classify");
+    assert_eq!(classified.ref_name, "Page");
+
+    let native = find_native_concept(&classified.ref_name).expect("Page is native");
+    let content = build_native_concept_hover(native);
+
+    assert!(content.contains("**Page** *(native)*"), "got: {content}");
+    assert!(content.contains("single page extracted from a document"), "should contain description");
+    assert!(content.contains("`text_and_images`"), "should list text_and_images field");
+    assert!(content.contains("`page_view`"), "should list page_view field");
+}
+
+#[test]
+fn test_hover_native_concept_in_inputs() {
+    let src = r#"
+domain = "test"
+
+[pipe.analyze]
+type = "PipeLLM"
+inputs = { doc = "Document" }
+output = "Text"
+prompt = "Analyze."
+"#;
+    let offset = offset_inside_string(src, r#"doc = "Document""#);
+
+    let (dom, query) = parse_and_query(src, offset);
+    assert!(resolve_reference(&dom, &query).is_none());
+
+    let classified = classify_reference(&query).expect("should classify");
+    assert!(matches!(classified.kind, ReferenceKind::Concept));
+    assert_eq!(classified.ref_name, "Document");
+
+    let native = find_native_concept(&classified.ref_name).expect("Document is native");
+    let content = build_native_concept_hover(native);
+
+    assert!(content.contains("**Document** *(native)*"), "got: {content}");
+    assert!(content.contains("`url`: str"), "should list url field");
+    assert!(content.contains("`filename`"), "should list filename field");
+}
+
+#[test]
+fn test_hover_native_concept_with_domain_prefix() {
+    let src = r#"
+domain = "test"
+
+[pipe.process]
+type = "PipeLLM"
+output = "native.Image"
+prompt = "Process."
+"#;
+    let offset = offset_inside_string(src, r#"output = "native.Image""#);
+
+    let (dom, query) = parse_and_query(src, offset);
+    assert!(resolve_reference(&dom, &query).is_none());
+
+    let classified = classify_reference(&query).expect("should classify");
+    assert_eq!(classified.ref_name, "Image", "domain prefix should be stripped");
+
+    let native = find_native_concept(&classified.ref_name).expect("Image is native");
+    let content = build_native_concept_hover(native);
+
+    assert!(content.contains("**Image** *(native)*"), "got: {content}");
+    assert!(content.contains("image with URL"), "should contain description");
+    assert!(content.contains("`url`: str"), "should list url field");
+    assert!(content.contains("`caption`"), "should list caption field");
+}
+
+#[test]
+fn test_hover_native_concept_anything() {
+    let src = r#"
+domain = "test"
+
+[pipe.passthrough]
+type = "PipeLLM"
+output = "Anything"
+prompt = "Pass."
+"#;
+    let offset = offset_inside_string(src, r#"output = "Anything""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    let classified = classify_reference(&query).expect("should classify");
+    let native = find_native_concept(&classified.ref_name).expect("Anything is native");
+    let content = build_native_concept_hover(native);
+
+    assert!(content.contains("**Anything** *(native)*"), "got: {content}");
+    assert!(content.contains("Accepts any content type"), "should contain description");
+    assert!(!content.contains("**Fields:**"), "Anything has no fields");
 }
