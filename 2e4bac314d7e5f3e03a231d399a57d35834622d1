@@ -1,0 +1,25 @@
+.github/workflows/ci.yaml
+  f697a6f95370233e 95
+test-data/mthds/false-positives.mthds
+  f697a6f95370233e 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "2e4bac314d7e5f3e03a231d399a57d35834622d1",
+  "prompts": {
+    "f697a6f95370233e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a6c5bd9-f6c1-404c-bbc0-099b6f722494",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
