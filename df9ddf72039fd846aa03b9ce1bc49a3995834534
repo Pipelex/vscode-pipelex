@@ -1,0 +1,25 @@
+crates/taplo-lsp/src/handlers/mthds_resolution.rs
+  3b74507fe0768f72 143-145,147-150
+crates/taplo-lsp/src/handlers/tests/hover.rs
+  3b74507fe0768f72 444-463
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "df9ddf72039fd846aa03b9ce1bc49a3995834534",
+  "prompts": {
+    "3b74507fe0768f72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6742ce94-ae6b-42a9-bb48-12df1877a772",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 28,
+      "total_deletions": 1,
+      "accepted_lines": 28,
+      "overriden_lines": 0
+    }
+  }
+}
