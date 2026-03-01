@@ -1,0 +1,23 @@
+crates/taplo-lsp/src/handlers/mthds_resolution.rs
+  41c5cd67d6975a4b 171
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "4bb86a4a5ba151a2e8f46bea1ce1b36088589cce",
+  "prompts": {
+    "41c5cd67d6975a4b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a53b7927-bb95-4d20-afe0-353e1272019d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
