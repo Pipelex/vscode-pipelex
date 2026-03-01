@@ -92,7 +92,7 @@ jobs:
       - name: Test VS Code extension
         run: |
           corepack enable
-          cd editors/vscode && yarn install && yarn test
+          cd editors/vscode && yarn install --immutable && yarn test
 
   check_wasm32:
     name: Check on WASM
