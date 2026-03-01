@@ -227,10 +227,12 @@ const pipeRefEntry = {
 // 11. key = "domain.ConceptType[]" (concept-type value, catch-all for inputs etc.)
 // Matches any lowercase key whose value looks like a concept type reference.
 // Placed before genericEntry so it wins when the value is PascalCase.
+// Negative lookahead excludes keys that are NOT concept references but can have PascalCase values.
+const NON_CONCEPT_KEYS = 'description|prompt|system_prompt|name|model_to_structure';
 const conceptValueEntry = {
   name: "meta.entry.concept-value.mthds",
   match:
-    '\\s*([a-z][a-z0-9_]*)\\s*(=)\\s*(")'
+    `\\s*((?!(?:${NON_CONCEPT_KEYS})\\b)[a-z][a-z0-9_]*)\\s*(=)\\s*(")`
     + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
     + '([A-Z][A-Za-z0-9]*)'         // ConceptName
     + MULTIPLICITY
