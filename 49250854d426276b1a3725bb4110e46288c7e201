@@ -1,0 +1,25 @@
+editors/vscode/src/syntax/__tests__/mthdsGrammar.test.ts
+  45d3e44d67613a4b 278-305
+editors/vscode/src/syntax/mthds/entry.ts
+  45d3e44d67613a4b 230-231,235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "49250854d426276b1a3725bb4110e46288c7e201",
+  "prompts": {
+    "45d3e44d67613a4b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43294411-8bbd-4e5e-bad7-59835f506f4b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 31,
+      "total_deletions": 1,
+      "accepted_lines": 31,
+      "overriden_lines": 0
+    }
+  }
+}
