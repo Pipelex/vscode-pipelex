@@ -1,0 +1,31 @@
+editors/vscode/src/pipelex/pipeCodeLensProvider.ts
+  48177de78475cab6 1-30
+editors/vscode/src/pipelex/__tests__/pipeCodeLensProvider.test.ts
+  48177de78475cab6 1-87
+editors/vscode/src/pipelex/pipelexExtension.ts
+  48177de78475cab6 79-82,94-108,120-121,123-131,133-135,140-146
+editors/vscode/src/pipelex/__tests__/pipelexExtension.test.ts
+  48177de78475cab6 36,53-60
+editors/vscode/package.json
+  48177de78475cab6 153-156,197-200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "b47262172972152dcf56e02c94ae1781b456c64e",
+  "prompts": {
+    "48177de78475cab6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4e7d7484-e70c-4c7d-92e2-08771c8706df",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 197,
+      "total_deletions": 32,
+      "accepted_lines": 177,
+      "overriden_lines": 0
+    }
+  }
+}
