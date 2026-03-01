@@ -1,0 +1,23 @@
+editors/vscode/src/pipelex/pipelexExtension.ts
+  3ff4d2ba258f8bc5 113-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "ada4ae08a4f42b2236d564a7eb45b4caa886dd09",
+  "prompts": {
+    "3ff4d2ba258f8bc5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c8a73a0-ebb8-4c2c-a903-8e88c8cfa51a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 1,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
