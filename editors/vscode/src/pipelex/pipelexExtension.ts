@@ -135,7 +135,7 @@ function shellQuote(s: string): string {
     return `'${s.replace(/'/g, "'\\''")}'`;
 }
 
-/** Escape a string for safe use in PowerShell / cmd.exe. */
+/** Escape a string for safe use in PowerShell (single-quoted literal). */
 function winQuote(s: string): string {
-    return `"${s.replace(/"/g, '\\"')}"`;
+    return `'${s.replace(/'/g, "''")}'`;
 }
