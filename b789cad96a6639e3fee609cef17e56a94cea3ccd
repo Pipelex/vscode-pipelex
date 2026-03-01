@@ -1,0 +1,29 @@
+Makefile
+  108f4ae9443cfed7 107
+test-data/mthds/false-positives.mthds
+  108f4ae9443cfed7 9
+test-data/mthds/goto-definition/concept_with_multiplicity.mthds
+  108f4ae9443cfed7 1-9
+crates/taplo-lsp/src/handlers/tests/goto_definition.rs
+  108f4ae9443cfed7 2,17-19,23-24,29,36,160-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "b789cad96a6639e3fee609cef17e56a94cea3ccd",
+  "prompts": {
+    "108f4ae9443cfed7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3c435bdf-4806-4f02-8010-110e0bd2ae1e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 28,
+      "total_deletions": 64,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    }
+  }
+}
