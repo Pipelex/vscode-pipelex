@@ -33,6 +33,7 @@ vi.mock('vscode', () => ({
     },
     languages: {
         registerDocumentSemanticTokensProvider: mockState.registerDocumentSemanticTokensProvider,
+        registerCodeLensProvider: vi.fn(() => ({ dispose: vi.fn() })),
     },
 }));
 
@@ -45,6 +46,14 @@ vi.mock('../validation/pipelexValidator', () => {
         PipelexValidator: class {
             constructor() { mockState.validatorConstructed = true; }
             dispose() {}
+        },
+    };
+});
+
+vi.mock('../pipeCodeLensProvider', () => {
+    return {
+        PipeCodeLensProvider: class {
+            provideCodeLenses() { return []; }
         },
     };
 });
