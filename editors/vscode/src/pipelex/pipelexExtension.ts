@@ -110,7 +110,8 @@ async function registerNodeFeatures(
             const quote = isWindows ? winQuote : shellQuote;
             const inputsArg = fs.existsSync(inputsPath) ? ` --inputs ${quote(inputsPath)}` : '';
             terminal.show();
-            terminal.sendText(`${quote(pipelexCmd)} run bundle ${quote(filePath)}${inputsArg}`);
+            const callOp = isWindows ? '& ' : '';
+            terminal.sendText(`${callOp}${quote(pipelexCmd)} run bundle ${quote(filePath)}${inputsArg}`);
         })
     );
 
