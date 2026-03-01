@@ -6,7 +6,7 @@ description = "Test fixture for false positives"
 
 [concept.PlainText]
 description  = "A simple text concept with words that could false-match"
-description = "The variable foo should not be colored"
+note = "The variable foo should not be colored"
 
 # Literal strings must NOT match @injection or $template or {{ jinja }}
 note = 'Literal string: @not_injection $not_template {{ not_jinja }}'

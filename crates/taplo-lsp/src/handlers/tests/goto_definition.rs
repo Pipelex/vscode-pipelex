@@ -1,9 +1,6 @@
 use super::parse_and_query;
-use crate::handlers::mthds_resolution::{is_inside_inputs_inline_table, ReferenceKind};
-use taplo::{
-    dom::{KeyOrIndex, Keys},
-    syntax::SyntaxKind::{IDENT, STRING, STRING_LITERAL},
-};
+use crate::handlers::mthds_resolution::classify_reference;
+use taplo::dom::{KeyOrIndex, Keys};
 
 macro_rules! fixture {
     ($name:literal) => {
@@ -17,77 +14,26 @@ macro_rules! fixture {
 /// Simulate the goto_definition handler logic for a given TOML source and cursor offset.
 /// Returns the root_key ("pipe" or "concept") and the reference name if the handler
 /// would produce a result, or None if it would bail.
+///
+/// Delegates to `classify_reference` so this test exercises the same code path as production,
+/// including `strip_concept_qualifiers` (domain prefix and multiplicity suffix stripping).
 fn simulate_handler(toml: &str, offset: u32) -> Option<(String, String)> {
     let (dom, query) = parse_and_query(toml, offset);
 
-    // Check cursor is on a string token.
-    let position_info = query
-        .before
-        .as_ref()
-        .filter(|p| matches!(p.syntax.kind(), STRING | STRING_LITERAL))
-        .or_else(|| {
-            query
-                .after
-                .as_ref()
-                .filter(|p| matches!(p.syntax.kind(), STRING | STRING_LITERAL))
-        });
+    let classified = classify_reference(&query)?;
+    let root_key = classified.kind.root_key();
 
-    let position_info = position_info?;
-
-    // entry_key
-    let entry_key_node = query.entry_key()?;
-
-    let key_text: String = entry_key_node
-        .descendants_with_tokens()
-        .filter_map(|t| t.into_token())
-        .filter(|t| t.kind() == IDENT)
-        .map(|t| t.text().to_string())
-        .collect::<Vec<_>>()
-        .join(".");
-
-    let kind = if matches!(
-        key_text.as_str(),
-        "pipe" | "main_pipe" | "default_pipe_code"
-    ) {
-        ReferenceKind::Pipe
-    } else if matches!(key_text.as_str(), "output" | "refines") {
-        ReferenceKind::Concept
-    } else if is_inside_inputs_inline_table(&position_info.syntax) {
-        ReferenceKind::Concept
-    } else {
-        return None;
-    };
-
-    let ref_name = position_info
-        .dom_node
-        .as_ref()
-        .and_then(|(_, node)| node.as_str().map(|s| s.value().to_string()))
-        .unwrap_or_else(|| {
-            let text = position_info.syntax.text().to_string();
-            text.trim_matches('"').trim_matches('\'').to_string()
-        });
-
-    if ref_name.is_empty() {
-        return None;
-    }
-
-    let root_key = match kind {
-        ReferenceKind::Pipe => "pipe",
-        ReferenceKind::Concept => "concept",
-    };
-
-    // Check DOM path exists
     let target_keys = Keys::new(
         [
             KeyOrIndex::Key(taplo::dom::node::Key::new(root_key)),
-            KeyOrIndex::Key(taplo::dom::node::Key::new(&ref_name)),
+            KeyOrIndex::Key(taplo::dom::node::Key::new(&classified.ref_name)),
         ]
         .into_iter(),
     );
 
     dom.path(&target_keys)?;
 
-    Some((root_key.to_string(), ref_name))
+    Some((root_key.to_string(), classified.ref_name))
 }
 
 use super::{offset_inside_string, offset_inside_string_after};
@@ -210,4 +156,12 @@ fn test_with_bare_table_headers() {
             "output = \"Slide\" should resolve to concept.Slide"
         );
     }
+}
+
+#[test]
+fn test_concept_with_multiplicity_suffix() {
+    let mthds_code = fixture!("concept_with_multiplicity.mthds");
+    let offset = offset_inside_string(mthds_code, r#"output = "Slide[]""#);
+    let result = simulate_handler(mthds_code, offset);
+    assert_eq!(result, Some(("concept".to_string(), "Slide".to_string())));
 }
