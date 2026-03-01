@@ -13,7 +13,6 @@
     clippy::case_sensitive_file_extension_comparisons,
     clippy::cast_possible_truncation,
     clippy::doc_markdown,
-    clippy::if_same_then_else,
     clippy::manual_let_else,
     clippy::map_unwrap_or,
     clippy::redundant_closure_for_method_calls,

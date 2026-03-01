@@ -168,6 +168,7 @@ pub(crate) fn is_model_field(query: &Query) -> bool {
 /// Determines the reference kind (pipe or concept) and extracts the bare
 /// reference name (stripping domain prefix and multiplicity for concepts).
 /// Returns `None` if the cursor is not on a reference field.
+#[allow(clippy::if_same_then_else)] // branches are semantically distinct (key match vs. AST walk)
 pub(crate) fn classify_reference(query: &Query) -> Option<ClassifiedReference> {
     let position_info = find_string_position_info(query)?;
 
