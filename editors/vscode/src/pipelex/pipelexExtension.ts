@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import * as vscode from 'vscode';
 import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
 import { getOutput } from '../util';
@@ -77,6 +75,8 @@ async function registerNodeFeatures(
     }
 
     // Run bundle command
+    const fs = require('fs') as typeof import('fs');
+    const path = require('path') as typeof import('path');
     context.subscriptions.push(
         vscode.commands.registerCommand('pipelex.runBundle', async () => {
             const editor = vscode.window.activeTextEditor;
@@ -89,9 +89,14 @@ async function registerNodeFeatures(
             }
             const filePath = editor.document.uri.fsPath;
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+            const isWindows = process.platform === 'win32';
             let pipelexCmd = 'pipelex';
             if (workspaceFolder) {
-                const venvPipelex = path.join(workspaceFolder.uri.fsPath, '.venv', 'bin', 'pipelex');
+                const venvPipelex = path.join(
+                    workspaceFolder.uri.fsPath,
+                    isWindows ? path.join('.venv', 'Scripts', 'pipelex.exe')
+                              : path.join('.venv', 'bin', 'pipelex'),
+                );
                 if (fs.existsSync(venvPipelex)) {
                     pipelexCmd = venvPipelex;
                 }
@@ -102,9 +107,10 @@ async function registerNodeFeatures(
                 terminal = vscode.window.createTerminal({ name: terminalName });
             }
             const inputsPath = path.join(path.dirname(filePath), 'inputs.json');
-            const inputsArg = fs.existsSync(inputsPath) ? ` --inputs ${shellQuote(inputsPath)}` : '';
+            const quote = isWindows ? winQuote : shellQuote;
+            const inputsArg = fs.existsSync(inputsPath) ? ` --inputs ${quote(inputsPath)}` : '';
             terminal.show();
-            terminal.sendText(`${shellQuote(pipelexCmd)} run bundle ${shellQuote(filePath)}${inputsArg}`);
+            terminal.sendText(`${quote(pipelexCmd)} run bundle ${quote(filePath)}${inputsArg}`);
         })
     );
 
@@ -124,7 +130,12 @@ async function registerNodeFeatures(
     );
 }
 
-/** Escape a path for safe use in a shell command. */
+/** Escape a string for safe use in a POSIX shell command. */
 function shellQuote(s: string): string {
     return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+/** Escape a string for safe use in PowerShell / cmd.exe. */
+function winQuote(s: string): string {
+    return `"${s.replace(/"/g, '\\"')}"`;
 }
