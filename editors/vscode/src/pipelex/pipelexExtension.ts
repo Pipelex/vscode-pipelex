@@ -74,9 +74,38 @@ async function registerNodeFeatures(
         context.subscriptions.push(validator);
     }
 
-    // Run bundle command
     const fs = require('fs') as typeof import('fs');
     const path = require('path') as typeof import('path');
+
+    /** Resolve pipelex command, get/create terminal, and send a command string. */
+    function runInTerminal(filePath: string, uri: vscode.Uri, buildCmd: (quote: (s: string) => string, pipelexCmd: string, inputsArg: string) => string) {
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+        const isWindows = process.platform === 'win32';
+        let pipelexCmd = 'pipelex';
+        if (workspaceFolder) {
+            const venvPipelex = path.join(
+                workspaceFolder.uri.fsPath,
+                isWindows ? path.join('.venv', 'Scripts', 'pipelex.exe')
+                          : path.join('.venv', 'bin', 'pipelex'),
+            );
+            if (fs.existsSync(venvPipelex)) {
+                pipelexCmd = venvPipelex;
+            }
+        }
+        const terminalName = 'Pipelex';
+        let terminal = vscode.window.terminals.find(t => t.name === terminalName);
+        if (!terminal) {
+            terminal = vscode.window.createTerminal({ name: terminalName });
+        }
+        const inputsPath = path.join(path.dirname(filePath), 'inputs.json');
+        const quote = isWindows ? winQuote : shellQuote;
+        const inputsArg = fs.existsSync(inputsPath) ? ` --inputs ${quote(inputsPath)}` : '';
+        terminal.show();
+        const callOp = isWindows ? '& ' : '';
+        terminal.sendText(`${callOp}${buildCmd(quote, pipelexCmd, inputsArg)}`);
+    }
+
+    // Run bundle command
     context.subscriptions.push(
         vscode.commands.registerCommand('pipelex.runBundle', async () => {
             const editor = vscode.window.activeTextEditor;
@@ -88,31 +117,33 @@ async function registerNodeFeatures(
                 await editor.document.save();
             }
             const filePath = editor.document.uri.fsPath;
-            const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
-            const isWindows = process.platform === 'win32';
-            let pipelexCmd = 'pipelex';
-            if (workspaceFolder) {
-                const venvPipelex = path.join(
-                    workspaceFolder.uri.fsPath,
-                    isWindows ? path.join('.venv', 'Scripts', 'pipelex.exe')
-                              : path.join('.venv', 'bin', 'pipelex'),
-                );
-                if (fs.existsSync(venvPipelex)) {
-                    pipelexCmd = venvPipelex;
-                }
-            }
-            const terminalName = 'Pipelex';
-            let terminal = vscode.window.terminals.find(t => t.name === terminalName);
-            if (!terminal) {
-                terminal = vscode.window.createTerminal({ name: terminalName });
-            }
-            const inputsPath = path.join(path.dirname(filePath), 'inputs.json');
-            const quote = isWindows ? winQuote : shellQuote;
-            const inputsArg = fs.existsSync(inputsPath) ? ` --inputs ${quote(inputsPath)}` : '';
-            terminal.show();
-            const callOp = isWindows ? '& ' : '';
-            terminal.sendText(`${callOp}${quote(pipelexCmd)} run bundle ${quote(filePath)}${inputsArg}`);
+            runInTerminal(filePath, editor.document.uri, (quote, cmd, inputsArg) =>
+                `${quote(cmd)} run bundle ${quote(filePath)}${inputsArg}`
+            );
         })
+    );
+
+    // Run individual pipe command (invoked from CodeLens)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('pipelex.runPipe', async (uri: vscode.Uri, pipeName: string) => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor && editor.document.uri.toString() === uri.toString() && editor.document.isDirty) {
+                await editor.document.save();
+            }
+            const filePath = uri.fsPath;
+            runInTerminal(filePath, uri, (quote, cmd, inputsArg) =>
+                `${quote(cmd)} run bundle ${quote(filePath)} --pipe ${pipeName}${inputsArg}`
+            );
+        })
+    );
+
+    // Register CodeLens provider for pipe headers
+    const { PipeCodeLensProvider } = await import('./pipeCodeLensProvider');
+    context.subscriptions.push(
+        vscode.languages.registerCodeLensProvider(
+            { language: 'mthds' },
+            new PipeCodeLensProvider()
+        )
     );
 
     // Method graph webview panel
