@@ -146,6 +146,16 @@
         {
           "command": "pipelex.showMethodGraph",
           "when": "editorLangId == mthds"
+        },
+        {
+          "command": "pipelex.runBundle",
+          "when": "editorLangId == mthds"
+        }
+      ],
+      "editor/title/run": [
+        {
+          "command": "pipelex.runBundle",
+          "when": "resourceLangId == mthds"
         }
       ]
     },
@@ -175,6 +185,11 @@
       {
         "command": "pipelex.showMethodGraph",
         "title": "Pipelex: Show Method Graph"
+      },
+      {
+        "command": "pipelex.runBundle",
+        "title": "Pipelex: Run Bundle",
+        "icon": "$(play)"
       }
     ],
     "semanticTokenTypes": [

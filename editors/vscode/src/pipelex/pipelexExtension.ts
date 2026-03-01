@@ -74,6 +74,46 @@ async function registerNodeFeatures(
         context.subscriptions.push(validator);
     }
 
+    // Run bundle command
+    const fs = require('fs') as typeof import('fs');
+    const path = require('path') as typeof import('path');
+    context.subscriptions.push(
+        vscode.commands.registerCommand('pipelex.runBundle', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.languageId !== 'mthds') {
+                vscode.window.showWarningMessage('Open an MTHDS file to run.');
+                return;
+            }
+            if (editor.document.isDirty) {
+                await editor.document.save();
+            }
+            const filePath = editor.document.uri.fsPath;
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+            const isWindows = process.platform === 'win32';
+            let pipelexCmd = 'pipelex';
+            if (workspaceFolder) {
+                const venvPipelex = path.join(
+                    workspaceFolder.uri.fsPath,
+                    isWindows ? path.join('.venv', 'Scripts', 'pipelex.exe')
+                              : path.join('.venv', 'bin', 'pipelex'),
+                );
+                if (fs.existsSync(venvPipelex)) {
+                    pipelexCmd = venvPipelex;
+                }
+            }
+            const terminalName = 'Pipelex';
+            let terminal = vscode.window.terminals.find(t => t.name === terminalName);
+            if (!terminal) {
+                terminal = vscode.window.createTerminal({ name: terminalName });
+            }
+            const inputsPath = path.join(path.dirname(filePath), 'inputs.json');
+            const quote = isWindows ? winQuote : shellQuote;
+            const inputsArg = fs.existsSync(inputsPath) ? ` --inputs ${quote(inputsPath)}` : '';
+            terminal.show();
+            terminal.sendText(`${quote(pipelexCmd)} run bundle ${quote(filePath)}${inputsArg}`);
+        })
+    );
+
     // Method graph webview panel
     const { MethodGraphPanel } = await import('./graph/methodGraphPanel');
     const graphPanel = new MethodGraphPanel(getOutput());
@@ -88,4 +128,14 @@ async function registerNodeFeatures(
             graphPanel.show(editor.document.uri);
         })
     );
+}
+
+/** Escape a string for safe use in a POSIX shell command. */
+function shellQuote(s: string): string {
+    return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+/** Escape a string for safe use in PowerShell / cmd.exe. */
+function winQuote(s: string): string {
+    return `"${s.replace(/"/g, '\\"')}"`;
 }
