@@ -34,8 +34,8 @@ exclude = [
 # Global formatting defaults
 # =============================================================================
 # These apply to every file matched by `include` unless overridden by a
-# [[rule]].formatting section below.  Every option is shown at its built-in
-# default so you can tune any of them in one place.
+# [[rule]].formatting section below.  Options are shown at their built-in
+# defaults unless noted otherwise.
 
 [formatting]
 align_entries         = false # line up "=" signs across consecutive entries

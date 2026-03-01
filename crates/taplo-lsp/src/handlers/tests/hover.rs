@@ -494,3 +494,64 @@ fn test_build_model_hover_pipe_type_without_prefix() {
     let content = build_model_hover("$gpt-4o", Some("SomethingElse"));
     assert_eq!(content, "**gpt-4o** — model preset", "got: {content}");
 }
+
+// ---------------------------------------------------------------------------
+// classify_reference edge cases: degenerate concept qualifiers
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_classify_reference_bare_brackets_returns_none() {
+    let src = r#"
+domain = "test"
+
+[pipe.my_pipe]
+type = "PipeLLM"
+output = "[]"
+prompt = "hello"
+"#;
+    let offset = offset_inside_string(src, r#"output = "[]""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    assert!(
+        classify_reference(&query).is_none(),
+        "bare brackets should not classify as a valid reference"
+    );
+}
+
+#[test]
+fn test_classify_reference_lone_dot_returns_none() {
+    let src = r#"
+domain = "test"
+
+[pipe.my_pipe]
+type = "PipeLLM"
+output = "."
+prompt = "hello"
+"#;
+    let offset = offset_inside_string(src, r#"output = ".""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    assert!(
+        classify_reference(&query).is_none(),
+        "lone dot should not classify as a valid reference"
+    );
+}
+
+#[test]
+fn test_classify_reference_specific_count_only_returns_none() {
+    let src = r#"
+domain = "test"
+
+[pipe.my_pipe]
+type = "PipeLLM"
+output = "[5]"
+prompt = "hello"
+"#;
+    let offset = offset_inside_string(src, r#"output = "[5]""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    assert!(
+        classify_reference(&query).is_none(),
+        "specific count only should not classify as a valid reference"
+    );
+}

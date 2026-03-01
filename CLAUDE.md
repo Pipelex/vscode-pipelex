@@ -39,7 +39,7 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - `make ext-install` - Build, package, and install the `.vsix` into Cursor or VS Code
 - `make ext-uninstall` - Uninstall the extension from the IDE
 - `make test` - Run all tests (Rust crates + VS Code extension vitest)
-- `make check` - Quick compilation checks (CLI + WASM target)
+- `make check` - **Full quality gate**: fmt check, plxt fmt check, clippy (`-D warnings`), all crate tests, vitest, and WASM check. Always run after code changes.
 - `make clean` - Remove all build artifacts (cargo, JS dist, VSIX)
 - `make sync-grammar` - Copy MTHDS TextMate grammar to the website repo
 
@@ -57,6 +57,7 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - **Package manager**: Yarn 4 (via corepack)
 - **Main branch**: `main`
 - **Rust formatter**: rustfmt (config in `rustfmt.toml`)
+- **Clippy**: runs with `-D warnings` in `make check`. Notably, `#[cfg(test)] mod tests` must be the **last item** in any Rust file (`items_after_test_module` lint).
 - **TOML formatter**: taplo (config in `taplo.toml`)
 - **No ESLint/Prettier** for TypeScript code in editors/vscode
 - **GitHub organization**: Pipelex (repo: `Pipelex/vscode-pipelex`)

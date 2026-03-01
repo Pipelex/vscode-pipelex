@@ -207,6 +207,10 @@ pub(crate) fn classify_reference(query: &Query) -> Option<ClassifiedReference> {
         ReferenceKind::Pipe => raw_ref_name,
     };
 
+    if ref_name.is_empty() {
+        return None;
+    }
+
     Some(ClassifiedReference { kind, ref_name })
 }
 
@@ -293,4 +297,54 @@ pub(crate) fn is_inside_inputs_inline_table(token: &taplo::syntax::SyntaxToken) 
         .flat_map(|key| key.descendants_with_tokens())
         .filter_map(|t| t.into_token())
         .any(|t| t.kind() == SyntaxKind::IDENT && t.text() == "inputs")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_concept_qualifiers;
+
+    #[test]
+    fn strip_bare_brackets() {
+        assert_eq!(strip_concept_qualifiers("[]"), "");
+    }
+
+    #[test]
+    fn strip_lone_dot() {
+        assert_eq!(strip_concept_qualifiers("."), "");
+    }
+
+    #[test]
+    fn strip_specific_count_only() {
+        assert_eq!(strip_concept_qualifiers("[5]"), "");
+    }
+
+    #[test]
+    fn strip_domain_and_brackets() {
+        assert_eq!(strip_concept_qualifiers("domain.[]"), "");
+    }
+
+    #[test]
+    fn strip_normal_concept_unchanged() {
+        assert_eq!(strip_concept_qualifiers("Analysis"), "Analysis");
+    }
+
+    #[test]
+    fn strip_indefinite_multiplicity() {
+        assert_eq!(strip_concept_qualifiers("Slide[]"), "Slide");
+    }
+
+    #[test]
+    fn strip_specific_multiplicity() {
+        assert_eq!(strip_concept_qualifiers("Page[5]"), "Page");
+    }
+
+    #[test]
+    fn strip_domain_prefix() {
+        assert_eq!(strip_concept_qualifiers("images.Photo"), "Photo");
+    }
+
+    #[test]
+    fn strip_domain_prefix_and_multiplicity() {
+        assert_eq!(strip_concept_qualifiers("legal.Contract[]"), "Contract");
+    }
 }
