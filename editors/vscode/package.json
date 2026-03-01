@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -154,6 +154,22 @@
         {
           "command": "pipelex.runPipe",
           "when": "false"
+        },
+        {
+          "command": "pipelex.toggleRunPipeCodeLens",
+          "when": "editorLangId == mthds"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "pipelex.showMethodGraph",
+          "when": "resourceLangId == mthds",
+          "group": "navigation"
+        },
+        {
+          "command": "pipelex.toggleRunPipeCodeLens",
+          "when": "resourceLangId == mthds",
+          "group": "navigation"
         }
       ],
       "editor/title/run": [
@@ -188,7 +204,13 @@
       },
       {
         "command": "pipelex.showMethodGraph",
-        "title": "Pipelex: Show Method Graph"
+        "title": "Pipelex: Show Method Graph",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "pipelex.toggleRunPipeCodeLens",
+        "title": "Pipelex: Toggle Run Pipe CodeLens",
+        "icon": "$(play-circle)"
       },
       {
         "command": "pipelex.runBundle",
@@ -491,6 +513,12 @@
         },
         "pipelex.mthds.semanticTokens": {
           "description": "Enable semantic tokens for MTHDS files (adds declaration/reference distinction).",
+          "type": "boolean",
+          "scope": "resource",
+          "default": true
+        },
+        "pipelex.mthds.runPipeCodeLens": {
+          "description": "Show 'Run Pipe' CodeLens above pipe headers in MTHDS files.",
           "type": "boolean",
           "scope": "resource",
           "default": true

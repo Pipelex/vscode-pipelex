@@ -137,13 +137,43 @@ async function registerNodeFeatures(
         })
     );
 
-    // Register CodeLens provider for pipe headers
+    // Register CodeLens provider for pipe headers (togglable via setting)
     const { PipeCodeLensProvider } = await import('./pipeCodeLensProvider');
-    context.subscriptions.push(
-        vscode.languages.registerCodeLensProvider(
+    let codeLensRegistration: vscode.Disposable | undefined;
+
+    function registerCodeLens() {
+        codeLensRegistration = vscode.languages.registerCodeLensProvider(
             { language: 'mthds' },
             new PipeCodeLensProvider()
-        )
+        );
+        context.subscriptions.push(codeLensRegistration);
+    }
+
+    if (config.get<boolean>('mthds.runPipeCodeLens', true)) {
+        registerCodeLens();
+    }
+
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('pipelex.mthds.runPipeCodeLens')) {
+                const enabled = vscode.workspace.getConfiguration('pipelex')
+                    .get<boolean>('mthds.runPipeCodeLens', true);
+                if (enabled && !codeLensRegistration) {
+                    registerCodeLens();
+                } else if (!enabled && codeLensRegistration) {
+                    codeLensRegistration.dispose();
+                    codeLensRegistration = undefined;
+                }
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('pipelex.toggleRunPipeCodeLens', () => {
+            const cfg = vscode.workspace.getConfiguration('pipelex');
+            const current = cfg.get<boolean>('mthds.runPipeCodeLens', true);
+            cfg.update('mthds.runPipeCodeLens', !current);
+        })
     );
 
     // Method graph webview panel

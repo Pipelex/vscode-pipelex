@@ -22,6 +22,7 @@ vi.mock('vscode', () => ({
             get: (_key: string, def: any) => def,
         }),
         onDidOpenTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
     },
     window: {
         showWarningMessage: mockState.showWarningMessage,
@@ -106,6 +107,16 @@ describe('registerPipelexFeatures', () => {
         // After awaiting, the showMethodGraph command should be registered
         expect(mockState.registerCommand).toHaveBeenCalledWith(
             'pipelex.showMethodGraph',
+            expect.any(Function)
+        );
+    });
+
+    it('registers toggleRunPipeCodeLens command', async () => {
+        const context = makeContext();
+        await registerPipelexFeatures(context);
+
+        expect(mockState.registerCommand).toHaveBeenCalledWith(
+            'pipelex.toggleRunPipeCodeLens',
             expect.any(Function)
         );
     });
