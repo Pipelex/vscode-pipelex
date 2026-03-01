@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
 import { getOutput } from '../util';
@@ -75,8 +77,6 @@ async function registerNodeFeatures(
     }
 
     // Run bundle command
-    const fs = require('fs');
-    const path = require('path');
     context.subscriptions.push(
         vscode.commands.registerCommand('pipelex.runBundle', async () => {
             const editor = vscode.window.activeTextEditor;
@@ -102,9 +102,9 @@ async function registerNodeFeatures(
                 terminal = vscode.window.createTerminal({ name: terminalName });
             }
             const inputsPath = path.join(path.dirname(filePath), 'inputs.json');
-            const inputsArg = fs.existsSync(inputsPath) ? ` --inputs '${inputsPath}'` : '';
+            const inputsArg = fs.existsSync(inputsPath) ? ` --inputs ${shellQuote(inputsPath)}` : '';
             terminal.show();
-            terminal.sendText(`'${pipelexCmd}' run bundle '${filePath}'${inputsArg}`);
+            terminal.sendText(`${shellQuote(pipelexCmd)} run bundle ${shellQuote(filePath)}${inputsArg}`);
         })
     );
 
@@ -122,4 +122,9 @@ async function registerNodeFeatures(
             graphPanel.show(editor.document.uri);
         })
     );
+}
+
+/** Escape a path for safe use in a shell command. */
+function shellQuote(s: string): string {
+    return `'${s.replace(/'/g, "'\\''")}'`;
 }
