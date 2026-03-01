@@ -1,18 +1,21 @@
 # Test: Concept table header variations
 # Covers: [concept], [concept.Name], [concept.Name.structure], generic tables
 
+domain      = "test_concept-tables"
+description = "Test fixture for concept tables"
+
 [concept]
 Name = "Description"
 
 [concept.FeatureAnalysis]
-definition = "Analysis of features"
+description = "Analysis of features"
 
 [concept.FeatureAnalysis.structure]
-field = { type = "text", required = true }
+field       = { type = "text", required = true }
 description = "A plain text field"
-nested_ref = { type = "text", definition = "Nested field definition" }
+nested_ref  = { type = "text", description = "Nested field definition" }
 
 # Namespaced concept in refines
 [concept.ImagePrompt]
-definition = "A prompt for image generation"
-refines = "images.ImgGenPrompt"
+description = "A prompt for image generation"
+refines    = "images.ImgGenPrompt"

@@ -284,9 +284,7 @@ impl<E: Environment> SchemaAssociations<E> {
                     if let Some(assoc) =
                         schema_association_from_opts(schema_opts, priority::CONFIG_RULE)
                     {
-                        self.associations
-                            .write()
-                            .push((file_rule.into(), assoc));
+                        self.associations.write().push((file_rule.into(), assoc));
                     }
                 }
             }
@@ -298,12 +296,8 @@ impl<E: Environment> SchemaAssociations<E> {
 
         if let Some(schema_opts) = &config.global_options.schema {
             if schema_opts.enabled.unwrap_or(true) {
-                if let Some(assoc) =
-                    schema_association_from_opts(schema_opts, priority::CONFIG)
-                {
-                    self.associations
-                        .write()
-                        .push((file_rule.into(), assoc));
+                if let Some(assoc) = schema_association_from_opts(schema_opts, priority::CONFIG) {
+                    self.associations.write().push((file_rule.into(), assoc));
                 }
             }
         }
@@ -581,6 +575,7 @@ pub struct SchemaAssociation {
 }
 
 impl SchemaAssociation {
+    #[must_use]
     pub fn all_urls(&self) -> Vec<&Url> {
         std::iter::once(&self.url)
             .chain(self.fallback_urls.iter())
@@ -638,12 +633,7 @@ mod tests {
             ]),
         };
 
-        let assoc =
-            schema_association_from_opts(
-                &opts,
-                priority::CONFIG,
-            )
-            .unwrap();
+        let assoc = schema_association_from_opts(&opts, priority::CONFIG).unwrap();
 
         assert_eq!(assoc.url.as_str(), "file:///first/schema.json");
         assert_eq!(assoc.fallback_urls.len(), 2);
@@ -667,11 +657,7 @@ mod tests {
             resolved_sources: Some(vec![]),
         };
 
-        let assoc =
-            schema_association_from_opts(
-                &opts,
-                priority::CONFIG,
-            );
+        let assoc = schema_association_from_opts(&opts, priority::CONFIG);
 
         assert!(assoc.is_none());
     }
@@ -686,17 +672,9 @@ mod tests {
             resolved_sources: None,
         };
 
-        let assoc =
-            schema_association_from_opts(
-                &opts,
-                priority::CONFIG,
-            )
-            .unwrap();
+        let assoc = schema_association_from_opts(&opts, priority::CONFIG).unwrap();
 
-        assert_eq!(
-            assoc.url.as_str(),
-            "https://legacy.example.com/schema.json"
-        );
+        assert_eq!(assoc.url.as_str(), "https://legacy.example.com/schema.json");
         assert!(assoc.fallback_urls.is_empty());
     }
 
@@ -710,11 +688,7 @@ mod tests {
             resolved_sources: None,
         };
 
-        let assoc =
-            schema_association_from_opts(
-                &opts,
-                priority::CONFIG,
-            );
+        let assoc = schema_association_from_opts(&opts, priority::CONFIG);
 
         assert!(assoc.is_none());
     }

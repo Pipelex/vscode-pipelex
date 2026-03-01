@@ -71,7 +71,7 @@ const typeEntry = {
 // 5. model = "$sigil-ref"
 const modelEntry = {
   name: "meta.entry.model.mthds",
-  match: '\\s*(model)\\s*(=)\\s*(")([$@~])([a-zA-Z][a-zA-Z0-9_-]*)(")',
+  match: '\\s*(model)\\s*(=)\\s*(")([$@~#])([a-zA-Z][a-zA-Z0-9_-]*)(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
@@ -79,6 +79,19 @@ const modelEntry = {
     4: { name: "punctuation.definition.model-sigil.mthds" },
     5: { name: "entity.name.model-ref.mthds" },
     6: { name: "punctuation.definition.string.end.mthds" },
+  },
+};
+
+// 5b. model = "bare-model-name" (no sigil)
+const modelBareEntry = {
+  name: "meta.entry.model.mthds",
+  match: '\\s*(model)\\s*(=)\\s*(")([a-zA-Z][a-zA-Z0-9_.:-]*)(")',
+  captures: {
+    1: { name: "support.type.property-name.mthds" },
+    2: { name: "punctuation.eq.mthds" },
+    3: { name: "punctuation.definition.string.begin.mthds" },
+    4: { name: "entity.name.model-ref.mthds" },
+    5: { name: "punctuation.definition.string.end.mthds" },
   },
 };
 
@@ -214,10 +227,12 @@ const pipeRefEntry = {
 // 11. key = "domain.ConceptType[]" (concept-type value, catch-all for inputs etc.)
 // Matches any lowercase key whose value looks like a concept type reference.
 // Placed before genericEntry so it wins when the value is PascalCase.
+// Negative lookahead excludes keys that are NOT concept references but can have PascalCase values.
+const NON_CONCEPT_KEYS = 'description|prompt|system_prompt|name|model_to_structure';
 const conceptValueEntry = {
   name: "meta.entry.concept-value.mthds",
   match:
-    '\\s*([a-z][a-z0-9_]*)\\s*(=)\\s*(")'
+    `\\s*((?!(?:${NON_CONCEPT_KEYS})\\b)[a-z][a-z0-9_]*)\\s*(=)\\s*(")`
     + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
     + '([A-Z][A-Za-z0-9]*)'         // ConceptName
     + MULTIPLICITY
@@ -269,6 +284,7 @@ export const entryBegin = {
     refinesEntry,
     typeEntry,
     modelEntry,
+    modelBareEntry,
     jinja2Block,
     jinja2Line,
     promptBlock,

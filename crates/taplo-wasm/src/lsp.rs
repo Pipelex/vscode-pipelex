@@ -63,7 +63,7 @@ impl Sink<rpc::Message> for WasmLspInterface {
         message: rpc::Message,
     ) -> Result<(), Self::Error> {
         let this = JsValue::null();
-        
+
         // Workaround: serde_wasm_bindgen::to_value drops complex content
         // Convert to JSON string then parse to avoid the serialization bug
         let js_value = if message.result.is_some() || message.params.is_some() {
@@ -72,10 +72,8 @@ impl Sink<rpc::Message> for WasmLspInterface {
         } else {
             serde_wasm_bindgen::to_value(&message).unwrap()
         };
-        
-        self.js_on_message
-            .call1(&this, &js_value)
-            .unwrap();
+
+        self.js_on_message.call1(&this, &js_value).unwrap();
         Ok(())
     }
 

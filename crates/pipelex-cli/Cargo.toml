@@ -10,11 +10,16 @@ homepage     = { workspace = true }
 repository   = { workspace = true }
 
 [features]
-default     = ["completions", "lint", "lsp", "rustls-tls"]
-lint        = ["reqwest", "taplo-cli/lint", "taplo-common/reqwest", "taplo-common/schema"]
-lsp         = ["async-ctrlc", "lint", "taplo-cli/lsp", "taplo-lsp"]
-native-tls  = ["taplo-common/native-tls", "taplo-lsp?/native-tls"]
-rustls-tls  = ["taplo-common/rustls-tls", "taplo-lsp?/rustls-tls"]
+default = ["completions", "lint", "lsp", "rustls-tls"]
+lint = [
+  "reqwest",
+  "taplo-cli/lint",
+  "taplo-common/reqwest",
+  "taplo-common/schema",
+]
+lsp = ["async-ctrlc", "lint", "taplo-cli/lsp", "taplo-lsp"]
+native-tls = ["taplo-common/native-tls", "taplo-lsp?/native-tls"]
+rustls-tls = ["taplo-common/rustls-tls", "taplo-lsp?/rustls-tls"]
 completions = ["dep:clap_complete"]
 
 [dependencies]
@@ -29,12 +34,22 @@ toml    = { version = "0.7" }
 tracing = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-lsp-async-stub = { version = "0.7.0", path = "../lsp-async-stub", features = ["tokio-tcp", "tokio-stdio"] }
+lsp-async-stub = { version = "0.7.0", path = "../lsp-async-stub", features = [
+  "tokio-tcp",
+  "tokio-stdio",
+] }
 
 async-ctrlc   = { version = "1.2.0", features = ["stream"], optional = true }
 clap_complete = { version = "4.4.18", optional = true }
 
-tokio = { workspace = true, features = ["sync", "fs", "time", "io-std", "rt-multi-thread", "parking_lot"] }
+tokio = { workspace = true, features = [
+  "sync",
+  "fs",
+  "time",
+  "io-std",
+  "rt-multi-thread",
+  "parking_lot",
+] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 tokio   = { workspace = true, features = ["sync", "parking_lot", "io-util"] }
@@ -48,3 +63,6 @@ optional  = true
 [[bin]]
 name = "plxt"
 path = "bin/plxt.rs"
+
+[lints]
+workspace = true

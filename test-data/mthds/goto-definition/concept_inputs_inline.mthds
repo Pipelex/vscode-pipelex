@@ -1,3 +1,6 @@
+domain      = "test_concept_inputs_inline"
+description = "Test fixture for concept inputs inline"
+
 [concept.FeatureAnalysis]
 description = "Feature analysis"
 

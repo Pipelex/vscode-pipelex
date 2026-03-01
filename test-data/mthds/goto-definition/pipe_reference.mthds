@@ -1,3 +1,6 @@
+domain      = "test_pipe_reference"
+description = "Test fixture for pipe reference"
+
 [pipe.my_pipe]
 description = "A pipe"
 

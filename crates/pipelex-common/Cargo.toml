@@ -19,10 +19,21 @@ tracing     = { workspace = true }
 url         = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { workspace = true, features = ["fs", "io-std", "io-util", "parking_lot", "rt", "sync", "time"] }
+tokio = { workspace = true, features = [
+  "fs",
+  "io-std",
+  "io-util",
+  "parking_lot",
+  "rt",
+  "sync",
+  "time",
+] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 tokio = { workspace = true, features = ["io-util", "parking_lot", "sync"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

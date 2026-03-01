@@ -275,4 +275,32 @@ describe('MTHDS TextMate grammar — concept-value entry patterns (inputs etc.)'
     expect(multiplicity.length).toBe(1);
     expect(multiplicity[0].text).toBe('[]');
   });
+
+  it('does NOT apply concept coloring to description = "SomeText"', () => {
+    const line = 'description = "SomeText"';
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(0);
+  });
+
+  it('does NOT apply concept coloring to prompt = "Analyze"', () => {
+    const line = 'prompt = "Analyze"';
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(0);
+  });
+
+  it('does NOT apply concept coloring to system_prompt = "You"', () => {
+    const line = 'system_prompt = "You"';
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(0);
+  });
+
+  it('does NOT apply concept coloring to name = "MyPipeline"', () => {
+    const line = 'name = "MyPipeline"';
+
+    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    expect(concept.length).toBe(0);
+  });
 });

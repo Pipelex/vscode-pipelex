@@ -109,7 +109,7 @@ pub async fn initialize<E: Environment>(
         }),
         offset_encoding: None,
     };
-    
+
     Ok(result)
 }
 
