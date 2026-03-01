@@ -140,8 +140,14 @@ pub(crate) fn extract_string_value(position_info: &PositionInfo) -> String {
 }
 
 /// Check whether the cursor is on a `model` or `model_to_structure` string value.
+///
+/// Returns `false` if the token is inside an `inputs = { … }` inline table,
+/// since an input parameter named `model` is a concept reference, not a model field.
 pub(crate) fn is_model_field(query: &Query) -> bool {
-    if find_string_position_info(query).is_none() {
+    let Some(position_info) = find_string_position_info(query) else {
+        return false;
+    };
+    if is_inside_inputs_inline_table(&position_info.syntax) {
         return false;
     }
     let Some(entry_key_node) = query.entry_key() else {

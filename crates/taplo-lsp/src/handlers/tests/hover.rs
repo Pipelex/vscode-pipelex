@@ -441,6 +441,27 @@ prompt = "hello"
 }
 
 #[test]
+fn test_hover_model_field_not_inside_inputs_inline_table() {
+    let src = r#"
+domain = "test"
+
+[pipe.my_pipe]
+type = "PipeLLM"
+model = "$gpt-4o"
+output = "Text"
+inputs = { model = "CustomConcept" }
+prompt = "hello"
+"#;
+    let offset = offset_inside_string(src, r#"model = "CustomConcept""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    assert!(
+        !is_model_field(&query),
+        "model inside inputs inline table should not be detected as model field"
+    );
+}
+
+#[test]
 fn test_build_model_hover_with_pipe_type() {
     let content = build_model_hover("$gpt-4o", Some("PipeLLM"));
     assert_eq!(content, "**gpt-4o** — LLM model preset", "got: {content}");
