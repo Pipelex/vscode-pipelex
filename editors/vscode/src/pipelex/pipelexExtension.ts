@@ -74,6 +74,40 @@ async function registerNodeFeatures(
         context.subscriptions.push(validator);
     }
 
+    // Run bundle command
+    const fs = require('fs');
+    const path = require('path');
+    context.subscriptions.push(
+        vscode.commands.registerCommand('pipelex.runBundle', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.languageId !== 'mthds') {
+                vscode.window.showWarningMessage('Open an MTHDS file to run.');
+                return;
+            }
+            if (editor.document.isDirty) {
+                await editor.document.save();
+            }
+            const filePath = editor.document.uri.fsPath;
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+            let pipelexCmd = 'pipelex';
+            if (workspaceFolder) {
+                const venvPipelex = path.join(workspaceFolder.uri.fsPath, '.venv', 'bin', 'pipelex');
+                if (fs.existsSync(venvPipelex)) {
+                    pipelexCmd = venvPipelex;
+                }
+            }
+            const terminalName = 'Pipelex';
+            let terminal = vscode.window.terminals.find(t => t.name === terminalName);
+            if (!terminal) {
+                terminal = vscode.window.createTerminal({ name: terminalName });
+            }
+            const inputsPath = path.join(path.dirname(filePath), 'inputs.json');
+            const inputsArg = fs.existsSync(inputsPath) ? ` --inputs '${inputsPath}'` : '';
+            terminal.show();
+            terminal.sendText(`'${pipelexCmd}' run bundle '${filePath}'${inputsArg}`);
+        })
+    );
+
     // Method graph webview panel
     const { MethodGraphPanel } = await import('./graph/methodGraphPanel');
     const graphPanel = new MethodGraphPanel(getOutput());
