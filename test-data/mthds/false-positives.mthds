@@ -1,9 +1,12 @@
 # Test: Ensure plain strings are NOT colored as Jinja/HTML/injections
 # Covers: literal strings (no MTHDS patterns), plain definition values, structure fields
 
+domain      = "test_false-positives"
+description = "Test fixture for false positives"
+
 [concept.PlainText]
-definition = "A simple text concept with words that could false-match"
-description = "The variable foo should not be colored"
+description  = "A simple text concept with words that could false-match"
+remark = "The variable foo should not be colored"
 
 # Literal strings must NOT match @injection or $template or {{ jinja }}
 note = 'Literal string: @not_injection $not_template {{ not_jinja }}'
@@ -17,10 +20,10 @@ $also_not_template
 # Structure fields with type = "text" should NOT get pipe-type coloring
 [concept.PlainText.structure]
 field_a = { type = "text", required = true }
-field_b = { type = "text", definition = "A plain text field" }
+field_b = { type = "text", description = "A plain text field" }
 
 # Boolean and number values
 enabled = true
-count = 42
-ratio = 3.14
+count   = 42
+ratio   = 3.14
 hex_val = 0xFF

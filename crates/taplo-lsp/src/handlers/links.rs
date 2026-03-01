@@ -70,11 +70,7 @@ pub async fn links<E: Environment>(
                 }
             };
 
-            let schemas = match ws
-                .schemas
-                .schemas_at_path(&schema_url, &value, &keys)
-                .await
-            {
+            let schemas = match ws.schemas.schemas_at_path(&schema_url, &value, &keys).await {
                 Ok(s) => s,
                 Err(error) => {
                     tracing::error!(?error, "failed to collect schemas");

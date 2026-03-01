@@ -221,7 +221,10 @@ impl<E: Environment> Taplo<E> {
 
         for path in files {
             if path.extension().map_or(false, |ext| ext == "plx") {
-                tracing::warn!(?path, "the .plx file extension is deprecated, rename to .mthds");
+                tracing::warn!(
+                    ?path,
+                    "the .plx file extension is deprecated, rename to .mthds"
+                );
             }
 
             let format_opts = self.format_options(&config, &cmd, &path)?;

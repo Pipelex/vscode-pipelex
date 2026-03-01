@@ -1,6 +1,7 @@
 const BARE_KEY = `(?:[A-Za-z0-9_+-]+)`;
 const QUOTED_KEY = `(?:"[^"]+")|(?:'[^']+')`;
 const ANY_KEY = `(?:${BARE_KEY})|${QUOTED_KEY}`;
+const MULTIPLICITY = '(\\[\\d*\\])?'; // multiplicity []/[N] (optional)
 
 // 1. pipe.name = (pipe entry)
 const pipeEntry = {
@@ -29,33 +30,30 @@ const pipeEntry = {
   },
 };
 
-// 2. output = "ConceptType"
-const outputEntry = {
-  name: "meta.entry.output-type.mthds",
-  match:
-    '\\s*(output)\\s*(=)\\s*(")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(")',
-  captures: {
-    1: { name: "support.type.property-name.mthds" },
-    2: { name: "punctuation.eq.mthds" },
-    3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "support.type.concept.mthds" },
-    5: { name: "punctuation.definition.string.end.mthds" },
-  },
-};
-
-// 3. refines = "ConceptType"
-const refinesEntry = {
-  name: "meta.entry.refines-type.mthds",
-  match:
-    '\\s*(refines)\\s*(=)\\s*(")((?:[a-z][a-z0-9_]*\\.)?[A-Za-z][A-Za-z0-9]*(?:\\.[A-Za-z][A-Za-z0-9]*)*)(")',
-  captures: {
-    1: { name: "support.type.property-name.mthds" },
-    2: { name: "punctuation.eq.mthds" },
-    3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "support.type.concept.mthds" },
-    5: { name: "punctuation.definition.string.end.mthds" },
-  },
-};
+// 2–3. output/refines = "ConceptType" or "domain.ConceptType" or "ConceptType[]"
+function makeConceptRefEntry(keyword: 'output' | 'refines') {
+  return {
+    name: `meta.entry.${keyword}-type.mthds`,
+    match:
+      `\\s*(${keyword})\\s*(=)\\s*(")`
+      + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
+      + '([A-Z][A-Za-z0-9]*)'         // ConceptName
+      + MULTIPLICITY
+      + '(")',
+    captures: {
+      1: { name: "support.type.property-name.mthds" },
+      2: { name: "punctuation.eq.mthds" },
+      3: { name: "punctuation.definition.string.begin.mthds" },
+      4: { name: "entity.other.pipe-domain.mthds" },
+      5: { name: "punctuation.separator.dot.mthds" },
+      6: { name: "support.type.concept.mthds" },
+      7: { name: "punctuation.definition.multiplicity.mthds" },
+      8: { name: "punctuation.definition.string.end.mthds" },
+    },
+  };
+}
+const outputEntry = makeConceptRefEntry('output');
+const refinesEntry = makeConceptRefEntry('refines');
 
 // 4. type = "PipeType" (NEW)
 const typeEntry = {
@@ -73,7 +71,7 @@ const typeEntry = {
 // 5. model = "$sigil-ref"
 const modelEntry = {
   name: "meta.entry.model.mthds",
-  match: '\\s*(model)\\s*(=)\\s*(")([$@~])([a-zA-Z][a-zA-Z0-9_-]*)(")',
+  match: '\\s*(model)\\s*(=)\\s*(")([$@~#])([a-zA-Z][a-zA-Z0-9_-]*)(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
@@ -81,6 +79,19 @@ const modelEntry = {
     4: { name: "punctuation.definition.model-sigil.mthds" },
     5: { name: "entity.name.model-ref.mthds" },
     6: { name: "punctuation.definition.string.end.mthds" },
+  },
+};
+
+// 5b. model = "bare-model-name" (no sigil)
+const modelBareEntry = {
+  name: "meta.entry.model.mthds",
+  match: '\\s*(model)\\s*(=)\\s*(")([a-zA-Z][a-zA-Z0-9_.:-]*)(")',
+  captures: {
+    1: { name: "support.type.property-name.mthds" },
+    2: { name: "punctuation.eq.mthds" },
+    3: { name: "punctuation.definition.string.begin.mthds" },
+    4: { name: "entity.name.model-ref.mthds" },
+    5: { name: "punctuation.definition.string.end.mthds" },
   },
 };
 
@@ -169,20 +180,76 @@ const promptLine = {
   patterns: promptIncludes,
 };
 
-// 10. pipe = "pipe_name" (NEW — colorize pipe name value in step objects)
-const pipeRefEntry = {
-  name: "meta.entry.pipe-ref.mthds",
-  match: '\\s*(pipe)\\s*(=)\\s*(")((?:[a-z][a-z0-9_]*)(?:\\.[a-z][a-z0-9_]*)*)(")',
+// 10a. pipe = "host/Owner/repo/package->domain.pipe_code" (full package ref)
+const pipeRefPackageEntry = {
+  name: "meta.entry.pipe-ref-package.mthds",
+  match:
+    '\\s*(pipe)\\s*(=)\\s*(")'
+    + '([a-z][a-z0-9.-]*(?:/[A-Za-z][A-Za-z0-9_-]*){2})' // repo: host/owner/repo
+    + '(/[a-z][a-z0-9_]*)'                                 // /package
+    + '(->)'                                                // arrow
+    + '(?:([a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)*)(\\.))?'  // domain + dot (optional)
+    + '([a-z][a-z0-9_]*)'                                      // pipe_code
+    + '(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "support.function.pipe-name.mthds" },
-    5: { name: "punctuation.definition.string.end.mthds" },
+    4: { name: "entity.name.package-address.mthds" },          // muted slate
+    5: { name: "entity.name.package-address.mthds" },          // muted slate
+    6: { name: "punctuation.separator.pipe-ref-arrow.mthds" }, // pink
+    7: { name: "entity.other.pipe-domain.mthds" },             // mid-gray
+    8: { name: "punctuation.separator.dot.mthds" },            // dot before pipe_code
+    9: { name: "support.function.pipe-name.mthds" },           // coral bold
+    10: { name: "punctuation.definition.string.end.mthds" },
   },
 };
 
-// 11. Generic entry (fallback)
+// 10b. pipe = "domain.pipe_code" or pipe = "pipe_code" (local ref)
+const pipeRefEntry = {
+  name: "meta.entry.pipe-ref.mthds",
+  match:
+    '\\s*(pipe)\\s*(=)\\s*(")'
+    + '(?:([a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)*)(\\.))?'  // domain + dot (optional)
+    + '([a-z][a-z0-9_]*)'                                     // pipe_code
+    + '(")',
+  captures: {
+    1: { name: "support.type.property-name.mthds" },
+    2: { name: "punctuation.eq.mthds" },
+    3: { name: "punctuation.definition.string.begin.mthds" },
+    4: { name: "entity.other.pipe-domain.mthds" },             // mid-gray (optional)
+    5: { name: "punctuation.separator.dot.mthds" },             // dot before pipe_code
+    6: { name: "support.function.pipe-name.mthds" },           // coral bold
+    7: { name: "punctuation.definition.string.end.mthds" },
+  },
+};
+
+// 11. key = "domain.ConceptType[]" (concept-type value, catch-all for inputs etc.)
+// Matches any lowercase key whose value looks like a concept type reference.
+// Placed before genericEntry so it wins when the value is PascalCase.
+// Negative lookahead excludes keys that are NOT concept references but can have PascalCase values.
+const NON_CONCEPT_KEYS = 'description|prompt|system_prompt|name|model_to_structure';
+const conceptValueEntry = {
+  name: "meta.entry.concept-value.mthds",
+  match:
+    `\\s*((?!(?:${NON_CONCEPT_KEYS})\\b)[a-z][a-z0-9_]*)\\s*(=)\\s*(")`
+    + '(?:([a-z][a-z0-9_]*)(\\.))?' // domain + dot (optional)
+    + '([A-Z][A-Za-z0-9]*)'         // ConceptName
+    + MULTIPLICITY
+    + '(")',
+  captures: {
+    1: { name: "support.type.property-name.mthds" },
+    2: { name: "punctuation.eq.mthds" },
+    3: { name: "punctuation.definition.string.begin.mthds" },
+    4: { name: "entity.other.pipe-domain.mthds" },
+    5: { name: "punctuation.separator.dot.mthds" },
+    6: { name: "support.type.concept.mthds" },
+    7: { name: "punctuation.definition.multiplicity.mthds" },
+    8: { name: "punctuation.definition.string.end.mthds" },
+  },
+};
+
+// 12. Generic entry (fallback)
 const genericEntry = {
   name: "meta.entry.mthds",
   match: `\\s*((?:(?:${ANY_KEY})\\s*\\.?\\s*)+)\\s*(=)`,
@@ -205,19 +272,24 @@ const genericEntry = {
   },
 };
 
-// Order matters — first match wins
+// Order matters — first match wins.
+// Pipe ref entries must come before pipeEntry: they match the full
+// `pipe = "value"` (more specific), while pipeEntry only matches `pipe =`.
 export const entryBegin = {
   patterns: [
+    pipeRefPackageEntry,
+    pipeRefEntry,
     pipeEntry,
     outputEntry,
     refinesEntry,
     typeEntry,
     modelEntry,
+    modelBareEntry,
     jinja2Block,
     jinja2Line,
     promptBlock,
     promptLine,
-    pipeRefEntry,
+    conceptValueEntry,
     genericEntry,
   ],
 };

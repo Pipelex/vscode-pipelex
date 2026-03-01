@@ -38,11 +38,7 @@ impl<E: Environment> PipelexLsp<E> {
     ///
     /// Currently delegates directly to taplo-lsp. In the future, this is where
     /// MTHDS-specific request/notification handlers would be added.
-    pub async fn handle_message<W>(
-        &self,
-        message: rpc::Message,
-        writer: W,
-    ) -> Result<(), io::Error>
+    pub async fn handle_message<W>(&self, message: rpc::Message, writer: W) -> Result<(), io::Error>
     where
         W: Sink<rpc::Message, Error = io::Error> + Unpin + Clone + 'static,
     {

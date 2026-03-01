@@ -1,6 +1,6 @@
-domain = "extract_slides"
+domain      = "extract_slides"
 description = "The domain of extracting slides from documents"
-main_pipe = "extract_slides"
+main_pipe   = "extract_slides"
 
 [concept]
 [concept.Slide]
@@ -16,11 +16,11 @@ description = "Extract markdown from a document"
 inputs = { document = "Document" }
 output = "Text"
 steps = [
-    { pipe = "describe_slide", result = "slides" },
+  { pipe = "describe_slide", result = "slides" },
 ]
 
 [pipe.describe_slide]
-type = "PipeLLM"
+type        = "PipeLLM"
 description = "Describe a slide"
-inputs = { page = "Page" }
-output = "Slide"
+inputs      = { page = "Page" }
+output      = "Slide"

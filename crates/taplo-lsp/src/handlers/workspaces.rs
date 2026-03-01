@@ -1,7 +1,7 @@
 use super::update_configuration;
 use crate::world::{WorkspaceState, World};
 use lsp_async_stub::{Context, Params};
-use lsp_types::{DidChangeWorkspaceFoldersParams, DidChangeWatchedFilesParams};
+use lsp_types::{DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersParams};
 use taplo_common::environment::Environment;
 
 pub async fn workspace_change<E: Environment>(
@@ -70,7 +70,10 @@ pub async fn watched_files_change<E: Environment>(
                 for ws_url in ws_urls {
                     if let Some(ws) = workspaces.get_mut(&ws_url) {
                         if let Err(error) = ws.initialize(context.clone(), &context.env).await {
-                            tracing::error!(?error, "failed to reinitialize workspace after config change");
+                            tracing::error!(
+                                ?error,
+                                "failed to reinitialize workspace after config change"
+                            );
                         }
                         reinitialized_ws.push(ws_url);
                     }
@@ -89,15 +92,12 @@ pub async fn watched_files_change<E: Environment>(
             .collect();
         drop(workspaces);
 
-        for (ws_url, doc_url) in reinitialized_ws
-            .iter()
-            .flat_map(|ws_url| {
-                doc_urls
-                    .iter()
-                    .filter(|d| d.as_str().starts_with(ws_url.as_str()))
-                    .map(move |d| (ws_url.clone(), d.clone()))
-            })
-        {
+        for (ws_url, doc_url) in reinitialized_ws.iter().flat_map(|ws_url| {
+            doc_urls
+                .iter()
+                .filter(|d| d.as_str().starts_with(ws_url.as_str()))
+                .map(move |d| (ws_url.clone(), d.clone()))
+        }) {
             crate::diagnostics::publish_diagnostics(context.clone(), ws_url, doc_url).await;
         }
     }
@@ -118,9 +118,18 @@ pub async fn watched_files_change<E: Environment>(
                 drop(workspaces);
                 // Re-trigger diagnostics for this file if it's currently open
                 let workspaces = context.workspaces.read().await;
-                if workspaces.by_document(&change.uri).documents.contains_key(&change.uri) {
+                if workspaces
+                    .by_document(&change.uri)
+                    .documents
+                    .contains_key(&change.uri)
+                {
                     drop(workspaces);
-                    crate::diagnostics::publish_diagnostics(context.clone(), workspace_uri, change.uri).await;
+                    crate::diagnostics::publish_diagnostics(
+                        context.clone(),
+                        workspace_uri,
+                        change.uri,
+                    )
+                    .await;
                 }
             }
         }

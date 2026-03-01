@@ -1,2 +1,5 @@
+domain      = "test_unrelated_key"
+description = "Test fixture for unrelated key"
+
 [pipe.my_pipe]
 description = "SomeString"

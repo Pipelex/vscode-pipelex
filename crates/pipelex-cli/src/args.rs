@@ -1,8 +1,8 @@
 use clap::{crate_version, Parser, Subcommand};
 use std::path::PathBuf;
-pub use taplo_cli::args::{Colors, FormatCommand, GeneralArgs, GetCommand, OutputFormat};
 #[cfg(feature = "lint")]
 pub use taplo_cli::args::LintCommand;
+pub use taplo_cli::args::{Colors, FormatCommand, GeneralArgs, GetCommand, OutputFormat};
 #[cfg(feature = "lsp")]
 pub use taplo_cli::args::{LspCommand, LspCommandIo};
 
