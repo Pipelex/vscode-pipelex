@@ -1,0 +1,35 @@
+crates/taplo-common/src/util.rs
+  db310959c3364f77 111
+crates/lsp-async-stub/src/lib.rs
+  db310959c3364f77 70
+crates/taplo-common/src/schema/cache.rs
+  db310959c3364f77 22,38,57,76,102,119
+crates/taplo-wasm/src/environment.rs
+  db310959c3364f77 39,58,96,111
+crates/taplo-cli/src/commands/lint.rs
+  db310959c3364f77 87
+crates/pipelex-wasm/src/environment.rs
+  db310959c3364f77 42,61,99,114
+crates/taplo-cli/src/commands/format.rs
+  db310959c3364f77 223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "ea0196103e1a18dec10efb2c8a6940a1ed509c98",
+  "prompts": {
+    "db310959c3364f77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7a723926-6b3e-439e-bc43-94b37e7f76c3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 30,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}
