@@ -173,11 +173,6 @@ function buildDataflowAnalysis(graphspec) {
 function buildDataflowGraph(graphspec, analysis) {
     const nodes = [];
     const edges = [];
-    const nodeIdMap = {};
-
-    for (const node of graphspec.nodes) {
-        nodeIdMap[node.id] = node;
-    }
 
     // Find participating pipes (those that produce or consume data)
     const participatingPipes = new Set();
@@ -396,8 +391,8 @@ function buildDataflowGraph(graphspec, analysis) {
 // ====================================================================
 function buildOrchestrationGraph(viewspec) {
     const nodes = viewspec.nodes.map(node => {
-        const isFailed = node.ui?.classes?.includes('failed');
-        const isSucceeded = node.ui?.classes?.includes('succeeded');
+        const isFailed = node.status === 'failed';
+        const isSucceeded = node.status === 'succeeded';
         const isController = node.kind === 'controller';
         const badge = node.ui?.badges?.[0] || '';
         const label = node.label || node.id;
@@ -538,7 +533,7 @@ function buildGraph(viewspec, graphspec) {
 }
 
 // Update footer stats
-function updateFooterStats(viewspec, analysis) {
+function updateFooterStats(viewspec, graphspec, analysis) {
     const statsEl = document.getElementById('footer-stats');
     if (!statsEl) return;
 
@@ -644,7 +639,7 @@ function GraphViewer() {
                 setNodes(layouted.nodes);
                 setEdges(layouted.edges);
 
-                updateFooterStats(viewspec, analysis);
+                updateFooterStats(viewspec, graphspec, analysis);
 
                 // Fit view after render
                 setTimeout(() => {

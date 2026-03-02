@@ -91,6 +91,41 @@ body.vscode-high-contrast {
     --color-edge: #6fc3df;
 }
 
+/* High contrast light */
+body.vscode-high-contrast-light {
+    --color-bg: #ffffff;
+    --color-surface: #ffffff;
+    --color-surface-hover: #e8e8e8;
+    --color-border: #000000;
+    --color-text: #000000;
+    --color-text-muted: #292929;
+    --color-text-dim: #595959;
+    --color-accent: #0f4a85;
+    --color-accent-hover: #0a3463;
+    --color-success: #0a6640;
+    --color-success-bg: rgba(10, 102, 64, 0.15);
+    --color-error: #b80000;
+    --color-error-bg: rgba(184, 0, 0, 0.15);
+    --color-warning: #b45309;
+    --color-stuff: #b45309;
+    --color-stuff-bg: rgba(180, 83, 9, 0.12);
+    --color-stuff-border: #92400e;
+    --color-stuff-text: #451a03;
+    --color-stuff-text-dim: #78350f;
+    --color-pipe: #0f4a85;
+    --color-pipe-bg: rgba(15, 74, 133, 0.1);
+    --color-pipe-text: #0a2540;
+    --color-pipe-failed: #b80000;
+    --color-pipe-failed-bg: rgba(184, 0, 0, 0.12);
+    --color-edge: #0f4a85;
+    --color-batch-item: #6b21a8;
+    --color-batch-aggregate: #0a6640;
+    --color-parallel-combine: #7e22ce;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
     font-family: var(--font-sans);
