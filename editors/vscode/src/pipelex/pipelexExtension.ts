@@ -146,12 +146,14 @@ async function registerNodeFeatures(
             { language: 'mthds' },
             new PipeCodeLensProvider()
         );
-        context.subscriptions.push(codeLensRegistration);
     }
 
     if (config.get<boolean>('mthds.runPipeCodeLens', true)) {
         registerCodeLens();
     }
+
+    // Dispose the CodeLens registration on extension deactivation
+    context.subscriptions.push({ dispose: () => codeLensRegistration?.dispose() });
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(e => {
