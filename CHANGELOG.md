@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-03-02
+
+### Added
+- Add PipeSearch pipe type to embedded MTHDS JSON schema (plxt 0.2.3)
+
+### Fixed
+- Fix graph direction setting field name mismatch (`left_right` → `left_to_right`)
+- Fix webview data race by always buffering pending data before HTML reload
+- Fix pre-React global message listener not being removed after React mounts
+
 ## [0.4.3] - 2026-03-01
 
 ### Added
