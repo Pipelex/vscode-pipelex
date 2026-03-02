@@ -1,0 +1,55 @@
+editors/vscode/src/pipelex/pipelexExtension.ts
+  a953a1e968f58ac7 183
+editors/vscode/src/pipelex/graph/webview/graph.js
+  a953a1e968f58ac7 1-3,13-125,128-138,140-153,155-177,179-193,195-196,198-200,202-338,340-365,367-544,546-657,667-728
+  ffeec5d8ae1b8241 4-12,126-127,139,154,178,194,197,201,339,366,545,658-666
+editors/vscode/src/pipelex/graph/webview/graph.css
+  a953a1e968f58ac7 1-243
+editors/vscode/src/pipelex/graph/methodGraphPanel.ts
+  ffeec5d8ae1b8241 19-20,182,191-202,278-285
+  a953a1e968f58ac7 7,17,22,24,70-71,82-83,90-95,138-141,143-150,168-181,183-190,203-206,255-277,286-299,301-314,329
+editors/vscode/src/pipelex/__tests__/methodGraphPanel.test.ts
+  a953a1e968f58ac7 6-9,28,32,42-49,51,57-63,71-74,105,117,130-134,154-158,179,185,196,207-224,232-282,284-286,288-295,299-335,348,386,416,431,445
+  ffeec5d8ae1b8241 225-231,283,287
+editors/vscode/package.json
+  a953a1e968f58ac7 548-561
+editors/vscode/scripts/build.mjs
+  a953a1e968f58ac7 3,9-16
+editors/vscode/src/pipelex/graph/webview/graph.html
+  a953a1e968f58ac7 1-40
+editors/vscode/src/pipelex/validation/sourceLocator.ts
+  a953a1e968f58ac7 54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "d72bc7565d30f6a47f9f16be0ae44a386c8d6a58",
+  "prompts": {
+    "a953a1e968f58ac7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cdbc9201-6395-45df-a701-63bc0919d456",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1343,
+      "total_deletions": 52,
+      "accepted_lines": 1286,
+      "overriden_lines": 0
+    },
+    "ffeec5d8ae1b8241": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "144141b9-8bd1-48ea-bea0-d08944553b13",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 61,
+      "total_deletions": 18,
+      "accepted_lines": 61,
+      "overriden_lines": 0
+    }
+  }
+}
