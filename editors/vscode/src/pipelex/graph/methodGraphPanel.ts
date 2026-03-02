@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { resolveCli } from '../validation/cliResolver';
 import { spawnCli, cancelAllInflight } from '../validation/processUtils';
 import { extractJson } from '../validation/pipelexValidator';
+import { findTableHeader } from '../validation/sourceLocator';
 
 export class MethodGraphPanel implements vscode.Disposable {
     private static readonly CSP_NONCE_SENTINEL = 'PIPELEX_CSP_NONCE';
@@ -13,10 +14,14 @@ export class MethodGraphPanel implements vscode.Disposable {
     private readonly disposables: vscode.Disposable[] = [];
     private readonly inflight = new Map<string, AbortController>();
     private readonly output: vscode.OutputChannel;
+    private readonly extensionUri: vscode.Uri;
     private cliWarningShown = false;
+    private webviewReady = false;
+    private pendingData: any = null;
 
-    constructor(output: vscode.OutputChannel) {
+    constructor(output: vscode.OutputChannel, extensionUri: vscode.Uri) {
         this.output = output;
+        this.extensionUri = extensionUri;
 
         this.disposables.push(
             vscode.workspace.onDidSaveTextDocument(doc => {
@@ -62,6 +67,8 @@ export class MethodGraphPanel implements vscode.Disposable {
         this.currentUri = uri;
         const filename = uri.fsPath.replace(/^.*[\\/]/, '');
 
+        const webviewDir = vscode.Uri.joinPath(this.extensionUri, 'dist', 'pipelex', 'graph', 'webview');
+
         if (this.panel) {
             this.panel.title = `Method Graph — ${filename}`;
             this.panel.reveal(undefined, true);
@@ -70,12 +77,22 @@ export class MethodGraphPanel implements vscode.Disposable {
                 'pipelexMethodGraph',
                 `Method Graph — ${filename}`,
                 { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-                { enableScripts: true, retainContextWhenHidden: true }
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: [webviewDir],
+                }
             );
             this.panel.onDidDispose(() => {
                 this.panel = undefined;
                 this.currentUri = undefined;
             });
+
+            this.panel.webview.onDidReceiveMessage(
+                message => this.handleWebviewMessage(message),
+                undefined,
+                this.disposables,
+            );
         }
 
         this.refresh(uri);
@@ -118,11 +135,19 @@ export class MethodGraphPanel implements vscode.Disposable {
 
         this.setHtml(loadingHtml());
 
-        const config = vscode.workspace.getConfiguration('pipelex');
-        const timeout = config.get<number>('validation.timeout', 30000);
-        const direction = config.get<string>('graph.direction', 'top_down');
+        const pipelexConfig = vscode.workspace.getConfiguration('pipelex');
+        const timeout = pipelexConfig.get<number>('validation.timeout', 30000);
+        const direction = pipelexConfig.get<string>('graph.direction', 'top_down');
+        const renderer = pipelexConfig.get<string>('graph.renderer', 'classic');
         const filePath = uri.fsPath;
-        const args = [...resolved.args, 'validate', 'bundle', filePath, '--graph', '--direction', direction];
+        const useExtensionRenderer = renderer === 'extension';
+        // Build CLI flags based on renderer choice
+        const graphFlags: string[] = [];
+        if (useExtensionRenderer) {
+            graphFlags.push('--view');
+        }
+        graphFlags.push('--graph'); // Always request --graph as fallback
+        const args = [...resolved.args, 'validate', 'bundle', filePath, ...graphFlags, '--direction', direction];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
         const cwd = workspaceFolder?.uri.fsPath;
 
@@ -140,6 +165,39 @@ export class MethodGraphPanel implements vscode.Disposable {
                 return;
             }
             const result = JSON.parse(json);
+
+            // Extension-owned webview with ViewSpec (only when explicitly selected)
+            if (useExtensionRenderer && result?.viewspec) {
+                const webviewHtml = this.buildWebviewHtml();
+                if (!webviewHtml) {
+                    this.setHtml(messageHtml(
+                        'Webview Error',
+                        'Could not load graph webview assets.'
+                    ));
+                    return;
+                }
+                // Map direction setting to Dagre format
+                const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
+
+                const setDataPayload = {
+                    type: 'setData',
+                    viewspec: result.viewspec,
+                    graphspec: result.graphspec || null,
+                    config: {
+                        direction: dagreDirection,
+                        nodesep: 50,
+                        ranksep: 80,
+                    },
+                };
+
+                // Reset webviewReady — the new HTML will reload the webview
+                this.webviewReady = false;
+                this.pendingData = setDataPayload;
+                this.setHtml(webviewHtml);
+                return;
+            }
+
+            // Classic renderer: HTML file from --graph
             const htmlPath: string | undefined = result?.graph_files?.reactflow_html;
             if (!htmlPath) {
                 this.setHtml(messageHtml(
@@ -188,6 +246,69 @@ export class MethodGraphPanel implements vscode.Disposable {
         }
     }
 
+    private buildWebviewHtml(): string | undefined {
+        if (!this.panel) return undefined;
+
+        const webviewDir = vscode.Uri.joinPath(this.extensionUri, 'dist', 'pipelex', 'graph', 'webview');
+        const htmlPath = vscode.Uri.joinPath(webviewDir, 'graph.html').fsPath;
+
+        let html: string;
+        try {
+            html = fs.readFileSync(htmlPath, 'utf-8');
+        } catch {
+            return undefined;
+        }
+
+        const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph.css'));
+        const jsUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph.js'));
+
+        html = html.replace('{{GRAPH_CSS_URI}}', cssUri.toString());
+        html = html.replace('{{GRAPH_JS_URI}}', jsUri.toString());
+
+        return html;
+    }
+
+    private handleWebviewMessage(message: any) {
+        if (message.type === 'webviewReady') {
+            this.webviewReady = true;
+            if (this.pendingData && this.panel) {
+                this.panel.webview.postMessage(this.pendingData);
+                this.pendingData = null;
+            }
+            return;
+        }
+        if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {
+            this.navigateToPipe(message.pipeCode);
+        }
+    }
+
+    private async navigateToPipe(pipeCode: string) {
+        if (!this.currentUri) return;
+
+        try {
+            const document = await vscode.workspace.openTextDocument(this.currentUri);
+            const headerLine = findTableHeader(document, 'pipe', pipeCode);
+            if (headerLine === -1) {
+                this.output.appendLine(`Could not find [pipe.${pipeCode}] in ${this.currentUri.fsPath}`);
+                return;
+            }
+
+            const panelCol = this.panel?.viewColumn;
+            const targetCol = panelCol && panelCol > 1 ? panelCol - 1 : vscode.ViewColumn.One;
+
+            const editor = await vscode.window.showTextDocument(document, {
+                viewColumn: targetCol,
+                preserveFocus: false,
+            });
+
+            const range = document.lineAt(headerLine).range;
+            editor.selection = new vscode.Selection(range.start, range.end);
+            editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+        } catch (err: any) {
+            this.output.appendLine(`navigateToPipe error: ${err.message ?? err}`);
+        }
+    }
+
     private setHtml(html: string) {
         if (!this.panel) return;
 
@@ -199,7 +320,7 @@ export class MethodGraphPanel implements vscode.Disposable {
             // Replace all sentinel occurrences with the real nonce
             html = html.replace(new RegExp(MethodGraphPanel.CSP_NONCE_SENTINEL, 'g'), nonce);
             // Inject full CSP meta tag into <head>
-            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' https://unpkg.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; connect-src 'none';">`;
+            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' ${cspSource} https://unpkg.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; connect-src 'none';">`;
             html = html.replace('<head>', `<head>\n${cspMeta}`);
         } else {
             // Simple HTML (loading/message): add nonce to <style> tags, minimal CSP

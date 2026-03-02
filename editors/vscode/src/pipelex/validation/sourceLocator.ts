@@ -51,7 +51,7 @@ function extractCodeFromMessage(message: string, kind: 'pipe' | 'concept'): stri
     return match ? match[1] : null;
 }
 
-function findTableHeader(document: vscode.TextDocument, kind: string, code: string): number {
+export function findTableHeader(document: vscode.TextDocument, kind: string, code: string): number {
     const pattern = new RegExp(`^\\s*\\[${kind}\\.${escapeRegex(code)}\\]`);
     for (let i = 0; i < document.lineCount; i++) {
         if (pattern.test(document.lineAt(i).text)) {
