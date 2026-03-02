@@ -132,7 +132,7 @@ async function registerNodeFeatures(
             }
             const filePath = uri.fsPath;
             runInTerminal(filePath, uri, (quote, cmd, inputsArg) =>
-                `${quote(cmd)} run bundle ${quote(filePath)} --pipe ${pipeName}${inputsArg}`
+                `${quote(cmd)} run bundle ${quote(filePath)} --pipe ${quote(pipeName)}${inputsArg}`
             );
         })
     );
