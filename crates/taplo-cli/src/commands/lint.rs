@@ -84,7 +84,7 @@ impl<E: Environment> Taplo<E> {
         let mut result = Ok(());
 
         for file in files {
-            if file.extension().map_or(false, |ext| ext == "plx") {
+            if file.extension().is_some_and(|ext| ext == "plx") {
                 tracing::warn!(
                     ?file,
                     "the .plx file extension is deprecated, rename to .mthds"
