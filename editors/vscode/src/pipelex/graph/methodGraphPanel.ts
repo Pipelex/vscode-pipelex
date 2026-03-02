@@ -177,7 +177,7 @@ export class MethodGraphPanel implements vscode.Disposable {
                     return;
                 }
                 // Map direction setting to Dagre format
-                const dagreDirection = direction === 'left_right' ? 'LR' : 'TB';
+                const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
 
                 const setDataPayload = {
                     type: 'setData',
@@ -192,14 +192,8 @@ export class MethodGraphPanel implements vscode.Disposable {
 
                 // Reset webviewReady — the new HTML will reload the webview
                 this.webviewReady = false;
+                this.pendingData = setDataPayload;
                 this.setHtml(webviewHtml);
-
-                // Buffer data until the webview signals it's ready
-                if (this.webviewReady) {
-                    this.panel!.webview.postMessage(setDataPayload);
-                } else {
-                    this.pendingData = setDataPayload;
-                }
                 return;
             }
 

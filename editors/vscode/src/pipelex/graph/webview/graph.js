@@ -4,11 +4,12 @@ const vscode = acquireVsCodeApi();
 // Pre-React message queue: captures messages arriving before React mounts
 const _preReactQueue = [];
 let _reactReady = false;
-window.addEventListener('message', function(event) {
+const _globalListener = function(event) {
     if (!_reactReady) {
         _preReactQueue.push(event.data);
     }
-});
+};
+window.addEventListener('message', _globalListener);
 
 // State
 let currentDirection = 'TB';
@@ -658,6 +659,7 @@ function GraphViewer() {
 
         // Signal that React is ready and drain any messages that arrived early
         _reactReady = true;
+        window.removeEventListener('message', _globalListener);
         vscode.postMessage({ type: 'webviewReady' });
         for (const queued of _preReactQueue) {
             handleMessage({ data: queued });
