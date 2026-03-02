@@ -1,23 +1,26 @@
 # Test: Step objects with pipe references, result, batch_over, batch_as
 # Covers: pipe = "name" in inline tables, result/batch_as/batch_over variables
 
+domain      = "test_steps"
+description = "Test fixture for steps"
+
 [pipe.sequence]
 type = "PipeSequence"
-definition = "A multi-step pipeline"
+description = "A multi-step pipeline"
 inputs = { data = "InputData" }
 output = "FinalResult"
 steps = [
-    { pipe = "step_one", result = "first_result" },
-    { pipe = "step_two", batch_over = "items", batch_as = "item", result = "second_result" },
-    { pipe = "step_three", result = "final_output" },
+  { pipe = "step_one", result = "first_result" },
+  { pipe = "step_two", batch_over = "items", batch_as = "item", result = "second_result" },
+  { pipe = "step_three", result = "final_output" },
 ]
 
 # Condition pipe with pipe_map
 [pipe.condition]
-type = "PipeCondition"
-definition = "Route based on condition"
-inputs = { data = "InputData" }
-output = "OutputData"
-expression = "data.category"
-pipe_map = { "type_a" = "handle_type_a", "type_b" = "handle_type_b" }
+type              = "PipeCondition"
+description        = "Route based on condition"
+inputs            = { data = "InputData" }
+output            = "OutputData"
+expression        = "data.category"
+pipe_map          = { "type_a" = "handle_type_a", "type_b" = "handle_type_b" }
 default_pipe_code = "handle_default"

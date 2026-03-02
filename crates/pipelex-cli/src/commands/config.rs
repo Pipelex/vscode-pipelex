@@ -24,7 +24,9 @@ impl<E: Environment> PlxtCli<E> {
                         Err(anyhow::anyhow!("no config file found"))
                     }
                 } else {
-                    Err(anyhow::anyhow!("unable to determine current working directory"))
+                    Err(anyhow::anyhow!(
+                        "unable to determine current working directory"
+                    ))
                 }
             }
         }

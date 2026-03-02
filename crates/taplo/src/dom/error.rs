@@ -6,13 +6,13 @@ use thiserror::Error;
 pub enum Error {
     #[error("the syntax was not expected here: {syntax:#?}")]
     UnexpectedSyntax { syntax: SyntaxElement },
-    #[error("the string contains invalid escape sequence(s)")]
+    #[error("the string contains invalid escape sequence(s): {string:?}")]
     InvalidEscapeSequence { string: SyntaxElement },
-    #[error("conflicting keys")]
+    #[error("conflicting keys: {key:?} and {other:?}")]
     ConflictingKeys { key: Key, other: Key },
-    #[error("expected table")]
+    #[error("expected table for {not_table:?}, required by {required_by:?}")]
     ExpectedTable { not_table: Key, required_by: Key },
-    #[error("expected array of tables")]
+    #[error("expected array of tables for {not_array_of_tables:?}, required by {required_by:?}")]
     ExpectedArrayOfTables {
         not_array_of_tables: Key,
         required_by: Key,

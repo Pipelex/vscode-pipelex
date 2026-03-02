@@ -605,10 +605,7 @@ mod tests {
         let resolved = schema.resolved_sources.unwrap();
 
         assert_eq!(resolved.len(), 3);
-        assert_eq!(
-            resolved[0].as_str(),
-            "file:///project/.pipelex/schema.json"
-        );
+        assert_eq!(resolved[0].as_str(), "file:///project/.pipelex/schema.json");
         assert_eq!(
             resolved[1].as_str(),
             "file:///Users/alice/.pipelex/schema.json"
@@ -661,10 +658,7 @@ mod tests {
         let schema = opts.schema.unwrap();
 
         assert!(schema.resolved_sources.is_none());
-        assert_eq!(
-            schema.url.unwrap().as_str(),
-            "file:///project/schema.json"
-        );
+        assert_eq!(schema.url.unwrap().as_str(), "file:///project/schema.json");
     }
 
     #[test]

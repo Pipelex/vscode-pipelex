@@ -19,7 +19,7 @@ pub struct Cache<E: Environment> {
     expiration_times: Arc<ArcSwap<(Duration, Duration)>>,
     lru_expires_by: Arc<Mutex<OffsetDateTime>>,
     schemas: Arc<Mutex<LruCache<Url, Arc<Value>>>>,
-    cache_path: Arc<ArcSwap<Option<PathBuf>>>,
+    path: Arc<ArcSwap<Option<PathBuf>>>,
 }
 
 impl<E: Environment> Cache<E> {
@@ -35,7 +35,7 @@ impl<E: Environment> Cache<E> {
                 NonZeroUsize::new(10).unwrap(),
                 ahash::RandomState::new(),
             ))),
-            cache_path: Default::default(),
+            path: Default::default(),
         }
     }
 
@@ -54,7 +54,7 @@ impl<E: Environment> Cache<E> {
     }
 
     pub fn set_cache_path(&self, path: Option<PathBuf>) {
-        self.cache_path.swap(Arc::new(path));
+        self.path.swap(Arc::new(path));
     }
 
     pub async fn load(
@@ -73,7 +73,7 @@ impl<E: Environment> Cache<E> {
             return Ok(s.clone());
         }
 
-        match &**self.cache_path.load() {
+        match &**self.path.load() {
             Some(cache_path) => {
                 let file_name = cache_hash(value_url);
                 let p = cache_path.join(file_name);
@@ -99,7 +99,7 @@ impl<E: Environment> Cache<E> {
     pub async fn save(&self, url: Url, value: Arc<Value>) -> Result<(), anyhow::Error> {
         let expires_by = self.env.now() + self.expiration_times.load().1;
 
-        match &**self.cache_path.load() {
+        match &**self.path.load() {
             Some(cache_path) => {
                 let file_name = cache_hash(&url);
                 let p = cache_path.join(file_name);
@@ -116,7 +116,7 @@ impl<E: Environment> Cache<E> {
     }
 
     pub fn is_cache_path_set(&self) -> bool {
-        self.cache_path.load().is_some()
+        self.path.load().is_some()
     }
 
     pub fn set_expiration_times(&self, mem: Duration, disk: Duration) {

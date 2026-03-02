@@ -40,6 +40,8 @@ pub(crate) use rename::*;
 mod conversion;
 pub(crate) use conversion::*;
 
+pub(crate) mod mthds_resolution;
+
 mod goto_definition;
 pub(crate) use goto_definition::*;
 

@@ -84,8 +84,11 @@ impl<E: Environment> Taplo<E> {
         let mut result = Ok(());
 
         for file in files {
-            if file.extension().map_or(false, |ext| ext == "plx") {
-                tracing::warn!(?file, "the .plx file extension is deprecated, rename to .mthds");
+            if file.extension().is_some_and(|ext| ext == "plx") {
+                tracing::warn!(
+                    ?file,
+                    "the .plx file extension is deprecated, rename to .mthds"
+                );
             }
 
             if let Err(error) = self.lint_file(&file).await {
@@ -154,10 +157,7 @@ impl<E: Environment> Taplo<E> {
                 }
             };
 
-            let errors = self
-                .schemas
-                .validate_root(&schema_url, &dom)
-                .await?;
+            let errors = self.schemas.validate_root(&schema_url, &dom).await?;
 
             if !errors.is_empty() {
                 self.print_schema_errors(&SimpleFile::new(file_path, source), &errors)

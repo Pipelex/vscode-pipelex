@@ -46,8 +46,7 @@ fn try_schema_ext(schema: &Value, key: &str) -> Option<TaploSchemaExt> {
 
 #[must_use]
 pub fn schema_ext_of(schema: &Value) -> Option<TaploSchemaExt> {
-    try_schema_ext(schema, PLXT_EXTENSION_KEY)
-        .or_else(|| try_schema_ext(schema, EXTENSION_KEY))
+    try_schema_ext(schema, PLXT_EXTENSION_KEY).or_else(|| try_schema_ext(schema, EXTENSION_KEY))
 }
 
 #[cfg(test)]

@@ -1,32 +1,41 @@
 # Test: Pipe table headers, type entries, model entries, inputs/output
 # Covers: [pipe], [pipe.name], type, output, model, inputs (single-line)
 
+domain      = "test_pipe-definitions"
+description = "Test fixture for pipe definitions"
+
 [pipe]
 
 [pipe.analyze_features]
-type = "PipeLLM"
-definition = "Analyze features"
-inputs = { photo = "native.Image" }
-output = "FeatureAnalysis"
-model = "$gpt-4o"
+type       = "PipeLLM"
+description = "Analyze features"
+inputs     = { photo = "native.Image" }
+output     = "FeatureAnalysis"
+model      = "$gpt-4o"
 
 [pipe.create_prompt]
-type = "PipeLLM"
-definition = "Create a prompt for image generation"
-inputs = { opposite_concept = "OppositeConcept" }
-output = "ImagePrompt"
-model = "@my-alias"
+type       = "PipeLLM"
+description = "Create a prompt for image generation"
+inputs     = { opposite_concept = "OppositeConcept" }
+output     = "ImagePrompt"
+model      = "@my-alias"
 
 [pipe.generate_image]
-type = "PipeImgGen"
-definition = "Generate the image"
-inputs = { image_prompt = "ImagePrompt" }
-output = "images.Photo"
-model = "~waterfall"
+type       = "PipeImgGen"
+description = "Generate the image"
+inputs     = { image_prompt = "ImagePrompt" }
+output     = "images.Photo"
+model      = "~waterfall"
+
+[pipe.simple_gen]
+type       = "PipeLLM"
+description = "Simple generation"
+output     = "Text"
+model      = "claude-3-opus"
 
 # Multi-input pipe
 [pipe.combine_data]
-type = "PipeLLM"
-definition = "Combine multiple data sources"
-inputs = { a = "TypeA", b = "TypeB", c = "native.TypeC" }
-output = "CombinedResult"
+type       = "PipeLLM"
+description = "Combine multiple data sources"
+inputs     = { a = "TypeA", b = "TypeB", c = "native.TypeC" }
+output     = "CombinedResult"

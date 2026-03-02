@@ -45,14 +45,24 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 url                = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-lsp-async-stub = { version = "0.7.0", path = "../lsp-async-stub", features = ["tokio-tcp", "tokio-stdio"] }
+lsp-async-stub = { version = "0.7.0", path = "../lsp-async-stub", features = [
+  "tokio-tcp",
+  "tokio-stdio",
+] }
 
 ansi_term     = { version = "0.12" }
 async-ctrlc   = { version = "1.2.0", features = ["stream"], optional = true }
 clap_complete = { version = "4.4.18", optional = true }
 prettydiff    = { version = "0.6.1", default-features = false }               # `prettydiff` is also a CLI that pulls in `clap` by default
 
-tokio = { workspace = true, features = ["sync", "fs", "time", "io-std", "rt-multi-thread", "parking_lot"] }
+tokio = { workspace = true, features = [
+  "sync",
+  "fs",
+  "time",
+  "io-std",
+  "rt-multi-thread",
+  "parking_lot",
+] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 tokio = { workspace = true, features = ["sync", "parking_lot", "io-util"] }
@@ -60,3 +70,6 @@ tokio = { workspace = true, features = ["sync", "parking_lot", "io-util"] }
 [[bin]]
 name = "taplo"
 path = "bin/taplo.rs"
+
+[lints]
+workspace = true

@@ -21,7 +21,7 @@ PYTHON_VERSION    ?= 3.13
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s update-schema up
-.PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check docs
+.PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check fmt-check fmt lint plxt-lint docs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -87,12 +87,27 @@ ext-uninstall: ## Uninstall the extension from your VS Code-based IDE
 
 # ── Test / Check ─────────────────────────────────────────────────────────────
 
+fmt: ## Format Rust source and TOML/MTHDS files
+	cargo fmt
+	cargo run --bin plxt -- fmt
+
+fmt-check: ## Check Rust and TOML/MTHDS formatting
+	cargo fmt --check
+	cargo run --bin plxt -- fmt --check --diff
+
+lint: ## Run Clippy on the workspace
+	cargo clippy --workspace --all-targets -- -D warnings
+
+plxt-lint: ## Lint TOML/MTHDS files with plxt
+	cargo run --bin plxt -- lint
+
 test: ## Run all tests (Rust + VS Code extension)
 	cargo test -p pipelex-common
 	cargo test -p taplo
+	cargo test -p taplo-lsp
 	cd $(EXT_DIR) && yarn test
 
-check: test ## Quick compilation checks (CLI + WASM, locked) + tests
+check: fmt-check lint test ## Full quality gate (format + lint + test + compilation)
 	cargo check -p pipelex-cli --locked
 	cargo check -p pipelex-wasm --target wasm32-unknown-unknown --locked
 

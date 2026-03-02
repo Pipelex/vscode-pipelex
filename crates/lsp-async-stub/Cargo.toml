@@ -24,6 +24,15 @@ tokio       = { workspace = true, optional = true }
 tracing     = { workspace = true }
 
 [features]
-default     = []
-tokio-stdio = ["tokio", "tokio/io-std", "tokio/io-util", "tokio/macros", "tokio/rt"]
-tokio-tcp   = ["tokio", "tokio/io-util", "tokio/macros", "tokio/net", "tokio/rt"]
+default = []
+tokio-stdio = [
+  "tokio",
+  "tokio/io-std",
+  "tokio/io-util",
+  "tokio/macros",
+  "tokio/rt",
+]
+tokio-tcp = ["tokio", "tokio/io-util", "tokio/macros", "tokio/net", "tokio/rt"]
+
+[lints]
+workspace = true

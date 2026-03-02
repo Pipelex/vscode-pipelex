@@ -40,7 +40,9 @@ pub mod builtins {
 
     #[must_use]
     pub fn mthds_schema() -> Arc<Value> {
-        Arc::new(serde_json::from_str(MTHDS_SCHEMA_JSON).expect("embedded MTHDS schema is invalid JSON"))
+        Arc::new(
+            serde_json::from_str(MTHDS_SCHEMA_JSON).expect("embedded MTHDS schema is invalid JSON"),
+        )
     }
 
     #[must_use]
@@ -235,7 +237,10 @@ impl<E: Environment> Schemas<E> {
 
     /// Try loading a schema from an ordered list of URLs (waterfall).
     /// Returns the first successfully loaded schema and the URL it was loaded from.
-    pub async fn load_schema_waterfall(&self, urls: &[&Url]) -> Result<(Url, Arc<Value>), anyhow::Error> {
+    pub async fn load_schema_waterfall(
+        &self,
+        urls: &[&Url],
+    ) -> Result<(Url, Arc<Value>), anyhow::Error> {
         let mut last_error = None;
         for url in urls {
             match self.load_schema(url).await {
@@ -951,10 +956,7 @@ mod tests {
     async fn resolve_association_waterfall_first_succeeds() {
         let mut files = std::collections::HashMap::new();
         files.insert(PathBuf::from("/schemas/first.json"), minimal_schema_json());
-        files.insert(
-            PathBuf::from("/schemas/second.json"),
-            minimal_schema_json(),
-        );
+        files.insert(PathBuf::from("/schemas/second.json"), minimal_schema_json());
         let env = MockEnv { files };
         let http = reqwest::Client::new();
         let schemas = super::Schemas::new(env, http);

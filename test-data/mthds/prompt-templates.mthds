@@ -1,9 +1,12 @@
 # Test: Prompt templates with data injection and template variables
 # Covers: prompt_template block strings, @injection, $template_variable
 
+domain      = "test_prompt-templates"
+description = "Test fixture for prompt templates"
+
 [pipe.ask]
 type = "PipeLLM"
-definition = "Analyze input data using a template"
+description = "Analyze input data using a template"
 inputs = { input_data = "RawData" }
 output = "Analysis"
 prompt_template = """
@@ -18,7 +21,7 @@ Be concise.
 # Prompt with multiple injections
 [pipe.compare]
 type = "PipeLLM"
-definition = "Compare two items"
+description = "Compare two items"
 inputs = { item_a = "ItemA", item_b = "ItemB" }
 output = "Comparison"
 prompt_template = """
@@ -35,7 +38,7 @@ $comparison_format
 
 # Single-line prompt_template
 [pipe.simple_ask]
-type = "PipeLLM"
+type            = "PipeLLM"
 prompt_template = "Summarize: @document"
 
 # Prompt with dotted variable names

@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-03-01
+
+### Added
+- Editor title bar buttons for MTHDS files: "Show Method Graph" and "Toggle Run Pipe CodeLens"
+- Toggle setting `pipelex.mthds.runPipeCodeLens` to show/hide per-pipe CodeLens
+- Per-pipe CodeLens to run individual pipes from the editor
+- Play button in editor title bar to run `.mthds` bundles
+- Native concept hover support for built-in MTHDS types
+- MTHDS semantic hover with shared reference resolution (plxt 0.2.2)
+- Code quality gates: fmt-check, lint, and enhanced CI (plxt 0.2.2)
+
+### Fixed
+- Fix Windows support: PowerShell call operator, single-quote escaping, browser activation for runBundle
+- Fix shell injection in runBundle terminal commands
+- Fix false-positive concept coloring on non-reference keys
+- Fix concept coloring for domain prefix, multiplicity suffixes, and input entries
+- Fix pipe ref semantic coloring
+- Fix empty hover rectangle and duplicated schema titles (plxt 0.2.2)
+- Fix bare model hover text and coloring (plxt 0.2.2)
+- Fix false-positive model hover on input parameters named "model" (plxt 0.2.2)
+- Fix empty ref_name after stripping concept qualifiers (plxt 0.2.2)
+- Narrow clippy suppression scope (plxt 0.2.2)
+
 ## [0.4.2] - 2026-02-27
 
 ### Added

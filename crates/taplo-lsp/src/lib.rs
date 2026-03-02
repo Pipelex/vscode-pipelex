@@ -9,7 +9,14 @@
     clippy::missing_panics_doc,
     clippy::similar_names,
     clippy::too_many_lines,
-    clippy::enum_glob_use
+    clippy::enum_glob_use,
+    clippy::case_sensitive_file_extension_comparisons,
+    clippy::cast_possible_truncation,
+    clippy::doc_markdown,
+    clippy::manual_let_else,
+    clippy::map_unwrap_or,
+    clippy::redundant_closure_for_method_calls,
+    clippy::uninlined_format_args
 )]
 
 use lsp_async_stub::Server;

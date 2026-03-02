@@ -1,0 +1,23 @@
+domain      = "hover_test"
+description = "Test fixture for pipe hover"
+main_pipe   = "run_analysis"
+
+[concept.Report]
+description = "A generated report"
+
+[concept.Report.structure]
+title   = { type = "text", required = true }
+content = { type = "text", required = true }
+
+[pipe.run_analysis]
+type = "PipeLLM"
+description = "Analyze input and produce a report"
+inputs = { doc = "Document", query = "Text" }
+output = "Report"
+model = "$default"
+prompt = """
+Analyze the document and answer the query.
+
+@doc
+@query
+"""

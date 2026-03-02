@@ -1,2 +1,5 @@
+domain      = "test_namespaced_concept"
+description = "Test fixture for namespaced concept"
+
 [pipe.my_pipe]
 output = "images.Photo"

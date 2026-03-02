@@ -1,3 +1,6 @@
+domain      = "test_concept_output"
+description = "Test fixture for concept output"
+
 [concept.DocumentAnalysis]
 description = "Analysis"
 

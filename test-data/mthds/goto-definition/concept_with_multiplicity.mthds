@@ -1,0 +1,9 @@
+domain = "test"
+description = "Test concept reference with multiplicity suffix"
+
+[concept.Slide]
+description = "A slide"
+
+[pipe.extract]
+type = "PipeLLM"
+output = "Slide[]"

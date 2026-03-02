@@ -22,6 +22,7 @@ vi.mock('vscode', () => ({
             get: (_key: string, def: any) => def,
         }),
         onDidOpenTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
     },
     window: {
         showWarningMessage: mockState.showWarningMessage,
@@ -33,6 +34,7 @@ vi.mock('vscode', () => ({
     },
     languages: {
         registerDocumentSemanticTokensProvider: mockState.registerDocumentSemanticTokensProvider,
+        registerCodeLensProvider: vi.fn(() => ({ dispose: vi.fn() })),
     },
 }));
 
@@ -45,6 +47,14 @@ vi.mock('../validation/pipelexValidator', () => {
         PipelexValidator: class {
             constructor() { mockState.validatorConstructed = true; }
             dispose() {}
+        },
+    };
+});
+
+vi.mock('../pipeCodeLensProvider', () => {
+    return {
+        PipeCodeLensProvider: class {
+            provideCodeLenses() { return []; }
         },
     };
 });
@@ -97,6 +107,16 @@ describe('registerPipelexFeatures', () => {
         // After awaiting, the showMethodGraph command should be registered
         expect(mockState.registerCommand).toHaveBeenCalledWith(
             'pipelex.showMethodGraph',
+            expect.any(Function)
+        );
+    });
+
+    it('registers toggleRunPipeCodeLens command', async () => {
+        const context = makeContext();
+        await registerPipelexFeatures(context);
+
+        expect(mockState.registerCommand).toHaveBeenCalledWith(
+            'pipelex.toggleRunPipeCodeLens',
             expect.any(Function)
         );
     });

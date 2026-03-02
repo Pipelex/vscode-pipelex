@@ -249,10 +249,7 @@ mod tests {
         };
         let mthds = MthdsEnvironment::new(env);
         let result = mthds.find_config_file(Path::new("/project")).await;
-        assert_eq!(
-            result,
-            Some(PathBuf::from("/project/.pipelex/plxt.toml"))
-        );
+        assert_eq!(result, Some(PathBuf::from("/project/.pipelex/plxt.toml")));
     }
 
     #[tokio::test]
@@ -273,13 +270,8 @@ mod tests {
             home: None,
         };
         let mthds = MthdsEnvironment::new(env);
-        let result = mthds
-            .find_config_file(Path::new("/project/sub/dir"))
-            .await;
-        assert_eq!(
-            result,
-            Some(PathBuf::from("/project/.pipelex/plxt.toml"))
-        );
+        let result = mthds.find_config_file(Path::new("/project/sub/dir")).await;
+        assert_eq!(result, Some(PathBuf::from("/project/.pipelex/plxt.toml")));
     }
 
     #[tokio::test]
@@ -360,10 +352,7 @@ mod tests {
         };
         let mthds = MthdsEnvironment::new(env);
         let result = mthds.find_config_file(Path::new("/project")).await;
-        assert_eq!(
-            result,
-            Some(PathBuf::from("/project/.pipelex/plxt.toml"))
-        );
+        assert_eq!(result, Some(PathBuf::from("/project/.pipelex/plxt.toml")));
     }
 
     #[tokio::test]
@@ -374,10 +363,7 @@ mod tests {
         };
         let mthds = MthdsEnvironment::new(env);
         let result = mthds.find_config_file(Path::new("/project")).await;
-        assert_eq!(
-            result,
-            Some(PathBuf::from("/home/user/.pipelex/plxt.toml"))
-        );
+        assert_eq!(result, Some(PathBuf::from("/home/user/.pipelex/plxt.toml")));
     }
 
     #[tokio::test]
@@ -391,10 +377,7 @@ mod tests {
         };
         let mthds = MthdsEnvironment::new(env);
         let result = mthds.find_config_file(Path::new("/project")).await;
-        assert_eq!(
-            result,
-            Some(PathBuf::from("/project/.pipelex/plxt.toml"))
-        );
+        assert_eq!(result, Some(PathBuf::from("/project/.pipelex/plxt.toml")));
     }
 
     #[tokio::test]
@@ -408,9 +391,6 @@ mod tests {
         };
         let mthds = MthdsEnvironment::new(env);
         let result = mthds.find_config_file(Path::new("/project")).await;
-        assert_eq!(
-            result,
-            Some(PathBuf::from("/home/user/.pipelex/plxt.toml"))
-        );
+        assert_eq!(result, Some(PathBuf::from("/home/user/.pipelex/plxt.toml")));
     }
 }

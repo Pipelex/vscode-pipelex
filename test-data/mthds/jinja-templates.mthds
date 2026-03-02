@@ -1,9 +1,12 @@
 # Test: Jinja2 templates with HTML, filters, control flow
 # Covers: jinja2 block strings, {% %}, {{ }}, {# #}, HTML tags, attributes
 
+domain      = "test_jinja-templates"
+description = "Test fixture for jinja templates"
+
 [pipe.format]
 type = "PipeJinja2"
-definition = "Format items into HTML"
+description = "Format items into HTML"
 inputs = { items = "ItemList", title = "Text" }
 output = "HtmlOutput"
 jinja2 = """
@@ -17,7 +20,7 @@ jinja2 = """
 # Jinja with complex filters and conditionals
 [pipe.filter_content]
 type = "PipeJinja2"
-definition = "Filter and format content"
+description = "Filter and format content"
 inputs = { channel_summaries = "ChannelSummary" }
 output = "HtmlNewsletter"
 jinja2 = """
@@ -37,5 +40,5 @@ jinja2 = """
 
 # Single-line jinja2
 [pipe.inline_format]
-type = "PipeJinja2"
+type   = "PipeJinja2"
 jinja2 = "{{ title | upper }}: {{ body }}"

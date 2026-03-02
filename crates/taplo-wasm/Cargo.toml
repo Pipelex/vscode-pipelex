@@ -14,10 +14,14 @@ crate-type = ["cdylib"]
 
 [dependencies]
 lsp-async-stub = { path = "../lsp-async-stub" }
-taplo          = { path = "../taplo" }
-taplo-cli      = { path = "../taplo-cli", optional = true, default-features = false }
-taplo-common   = { path = "../taplo-common", default-features = false, features = ["rustls-tls", "schema", "reqwest"] }
-taplo-lsp      = { path = "../taplo-lsp", optional = true, default-features = false }
+taplo = { path = "../taplo" }
+taplo-cli = { path = "../taplo-cli", optional = true, default-features = false }
+taplo-common = { path = "../taplo-common", default-features = false, features = [
+  "rustls-tls",
+  "schema",
+  "reqwest",
+] }
+taplo-lsp = { path = "../taplo-lsp", optional = true, default-features = false }
 
 anyhow                   = { workspace = true }
 async-trait              = { workspace = true }
@@ -43,3 +47,6 @@ wasm-bindgen-futures = { version = "0.4.45" }
 default = ["cli", "lsp"]
 cli     = ["taplo-cli"]
 lsp     = ["taplo-lsp"]
+
+[lints]
+workspace = true
