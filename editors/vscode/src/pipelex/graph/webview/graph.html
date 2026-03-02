@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Method Graph</title>
+<!-- React and ReactDOM from CDN -->
+<script nonce="PIPELEX_CSP_NONCE" crossorigin="anonymous" src="https://unpkg.com/react@18/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z"></script>
+<script nonce="PIPELEX_CSP_NONCE" crossorigin="anonymous" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1"></script>
+<!-- ReactFlow from CDN (v11) -->
+<script nonce="PIPELEX_CSP_NONCE" src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js" integrity="sha384-lA1w00Vex5qXDv4/xYJO/e8SCjfdlNghbTP+s+2zl37rCEAC7trsSRpYrv/JQy5y" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://unpkg.com/reactflow@11.11.4/dist/style.css">
+<!-- Dagre for layout -->
+<script nonce="PIPELEX_CSP_NONCE" src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js" integrity="sha384-2IH3T69EIKYC4c+RXZifZRvaH5SRUdacJW7j6HtE5rQbvLhKKdawxq6vpIzJ7j9M" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="{{GRAPH_CSS_URI}}">
+</head>
+<body>
+<div id="app-container">
+    <div id="root"></div>
+</div>
+
+<footer class="footer">
+    <div class="footer-legend">
+        <div class="legend-item"><div class="legend-dot pipe"></div>Pipe</div>
+        <div class="legend-item"><div class="legend-dot stuff"></div>Data</div>
+        <div class="legend-item"><div class="legend-dot success"></div>Success</div>
+        <div class="legend-item"><div class="legend-dot error"></div>Failed</div>
+    </div>
+    <div class="footer-actions">
+        <button id="direction-toggle" class="footer-btn" title="Toggle layout direction">
+            <span class="direction-icon lr-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+            <span class="direction-icon tb-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span>
+        </button>
+    </div>
+    <div class="footer-stats" id="footer-stats"></div>
+</footer>
+
+<script nonce="PIPELEX_CSP_NONCE" src="{{GRAPH_JS_URI}}"></script>
+</body>
+</html>

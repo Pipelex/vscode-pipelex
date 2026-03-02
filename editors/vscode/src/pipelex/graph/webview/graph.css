@@ -1,0 +1,243 @@
+/* VS Code theme detection — map VS Code theme classes to graph theme vars */
+
+/* Dark theme (default / vscode-dark) */
+:root, body.vscode-dark {
+    --color-bg: #1e1e1e;
+    --color-surface: #1e293b;
+    --color-surface-hover: #334155;
+    --color-border: #334155;
+    --color-text: #f1f5f9;
+    --color-text-muted: #94a3b8;
+    --color-text-dim: #64748b;
+    --color-accent: #3b82f6;
+    --color-accent-hover: #60a5fa;
+    --color-success: #10b981;
+    --color-success-bg: rgba(16, 185, 129, 0.15);
+    --color-error: #ef4444;
+    --color-error-bg: rgba(239, 68, 68, 0.15);
+    --color-warning: #f59e0b;
+    --color-stuff: #f59e0b;
+    --color-stuff-bg: rgba(245, 158, 11, 0.15);
+    --color-stuff-border: #d97706;
+    --color-stuff-text: #fef3c7;
+    --color-stuff-text-dim: #fcd34d;
+    --color-pipe: #3b82f6;
+    --color-pipe-bg: rgba(59, 130, 246, 0.1);
+    --color-pipe-text: #dbeafe;
+    --color-pipe-failed: #ef4444;
+    --color-pipe-failed-bg: rgba(239, 68, 68, 0.15);
+    --color-edge: #3b82f6;
+    --color-batch-item: #a855f7;
+    --color-batch-aggregate: #22c55e;
+    --color-parallel-combine: #c084fc;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'Monaco', 'Menlo', 'Courier New', monospace;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-pill: 999px;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* Light theme (vscode-light) */
+body.vscode-light {
+    --color-bg: #f8fafc;
+    --color-surface: #ffffff;
+    --color-surface-hover: #f1f5f9;
+    --color-border: #e2e8f0;
+    --color-text: #1e293b;
+    --color-text-muted: #64748b;
+    --color-text-dim: #94a3b8;
+    --color-accent: #3b82f6;
+    --color-accent-hover: #2563eb;
+    --color-success: #10b981;
+    --color-success-bg: rgba(16, 185, 129, 0.1);
+    --color-error: #ef4444;
+    --color-error-bg: rgba(239, 68, 68, 0.1);
+    --color-warning: #f59e0b;
+    --color-stuff: #f59e0b;
+    --color-stuff-bg: rgba(245, 158, 11, 0.1);
+    --color-stuff-border: #d97706;
+    --color-stuff-text: #78350f;
+    --color-stuff-text-dim: #92400e;
+    --color-pipe: #3b82f6;
+    --color-pipe-bg: rgba(59, 130, 246, 0.08);
+    --color-pipe-text: #1e3a8a;
+    --color-pipe-failed: #ef4444;
+    --color-pipe-failed-bg: rgba(239, 68, 68, 0.1);
+    --color-edge: #3b82f6;
+    --color-batch-item: #9333ea;
+    --color-batch-aggregate: #16a34a;
+    --color-parallel-combine: #a855f7;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* High contrast */
+body.vscode-high-contrast {
+    --color-bg: #000000;
+    --color-surface: #1a1a1a;
+    --color-surface-hover: #2a2a2a;
+    --color-border: #6fc3df;
+    --color-text: #ffffff;
+    --color-text-muted: #d4d4d4;
+    --color-text-dim: #a0a0a0;
+    --color-pipe: #6fc3df;
+    --color-pipe-bg: rgba(111, 195, 223, 0.15);
+    --color-pipe-text: #ffffff;
+    --color-edge: #6fc3df;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: var(--font-sans);
+    height: 100vh;
+    overflow: hidden;
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+#app-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 37px); /* Leave room for footer */
+}
+#root {
+    flex: 1;
+    width: 100%;
+    overflow: hidden;
+}
+.react-flow-container {
+    width: 100%;
+    height: 100%;
+    background: var(--color-bg);
+}
+.react-flow__node {
+    font-family: var(--font-sans);
+    cursor: pointer;
+}
+.react-flow__background {
+    background: var(--color-bg) !important;
+}
+.react-flow__controls {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    bottom: 10px !important;
+    left: 16px !important;
+}
+.react-flow__controls-button {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    fill: var(--color-text-muted);
+}
+.react-flow__controls-button:hover {
+    background: var(--color-surface-hover);
+}
+.react-flow__edge-path {
+    stroke-width: 2;
+}
+.react-flow__edge-text {
+    font-size: 11px;
+    fill: var(--color-text-muted);
+}
+.react-flow__edge-textbg {
+    fill: var(--color-bg);
+}
+/* Selected node highlight */
+.react-flow__node.selected {
+    box-shadow: 0 0 0 3px var(--color-accent), var(--shadow-lg) !important;
+    z-index: 1000 !important;
+}
+
+/* Footer */
+.footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 100;
+    font-size: 12px;
+    height: 37px;
+}
+.footer-legend {
+    display: flex;
+    gap: 16px;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-muted);
+}
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+.legend-dot.pipe {
+    background: var(--color-pipe);
+}
+.legend-dot.stuff {
+    background: var(--color-stuff);
+    border-radius: 5px;
+}
+.legend-dot.success {
+    background: var(--color-success);
+}
+.legend-dot.error {
+    background: var(--color-error);
+}
+.footer-actions {
+    display: flex;
+    gap: 8px;
+}
+.footer-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--color-surface-hover);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: var(--color-text-muted);
+}
+.footer-btn:hover {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
+}
+.direction-icon { display: none; }
+.direction-icon.active { display: inline-flex; align-items: center; justify-content: center; }
+.footer-stats {
+    display: flex;
+    gap: 12px;
+}
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+.stat-value {
+    font-weight: 600;
+    color: var(--color-text);
+}
+.stat-icon {
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+}

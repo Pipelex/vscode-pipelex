@@ -180,7 +180,7 @@ async function registerNodeFeatures(
 
     // Method graph webview panel
     const { MethodGraphPanel } = await import('./graph/methodGraphPanel');
-    const graphPanel = new MethodGraphPanel(getOutput());
+    const graphPanel = new MethodGraphPanel(getOutput(), context.extensionUri);
     context.subscriptions.push(graphPanel);
     context.subscriptions.push(
         vscode.commands.registerCommand('pipelex.showMethodGraph', () => {

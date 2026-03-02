@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---------- Hoisted mock state ----------
 const mockState = vi.hoisted(() => {
-    const mockWebview = { html: '' };
+    const mockWebview = {
+        html: '',
+        asWebviewUri: vi.fn((uri: any) => ({ toString: () => `https://webview-asset/${uri.fsPath || uri}` })),
+        onDidReceiveMessage: vi.fn(),
+        postMessage: vi.fn(),
+    };
     const mockPanel = {
         title: '',
         viewColumn: 2,
@@ -20,9 +25,11 @@ const mockState = vi.hoisted(() => {
         spawnCliReject: null as ((e: any) => void) | null,
         readFileResult: '<html>graph</html>',
         readFileResolve: null as ((v: any) => void) | null,
+        readFileSyncResult: '<!DOCTYPE html><html><head></head><body>PIPELEX_CSP_NONCE<div id="root"></div><script src="{{GRAPH_JS_URI}}"></script></body></html>',
         showWarningMessage: vi.fn(),
         executeCommand: vi.fn(),
         cancelAllInflightSpy: vi.fn(),
+        configOverrides: {} as Record<string, any>,
         // Event handler captures
         onSaveHandler: null as ((doc: any) => void) | null,
         onEditorChangeHandler: null as ((editor: any) => void) | null,
@@ -32,13 +39,28 @@ const mockState = vi.hoisted(() => {
 // ---------- Mocks ----------
 vi.mock('vscode', () => ({
     ViewColumn: { One: 1, Beside: -2 },
+    Uri: {
+        joinPath: vi.fn((...parts: any[]) => ({
+            fsPath: parts.map((p: any) => p.fsPath || p).join('/'),
+            toString: () => parts.map((p: any) => p.fsPath || p).join('/'),
+        })),
+    },
+    Selection: vi.fn(),
+    TextEditorRevealType: { InCenter: 2 },
     workspace: {
-        getConfiguration: () => ({ get: (_key: string, def: any) => def }),
+        getConfiguration: () => ({ get: (key: string, def: any) => mockState.configOverrides[key] ?? def }),
         onDidSaveTextDocument: vi.fn((handler: any) => {
             mockState.onSaveHandler = handler;
             return { dispose: vi.fn() };
         }),
         getWorkspaceFolder: () => ({ uri: { fsPath: '/workspace' } }),
+        openTextDocument: vi.fn(() => Promise.resolve({
+            lineCount: 10,
+            lineAt: (i: number) => ({
+                text: i === 3 ? '[pipe.my_pipe]' : '',
+                range: { start: { line: i, character: 0 }, end: { line: i, character: 14 } },
+            }),
+        })),
     },
     window: {
         createWebviewPanel: vi.fn((_id: string, title: string) => {
@@ -46,6 +68,10 @@ vi.mock('vscode', () => ({
             return mockState.mockPanel;
         }),
         showWarningMessage: mockState.showWarningMessage,
+        showTextDocument: vi.fn(() => Promise.resolve({
+            selection: null,
+            revealRange: vi.fn(),
+        })),
         onDidChangeActiveTextEditor: vi.fn((handler: any) => {
             mockState.onEditorChangeHandler = handler;
             return { dispose: vi.fn() };
@@ -76,6 +102,7 @@ vi.mock('../validation/processUtils', () => ({
 
 vi.mock('fs', () => ({
     default: {
+        readFileSync: vi.fn(() => mockState.readFileSyncResult),
         promises: {
             readFile: vi.fn((..._args: any[]) => {
                 if (mockState.readFileResolve) {
@@ -87,6 +114,7 @@ vi.mock('fs', () => ({
             }),
         },
     },
+    readFileSync: vi.fn(() => mockState.readFileSyncResult),
     promises: {
         readFile: vi.fn((..._args: any[]) => {
             if (mockState.readFileResolve) {
@@ -97,6 +125,13 @@ vi.mock('fs', () => ({
             return Promise.resolve(mockState.readFileResult);
         }),
     },
+}));
+
+vi.mock('../validation/sourceLocator', () => ({
+    findTableHeader: vi.fn((_doc: any, _kind: string, code: string) => {
+        if (code === 'my_pipe') return 3;
+        return -1;
+    }),
 }));
 
 // ---------- Import SUT after mocks ----------
@@ -113,6 +148,14 @@ function makeUri(fsPath: string) {
         fsPath,
         scheme: 'file',
         toString: () => `file://${fsPath}`,
+    } as any;
+}
+
+// Helper to create a mock extension URI
+function makeExtensionUri() {
+    return {
+        fsPath: '/ext',
+        toString: () => 'file:///ext',
     } as any;
 }
 
@@ -133,12 +176,13 @@ describe('MethodGraphPanel', () => {
         mockState.readFileResolve = null;
         mockState.onSaveHandler = null;
         mockState.onEditorChangeHandler = null;
+        mockState.configOverrides = {};
     });
 
     // --- Bug B: Filename extraction ---
 
     it('show() extracts filename correctly from unix paths', () => {
-        const panel = new MethodGraphPanel(mockOutput());
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/home/user/project/bundle.mthds');
 
         panel.show(uri);
@@ -149,7 +193,7 @@ describe('MethodGraphPanel', () => {
     });
 
     it('show() extracts filename correctly from Windows backslash paths', () => {
-        const panel = new MethodGraphPanel(mockOutput());
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('C:\\Users\\dev\\project\\bar.mthds');
 
         panel.show(uri);
@@ -157,6 +201,135 @@ describe('MethodGraphPanel', () => {
         // Bug B: current code uses split('/') which won't split backslashes
         // The title should be "Method Graph — bar.mthds", not the full path
         expect(mockState.mockPanel.title).toBe('Method Graph — bar.mthds');
+        panel.dispose();
+    });
+
+    // --- ViewSpec (--view) path ---
+
+    it('refresh() uses extension-owned webview when renderer is "extension" and viewspec is present', async () => {
+        mockState.configOverrides['graph.renderer'] = 'extension';
+        const viewspec = {
+            nodes: [{ id: 'n1', label: 'test', kind: 'operator', status: 'succeeded', ui: {}, inspector: {} }],
+            edges: [],
+        };
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ viewspec, pipe_code: 'main' }),
+            stderr: '',
+        };
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        // Data is buffered until webview signals ready — simulate the handshake
+        const receiveMessageCall = mockState.mockWebview.onDidReceiveMessage.mock.calls[0];
+        expect(receiveMessageCall).toBeDefined();
+        const messageHandler = receiveMessageCall[0];
+        messageHandler({ type: 'webviewReady' });
+
+        // Should have called postMessage with setData after webviewReady
+        expect(mockState.mockWebview.postMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: 'setData',
+                viewspec: viewspec,
+                config: expect.objectContaining({ direction: 'TB' }),
+            })
+        );
+        panel.dispose();
+    });
+
+    // --- Classic renderer (--graph) path (default) ---
+
+    it('refresh() uses classic HTML file when renderer is "classic" (default)', async () => {
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ graph_files: { reactflow_html: '/tmp/graph.html' } }),
+            stderr: '',
+        };
+        mockState.readFileResult = '<html>legacy graph</html>';
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        // Should NOT have called postMessage (legacy path)
+        expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
+        // Should have set HTML from the file
+        expect(mockState.mockWebview.html).toContain('legacy graph');
+        panel.dispose();
+    });
+
+    // --- navigateToPipe message handling ---
+
+    it('handleWebviewMessage navigates to pipe header on navigateToPipe', async () => {
+        mockState.configOverrides['graph.renderer'] = 'extension';
+        const vscode = await import('vscode');
+
+        const viewspec = {
+            nodes: [{ id: 'n1', label: 'my_pipe', kind: 'operator', status: 'succeeded', ui: {}, inspector: { pipe_code: 'my_pipe' } }],
+            edges: [],
+        };
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ viewspec, pipe_code: 'my_pipe' }),
+            stderr: '',
+        };
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        // Get the onDidReceiveMessage handler and complete handshake
+        const receiveMessageCall = mockState.mockWebview.onDidReceiveMessage.mock.calls[0];
+        expect(receiveMessageCall).toBeDefined();
+        const messageHandler = receiveMessageCall[0];
+        messageHandler({ type: 'webviewReady' });
+
+        // Simulate navigateToPipe message
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'my_pipe' });
+        await new Promise(r => setTimeout(r, 50));
+
+        // Should have opened the document and shown it
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(uri);
+        expect(vscode.window.showTextDocument).toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    // --- CLI flags based on renderer ---
+
+    it('refresh() sends only --graph when renderer is "classic"', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const args = vi.mocked(processUtils.spawnCli).mock.calls[0][1] as string[];
+        expect(args).toContain('--graph');
+        expect(args).not.toContain('--view');
+        panel.dispose();
+    });
+
+    it('refresh() sends --view and --graph when renderer is "extension"', async () => {
+        mockState.configOverrides['graph.renderer'] = 'extension';
+        const processUtils = await import('../validation/processUtils');
+
+        const viewspec = { nodes: [], edges: [] };
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ viewspec, pipe_code: 'main' }),
+            stderr: '',
+        };
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const args = vi.mocked(processUtils.spawnCli).mock.calls[0][1] as string[];
+        expect(args).toContain('--view');
+        expect(args).toContain('--graph');
         panel.dispose();
     });
 
@@ -172,7 +345,7 @@ describe('MethodGraphPanel', () => {
             }) as any;
         });
 
-        const panel = new MethodGraphPanel(mockOutput());
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri1 = makeUri('/project/file1.mthds');
         panel.show(uri1);
 
@@ -210,7 +383,7 @@ describe('MethodGraphPanel', () => {
             });
         });
 
-        const panel = new MethodGraphPanel(mockOutput());
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri1 = makeUri('/project/file1.mthds');
         panel.show(uri1);
 
@@ -240,7 +413,7 @@ describe('MethodGraphPanel', () => {
     // --- Regression: cancel all inflight (previous Bug 1) ---
 
     it('refresh() cancels all inflight jobs at start of refresh', async () => {
-        const panel = new MethodGraphPanel(mockOutput());
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/file.mthds');
 
         panel.show(uri);
@@ -255,7 +428,7 @@ describe('MethodGraphPanel', () => {
     it('refresh() shows warning message when CLI not found', async () => {
         mockState.resolveCliResult = null;
 
-        const panel = new MethodGraphPanel(mockOutput());
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/file.mthds');
         panel.show(uri);
         await new Promise(r => setTimeout(r, 10));
@@ -269,7 +442,7 @@ describe('MethodGraphPanel', () => {
     // --- Regression: infinite loop guard (previous Bug 4) ---
 
     it('onDidChangeActiveTextEditor does not redirect when panel is in column 1', async () => {
-        const panel = new MethodGraphPanel(mockOutput());
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/file.mthds');
         panel.show(uri);
         await new Promise(r => setTimeout(r, 10));

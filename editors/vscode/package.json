@@ -545,6 +545,20 @@
           "scope": "resource",
           "default": 30000
         },
+        "pipelex.graph.renderer": {
+          "description": "Which renderer to use for the method graph.",
+          "type": "string",
+          "enum": [
+            "classic",
+            "extension"
+          ],
+          "enumDescriptions": [
+            "Use the CLI-generated ReactFlow HTML (stable)",
+            "Use the extension-owned webview renderer (experimental)"
+          ],
+          "scope": "resource",
+          "default": "classic"
+        },
         "pipelex.graph.direction": {
           "description": "Layout direction for the method graph.",
           "type": "string",
