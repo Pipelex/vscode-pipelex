@@ -57,6 +57,7 @@ function getLayoutedElements(nodes, edges, direction) {
         marginy: 40,
     });
 
+    const nodeWidths = {};
     nodes.forEach((node) => {
         const nodeData = node.data || {};
         const isStuff = nodeData.isStuff;
@@ -64,6 +65,7 @@ function getLayoutedElements(nodes, edges, direction) {
         const estimatedWidth = Math.max(180, Math.min(400, labelText.length * 8 + 60));
         const width = isStuff ? Math.max(180, estimatedWidth) : Math.max(200, estimatedWidth);
         const height = isStuff ? 60 : 70;
+        nodeWidths[node.id] = width;
         g.setNode(node.id, { width, height });
     });
 
@@ -79,9 +81,7 @@ function getLayoutedElements(nodes, edges, direction) {
 
     const layoutedNodes = nodes.map((node) => {
         const nodeWithPosition = g.node(node.id);
-        const nodeData = node.data || {};
-        const isStuff = nodeData.isStuff;
-        const width = isStuff ? 180 : 200;
+        const width = nodeWidths[node.id] || 200;
         return {
             ...node,
             position: {
@@ -688,12 +688,6 @@ function GraphViewer() {
         );
     }, [setNodes]);
 
-    if (!ReactFlow) {
-        return React.createElement('div', { style: { padding: '20px', color: 'var(--color-text)' } },
-            React.createElement('p', null, 'Loading ReactFlow...')
-        );
-    }
-
     const onInit = (reactFlowInstance) => {
         reactFlowRef.current = reactFlowInstance;
     };
@@ -722,9 +716,19 @@ function GraphViewer() {
     );
 }
 
+// Guard component: prevents hooks from running when ReactFlow is unavailable
+function App() {
+    if (!ReactFlow) {
+        return React.createElement('div', { style: { padding: '20px', color: 'var(--color-text)' } },
+            React.createElement('p', null, 'Loading ReactFlow...')
+        );
+    }
+    return React.createElement(GraphViewer, null);
+}
+
 // Render the app
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(GraphViewer));
+root.render(React.createElement(App));
 
 // Apply initial direction icon
 applyDirectionIcon(currentDirection);
