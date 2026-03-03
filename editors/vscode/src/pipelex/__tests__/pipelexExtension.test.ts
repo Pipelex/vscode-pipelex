@@ -10,6 +10,7 @@ const mockState = vi.hoisted(() => ({
     childProcessAvailable: true,
     validatorConstructed: false,
     graphPanelConstructed: false,
+    pipeTestProviderConstructed: false,
 }));
 
 // ---------- Mocks ----------
@@ -34,7 +35,6 @@ vi.mock('vscode', () => ({
     },
     languages: {
         registerDocumentSemanticTokensProvider: mockState.registerDocumentSemanticTokensProvider,
-        registerCodeLensProvider: vi.fn(() => ({ dispose: vi.fn() })),
     },
 }));
 
@@ -51,10 +51,15 @@ vi.mock('../validation/pipelexValidator', () => {
     };
 });
 
-vi.mock('../pipeCodeLensProvider', () => {
+vi.mock('../terminalRunner', () => ({
+    runInTerminal: vi.fn(),
+}));
+
+vi.mock('../pipeTestProvider', () => {
     return {
-        PipeCodeLensProvider: class {
-            provideCodeLenses() { return []; }
+        PipeTestProvider: class {
+            constructor() { mockState.pipeTestProviderConstructed = true; }
+            dispose() {}
         },
     };
 });
@@ -90,6 +95,7 @@ describe('registerPipelexFeatures', () => {
         mockState.globalState.clear();
         mockState.validatorConstructed = false;
         mockState.graphPanelConstructed = false;
+        mockState.pipeTestProviderConstructed = false;
         mockState.childProcessAvailable = true;
     });
 
@@ -98,25 +104,11 @@ describe('registerPipelexFeatures', () => {
 
         const result = registerPipelexFeatures(context);
 
-        // If the function is synchronous (returns void), the command
-        // registration happens asynchronously and may not be done yet.
-        // We need to await the result to ensure commands are registered.
         expect(result).toBeInstanceOf(Promise);
         await result;
 
-        // After awaiting, the showMethodGraph command should be registered
         expect(mockState.registerCommand).toHaveBeenCalledWith(
             'pipelex.showMethodGraph',
-            expect.any(Function)
-        );
-    });
-
-    it('registers toggleRunPipeCodeLens command', async () => {
-        const context = makeContext();
-        await registerPipelexFeatures(context);
-
-        expect(mockState.registerCommand).toHaveBeenCalledWith(
-            'pipelex.toggleRunPipeCodeLens',
             expect.any(Function)
         );
     });
@@ -124,12 +116,10 @@ describe('registerPipelexFeatures', () => {
     it('registers showMethodGraph command only after dynamic imports resolve', async () => {
         const context = makeContext();
 
-        // Before calling, no command registered
         expect(mockState.registerCommand).not.toHaveBeenCalled();
 
         const result = registerPipelexFeatures(context);
 
-        // The promise must be awaited to guarantee registration
         if (result instanceof Promise) {
             await result;
         }
@@ -138,5 +128,12 @@ describe('registerPipelexFeatures', () => {
             'pipelex.showMethodGraph',
             expect.any(Function)
         );
+    });
+
+    it('instantiates PipeTestProvider during registration', async () => {
+        const context = makeContext();
+        await registerPipelexFeatures(context);
+
+        expect(mockState.pipeTestProviderConstructed).toBe(true);
     });
 });
