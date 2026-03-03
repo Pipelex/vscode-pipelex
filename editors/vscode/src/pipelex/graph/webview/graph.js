@@ -31,10 +31,21 @@ document.getElementById('direction-toggle').addEventListener('click', () => {
     if (window.setLayoutDirection) window.setLayoutDirection(currentDirection);
 });
 
+// Zoom toolbar buttons
+document.getElementById('zoom-in').addEventListener('click', () => {
+    if (window._reactFlowInstance) window._reactFlowInstance.zoomIn();
+});
+document.getElementById('zoom-out').addEventListener('click', () => {
+    if (window._reactFlowInstance) window._reactFlowInstance.zoomOut();
+});
+document.getElementById('zoom-fit').addEventListener('click', () => {
+    if (window._reactFlowInstance) window._reactFlowInstance.fitView({ padding: 0.1 });
+});
+
 // ReactFlow setup
 const { React, ReactDOM } = window;
 const ReactFlowLib = window.ReactFlowRenderer || window.ReactFlow || {};
-const { ReactFlow, useNodesState, useEdgesState, Background, Controls, MarkerType } = ReactFlowLib;
+const { ReactFlow, useNodesState, useEdgesState, Background, MarkerType } = ReactFlowLib;
 
 // Edge type is set dynamically from config; default to 'bezier' (matching pipelex defaults)
 let edgeType = 'bezier';
@@ -533,55 +544,6 @@ function buildGraph(viewspec, graphspec) {
     return { graphData: buildOrchestrationGraph(viewspec), analysis: null };
 }
 
-// Update footer stats
-function updateFooterStats(viewspec, graphspec, analysis) {
-    const statsEl = document.getElementById('footer-stats');
-    if (!statsEl) return;
-
-    const pipeCount = analysis
-        ? graphspec.nodes.filter(n => !analysis.controllerNodeIds.has(n.id)).length
-        : viewspec.nodes.length;
-    const stuffCount = analysis ? Object.keys(analysis.stuffRegistry).length : 0;
-    const succeededCount = viewspec.nodes.filter(n => n.status === 'succeeded').length;
-    const failedCount = viewspec.nodes.filter(n => n.status === 'failed').length;
-
-    let html = '<div class="stat-item">' +
-        '<svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-            '<rect x="3" y="3" width="18" height="18" rx="2"/>' +
-        '</svg>' +
-        '<span class="stat-value">' + pipeCount + '</span> pipes' +
-    '</div>';
-
-    if (stuffCount > 0) {
-        html += '<div class="stat-item" style="color: var(--color-stuff)">' +
-            '<svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                '<ellipse cx="12" cy="12" rx="10" ry="6"/>' +
-            '</svg>' +
-            '<span class="stat-value">' + stuffCount + '</span> data' +
-        '</div>';
-    }
-
-    if (succeededCount > 0) {
-        html += '<div class="stat-item" style="color: var(--color-success)">' +
-            '<svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                '<polyline points="20 6 9 17 4 12"/>' +
-            '</svg>' +
-            '<span class="stat-value">' + succeededCount + '</span>' +
-        '</div>';
-    }
-
-    if (failedCount > 0) {
-        html += '<div class="stat-item" style="color: var(--color-error)">' +
-            '<svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>' +
-            '</svg>' +
-            '<span class="stat-value">' + failedCount + '</span>' +
-        '</div>';
-    }
-
-    statsEl.innerHTML = html;
-}
-
 // ====================================================================
 // MAIN REACT COMPONENT
 // ====================================================================
@@ -650,8 +612,6 @@ function GraphViewer() {
                 setNodes(layouted.nodes);
                 setEdges(layouted.edges);
 
-                updateFooterStats(viewspec, graphspec, analysis);
-
                 // Fit view after render, then apply zoom/pan overrides
                 setTimeout(() => {
                     if (reactFlowRef.current) {
@@ -701,9 +661,10 @@ function GraphViewer() {
         );
     }, [setNodes]);
 
-    const onInit = (reactFlowInstance) => {
+    const onInit = React.useCallback((reactFlowInstance) => {
         reactFlowRef.current = reactFlowInstance;
-    };
+        window._reactFlowInstance = reactFlowInstance;
+    }, []);
 
     return React.createElement('div', { className: 'react-flow-container' },
         React.createElement(ReactFlow, {
@@ -723,8 +684,7 @@ function GraphViewer() {
                 gap: 20,
                 size: 1,
                 color: 'var(--color-bg-dots)',
-            }) : null,
-            Controls ? React.createElement(Controls, { showInteractive: false }) : null
+            }) : null
         )
     );
 }
