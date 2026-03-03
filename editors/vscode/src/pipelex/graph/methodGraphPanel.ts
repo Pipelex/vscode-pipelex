@@ -5,6 +5,7 @@ import { resolveCli } from '../validation/cliResolver';
 import { spawnCli, cancelAllInflight } from '../validation/processUtils';
 import { extractJson } from '../validation/pipelexValidator';
 import { findTableHeader } from '../validation/sourceLocator';
+import { resolveGraphConfig, getPaletteColors } from './graphConfig';
 
 export class MethodGraphPanel implements vscode.Disposable {
     private static readonly CSP_NONCE_SENTINEL = 'PIPELEX_CSP_NONCE';
@@ -178,6 +179,7 @@ export class MethodGraphPanel implements vscode.Disposable {
                 }
                 // Map direction setting to Dagre format
                 const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
+                const graphConfig = resolveGraphConfig();
 
                 const setDataPayload = {
                     type: 'setData',
@@ -185,8 +187,12 @@ export class MethodGraphPanel implements vscode.Disposable {
                     graphspec: result.graphspec || null,
                     config: {
                         direction: dagreDirection,
-                        nodesep: 50,
-                        ranksep: 80,
+                        nodesep: graphConfig.nodesep,
+                        ranksep: graphConfig.ranksep,
+                        edgeType: graphConfig.edgeType,
+                        initialZoom: graphConfig.initialZoom,
+                        panToTop: graphConfig.panToTop,
+                        paletteColors: getPaletteColors(graphConfig.palette),
                     },
                 };
 
