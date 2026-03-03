@@ -1,0 +1,46 @@
+editors/vscode/src/pipelex/pipelexExtension.ts
+  cdf6fdf0a2179585 77,97,111-114
+editors/vscode/src/pipelex/terminalRunner.ts
+  cdf6fdf0a2179585 1-46
+editors/vscode/src/pipelex/__tests__/pipelexExtension.test.ts
+  cdf6fdf0a2179585 13,54-58,60-62,98,132-137
+editors/vscode/src/pipelex/pipeTestProvider.ts
+  cdf6fdf0a2179585 1-56,58-61,63-86,88-107,109-110,112-137,142,144-155,157-208
+  5c2f5ecd09b41888 57,62,87,108,111,138-141,143,156
+editors/vscode/src/pipelex/__tests__/pipeTestProvider.test.ts
+  5c2f5ecd09b41888 29-30
+  cdf6fdf0a2179585 1-28,31-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "46b36878dd87352a0c5ab494176615818d9aae06",
+  "prompts": {
+    "5c2f5ecd09b41888": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0ac48632-d302-4eee-a967-3e096add446c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 12,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    },
+    "cdf6fdf0a2179585": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2433219b-e000-43e7-80b9-148b012680a4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 354,
+      "total_deletions": 124,
+      "accepted_lines": 342,
+      "overriden_lines": 0
+    }
+  }
+}
