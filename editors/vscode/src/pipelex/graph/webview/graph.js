@@ -36,7 +36,8 @@ const { React, ReactDOM } = window;
 const ReactFlowLib = window.ReactFlowRenderer || window.ReactFlow || {};
 const { ReactFlow, useNodesState, useEdgesState, Background, Controls, MarkerType } = ReactFlowLib;
 
-const EDGE_TYPE = 'smoothstep';
+// Edge type is set dynamically from config; default to 'bezier' (matching pipelex defaults)
+let edgeType = 'bezier';
 
 // ====================================================================
 // DAGRE LAYOUT
@@ -44,7 +45,7 @@ const EDGE_TYPE = 'smoothstep';
 function getLayoutedElements(nodes, edges, direction) {
     direction = direction || 'TB';
     const nodesep = (config && config.nodesep) || 50;
-    const ranksep = (config && config.ranksep) || 80;
+    const ranksep = (config && config.ranksep) || 30;
 
     const g = new dagre.graphlib.Graph();
     g.setDefaultEdgeLabel(() => ({}));
@@ -295,7 +296,7 @@ function buildDataflowGraph(graphspec, analysis) {
             id: 'edge_' + (edgeId++),
             source: producerNodeId,
             target: stuffId,
-            type: EDGE_TYPE,
+            type: edgeType,
             animated: false,
             style: { stroke: 'var(--color-edge)', strokeWidth: 2 },
             markerEnd: {
@@ -313,7 +314,7 @@ function buildDataflowGraph(graphspec, analysis) {
                 id: 'edge_' + (edgeId++),
                 source: stuffId,
                 target: consumerNodeId,
-                type: EDGE_TYPE,
+                type: edgeType,
                 animated: false,
                 style: { stroke: 'var(--color-edge)', strokeWidth: 2 },
                 markerEnd: {
@@ -335,7 +336,7 @@ function buildDataflowGraph(graphspec, analysis) {
             id: edge.id || ('edge_' + (edgeId++)),
             source: sourceId,
             target: targetId,
-            type: EDGE_TYPE,
+            type: edgeType,
             animated: false,
             style: {
                 stroke: 'var(--color-parallel-combine)',
@@ -362,7 +363,7 @@ function buildDataflowGraph(graphspec, analysis) {
             id: edge.id || ('edge_' + (edgeId++)),
             source: sourceId,
             target: targetId,
-            type: EDGE_TYPE,
+            type: edgeType,
             animated: false,
             label: edge.label || '',
             labelStyle: {
@@ -494,7 +495,7 @@ function buildOrchestrationGraph(viewspec) {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        type: EDGE_TYPE,
+        type: edgeType,
         animated: edge.animated || false,
         label: edge.label,
         labelStyle: {
@@ -624,9 +625,19 @@ function GraphViewer() {
                 graphspec = message.graphspec || null;
                 config = message.config || {};
                 currentDirection = config.direction || 'TB';
+                edgeType = config.edgeType || 'bezier';
                 setDirection(currentDirection);
                 prevDirectionRef.current = currentDirection;
                 applyDirectionIcon(currentDirection);
+
+                // Apply palette colors as CSS custom properties on <body>
+                // (must target body, not documentElement, because body.vscode-dark
+                // redefines these variables and would shadow html-level overrides)
+                if (config.paletteColors) {
+                    for (const [cssVar, value] of Object.entries(config.paletteColors)) {
+                        document.body.style.setProperty(cssVar, value);
+                    }
+                }
 
                 const { graphData, analysis } = buildGraph(viewspec, graphspec);
                 initialDataRef.current = graphData;
@@ -641,10 +652,17 @@ function GraphViewer() {
 
                 updateFooterStats(viewspec, graphspec, analysis);
 
-                // Fit view after render
+                // Fit view after render, then apply zoom/pan overrides
                 setTimeout(() => {
                     if (reactFlowRef.current) {
                         reactFlowRef.current.fitView({ padding: 0.1 });
+                        if (config.initialZoom !== undefined && config.initialZoom !== null) {
+                            reactFlowRef.current.zoomTo(config.initialZoom);
+                        }
+                        if (config.panToTop) {
+                            const vp = reactFlowRef.current.getViewport();
+                            reactFlowRef.current.setViewport({ x: vp.x, y: 20, zoom: vp.zoom });
+                        }
                     }
                 }, 100);
             }
@@ -697,14 +715,14 @@ function GraphViewer() {
             onInit: onInit,
             fitView: true,
             fitViewOptions: { padding: 0.1 },
-            defaultEdgeOptions: { type: EDGE_TYPE },
+            defaultEdgeOptions: { type: edgeType },
             proOptions: { hideAttribution: true },
         },
             Background ? React.createElement(Background, {
                 variant: 'dots',
                 gap: 20,
                 size: 1,
-                color: '#334155',
+                color: 'var(--color-bg-dots)',
             }) : null,
             Controls ? React.createElement(Controls, { showInteractive: false }) : null
         )

@@ -545,19 +545,35 @@
           "scope": "resource",
           "default": 30000
         },
-        "pipelex.graph.renderer": {
-          "description": "Which renderer to use for the method graph.",
+        "pipelex.graph.edgeType": {
           "type": "string",
           "enum": [
-            "classic",
-            "extension"
+            "bezier",
+            "smoothstep",
+            "step",
+            "straight"
           ],
           "enumDescriptions": [
-            "Use the CLI-generated ReactFlow HTML (stable)",
-            "Use the extension-owned webview renderer (experimental)"
+            "Smooth bezier curves (default)",
+            "Rounded right-angle paths",
+            "Sharp right-angle paths",
+            "Straight lines"
           ],
           "scope": "resource",
-          "default": "classic"
+          "description": "Edge curve type for the graph renderer. Overrides pipelex.toml."
+        },
+        "pipelex.graph.palette": {
+          "type": "string",
+          "enum": [
+            "dracula",
+            "yellow_blue"
+          ],
+          "enumDescriptions": [
+            "Vibrant dark palette with salmon pipes, teal data, lemon edges",
+            "Classic blue pipes and amber data"
+          ],
+          "scope": "resource",
+          "description": "Color palette for the graph renderer. Overrides pipelex.toml."
         },
         "pipelex.graph.direction": {
           "description": "Layout direction for the method graph.",
@@ -715,6 +731,7 @@
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
     "node-fetch": "^3.3.2",
+    "smol-toml": "^1.6.0",
     "vscode-languageclient": "^9.0.1",
     "which": "^5.0.0"
   },
