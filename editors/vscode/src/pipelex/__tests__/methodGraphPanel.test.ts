@@ -297,7 +297,15 @@ describe('MethodGraphPanel', () => {
         await new Promise(r => setTimeout(r, 10));
 
         // The staleness check after spawnCli should prevent the stale
-        // viewspec from being rendered on the webview.
+        // viewspec from being buffered or sent to the webview.
+        expect((panel as any).pendingData).toBeNull();
+
+        // Even after webviewReady handshake, stale data must not be delivered
+        const receiveMessageCall = mockState.mockWebview.onDidReceiveMessage.mock.calls[0];
+        expect(receiveMessageCall).toBeDefined();
+        const messageHandler = receiveMessageCall[0];
+        messageHandler({ type: 'webviewReady' });
+
         expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
 
         panel.dispose();

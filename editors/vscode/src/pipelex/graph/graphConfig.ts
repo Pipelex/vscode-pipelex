@@ -72,6 +72,9 @@ async function readPipelexToml(): Promise<Partial<GraphRenderConfig>> {
         if (typeof rf.style?.palette === 'string') result.palette = rf.style.palette;
         return result;
     } catch {
+        vscode.window.showWarningMessage(
+            'Pipelex graph: failed to parse ~/.pipelex/pipelex.toml. Check for syntax errors.'
+        );
         return {};
     }
 }

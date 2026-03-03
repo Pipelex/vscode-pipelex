@@ -179,6 +179,9 @@ export class MethodGraphPanel implements vscode.Disposable {
             const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
             const graphConfig = await resolveGraphConfig();
 
+            if (controller.signal.aborted) return;
+            if (this.currentUri?.toString() !== uri.toString()) return;
+
             const setDataPayload = {
                 type: 'setData',
                 viewspec: result.viewspec,

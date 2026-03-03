@@ -72,6 +72,7 @@ body.vscode-light {
     --color-batch-item: #9333ea;
     --color-batch-aggregate: #16a34a;
     --color-parallel-combine: #a855f7;
+    --color-bg-dots: #e2e8f0;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -90,6 +91,7 @@ body.vscode-high-contrast {
     --color-pipe-bg: rgba(111, 195, 223, 0.15);
     --color-pipe-text: #ffffff;
     --color-edge: #6fc3df;
+    --color-bg-dots: #333333;
 }
 
 /* High contrast light */
@@ -122,6 +124,7 @@ body.vscode-high-contrast-light {
     --color-batch-item: #6b21a8;
     --color-batch-aggregate: #0a6640;
     --color-parallel-combine: #7e22ce;
+    --color-bg-dots: #d4d4d4;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);

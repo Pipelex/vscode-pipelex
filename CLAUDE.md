@@ -80,18 +80,7 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 
 ## Graph Rendering (ReactFlow)
 
-The extension includes a webview panel that renders method/pipe graphs using ReactFlow. There are two approaches, both originating from the `pipelex` Python repo:
-
-### Classic approach (ready-made HTML)
-`pipelex-agent validate` can produce a complete, self-contained HTML page (rendered via Jinja2 templates). The extension simply displays this HTML in a webview. The upstream generation code lives in:
-- `../pipelex/pipelex/graph/` — graph analysis, spec, factory
-- `../pipelex/pipelex/graph/reactflow/` — ReactFlow viewspec, HTML generation, Jinja2 templates
-- `../pipelex/pipelex/graph/reactflow/viewspec.py` — node/edge data model (ViewSpec)
-- `../pipelex/pipelex/graph/reactflow/viewspec_transformer.py` — transforms graph data into ReactFlow viewspec
-- `../pipelex/pipelex/graph/reactflow/reactflow_html.py` — assembles final HTML from templates
-
-### New approach (viewspec-driven, in development)
-Instead of receiving ready-made HTML, the extension receives a **ViewSpec** (JSON with nodes and edges) from `pipelex-agent validate` and renders the graph itself using ReactFlow in the webview. This gives us full control over layout, styling, and interactivity in the extension.
+The extension includes a webview panel that renders method/pipe graphs using ReactFlow. The extension receives a **ViewSpec** (JSON with nodes and edges) from `pipelex-agent validate --view` and renders the graph itself using ReactFlow in the webview. This gives full control over layout, styling, and interactivity.
 
 ### Extension-side code
 - `editors/vscode/src/pipelex/graph/methodGraphPanel.ts` — webview panel manager
