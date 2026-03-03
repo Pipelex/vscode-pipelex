@@ -48,11 +48,11 @@ const PALETTE_COLORS: Record<string, Record<string, string>> = {
     // yellow_blue uses CSS defaults — no overrides needed
 };
 
-function readPipelexToml(): Partial<GraphRenderConfig> {
+async function readPipelexToml(): Promise<Partial<GraphRenderConfig>> {
     const tomlPath = path.join(os.homedir(), '.pipelex', 'pipelex.toml');
     let content: string;
     try {
-        content = fs.readFileSync(tomlPath, 'utf-8');
+        content = await fs.promises.readFile(tomlPath, 'utf-8');
     } catch {
         return {};
     }
@@ -76,8 +76,8 @@ function readPipelexToml(): Partial<GraphRenderConfig> {
     }
 }
 
-export function resolveGraphConfig(): GraphRenderConfig {
-    const fromToml = readPipelexToml();
+export async function resolveGraphConfig(): Promise<GraphRenderConfig> {
+    const fromToml = await readPipelexToml();
     const merged: GraphRenderConfig = { ...DEFAULTS, ...fromToml };
 
     // VS Code settings override (only when explicitly set)

@@ -179,7 +179,7 @@ export class MethodGraphPanel implements vscode.Disposable {
                 }
                 // Map direction setting to Dagre format
                 const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
-                const graphConfig = resolveGraphConfig();
+                const graphConfig = await resolveGraphConfig();
 
                 const setDataPayload = {
                     type: 'setData',

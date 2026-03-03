@@ -634,8 +634,8 @@ function GraphViewer() {
                 // (must target body, not documentElement, because body.vscode-dark
                 // redefines these variables and would shadow html-level overrides)
                 if (config.paletteColors) {
-                    for (var cssVar in config.paletteColors) {
-                        document.body.style.setProperty(cssVar, config.paletteColors[cssVar]);
+                    for (const [cssVar, value] of Object.entries(config.paletteColors)) {
+                        document.body.style.setProperty(cssVar, value);
                     }
                 }
 
@@ -660,7 +660,7 @@ function GraphViewer() {
                             reactFlowRef.current.zoomTo(config.initialZoom);
                         }
                         if (config.panToTop) {
-                            var vp = reactFlowRef.current.getViewport();
+                            const vp = reactFlowRef.current.getViewport();
                             reactFlowRef.current.setViewport({ x: vp.x, y: 20, zoom: vp.zoom });
                         }
                     }
