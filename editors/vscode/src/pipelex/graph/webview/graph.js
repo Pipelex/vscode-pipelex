@@ -1351,6 +1351,7 @@ function GraphViewer() {
             fitView: true,
             fitViewOptions: { padding: 0.1 },
             defaultEdgeOptions: { type: edgeType },
+            minZoom: 0.1,
             proOptions: { hideAttribution: true },
         },
             Background ? React.createElement(Background, {
