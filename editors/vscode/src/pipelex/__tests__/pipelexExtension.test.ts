@@ -29,6 +29,7 @@ vi.mock('vscode', () => ({
         showWarningMessage: mockState.showWarningMessage,
         activeTextEditor: undefined,
         createOutputChannel: vi.fn(() => ({ appendLine: vi.fn(), dispose: vi.fn() })),
+        registerWebviewPanelSerializer: vi.fn(() => ({ dispose: vi.fn() })),
     },
     commands: {
         registerCommand: mockState.registerCommand,

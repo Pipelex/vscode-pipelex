@@ -68,8 +68,6 @@ export class MethodGraphPanel implements vscode.Disposable {
         this.currentUri = uri;
         const filename = uri.fsPath.replace(/^.*[\\/]/, '');
 
-        const webviewDir = vscode.Uri.joinPath(this.extensionUri, 'dist', 'pipelex', 'graph', 'webview');
-
         if (this.panel) {
             this.panel.title = `Method Graph — ${filename}`;
             this.panel.reveal(undefined, true);
@@ -81,22 +79,47 @@ export class MethodGraphPanel implements vscode.Disposable {
                 {
                     enableScripts: true,
                     retainContextWhenHidden: true,
-                    localResourceRoots: [webviewDir],
+                    localResourceRoots: [this.webviewDir()],
                 }
             );
-            this.panel.onDidDispose(() => {
-                this.panel = undefined;
-                this.currentUri = undefined;
-            });
-
-            this.panel.webview.onDidReceiveMessage(
-                message => this.handleWebviewMessage(message),
-                undefined,
-                this.disposables,
-            );
+            this.wirePanel();
         }
 
         this.refresh(uri);
+    }
+
+    restore(panel: vscode.WebviewPanel, uri: vscode.Uri) {
+        this.panel = panel;
+        this.currentUri = uri;
+
+        const filename = uri.fsPath.replace(/^.*[\\/]/, '');
+        this.panel.title = `Method Graph — ${filename}`;
+
+        // The extension path may have changed between sessions — update localResourceRoots
+        this.panel.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [this.webviewDir()],
+        };
+
+        this.wirePanel();
+        this.refresh(uri);
+    }
+
+    private webviewDir(): vscode.Uri {
+        return vscode.Uri.joinPath(this.extensionUri, 'dist', 'pipelex', 'graph', 'webview');
+    }
+
+    private wirePanel() {
+        if (!this.panel) return;
+        this.panel.onDidDispose(() => {
+            this.panel = undefined;
+            this.currentUri = undefined;
+        });
+        this.panel.webview.onDidReceiveMessage(
+            message => this.handleWebviewMessage(message),
+            undefined,
+            this.disposables,
+        );
     }
 
     dispose() {
@@ -185,6 +208,7 @@ export class MethodGraphPanel implements vscode.Disposable {
 
             const setDataPayload = {
                 type: 'setData',
+                uri: uri.toString(),
                 viewspec: result.viewspec,
                 graphspec: result.graphspec || null,
                 config: {
@@ -241,7 +265,7 @@ export class MethodGraphPanel implements vscode.Disposable {
     private buildWebviewHtml(): string | undefined {
         if (!this.panel) return undefined;
 
-        const webviewDir = vscode.Uri.joinPath(this.extensionUri, 'dist', 'pipelex', 'graph', 'webview');
+        const webviewDir = this.webviewDir();
         const htmlPath = vscode.Uri.joinPath(webviewDir, 'graph.html').fsPath;
 
         let html: string;

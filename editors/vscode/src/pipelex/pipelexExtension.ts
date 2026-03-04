@@ -103,6 +103,17 @@ async function registerNodeFeatures(
     const graphPanel = new MethodGraphPanel(getOutput(), context.extensionUri);
     context.subscriptions.push(graphPanel);
     context.subscriptions.push(
+        vscode.window.registerWebviewPanelSerializer('pipelexMethodGraph', {
+            async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: any) {
+                if (state?.uri) {
+                    graphPanel.restore(panel, vscode.Uri.parse(state.uri));
+                } else {
+                    panel.dispose();
+                }
+            }
+        })
+    );
+    context.subscriptions.push(
         vscode.commands.registerCommand('pipelex.showMethodGraph', () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor || editor.document.languageId !== 'mthds') {

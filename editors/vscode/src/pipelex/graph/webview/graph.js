@@ -1243,6 +1243,10 @@ function GraphViewer() {
         function handleMessage(event) {
             const message = event.data;
             if (message.type === 'setData') {
+                // Persist the source file URI so VS Code can restore after reload
+                if (message.uri) {
+                    vscode.setState({ uri: message.uri });
+                }
                 viewspec = message.viewspec;
                 graphspec = message.graphspec || null;
                 config = message.config || {};
