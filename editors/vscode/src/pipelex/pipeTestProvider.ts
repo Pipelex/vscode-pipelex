@@ -188,7 +188,8 @@ export class PipeTestProvider implements vscode.Disposable {
                 const fileUri = item.parent?.uri ?? uri;
                 if (fileUri) {
                     runInTerminal(fileUri.fsPath, fileUri, (quote, cmd, inputsArg) =>
-                        `${quote(cmd)} run bundle ${quote(fileUri.fsPath)} --pipe ${quote(pipeName)}${inputsArg}`
+                        `${quote(cmd)} run bundle ${quote(fileUri.fsPath)} --pipe ${quote(pipeName)}${inputsArg}`,
+                        pipeName,
                     );
                 }
             }

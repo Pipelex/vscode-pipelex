@@ -150,7 +150,7 @@
         {
           "command": "pipelex.runBundle",
           "when": "editorLangId == mthds"
-        },
+        }
       ],
       "editor/title": [
         {
