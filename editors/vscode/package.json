@@ -151,10 +151,6 @@
           "command": "pipelex.runBundle",
           "when": "editorLangId == mthds"
         },
-        {
-          "command": "pipelex.runPipe",
-          "when": "false"
-        }
       ],
       "editor/title": [
         {
@@ -202,10 +198,6 @@
         "command": "pipelex.runBundle",
         "title": "Pipelex: Run Bundle",
         "icon": "$(play)"
-      },
-      {
-        "command": "pipelex.runPipe",
-        "title": "Pipelex: Run Pipe"
       }
     ],
     "semanticTokenTypes": [

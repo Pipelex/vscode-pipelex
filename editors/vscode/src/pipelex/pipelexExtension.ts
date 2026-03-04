@@ -93,21 +93,6 @@ async function registerNodeFeatures(
             );
         })
     );
-
-    // Run individual pipe command (invoked programmatically or from test provider)
-    context.subscriptions.push(
-        vscode.commands.registerCommand('pipelex.runPipe', async (uri: vscode.Uri, pipeName: string) => {
-            const editor = vscode.window.activeTextEditor;
-            if (editor && editor.document.uri.toString() === uri.toString() && editor.document.isDirty) {
-                await editor.document.save();
-            }
-            const filePath = uri.fsPath;
-            runInTerminal(filePath, uri, (quote, cmd, inputsArg) =>
-                `${quote(cmd)} run bundle ${quote(filePath)} --pipe ${quote(pipeName)}${inputsArg}`
-            );
-        })
-    );
-
     // Pipe test provider (gutter play icons via Testing API)
     const { PipeTestProvider } = await import('./pipeTestProvider');
     const pipeTestProvider = new PipeTestProvider();
