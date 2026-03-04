@@ -16,6 +16,7 @@ let currentDirection = 'TB';
 let viewspec = null;
 let graphspec = null;
 let config = {};
+let showControllers = false;
 
 // Direction icon update
 function applyDirectionIcon(direction) {
@@ -40,6 +41,14 @@ document.getElementById('zoom-out').addEventListener('click', () => {
 });
 document.getElementById('zoom-fit').addEventListener('click', () => {
     if (window._reactFlowInstance) window._reactFlowInstance.fitView({ padding: 0.1 });
+});
+
+// Controllers toggle button
+const controllersToggleBtn = document.getElementById('controllers-toggle');
+controllersToggleBtn.addEventListener('click', () => {
+    showControllers = !showControllers;
+    controllersToggleBtn.classList.toggle('active', showControllers);
+    if (window.rebuildAndLayout) window.rebuildAndLayout();
 });
 
 // ReactFlow setup
@@ -175,6 +184,7 @@ function buildDataflowAnalysis(graphspec) {
         stuffConsumers,
         controllerNodeIds,
         childNodeIds,
+        containmentTree,
     };
 }
 
@@ -399,6 +409,204 @@ function buildDataflowGraph(graphspec, analysis) {
 }
 
 // ====================================================================
+// CONTROLLER CONTAINERS: Build group nodes wrapping child operators
+// ====================================================================
+function buildControllerNodes(graphspec, analysis, layoutedNodes) {
+    const PADDING_X = 40;
+    const PADDING_TOP = 48; // room for label
+    const PADDING_BOTTOM = 20;
+
+    // Build lookup of layouted nodes by id
+    const nodeById = {};
+    for (const n of layoutedNodes) {
+        nodeById[n.id] = n;
+    }
+
+    // Build controller info from graphspec nodes
+    const controllerInfo = {};
+    for (const node of graphspec.nodes) {
+        if (analysis.controllerNodeIds.has(node.id)) {
+            controllerInfo[node.id] = node;
+        }
+    }
+
+    // Compute nesting depth (leaf controllers = 0, parents = 1+max child depth)
+    const depthCache = {};
+    function getDepth(controllerId) {
+        if (depthCache[controllerId] !== undefined) return depthCache[controllerId];
+        const children = analysis.containmentTree[controllerId] || [];
+        let maxChildDepth = -1;
+        for (const childId of children) {
+            if (analysis.controllerNodeIds.has(childId)) {
+                maxChildDepth = Math.max(maxChildDepth, getDepth(childId));
+            }
+        }
+        depthCache[controllerId] = maxChildDepth + 1;
+        return depthCache[controllerId];
+    }
+
+    // Build child -> parent controller mapping (for all children, not just operators)
+    const childToController = {};
+    for (const [ctrlId, children] of Object.entries(analysis.containmentTree)) {
+        for (const childId of children) {
+            childToController[childId] = ctrlId;
+        }
+    }
+
+    // Map stuff nodes to the controller they belong in
+    const stuffToController = {};
+    // Stuff produced by an operator inside a controller → assign to that controller
+    for (const [digest, producerId] of Object.entries(analysis.stuffProducers)) {
+        const stuffId = 'stuff_' + digest;
+        const ctrlId = childToController[producerId];
+        if (ctrlId && nodeById[stuffId]) {
+            stuffToController[stuffId] = ctrlId;
+        }
+    }
+    // Stuff produced by a controller itself (e.g. PipeParallel combined outputs) is
+    // excluded from stuffProducers. Assign to the controller's parent controller.
+    for (const node of graphspec.nodes) {
+        if (!analysis.controllerNodeIds.has(node.id)) continue;
+        const parentCtrlId = childToController[node.id];
+        if (!parentCtrlId) continue;
+        for (const output of (node.io?.outputs || [])) {
+            if (!output.digest) continue;
+            const stuffId = 'stuff_' + output.digest;
+            if (nodeById[stuffId] && !stuffToController[stuffId]) {
+                stuffToController[stuffId] = parentCtrlId;
+            }
+        }
+    }
+
+    // Build reverse index: controller -> stuff node ids
+    const controllerStuffChildren = {};
+    for (const [stuffId, ctrlId] of Object.entries(stuffToController)) {
+        if (!controllerStuffChildren[ctrlId]) controllerStuffChildren[ctrlId] = [];
+        controllerStuffChildren[ctrlId].push(stuffId);
+    }
+
+    // Sort controllers by depth ascending (process leaves first)
+    const controllerIds = Array.from(analysis.controllerNodeIds);
+    for (const id of controllerIds) getDepth(id);
+    controllerIds.sort((a, b) => depthCache[a] - depthCache[b]);
+
+    const controllerNodes = [];
+    const childToParent = {}; // childId -> parentControllerId
+
+    for (const controllerId of controllerIds) {
+        const directChildren = analysis.containmentTree[controllerId] || [];
+        // Only include children that are actually rendered
+        const renderedChildren = directChildren.filter(cid => nodeById[cid]);
+        const stuffChildren = controllerStuffChildren[controllerId] || [];
+        const allChildren = [...renderedChildren, ...stuffChildren];
+
+        if (allChildren.length === 0) continue;
+
+        // Compute bounding box from children
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const childId of allChildren) {
+            const child = nodeById[childId];
+            const pos = child.position;
+            const w = parseFloat(child.style?.width) || 200;
+            const h = parseFloat(child.style?.height) || (child.data?.isStuff ? 60 : 70);
+            minX = Math.min(minX, pos.x);
+            minY = Math.min(minY, pos.y);
+            maxX = Math.max(maxX, pos.x + w);
+            maxY = Math.max(maxY, pos.y + h);
+        }
+
+        const groupX = minX - PADDING_X;
+        const groupY = minY - PADDING_TOP;
+        const groupW = (maxX - minX) + 2 * PADDING_X;
+        const groupH = (maxY - minY) + PADDING_TOP + PADDING_BOTTOM;
+
+        const info = controllerInfo[controllerId] || {};
+        const pipeCode = info.pipe_code || controllerId.split(':').pop();
+        const pipeType = info.pipe_type || '';
+        const typeSuffix = pipeType.replace(/^Pipe/, '');
+        const labelText = typeSuffix ? (pipeCode + ' ' + typeSuffix) : pipeCode;
+
+        const groupNode = {
+            id: controllerId,
+            type: 'group',
+            data: {
+                label: labelText,
+                isController: true,
+                isPipe: false,
+                isStuff: false,
+                labelText: labelText,
+            },
+            position: { x: groupX, y: groupY },
+            style: {
+                width: groupW + 'px',
+                height: groupH + 'px',
+                background: 'var(--color-controller-bg)',
+                border: '2px dashed var(--color-controller-border)',
+                borderRadius: '12px',
+                padding: '0',
+                fontSize: '12px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 500,
+                color: 'var(--color-controller-text)',
+            },
+        };
+
+        controllerNodes.push(groupNode);
+        nodeById[controllerId] = groupNode;
+
+        // Record child-parent relationships (operators + stuff nodes)
+        for (const childId of allChildren) {
+            childToParent[childId] = controllerId;
+        }
+    }
+
+    // Convert child positions to parent-relative and set parentNode
+    for (const [childId, parentId] of Object.entries(childToParent)) {
+        const child = nodeById[childId];
+        const parent = nodeById[parentId];
+        if (!child || !parent) continue;
+        child.position = {
+            x: child.position.x - parent.position.x,
+            y: child.position.y - parent.position.y,
+        };
+        child.parentNode = parentId;
+        child.extent = 'parent';
+    }
+
+    return controllerNodes;
+}
+
+function applyControllers(layoutedNodes, layoutedEdges, graphspec, analysis) {
+    if (!showControllers || !analysis || !graphspec) {
+        return { nodes: layoutedNodes, edges: layoutedEdges };
+    }
+
+    const controllerNodes = buildControllerNodes(graphspec, analysis, layoutedNodes);
+    if (controllerNodes.length === 0) {
+        return { nodes: layoutedNodes, edges: layoutedEdges };
+    }
+
+    // Merge controller + operator/stuff nodes
+    const allNodes = [...controllerNodes, ...layoutedNodes];
+
+    // Sort: ReactFlow v11 requires parent group nodes before their children.
+    // Precompute containment depth: 0 = no parent, 1 = direct child, etc.
+    const nodeMap = {};
+    for (const n of allNodes) nodeMap[n.id] = n;
+    const depthOf = {};
+    function getContainmentDepth(id) {
+        if (depthOf[id] !== undefined) return depthOf[id];
+        const n = nodeMap[id];
+        depthOf[id] = n && n.parentNode ? 1 + getContainmentDepth(n.parentNode) : 0;
+        return depthOf[id];
+    }
+    for (const n of allNodes) getContainmentDepth(n.id);
+    allNodes.sort((a, b) => depthOf[a.id] - depthOf[b.id]);
+
+    return { nodes: allNodes, edges: layoutedEdges };
+}
+
+// ====================================================================
 // FALLBACK: Build orchestration graph from ViewSpec (no dataflow)
 // ====================================================================
 function buildOrchestrationGraph(viewspec) {
@@ -569,14 +777,37 @@ function GraphViewer() {
         if (!initialDataRef.current) return;
 
         const relayouted = getLayoutedElements(initialDataRef.current.nodes, initialDataRef.current.edges, direction);
-        setNodes(relayouted.nodes);
-        setEdges(relayouted.edges);
+        const withControllers = applyControllers(
+            relayouted.nodes, relayouted.edges,
+            initialDataRef.current._graphspec, initialDataRef.current._analysis
+        );
+        setNodes(withControllers.nodes);
+        setEdges(withControllers.edges);
         setTimeout(() => {
             if (reactFlowRef.current) {
                 reactFlowRef.current.fitView({ padding: 0.1 });
             }
         }, 50);
     }, [direction]);
+
+    // Expose rebuildAndLayout for controllers toggle
+    React.useEffect(() => {
+        window.rebuildAndLayout = () => {
+            if (!viewspec) return;
+            const { graphData, analysis } = buildGraph(viewspec, graphspec);
+            initialDataRef.current = graphData;
+            initialDataRef.current._analysis = analysis;
+            initialDataRef.current._graphspec = graphspec;
+            const layouted = getLayoutedElements(graphData.nodes, graphData.edges, currentDirection);
+            const withControllers = applyControllers(layouted.nodes, layouted.edges, graphspec, analysis);
+            setNodes(withControllers.nodes);
+            setEdges(withControllers.edges);
+            setTimeout(() => {
+                if (reactFlowRef.current) reactFlowRef.current.fitView({ padding: 0.1 });
+            }, 50);
+        };
+        return () => { window.rebuildAndLayout = null; };
+    }, [setNodes, setEdges]);
 
     // Listen for data from the extension
     React.useEffect(() => {
@@ -603,14 +834,17 @@ function GraphViewer() {
 
                 const { graphData, analysis } = buildGraph(viewspec, graphspec);
                 initialDataRef.current = graphData;
+                initialDataRef.current._analysis = analysis;
+                initialDataRef.current._graphspec = graphspec;
 
                 const needsLayout = graphData.nodes.some(n => !n.position || (n.position.x === 0 && n.position.y === 0));
                 const layouted = needsLayout
                     ? getLayoutedElements(graphData.nodes, graphData.edges, currentDirection)
                     : graphData;
+                const withControllers = applyControllers(layouted.nodes, layouted.edges, graphspec, analysis);
 
-                setNodes(layouted.nodes);
-                setEdges(layouted.edges);
+                setNodes(withControllers.nodes);
+                setEdges(withControllers.edges);
 
                 // Fit view after render, then apply zoom/pan overrides
                 setTimeout(() => {
@@ -645,6 +879,7 @@ function GraphViewer() {
     // Handle node click — send navigateToPipe message to extension
     const onNodeClick = React.useCallback((event, node) => {
         const nodeData = node.data || {};
+        if (nodeData.isController) return;
         if (nodeData.isPipe && nodeData.pipeCode) {
             vscode.postMessage({
                 type: 'navigateToPipe',

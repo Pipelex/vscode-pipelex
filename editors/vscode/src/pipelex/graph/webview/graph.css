@@ -37,6 +37,9 @@
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-pill: 999px;
+    --color-controller-bg: rgba(100, 116, 139, 0.08);
+    --color-controller-border: rgba(100, 116, 139, 0.3);
+    --color-controller-text: var(--color-text-dim);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -73,6 +76,9 @@ body.vscode-light {
     --color-batch-aggregate: #16a34a;
     --color-parallel-combine: #a855f7;
     --color-bg-dots: #e2e8f0;
+    --color-controller-bg: rgba(100, 116, 139, 0.06);
+    --color-controller-border: rgba(100, 116, 139, 0.25);
+    --color-controller-text: var(--color-text-dim);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -92,6 +98,9 @@ body.vscode-high-contrast {
     --color-pipe-text: #ffffff;
     --color-edge: #6fc3df;
     --color-bg-dots: #333333;
+    --color-controller-bg: rgba(111, 195, 223, 0.06);
+    --color-controller-border: rgba(111, 195, 223, 0.4);
+    --color-controller-text: var(--color-text-dim);
 }
 
 /* High contrast light */
@@ -125,6 +134,9 @@ body.vscode-high-contrast-light {
     --color-batch-aggregate: #0a6640;
     --color-parallel-combine: #7e22ce;
     --color-bg-dots: #d4d4d4;
+    --color-controller-bg: rgba(0, 0, 0, 0.04);
+    --color-controller-border: rgba(0, 0, 0, 0.2);
+    --color-controller-text: var(--color-text-dim);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
@@ -218,3 +230,21 @@ body {
 }
 .direction-icon { display: none; }
 .direction-icon.active { display: inline-flex; align-items: center; justify-content: center; }
+.toolbar-btn-label {
+    width: auto;
+    padding: 0 10px;
+    gap: 6px;
+    font-size: 12px;
+    font-family: var(--font-sans);
+}
+.toolbar-btn-text {
+    line-height: 1;
+}
+.toolbar-btn.active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
+}
+.react-flow__node-group {
+    cursor: default !important;
+}
