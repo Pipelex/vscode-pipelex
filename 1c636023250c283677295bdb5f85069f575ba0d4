@@ -1,0 +1,41 @@
+editors/vscode/src/pipelex/graph/webview/graph.css
+  cc80bad1cfb63694 233-240,242-243,245-261,263,266-274,276,279-294,296-308
+editors/vscode/src/pipelex/graph/webview/graph.js
+  3a4c76ea3ed532b0 53-57,416-645,650-652,683-685,687-689,691,998-1000,1002,1023-1026,1068-1071
+  cc80bad1cfb63694 46-49,734,736-737,955-972,1135
+editors/vscode/src/pipelex/graph/webview/graph.html
+  cc80bad1cfb63694 23-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "1c636023250c283677295bdb5f85069f575ba0d4",
+  "prompts": {
+    "3a4c76ea3ed532b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56e56da5-5bd8-40e0-aa23-f1433c0237df",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 366,
+      "total_deletions": 150,
+      "accepted_lines": 259,
+      "overriden_lines": 0
+    },
+    "cc80bad1cfb63694": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cf42a8ad-a0b6-4961-8a6d-ef9038825caa",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 103,
+      "total_deletions": 36,
+      "accepted_lines": 102,
+      "overriden_lines": 0
+    }
+  }
+}
