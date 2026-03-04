@@ -16,6 +16,7 @@ let currentDirection = 'TB';
 let viewspec = null;
 let graphspec = null;
 let config = {};
+let showControllers = false;
 
 // Direction icon update
 function applyDirectionIcon(direction) {
@@ -31,12 +32,37 @@ document.getElementById('direction-toggle').addEventListener('click', () => {
     if (window.setLayoutDirection) window.setLayoutDirection(currentDirection);
 });
 
+// Zoom toolbar buttons
+document.getElementById('zoom-in').addEventListener('click', () => {
+    if (window._reactFlowInstance) window._reactFlowInstance.zoomIn();
+});
+document.getElementById('zoom-out').addEventListener('click', () => {
+    if (window._reactFlowInstance) window._reactFlowInstance.zoomOut();
+});
+document.getElementById('zoom-fit').addEventListener('click', () => {
+    if (window._reactFlowInstance) window._reactFlowInstance.fitView({ padding: 0.1 });
+});
+
+// Controllers toggle switch
+const controllersToggle = document.getElementById('controllers-toggle');
+controllersToggle.addEventListener('change', () => {
+    showControllers = controllersToggle.checked;
+    vscode.postMessage({ type: 'updateShowControllers', value: showControllers });
+    if (window.rebuildAndLayout) window.rebuildAndLayout();
+});
+
+// Controller group padding constants (shared between spacing correction and group rendering)
+const CONTROLLER_PADDING_X = 40;
+const CONTROLLER_PADDING_TOP = 48; // room for label
+const CONTROLLER_PADDING_BOTTOM = 20;
+
 // ReactFlow setup
 const { React, ReactDOM } = window;
 const ReactFlowLib = window.ReactFlowRenderer || window.ReactFlow || {};
-const { ReactFlow, useNodesState, useEdgesState, Background, Controls, MarkerType } = ReactFlowLib;
+const { ReactFlow, useNodesState, useEdgesState, Background, MarkerType } = ReactFlowLib;
 
-const EDGE_TYPE = 'smoothstep';
+// Edge type is set dynamically from config; default to 'bezier' (matching pipelex defaults)
+let edgeType = 'bezier';
 
 // ====================================================================
 // DAGRE LAYOUT
@@ -44,7 +70,7 @@ const EDGE_TYPE = 'smoothstep';
 function getLayoutedElements(nodes, edges, direction) {
     direction = direction || 'TB';
     const nodesep = (config && config.nodesep) || 50;
-    const ranksep = (config && config.ranksep) || 80;
+    const ranksep = (config && config.ranksep) || 30;
 
     const g = new dagre.graphlib.Graph();
     g.setDefaultEdgeLabel(() => ({}));
@@ -70,7 +96,14 @@ function getLayoutedElements(nodes, edges, direction) {
     });
 
     edges.forEach((edge) => {
-        g.setEdge(edge.source, edge.target);
+        // Cross-group edges get low weight so dagre's crossing-minimization
+        // doesn't pull nodes from different controller groups together.
+        // Batch edges (batch_item / batch_aggregate) get extra rank spacing
+        // so the dashed edges have breathing room around the controller.
+        const edgeLabel = {};
+        if (edge._crossGroup) edgeLabel.weight = 0;
+        if (edge._batchEdge) edgeLabel.minlen = 3;
+        g.setEdge(edge.source, edge.target, edgeLabel);
     });
 
     dagre.layout(g);
@@ -163,6 +196,7 @@ function buildDataflowAnalysis(graphspec) {
         stuffConsumers,
         controllerNodeIds,
         childNodeIds,
+        containmentTree,
     };
 }
 
@@ -295,7 +329,7 @@ function buildDataflowGraph(graphspec, analysis) {
             id: 'edge_' + (edgeId++),
             source: producerNodeId,
             target: stuffId,
-            type: EDGE_TYPE,
+            type: edgeType,
             animated: false,
             style: { stroke: 'var(--color-edge)', strokeWidth: 2 },
             markerEnd: {
@@ -313,7 +347,7 @@ function buildDataflowGraph(graphspec, analysis) {
                 id: 'edge_' + (edgeId++),
                 source: stuffId,
                 target: consumerNodeId,
-                type: EDGE_TYPE,
+                type: edgeType,
                 animated: false,
                 style: { stroke: 'var(--color-edge)', strokeWidth: 2 },
                 markerEnd: {
@@ -335,7 +369,7 @@ function buildDataflowGraph(graphspec, analysis) {
             id: edge.id || ('edge_' + (edgeId++)),
             source: sourceId,
             target: targetId,
-            type: EDGE_TYPE,
+            type: edgeType,
             animated: false,
             style: {
                 stroke: 'var(--color-parallel-combine)',
@@ -362,8 +396,9 @@ function buildDataflowGraph(graphspec, analysis) {
             id: edge.id || ('edge_' + (edgeId++)),
             source: sourceId,
             target: targetId,
-            type: EDGE_TYPE,
+            type: edgeType,
             animated: false,
+            _batchEdge: true,
             label: edge.label || '',
             labelStyle: {
                 fontSize: '10px',
@@ -383,7 +418,610 @@ function buildDataflowGraph(graphspec, analysis) {
         });
     }
 
+    // Sort nodes by controller group so dagre's initial ordering clusters
+    // same-group nodes. This influences dagre's crossing-minimization to
+    // keep sibling groups separate rather than interleaving them.
+    if (analysis) {
+        const childToCtrl = buildChildToControllerMap(graphspec, analysis);
+
+        // For unassigned stuff (method inputs with no producer), assign to
+        // the controller of their first consumer so inputs cluster near their group
+        for (const [digest, consumers] of Object.entries(analysis.stuffConsumers)) {
+            const stuffId = 'stuff_' + digest;
+            if (childToCtrl[stuffId]) continue;
+            for (const consumerId of consumers) {
+                if (childToCtrl[consumerId]) {
+                    childToCtrl[stuffId] = childToCtrl[consumerId];
+                    break;
+                }
+            }
+        }
+
+        // Depth-first order index for controllers
+        const groupOrder = {};
+        let orderIdx = 0;
+        function assignOrder(ctrlId) {
+            groupOrder[ctrlId] = orderIdx++;
+            for (const childId of (analysis.containmentTree[ctrlId] || [])) {
+                if (analysis.controllerNodeIds.has(childId)) {
+                    assignOrder(childId);
+                }
+            }
+        }
+        for (const ctrlId of analysis.controllerNodeIds) {
+            if (!childToCtrl[ctrlId]) assignOrder(ctrlId);
+        }
+
+        // Build sort key from containment path
+        function sortKey(nodeId) {
+            const path = [];
+            let cur = childToCtrl[nodeId];
+            while (cur) {
+                path.unshift(groupOrder[cur] !== undefined ? groupOrder[cur] : 9999);
+                cur = childToCtrl[cur];
+            }
+            while (path.length < 10) path.push(0);
+            return path;
+        }
+
+        nodes.sort((a, b) => {
+            const ka = sortKey(a.id);
+            const kb = sortKey(b.id);
+            for (let i = 0; i < ka.length; i++) {
+                if (ka[i] !== kb[i]) return ka[i] - kb[i];
+            }
+            return 0;
+        });
+
+        // Mark edges that cross between different sibling controller groups.
+        // These get low weight in dagre so they don't pull nodes from different
+        // groups toward each other during crossing-minimization.
+        for (const edge of edges) {
+            const srcCtrl = childToCtrl[edge.source] || null;
+            const tgtCtrl = childToCtrl[edge.target] || null;
+            if (srcCtrl && tgtCtrl && srcCtrl !== tgtCtrl) {
+                edge._crossGroup = true;
+            }
+        }
+    }
+
     return { nodes, edges };
+}
+
+// ====================================================================
+// CONTROLLER HELPERS
+// ====================================================================
+
+/**
+ * Build a map from node id -> controller id for all nodes that belong to a controller.
+ * Includes both direct children (operators) and stuff nodes assigned to controllers.
+ */
+function buildChildToControllerMap(graphspec, analysis) {
+    const childToController = {};
+
+    // Direct children from containment tree
+    for (const [ctrlId, children] of Object.entries(analysis.containmentTree)) {
+        for (const childId of children) {
+            childToController[childId] = ctrlId;
+        }
+    }
+
+    // Stuff nodes produced by operators inside controllers
+    for (const [digest, producerId] of Object.entries(analysis.stuffProducers)) {
+        const stuffId = 'stuff_' + digest;
+        const ctrlId = childToController[producerId];
+        if (ctrlId) {
+            childToController[stuffId] = ctrlId;
+        }
+    }
+
+    // Stuff produced by controllers themselves → assign to parent controller
+    for (const node of graphspec.nodes) {
+        if (!analysis.controllerNodeIds.has(node.id)) continue;
+        const parentCtrlId = childToController[node.id];
+        if (!parentCtrlId) continue;
+        for (const output of (node.io?.outputs || [])) {
+            if (!output.digest) continue;
+            const stuffId = 'stuff_' + output.digest;
+            if (!childToController[stuffId]) {
+                childToController[stuffId] = parentCtrlId;
+            }
+        }
+    }
+
+    // Batch item stuff (fan-out) → assign to the PipeBatch controller
+    for (const edge of graphspec.edges) {
+        if (edge.kind === 'batch_item' && edge.target_stuff_digest) {
+            const stuffId = 'stuff_' + edge.target_stuff_digest;
+            // edge.source is the PipeBatch controller node
+            if (analysis.controllerNodeIds.has(edge.source) && !childToController[stuffId]) {
+                childToController[stuffId] = edge.source;
+            }
+        }
+    }
+
+    return childToController;
+}
+
+/**
+ * Post-layout pass that resolves overlaps and improves alignment. Direction-aware (TB/LR).
+ *
+ * Phase 1 — Sibling controller groups: detect overlapping padded bounding boxes of
+ *           sibling controllers and push them apart.
+ * Phase 2 — Loose nodes vs controller boxes: detect non-grouped nodes (method inputs,
+ *           downstream operators) that overlap with a child controller's padded box
+ *           and push them outward along the rank axis.
+ * Phase 3 — Input alignment: center loose stuff inputs above (TB) or beside (LR)
+ *           their downstream controller group.
+ * Phase 4 — Column alignment: align nodes within each leaf controller to a single
+ *           column on the order axis (X for TB, Y for LR).
+ */
+function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
+    if (!analysis || !graphspec) return nodes;
+    const isHorizontal = direction === 'LR' || direction === 'RL';
+
+    const childToCtrl = buildChildToControllerMap(graphspec, analysis);
+    const MIN_GAP = 20;
+
+    // Check if a node is a descendant of a controller (traverses parent chain)
+    function isDescendantOf(nodeId, ctrlId) {
+        let c = childToCtrl[nodeId];
+        while (c) {
+            if (c === ctrlId) return true;
+            c = childToCtrl[c];
+        }
+        return false;
+    }
+
+    function nodeHeight(n) {
+        return n.data?.isStuff ? 60 : 70;
+    }
+
+    // Work on a mutable copy of positions
+    const result = nodes.map(n => ({ ...n, position: { ...n.position } }));
+
+    // Build global controller -> node indices map
+    const ctrlIndices = {};
+    for (const ctrlId of analysis.controllerNodeIds) {
+        const indices = [];
+        for (let i = 0; i < result.length; i++) {
+            if (isDescendantOf(result[i].id, ctrlId)) indices.push(i);
+        }
+        if (indices.length > 0) ctrlIndices[ctrlId] = indices;
+    }
+
+    // Compute padded bounding box for a controller's current node positions
+    function computeBox(ctrlId) {
+        const indices = ctrlIndices[ctrlId];
+        if (!indices) return null;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const idx of indices) {
+            const n = result[idx];
+            const w = parseFloat(n.style?.width) || 200;
+            const h = nodeHeight(n);
+            minX = Math.min(minX, n.position.x);
+            minY = Math.min(minY, n.position.y);
+            maxX = Math.max(maxX, n.position.x + w);
+            maxY = Math.max(maxY, n.position.y + h);
+        }
+        return {
+            padLeft: minX - CONTROLLER_PADDING_X,
+            padTop: minY - CONTROLLER_PADDING_TOP,
+            padRight: maxX + CONTROLLER_PADDING_X,
+            padBottom: maxY + CONTROLLER_PADDING_BOTTOM,
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 1: resolve overlaps between sibling controller groups
+    // ------------------------------------------------------------------
+    for (const [_parentId, childIds] of Object.entries(analysis.containmentTree)) {
+        const childCtrls = childIds.filter(id => analysis.controllerNodeIds.has(id) && ctrlIndices[id]);
+        if (childCtrls.length < 2) continue;
+
+        for (let pass = 0; pass < 3; pass++) {
+            let anyShifted = false;
+
+            for (let i = 0; i < childCtrls.length; i++) {
+                for (let j = i + 1; j < childCtrls.length; j++) {
+                    const boxA = computeBox(childCtrls[i]);
+                    const boxB = computeBox(childCtrls[j]);
+                    if (!boxA || !boxB) continue;
+
+                    const hOverlap = Math.min(boxA.padRight, boxB.padRight) - Math.max(boxA.padLeft, boxB.padLeft);
+                    const vOverlap = Math.min(boxA.padBottom, boxB.padBottom) - Math.max(boxA.padTop, boxB.padTop);
+                    if (hOverlap <= 0 || vOverlap <= 0) continue;
+
+                    if (hOverlap <= vOverlap) {
+                        const rightCtrl = boxA.padLeft <= boxB.padLeft ? childCtrls[j] : childCtrls[i];
+                        for (const idx of ctrlIndices[rightCtrl]) {
+                            result[idx].position.x += hOverlap + MIN_GAP;
+                        }
+                    } else {
+                        const bottomCtrl = boxA.padTop <= boxB.padTop ? childCtrls[j] : childCtrls[i];
+                        for (const idx of ctrlIndices[bottomCtrl]) {
+                            result[idx].position.y += vOverlap + MIN_GAP;
+                        }
+                    }
+                    anyShifted = true;
+                }
+            }
+            if (!anyShifted) break;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 2: push loose nodes away from child controller padded boxes
+    // ------------------------------------------------------------------
+    for (const [_parentId, childIds] of Object.entries(analysis.containmentTree)) {
+        const childCtrls = childIds.filter(id => analysis.controllerNodeIds.has(id) && ctrlIndices[id]);
+        if (childCtrls.length === 0) continue;
+
+        // Collect indices of nodes that belong to ANY child controller
+        const inAnyChildCtrl = new Set();
+        for (const ctrlId of childCtrls) {
+            for (const idx of ctrlIndices[ctrlId]) inAnyChildCtrl.add(idx);
+        }
+
+        // Precompute controller boxes and combined spans (positions are stable during detection)
+        const boxes = {};
+        let ctrlsMinY = Infinity, ctrlsMaxY = -Infinity;
+        let ctrlsMinX = Infinity, ctrlsMaxX = -Infinity;
+        for (const ctrlId of childCtrls) {
+            const box = computeBox(ctrlId);
+            if (!box) continue;
+            boxes[ctrlId] = box;
+            ctrlsMinY = Math.min(ctrlsMinY, box.padTop);
+            ctrlsMaxY = Math.max(ctrlsMaxY, box.padBottom);
+            ctrlsMinX = Math.min(ctrlsMinX, box.padLeft);
+            ctrlsMaxX = Math.max(ctrlsMaxX, box.padRight);
+        }
+        if (ctrlsMinY === Infinity) continue;
+
+        // For TB layout, push loose nodes along Y (above/below controllers).
+        // For LR layout, push along X (left/right of controllers).
+        // The "cross axis" is the perpendicular one used to check overlap extent.
+        const ctrlsCenter = isHorizontal
+            ? (ctrlsMinX + ctrlsMaxX) / 2
+            : (ctrlsMinY + ctrlsMaxY) / 2;
+
+        // Find the maximum push needed before/after child controllers on the rank axis
+        let maxPushBefore = 0, maxPushAfter = 0;
+
+        for (let i = 0; i < result.length; i++) {
+            if (inAnyChildCtrl.has(i)) continue;
+            const n = result[i];
+            const w = parseFloat(n.style?.width) || 200;
+            const h = nodeHeight(n);
+
+            for (const ctrlId of childCtrls) {
+                const box = boxes[ctrlId];
+                if (!box) continue;
+
+                const hOvlp = Math.min(box.padRight, n.position.x + w) - Math.max(box.padLeft, n.position.x);
+                const vOvlp = Math.min(box.padBottom, n.position.y + h) - Math.max(box.padTop, n.position.y);
+                if (hOvlp <= 0 || vOvlp <= 0) continue;
+
+                if (isHorizontal) {
+                    const nodeCenterX = n.position.x + w / 2;
+                    const boxCenterX = (box.padLeft + box.padRight) / 2;
+                    if (nodeCenterX < boxCenterX) {
+                        const needed = (n.position.x + w) - box.padLeft + MIN_GAP;
+                        maxPushBefore = Math.max(maxPushBefore, needed);
+                    } else {
+                        const needed = box.padRight - n.position.x + MIN_GAP;
+                        maxPushAfter = Math.max(maxPushAfter, needed);
+                    }
+                } else {
+                    const nodeCenterY = n.position.y + h / 2;
+                    const boxCenterY = (box.padTop + box.padBottom) / 2;
+                    if (nodeCenterY < boxCenterY) {
+                        const needed = (n.position.y + h) - box.padTop + MIN_GAP;
+                        maxPushBefore = Math.max(maxPushBefore, needed);
+                    } else {
+                        const needed = box.padBottom - n.position.y + MIN_GAP;
+                        maxPushAfter = Math.max(maxPushAfter, needed);
+                    }
+                }
+            }
+        }
+
+        // Apply uniform shift to loose nodes within the cross-axis span of the
+        // controller zone. Nodes before → push back, nodes after → push forward.
+        if (maxPushBefore > 0 || maxPushAfter > 0) {
+            for (let i = 0; i < result.length; i++) {
+                if (inAnyChildCtrl.has(i)) continue;
+                const n = result[i];
+                const w = parseFloat(n.style?.width) || 200;
+                const h = nodeHeight(n);
+
+                if (isHorizontal) {
+                    // Only shift nodes whose vertical extent overlaps the controller zone
+                    const nodeBottom = n.position.y + h;
+                    if (nodeBottom <= ctrlsMinY || n.position.y >= ctrlsMaxY) continue;
+                    const nodeCenterX = n.position.x + w / 2;
+                    if (maxPushBefore > 0 && nodeCenterX < ctrlsCenter) {
+                        result[i].position.x -= maxPushBefore;
+                    }
+                    if (maxPushAfter > 0 && nodeCenterX >= ctrlsCenter) {
+                        result[i].position.x += maxPushAfter;
+                    }
+                } else {
+                    // Only shift nodes whose horizontal extent overlaps the controller zone
+                    const nodeRight = n.position.x + w;
+                    if (nodeRight <= ctrlsMinX || n.position.x >= ctrlsMaxX) continue;
+                    const nodeCenterY = n.position.y + h / 2;
+                    if (maxPushBefore > 0 && nodeCenterY < ctrlsCenter) {
+                        result[i].position.y -= maxPushBefore;
+                    }
+                    if (maxPushAfter > 0 && nodeCenterY >= ctrlsCenter) {
+                        result[i].position.y += maxPushAfter;
+                    }
+                }
+            }
+        }
+    }
+
+    // Build controller info lookup (used by Phase 3 and Phase 4)
+    const controllerInfoMap = {};
+    for (const node of graphspec.nodes) {
+        if (analysis.controllerNodeIds.has(node.id)) {
+            controllerInfoMap[node.id] = node;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 3: align loose input nodes above their downstream controller
+    // ------------------------------------------------------------------
+    // For each node not in any controller, find its outgoing edges and check
+    // if all targets belong to the same controller group. If so, center the
+    // node horizontally above that group's bounding box.
+    // Use stuffConsumers to find which controller each input feeds
+    for (let i = 0; i < result.length; i++) {
+        const n = result[i];
+        if (childToCtrl[n.id]) continue; // skip nodes already in a controller
+        if (!n.id.startsWith('stuff_')) continue; // only align stuff inputs
+
+        const digest = n.id.replace('stuff_', '');
+        const consumers = analysis.stuffConsumers[digest];
+        if (!consumers || consumers.length === 0) continue;
+
+        // Find which leaf controller(s) the consumers belong to
+        const targetCtrls = new Set();
+        for (const consumerId of consumers) {
+            const ctrl = childToCtrl[consumerId];
+            if (ctrl) targetCtrls.add(ctrl);
+        }
+        if (targetCtrls.size !== 1) continue; // ambiguous or no controller
+
+        const targetCtrl = targetCtrls.values().next().value;
+
+        // Skip PipeBatch/PipeParallel — inputs should stay spread across branches
+        const targetCtrlNode = controllerInfoMap[targetCtrl];
+        if (targetCtrlNode && (targetCtrlNode.pipe_type === 'PipeParallel' || targetCtrlNode.pipe_type === 'PipeBatch')) continue;
+
+        const box = computeBox(targetCtrl);
+        if (!box) continue;
+
+        // Center the node above (TB) or to the left of (LR) the controller group
+        if (isHorizontal) {
+            const groupCenterY = (box.padTop + CONTROLLER_PADDING_TOP + box.padBottom - CONTROLLER_PADDING_BOTTOM) / 2;
+            const h = nodeHeight(n);
+            result[i].position.y = groupCenterY - h / 2;
+        } else {
+            const groupCenterX = (box.padLeft + CONTROLLER_PADDING_X + box.padRight - CONTROLLER_PADDING_X) / 2;
+            const w = parseFloat(n.style?.width) || 200;
+            result[i].position.x = groupCenterX - w / 2;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 4: align nodes within each leaf controller into a single column
+    // ------------------------------------------------------------------
+    // For each controller that has no child controllers (leaf groups),
+    // align all member nodes to the group's median center on the order axis.
+    // Skip PipeParallel/PipeBatch controllers — their branches should stay side-by-side.
+    const orderAxis = isHorizontal ? 'y' : 'x';
+    for (const ctrlId of analysis.controllerNodeIds) {
+        // Skip non-leaf controllers (those that have child controllers)
+        const children = analysis.containmentTree[ctrlId] || [];
+        const hasChildCtrl = children.some(id => analysis.controllerNodeIds.has(id));
+        if (hasChildCtrl) continue;
+
+        // Skip PipeParallel controllers — branches are intentionally side-by-side
+        const ctrlNode = controllerInfoMap[ctrlId];
+        if (ctrlNode && (ctrlNode.pipe_type === 'PipeParallel' || ctrlNode.pipe_type === 'PipeBatch')) continue;
+
+        const indices = ctrlIndices[ctrlId];
+        if (!indices || indices.length < 2) continue;
+
+        // Compute the median center position on the order axis
+        const centers = indices.map(idx => {
+            const n = result[idx];
+            const w = parseFloat(n.style?.width) || 200;
+            return n.position[orderAxis] + (orderAxis === 'x' ? w / 2 : nodeHeight(n) / 2);
+        });
+        centers.sort((a, b) => a - b);
+        const median = centers[Math.floor(centers.length / 2)];
+
+        // Shift each node so its center aligns with the median
+        for (const idx of indices) {
+            const n = result[idx];
+            const w = parseFloat(n.style?.width) || 200;
+            const halfSize = orderAxis === 'x' ? w / 2 : nodeHeight(n) / 2;
+            result[idx].position[orderAxis] = median - halfSize;
+        }
+    }
+
+    return result;
+}
+
+// ====================================================================
+// CONTROLLER CONTAINERS: Build group nodes wrapping child operators
+// ====================================================================
+function buildControllerNodes(graphspec, analysis, layoutedNodes) {
+    const PADDING_X = CONTROLLER_PADDING_X;
+    const PADDING_TOP = CONTROLLER_PADDING_TOP;
+    const PADDING_BOTTOM = CONTROLLER_PADDING_BOTTOM;
+
+    // Build lookup of layouted nodes by id
+    const nodeById = {};
+    for (const n of layoutedNodes) {
+        nodeById[n.id] = n;
+    }
+
+    // Build controller info from graphspec nodes
+    const controllerInfo = {};
+    for (const node of graphspec.nodes) {
+        if (analysis.controllerNodeIds.has(node.id)) {
+            controllerInfo[node.id] = node;
+        }
+    }
+
+    // Compute nesting depth (leaf controllers = 0, parents = 1+max child depth)
+    const depthCache = {};
+    function getDepth(controllerId) {
+        if (depthCache[controllerId] !== undefined) return depthCache[controllerId];
+        const children = analysis.containmentTree[controllerId] || [];
+        let maxChildDepth = -1;
+        for (const childId of children) {
+            if (analysis.controllerNodeIds.has(childId)) {
+                maxChildDepth = Math.max(maxChildDepth, getDepth(childId));
+            }
+        }
+        depthCache[controllerId] = maxChildDepth + 1;
+        return depthCache[controllerId];
+    }
+
+    // Reuse the shared helper for child-to-controller mapping, then filter to rendered
+    // nodes and build the reverse index (controller -> stuff node ids)
+    const childToController = buildChildToControllerMap(graphspec, analysis);
+    const controllerStuffChildren = {};
+    for (const [nodeId, ctrlId] of Object.entries(childToController)) {
+        if (!nodeId.startsWith('stuff_')) continue;
+        if (!nodeById[nodeId]) continue; // only include rendered stuff nodes
+        if (!controllerStuffChildren[ctrlId]) controllerStuffChildren[ctrlId] = [];
+        controllerStuffChildren[ctrlId].push(nodeId);
+    }
+
+    // Sort controllers by depth ascending (process leaves first)
+    const controllerIds = Array.from(analysis.controllerNodeIds);
+    for (const id of controllerIds) getDepth(id);
+    controllerIds.sort((a, b) => depthCache[a] - depthCache[b]);
+
+    const controllerNodes = [];
+    const childToParent = {}; // childId -> parentControllerId
+
+    for (const controllerId of controllerIds) {
+        // Skip the root controller (main pipe) — it wraps everything and adds no value
+        if (!childToController[controllerId]) continue;
+
+        const directChildren = analysis.containmentTree[controllerId] || [];
+        // Only include children that are actually rendered
+        const renderedChildren = directChildren.filter(cid => nodeById[cid]);
+        const stuffChildren = controllerStuffChildren[controllerId] || [];
+        const allChildren = [...renderedChildren, ...stuffChildren];
+
+        if (allChildren.length === 0) continue;
+
+        // Compute bounding box from children
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const childId of allChildren) {
+            const child = nodeById[childId];
+            const pos = child.position;
+            const w = parseFloat(child.style?.width) || 200;
+            const h = parseFloat(child.style?.height) || (child.data?.isStuff ? 60 : 70);
+            minX = Math.min(minX, pos.x);
+            minY = Math.min(minY, pos.y);
+            maxX = Math.max(maxX, pos.x + w);
+            maxY = Math.max(maxY, pos.y + h);
+        }
+
+        const groupX = minX - PADDING_X;
+        const groupY = minY - PADDING_TOP;
+        const groupW = (maxX - minX) + 2 * PADDING_X;
+        const groupH = (maxY - minY) + PADDING_TOP + PADDING_BOTTOM;
+
+        const info = controllerInfo[controllerId] || {};
+        const pipeCode = info.pipe_code || controllerId.split(':').pop();
+        const pipeType = info.pipe_type || '';
+        const isImplicitBatch = pipeType === 'PipeBatch' && pipeCode.endsWith('_batch');
+        const groupNode = {
+            id: controllerId,
+            type: 'controllerGroup',
+            data: {
+                label: isImplicitBatch ? null : pipeCode,
+                pipeType: isImplicitBatch ? 'implicit PipeBatch' : pipeType,
+                isController: true,
+                isPipe: false,
+                isStuff: false,
+                // For navigation: use the branch pipe code (strip _batch suffix) for implicit batch
+                pipeCode: isImplicitBatch ? pipeCode.slice(0, -6) : pipeCode,
+            },
+            position: { x: groupX, y: groupY },
+            style: {
+                width: groupW + 'px',
+                height: groupH + 'px',
+                background: 'var(--color-controller-bg)',
+                border: '2px dashed var(--color-controller-border)',
+                borderRadius: '12px',
+                padding: '0',
+            },
+        };
+
+        controllerNodes.push(groupNode);
+        nodeById[controllerId] = groupNode;
+
+        // Record child-parent relationships (operators + stuff nodes)
+        for (const childId of allChildren) {
+            childToParent[childId] = controllerId;
+        }
+    }
+
+    // Convert child positions to parent-relative and set parentNode
+    for (const [childId, parentId] of Object.entries(childToParent)) {
+        const child = nodeById[childId];
+        const parent = nodeById[parentId];
+        if (!child || !parent) continue;
+        child.position = {
+            x: child.position.x - parent.position.x,
+            y: child.position.y - parent.position.y,
+        };
+        child.parentNode = parentId;
+        child.extent = 'parent';
+    }
+
+    return controllerNodes;
+}
+
+function applyControllers(layoutedNodes, layoutedEdges, graphspec, analysis) {
+    if (!showControllers || !analysis || !graphspec) {
+        return { nodes: layoutedNodes, edges: layoutedEdges };
+    }
+
+    const controllerNodes = buildControllerNodes(graphspec, analysis, layoutedNodes);
+    if (controllerNodes.length === 0) {
+        return { nodes: layoutedNodes, edges: layoutedEdges };
+    }
+
+    // Merge controller + operator/stuff nodes
+    const allNodes = [...controllerNodes, ...layoutedNodes];
+
+    // Sort: ReactFlow v11 requires parent group nodes before their children.
+    // Precompute containment depth: 0 = no parent, 1 = direct child, etc.
+    const nodeMap = {};
+    for (const n of allNodes) nodeMap[n.id] = n;
+    const depthOf = {};
+    function getContainmentDepth(id) {
+        if (depthOf[id] !== undefined) return depthOf[id];
+        const n = nodeMap[id];
+        depthOf[id] = n && n.parentNode ? 1 + getContainmentDepth(n.parentNode) : 0;
+        return depthOf[id];
+    }
+    for (const n of allNodes) getContainmentDepth(n.id);
+    allNodes.sort((a, b) => depthOf[a.id] - depthOf[b.id]);
+
+    return { nodes: allNodes, edges: layoutedEdges };
 }
 
 // ====================================================================
@@ -494,7 +1132,7 @@ function buildOrchestrationGraph(viewspec) {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        type: EDGE_TYPE,
+        type: edgeType,
         animated: edge.animated || false,
         label: edge.label,
         labelStyle: {
@@ -532,54 +1170,24 @@ function buildGraph(viewspec, graphspec) {
     return { graphData: buildOrchestrationGraph(viewspec), analysis: null };
 }
 
-// Update footer stats
-function updateFooterStats(viewspec, graphspec, analysis) {
-    const statsEl = document.getElementById('footer-stats');
-    if (!statsEl) return;
-
-    const pipeCount = analysis
-        ? graphspec.nodes.filter(n => !analysis.controllerNodeIds.has(n.id)).length
-        : viewspec.nodes.length;
-    const stuffCount = analysis ? Object.keys(analysis.stuffRegistry).length : 0;
-    const succeededCount = viewspec.nodes.filter(n => n.status === 'succeeded').length;
-    const failedCount = viewspec.nodes.filter(n => n.status === 'failed').length;
-
-    let html = '<div class="stat-item">' +
-        '<svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-            '<rect x="3" y="3" width="18" height="18" rx="2"/>' +
-        '</svg>' +
-        '<span class="stat-value">' + pipeCount + '</span> pipes' +
-    '</div>';
-
-    if (stuffCount > 0) {
-        html += '<div class="stat-item" style="color: var(--color-stuff)">' +
-            '<svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                '<ellipse cx="12" cy="12" rx="10" ry="6"/>' +
-            '</svg>' +
-            '<span class="stat-value">' + stuffCount + '</span> data' +
-        '</div>';
-    }
-
-    if (succeededCount > 0) {
-        html += '<div class="stat-item" style="color: var(--color-success)">' +
-            '<svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                '<polyline points="20 6 9 17 4 12"/>' +
-            '</svg>' +
-            '<span class="stat-value">' + succeededCount + '</span>' +
-        '</div>';
-    }
-
-    if (failedCount > 0) {
-        html += '<div class="stat-item" style="color: var(--color-error)">' +
-            '<svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>' +
-            '</svg>' +
-            '<span class="stat-value">' + failedCount + '</span>' +
-        '</div>';
-    }
-
-    statsEl.innerHTML = html;
+// ====================================================================
+// CUSTOM NODE TYPES
+// ====================================================================
+function ControllerGroupNode({ data }) {
+    return React.createElement('div', {
+        className: 'controller-group-node',
+    },
+        data.label ? React.createElement('div', {
+            className: 'controller-group-label',
+        }, data.label) : null,
+        data.pipeType ? React.createElement('div', {
+            className: 'controller-group-type',
+        }, data.pipeType) : null
+    );
 }
+
+// Must be defined at module scope for stable reference (avoids ReactFlow re-mount warnings)
+const controllerNodeTypes = { controllerGroup: ControllerGroupNode };
 
 // ====================================================================
 // MAIN REACT COMPONENT
@@ -591,6 +1199,18 @@ function GraphViewer() {
     const reactFlowRef = React.useRef(null);
     const prevDirectionRef = React.useRef(currentDirection);
     const initialDataRef = React.useRef(null);
+    // Cache post-layout, pre-controller nodes/edges so controller toggle skips re-layout
+    const layoutCacheRef = React.useRef(null);
+
+    // Deep-clone cached nodes so applyControllers can mutate positions/parentNode
+    function cloneCachedNodes(nodes) {
+        return nodes.map(n => ({
+            ...n,
+            position: { ...n.position },
+            data: { ...n.data },
+            style: n.style ? { ...n.style } : undefined,
+        }));
+    }
 
     // Expose setLayoutDirection for direction toggle button
     React.useEffect(() => {
@@ -606,8 +1226,16 @@ function GraphViewer() {
         if (!initialDataRef.current) return;
 
         const relayouted = getLayoutedElements(initialDataRef.current.nodes, initialDataRef.current.edges, direction);
-        setNodes(relayouted.nodes);
-        setEdges(relayouted.edges);
+        const spaced = initialDataRef.current._analysis
+            ? ensureControllerSpacing(relayouted.nodes, initialDataRef.current._graphspec, initialDataRef.current._analysis, direction)
+            : relayouted.nodes;
+        layoutCacheRef.current = { nodes: spaced, edges: relayouted.edges };
+        const withControllers = applyControllers(
+            cloneCachedNodes(spaced), relayouted.edges,
+            initialDataRef.current._graphspec, initialDataRef.current._analysis
+        );
+        setNodes(withControllers.nodes);
+        setEdges(withControllers.edges);
         setTimeout(() => {
             if (reactFlowRef.current) {
                 reactFlowRef.current.fitView({ padding: 0.1 });
@@ -615,36 +1243,80 @@ function GraphViewer() {
         }, 50);
     }, [direction]);
 
+    // Expose rebuildAndLayout for controllers toggle — reuses cached layout positions
+    React.useEffect(() => {
+        window.rebuildAndLayout = () => {
+            if (!layoutCacheRef.current || !initialDataRef.current) return;
+            const cachedNodes = cloneCachedNodes(layoutCacheRef.current.nodes);
+            const cachedEdges = layoutCacheRef.current.edges;
+            const withControllers = applyControllers(
+                cachedNodes, cachedEdges,
+                initialDataRef.current._graphspec, initialDataRef.current._analysis
+            );
+            setNodes(withControllers.nodes);
+            setEdges(withControllers.edges);
+        };
+        return () => { window.rebuildAndLayout = null; };
+    }, [setNodes, setEdges]);
+
     // Listen for data from the extension
     React.useEffect(() => {
         function handleMessage(event) {
             const message = event.data;
             if (message.type === 'setData') {
+                // Persist the source file URI so VS Code can restore after reload
+                if (message.uri) {
+                    vscode.setState({ uri: message.uri });
+                }
                 viewspec = message.viewspec;
                 graphspec = message.graphspec || null;
                 config = message.config || {};
                 currentDirection = config.direction || 'TB';
+                edgeType = config.edgeType || 'bezier';
+                showControllers = config.showControllers || false;
+                controllersToggle.checked = showControllers;
                 setDirection(currentDirection);
                 prevDirectionRef.current = currentDirection;
                 applyDirectionIcon(currentDirection);
 
+                // Apply palette colors as CSS custom properties on <body>
+                // (must target body, not documentElement, because body.vscode-dark
+                // redefines these variables and would shadow html-level overrides)
+                if (config.paletteColors) {
+                    for (const [cssVar, value] of Object.entries(config.paletteColors)) {
+                        document.body.style.setProperty(cssVar, value);
+                    }
+                }
+
                 const { graphData, analysis } = buildGraph(viewspec, graphspec);
                 initialDataRef.current = graphData;
+                initialDataRef.current._analysis = analysis;
+                initialDataRef.current._graphspec = graphspec;
 
                 const needsLayout = graphData.nodes.some(n => !n.position || (n.position.x === 0 && n.position.y === 0));
                 const layouted = needsLayout
                     ? getLayoutedElements(graphData.nodes, graphData.edges, currentDirection)
                     : graphData;
+                const spaced = analysis
+                    ? ensureControllerSpacing(layouted.nodes, graphspec, analysis, currentDirection)
+                    : layouted.nodes;
+                layoutCacheRef.current = { nodes: spaced, edges: layouted.edges };
+                const withControllers = applyControllers(cloneCachedNodes(spaced), layouted.edges, graphspec, analysis);
 
-                setNodes(layouted.nodes);
-                setEdges(layouted.edges);
+                setNodes(withControllers.nodes);
+                setEdges(withControllers.edges);
 
-                updateFooterStats(viewspec, graphspec, analysis);
-
-                // Fit view after render
+                // Fit view after render, then apply zoom/pan overrides
                 setTimeout(() => {
                     if (reactFlowRef.current) {
                         reactFlowRef.current.fitView({ padding: 0.1 });
+                        if (config.initialZoom !== undefined && config.initialZoom !== null) {
+                            reactFlowRef.current.zoomTo(config.initialZoom);
+                        }
+                        if (config.panToTop) {
+                            const vp = reactFlowRef.current.getViewport();
+                            reactFlowRef.current.setViewport({ x: vp.x, y: 20, zoom: vp.zoom });
+                        }
                     }
                 }, 100);
             }
@@ -667,6 +1339,16 @@ function GraphViewer() {
     // Handle node click — send navigateToPipe message to extension
     const onNodeClick = React.useCallback((event, node) => {
         const nodeData = node.data || {};
+        if (nodeData.isController) {
+            const code = nodeData.pipeCode || nodeData.label;
+            if (code) {
+                vscode.postMessage({
+                    type: 'navigateToPipe',
+                    pipeCode: code,
+                });
+            }
+            // fall through to selection logic below
+        }
         if (nodeData.isPipe && nodeData.pipeCode) {
             vscode.postMessage({
                 type: 'navigateToPipe',
@@ -683,30 +1365,32 @@ function GraphViewer() {
         );
     }, [setNodes]);
 
-    const onInit = (reactFlowInstance) => {
+    const onInit = React.useCallback((reactFlowInstance) => {
         reactFlowRef.current = reactFlowInstance;
-    };
+        window._reactFlowInstance = reactFlowInstance;
+    }, []);
 
     return React.createElement('div', { className: 'react-flow-container' },
         React.createElement(ReactFlow, {
             nodes: nodes,
             edges: edges,
+            nodeTypes: controllerNodeTypes,
             onNodesChange: onNodesChange,
             onEdgesChange: onEdgesChange,
             onNodeClick: onNodeClick,
             onInit: onInit,
             fitView: true,
             fitViewOptions: { padding: 0.1 },
-            defaultEdgeOptions: { type: EDGE_TYPE },
+            defaultEdgeOptions: { type: edgeType },
+            minZoom: 0.1,
             proOptions: { hideAttribution: true },
         },
             Background ? React.createElement(Background, {
                 variant: 'dots',
                 gap: 20,
                 size: 1,
-                color: '#334155',
-            }) : null,
-            Controls ? React.createElement(Controls, { showInteractive: false }) : null
+                color: 'var(--color-bg-dots)',
+            }) : null
         )
     );
 }

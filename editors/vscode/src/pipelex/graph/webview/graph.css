@@ -30,12 +30,16 @@
     --color-batch-item: #a855f7;
     --color-batch-aggregate: #22c55e;
     --color-parallel-combine: #c084fc;
-    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-mono: 'Monaco', 'Menlo', 'Courier New', monospace;
+    --color-bg-dots: #334155;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Monaco', 'Menlo', monospace;
     --radius-sm: 4px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-pill: 999px;
+    --color-controller-bg: rgba(100, 116, 139, 0.08);
+    --color-controller-border: rgba(100, 116, 139, 0.3);
+    --color-controller-text: var(--color-text-muted);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -71,6 +75,10 @@ body.vscode-light {
     --color-batch-item: #9333ea;
     --color-batch-aggregate: #16a34a;
     --color-parallel-combine: #a855f7;
+    --color-bg-dots: #e2e8f0;
+    --color-controller-bg: rgba(100, 116, 139, 0.06);
+    --color-controller-border: rgba(100, 116, 139, 0.25);
+    --color-controller-text: var(--color-text-muted);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -89,6 +97,10 @@ body.vscode-high-contrast {
     --color-pipe-bg: rgba(111, 195, 223, 0.15);
     --color-pipe-text: #ffffff;
     --color-edge: #6fc3df;
+    --color-bg-dots: #333333;
+    --color-controller-bg: rgba(111, 195, 223, 0.06);
+    --color-controller-border: rgba(111, 195, 223, 0.4);
+    --color-controller-text: var(--color-text-muted);
 }
 
 /* High contrast light */
@@ -121,6 +133,10 @@ body.vscode-high-contrast-light {
     --color-batch-item: #6b21a8;
     --color-batch-aggregate: #0a6640;
     --color-parallel-combine: #7e22ce;
+    --color-bg-dots: #d4d4d4;
+    --color-controller-bg: rgba(0, 0, 0, 0.04);
+    --color-controller-border: rgba(0, 0, 0, 0.2);
+    --color-controller-text: var(--color-text-muted);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
@@ -137,7 +153,8 @@ body {
 #app-container {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 37px); /* Leave room for footer */
+    margin-top: 37px;
+    height: calc(100vh - 37px); /* Leave room for toolbar */
 }
 #root {
     flex: 1;
@@ -156,22 +173,6 @@ body {
 .react-flow__background {
     background: var(--color-bg) !important;
 }
-.react-flow__controls {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-    bottom: 10px !important;
-    left: 16px !important;
-}
-.react-flow__controls-button {
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border);
-    fill: var(--color-text-muted);
-}
-.react-flow__controls-button:hover {
-    background: var(--color-surface-hover);
-}
 .react-flow__edge-path {
     stroke-width: 2;
 }
@@ -187,56 +188,25 @@ body {
     box-shadow: 0 0 0 3px var(--color-accent), var(--shadow-lg) !important;
     z-index: 1000 !important;
 }
+.react-flow__node-controllerGroup.selected {
+    box-shadow: 0 0 0 2px var(--color-accent), var(--shadow-lg) !important;
+}
 
-/* Footer */
-.footer {
+/* Toolbar */
+.toolbar {
     position: fixed;
-    bottom: 0;
+    top: 0;
     left: 0;
     right: 0;
     background: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-    padding: 8px 16px;
+    border-bottom: 1px solid var(--color-border);
+    padding: 4px 16px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
     z-index: 100;
-    font-size: 12px;
     height: 37px;
 }
-.footer-legend {
-    display: flex;
-    gap: 16px;
-}
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--color-text-muted);
-}
-.legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 3px;
-}
-.legend-dot.pipe {
-    background: var(--color-pipe);
-}
-.legend-dot.stuff {
-    background: var(--color-stuff);
-    border-radius: 5px;
-}
-.legend-dot.success {
-    background: var(--color-success);
-}
-.legend-dot.error {
-    background: var(--color-error);
-}
-.footer-actions {
-    display: flex;
-    gap: 8px;
-}
-.footer-btn {
+.toolbar-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -249,30 +219,92 @@ body {
     transition: all 0.15s ease;
     color: var(--color-text-muted);
 }
-.footer-btn:hover {
+.toolbar-btn:hover {
     background: var(--color-accent);
     border-color: var(--color-accent);
     color: white;
 }
+.toolbar-spacer {
+    flex: 1;
+}
+.toolbar-zoom {
+    display: flex;
+    gap: 4px;
+}
 .direction-icon { display: none; }
 .direction-icon.active { display: inline-flex; align-items: center; justify-content: center; }
-.footer-stats {
-    display: flex;
-    gap: 12px;
-}
-.stat-item {
+/* Toggle switch */
+.toggle-switch {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--color-text-muted);
+    gap: 8px;
+    cursor: pointer;
+    margin-left: 8px;
+    user-select: none;
 }
-.stat-value {
-    font-weight: 600;
-    color: var(--color-text);
+.toggle-switch input {
+    display: none;
 }
-.stat-icon {
+.toggle-track {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    background: var(--color-border);
+    border-radius: 9px;
+    transition: background 0.2s ease;
+}
+.toggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
     width: 14px;
     height: 14px;
-    opacity: 0.7;
+    background: var(--color-text-muted);
+    border-radius: 50%;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+.toggle-switch input:checked + .toggle-track {
+    background: var(--color-accent);
+}
+.toggle-switch input:checked + .toggle-track .toggle-knob {
+    transform: translateX(14px);
+    background: white;
+}
+.toggle-label {
+    font-size: 12px;
+    font-family: var(--font-sans);
+    color: var(--color-text-muted);
+    line-height: 1;
+}
+.react-flow__node-controllerGroup {
+    cursor: default !important;
+}
+.controller-group-node {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+.controller-group-label {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    color: var(--color-controller-text);
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+}
+.controller-group-type {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: 400;
+    color: var(--color-controller-text);
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
 }

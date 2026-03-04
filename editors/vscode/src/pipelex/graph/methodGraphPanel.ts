@@ -5,6 +5,7 @@ import { resolveCli } from '../validation/cliResolver';
 import { spawnCli, cancelAllInflight } from '../validation/processUtils';
 import { extractJson } from '../validation/pipelexValidator';
 import { findTableHeader } from '../validation/sourceLocator';
+import { resolveGraphConfig, getPaletteColors } from './graphConfig';
 
 export class MethodGraphPanel implements vscode.Disposable {
     private static readonly CSP_NONCE_SENTINEL = 'PIPELEX_CSP_NONCE';
@@ -67,8 +68,6 @@ export class MethodGraphPanel implements vscode.Disposable {
         this.currentUri = uri;
         const filename = uri.fsPath.replace(/^.*[\\/]/, '');
 
-        const webviewDir = vscode.Uri.joinPath(this.extensionUri, 'dist', 'pipelex', 'graph', 'webview');
-
         if (this.panel) {
             this.panel.title = `Method Graph — ${filename}`;
             this.panel.reveal(undefined, true);
@@ -80,22 +79,47 @@ export class MethodGraphPanel implements vscode.Disposable {
                 {
                     enableScripts: true,
                     retainContextWhenHidden: true,
-                    localResourceRoots: [webviewDir],
+                    localResourceRoots: [this.webviewDir()],
                 }
             );
-            this.panel.onDidDispose(() => {
-                this.panel = undefined;
-                this.currentUri = undefined;
-            });
-
-            this.panel.webview.onDidReceiveMessage(
-                message => this.handleWebviewMessage(message),
-                undefined,
-                this.disposables,
-            );
+            this.wirePanel();
         }
 
         this.refresh(uri);
+    }
+
+    restore(panel: vscode.WebviewPanel, uri: vscode.Uri) {
+        this.panel = panel;
+        this.currentUri = uri;
+
+        const filename = uri.fsPath.replace(/^.*[\\/]/, '');
+        this.panel.title = `Method Graph — ${filename}`;
+
+        // The extension path may have changed between sessions — update localResourceRoots
+        this.panel.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [this.webviewDir()],
+        };
+
+        this.wirePanel();
+        this.refresh(uri);
+    }
+
+    private webviewDir(): vscode.Uri {
+        return vscode.Uri.joinPath(this.extensionUri, 'dist', 'pipelex', 'graph', 'webview');
+    }
+
+    private wirePanel() {
+        if (!this.panel) return;
+        this.panel.onDidDispose(() => {
+            this.panel = undefined;
+            this.currentUri = undefined;
+        });
+        this.panel.webview.onDidReceiveMessage(
+            message => this.handleWebviewMessage(message),
+            undefined,
+            this.disposables,
+        );
     }
 
     dispose() {
@@ -138,16 +162,9 @@ export class MethodGraphPanel implements vscode.Disposable {
         const pipelexConfig = vscode.workspace.getConfiguration('pipelex');
         const timeout = pipelexConfig.get<number>('validation.timeout', 30000);
         const direction = pipelexConfig.get<string>('graph.direction', 'top_down');
-        const renderer = pipelexConfig.get<string>('graph.renderer', 'classic');
+        const showControllers = pipelexConfig.get<boolean>('graph.showControllers', false);
         const filePath = uri.fsPath;
-        const useExtensionRenderer = renderer === 'extension';
-        // Build CLI flags based on renderer choice
-        const graphFlags: string[] = [];
-        if (useExtensionRenderer) {
-            graphFlags.push('--view');
-        }
-        graphFlags.push('--graph'); // Always request --graph as fallback
-        const args = [...resolved.args, 'validate', 'bundle', filePath, ...graphFlags, '--direction', direction];
+        const args = [...resolved.args, 'validate', 'bundle', filePath, '--view', '--direction', direction];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
         const cwd = workspaceFolder?.uri.fsPath;
 
@@ -166,51 +183,50 @@ export class MethodGraphPanel implements vscode.Disposable {
             }
             const result = JSON.parse(json);
 
-            // Extension-owned webview with ViewSpec (only when explicitly selected)
-            if (useExtensionRenderer && result?.viewspec) {
-                const webviewHtml = this.buildWebviewHtml();
-                if (!webviewHtml) {
-                    this.setHtml(messageHtml(
-                        'Webview Error',
-                        'Could not load graph webview assets.'
-                    ));
-                    return;
-                }
-                // Map direction setting to Dagre format
-                const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
-
-                const setDataPayload = {
-                    type: 'setData',
-                    viewspec: result.viewspec,
-                    graphspec: result.graphspec || null,
-                    config: {
-                        direction: dagreDirection,
-                        nodesep: 50,
-                        ranksep: 80,
-                    },
-                };
-
-                // Reset webviewReady — the new HTML will reload the webview
-                this.webviewReady = false;
-                this.pendingData = setDataPayload;
-                this.setHtml(webviewHtml);
-                return;
-            }
-
-            // Classic renderer: HTML file from --graph
-            const htmlPath: string | undefined = result?.graph_files?.reactflow_html;
-            if (!htmlPath) {
+            if (!result?.viewspec) {
                 this.setHtml(messageHtml(
                     'No Graph Available',
-                    'The CLI did not return a graph file path.'
+                    'The CLI did not return a viewspec.'
                 ));
                 return;
             }
 
-            const htmlContent = await fs.promises.readFile(htmlPath, 'utf-8');
+            const webviewHtml = this.buildWebviewHtml();
+            if (!webviewHtml) {
+                this.setHtml(messageHtml(
+                    'Webview Error',
+                    'Could not load graph webview assets.'
+                ));
+                return;
+            }
+            // Map direction setting to Dagre format
+            const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
+            const graphConfig = await resolveGraphConfig();
+
             if (controller.signal.aborted) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
-            this.setHtml(htmlContent);
+
+            const setDataPayload = {
+                type: 'setData',
+                uri: uri.toString(),
+                viewspec: result.viewspec,
+                graphspec: result.graphspec || null,
+                config: {
+                    direction: dagreDirection,
+                    showControllers,
+                    nodesep: graphConfig.nodesep,
+                    ranksep: graphConfig.ranksep,
+                    edgeType: graphConfig.edgeType,
+                    initialZoom: graphConfig.initialZoom,
+                    panToTop: graphConfig.panToTop,
+                    paletteColors: getPaletteColors(graphConfig.palette),
+                },
+            };
+
+            // Reset webviewReady — the new HTML will reload the webview
+            this.webviewReady = false;
+            this.pendingData = setDataPayload;
+            this.setHtml(webviewHtml);
         } catch (err: any) {
             if (controller.signal.aborted) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
@@ -249,7 +265,7 @@ export class MethodGraphPanel implements vscode.Disposable {
     private buildWebviewHtml(): string | undefined {
         if (!this.panel) return undefined;
 
-        const webviewDir = vscode.Uri.joinPath(this.extensionUri, 'dist', 'pipelex', 'graph', 'webview');
+        const webviewDir = this.webviewDir();
         const htmlPath = vscode.Uri.joinPath(webviewDir, 'graph.html').fsPath;
 
         let html: string;
@@ -275,6 +291,14 @@ export class MethodGraphPanel implements vscode.Disposable {
                 this.panel.webview.postMessage(this.pendingData);
                 this.pendingData = null;
             }
+            return;
+        }
+        if (message.type === 'updateShowControllers' && typeof message.value === 'boolean') {
+            const cfg = vscode.workspace.getConfiguration('pipelex');
+            const target = vscode.workspace.workspaceFolders?.length
+                ? vscode.ConfigurationTarget.Workspace
+                : vscode.ConfigurationTarget.Global;
+            cfg.update('graph.showControllers', message.value, target);
             return;
         }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {

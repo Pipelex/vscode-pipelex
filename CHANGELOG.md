@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-04
+
+### Added
+- Controller group boxes in method graph: toggle to show pipe controller boundaries with labels and type annotations
+- Graph toolbar replacing footer: direction toggle, zoom controls, and controller visibility switch
+- Click-to-navigate on controller group boxes and pipe nodes in the graph
+- Implicit PipeBatch detection: `batch_over` controllers show "implicit PipeBatch" type with no fabricated name
+- Batch item stuff nodes rendered inside their PipeBatch controller box
+- `pipelex.toml`-driven graph styling (palette colors, spacing, zoom, pan)
+- Pipe run actions via VS Code Testing API (replaces CodeLens)
+- Method Graph panel restored automatically after window reload
+- Controller toggle state persisted as a VS Code workspace setting
+- Update MTHDS schema to v0.20.0: remove SearchDepth from search settings (plxt 0.3.0)
+
+### Fixed
+- Fix PipeBatch inputs and branches collapsing onto same position in graph layout
+- Fix PipeParallel branches collapsing onto same position in graph layout
+- Fix controller toggle resetting zoom by caching layout positions
+- Fix controller toggle setting update failing without a workspace
+- Skip `--inputs` flag when pipe has no inputs
+
+### Changed
+- Redesigned graph rendering: ViewSpec-only path with dataflow graph builder
+- Controller selection highlight softened to 2px accent ring
+
+### Removed
+- Remove legacy graph renderer (classic mode)
+- Remove dead `pipelex.runPipe` command
+
 ## [0.4.4] - 2026-03-02
 
 ### Added

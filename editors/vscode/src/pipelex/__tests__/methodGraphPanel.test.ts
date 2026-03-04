@@ -23,8 +23,6 @@ const mockState = vi.hoisted(() => {
         spawnCliResult: { stdout: '', stderr: '' },
         spawnCliResolve: null as ((v: any) => void) | null,
         spawnCliReject: null as ((e: any) => void) | null,
-        readFileResult: '<html>graph</html>',
-        readFileResolve: null as ((v: any) => void) | null,
         readFileSyncResult: '<!DOCTYPE html><html><head></head><body>PIPELEX_CSP_NONCE<div id="root"></div><script src="{{GRAPH_JS_URI}}"></script></body></html>',
         showWarningMessage: vi.fn(),
         executeCommand: vi.fn(),
@@ -103,28 +101,8 @@ vi.mock('../validation/processUtils', () => ({
 vi.mock('fs', () => ({
     default: {
         readFileSync: vi.fn(() => mockState.readFileSyncResult),
-        promises: {
-            readFile: vi.fn((..._args: any[]) => {
-                if (mockState.readFileResolve) {
-                    return new Promise((resolve) => {
-                        mockState.readFileResolve = resolve;
-                    });
-                }
-                return Promise.resolve(mockState.readFileResult);
-            }),
-        },
     },
     readFileSync: vi.fn(() => mockState.readFileSyncResult),
-    promises: {
-        readFile: vi.fn((..._args: any[]) => {
-            if (mockState.readFileResolve) {
-                return new Promise((resolve) => {
-                    mockState.readFileResolve = resolve;
-                });
-            }
-            return Promise.resolve(mockState.readFileResult);
-        }),
-    },
 }));
 
 vi.mock('../validation/sourceLocator', () => ({
@@ -167,13 +145,11 @@ describe('MethodGraphPanel', () => {
         mockState.mockPanel.viewColumn = 2;
         mockState.resolveCliResult = { command: 'pipelex-agent', args: [] };
         mockState.spawnCliResult = {
-            stdout: JSON.stringify({ graph_files: { reactflow_html: '/tmp/graph.html' } }),
+            stdout: JSON.stringify({ viewspec: { nodes: [], edges: [] } }),
             stderr: '',
         };
         mockState.spawnCliResolve = null;
         mockState.spawnCliReject = null;
-        mockState.readFileResult = '<html>graph</html>';
-        mockState.readFileResolve = null;
         mockState.onSaveHandler = null;
         mockState.onEditorChangeHandler = null;
         mockState.configOverrides = {};
@@ -206,8 +182,7 @@ describe('MethodGraphPanel', () => {
 
     // --- ViewSpec (--view) path ---
 
-    it('refresh() uses extension-owned webview when renderer is "extension" and viewspec is present', async () => {
-        mockState.configOverrides['graph.renderer'] = 'extension';
+    it('refresh() uses extension-owned webview when viewspec is present', async () => {
         const viewspec = {
             nodes: [{ id: 'n1', label: 'test', kind: 'operator', status: 'succeeded', ui: {}, inspector: {} }],
             edges: [],
@@ -239,31 +214,9 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    // --- Classic renderer (--graph) path (default) ---
-
-    it('refresh() uses classic HTML file when renderer is "classic" (default)', async () => {
-        mockState.spawnCliResult = {
-            stdout: JSON.stringify({ graph_files: { reactflow_html: '/tmp/graph.html' } }),
-            stderr: '',
-        };
-        mockState.readFileResult = '<html>legacy graph</html>';
-
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 50));
-
-        // Should NOT have called postMessage (legacy path)
-        expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
-        // Should have set HTML from the file
-        expect(mockState.mockWebview.html).toContain('legacy graph');
-        panel.dispose();
-    });
-
     // --- navigateToPipe message handling ---
 
     it('handleWebviewMessage navigates to pipe header on navigateToPipe', async () => {
-        mockState.configOverrides['graph.renderer'] = 'extension';
         const vscode = await import('vscode');
 
         const viewspec = {
@@ -296,31 +249,10 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    // --- CLI flags based on renderer ---
+    // --- CLI flags ---
 
-    it('refresh() sends only --graph when renderer is "classic"', async () => {
+    it('refresh() sends --view flag', async () => {
         const processUtils = await import('../validation/processUtils');
-
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 50));
-
-        const args = vi.mocked(processUtils.spawnCli).mock.calls[0][1] as string[];
-        expect(args).toContain('--graph');
-        expect(args).not.toContain('--view');
-        panel.dispose();
-    });
-
-    it('refresh() sends --view and --graph when renderer is "extension"', async () => {
-        mockState.configOverrides['graph.renderer'] = 'extension';
-        const processUtils = await import('../validation/processUtils');
-
-        const viewspec = { nodes: [], edges: [] };
-        mockState.spawnCliResult = {
-            stdout: JSON.stringify({ viewspec, pipe_code: 'main' }),
-            stderr: '',
-        };
 
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/file.mthds');
@@ -329,52 +261,13 @@ describe('MethodGraphPanel', () => {
 
         const args = vi.mocked(processUtils.spawnCli).mock.calls[0][1] as string[];
         expect(args).toContain('--view');
-        expect(args).toContain('--graph');
-        panel.dispose();
-    });
-
-    // --- Bug C: Staleness after readFile ---
-
-    it('refresh() discards readFile result when file switched during read', async () => {
-        // Use deferred readFile so we can switch files while it's pending
-        let readFileResolve: ((v: string) => void) | null = null;
-        const fs = await import('fs');
-        vi.mocked(fs.promises.readFile).mockImplementation(() => {
-            return new Promise<string>((resolve) => {
-                readFileResolve = resolve as (v: string) => void;
-            }) as any;
-        });
-
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
-        const uri1 = makeUri('/project/file1.mthds');
-        panel.show(uri1);
-
-        // Wait for spawnCli to resolve and readFile to be called
-        await vi.waitFor(() => {
-            expect(readFileResolve).not.toBeNull();
-        });
-
-        // Simulate user switching to a different file
-        const uri2 = makeUri('/project/file2.mthds');
-        (panel as any).currentUri = uri2;
-
-        // Now resolve readFile with stale content
-        readFileResolve!('<html>stale graph for file1</html>');
-        await new Promise(r => setTimeout(r, 10));
-
-        // Bug C: The stale content should NOT be set on the webview
-        expect(mockState.mockWebview.html).not.toContain('stale graph for file1');
-
+        expect(args).not.toContain('--graph');
         panel.dispose();
     });
 
     // --- Regression: staleness after spawnCli (previous Bug 1) ---
 
     it('refresh() discards spawnCli result when file switched during spawn', async () => {
-        // Set readFileResult to contain 'stale' so that if the staleness guard
-        // were removed, the webview would contain 'stale' and this test would fail.
-        mockState.readFileResult = '<html>stale content from old file</html>';
-
         let resolveSpawn: ((v: any) => void) | null = null;
         const processUtils = await import('../validation/processUtils');
         vi.mocked(processUtils.spawnCli).mockImplementation(() => {
@@ -398,14 +291,22 @@ describe('MethodGraphPanel', () => {
 
         // Resolve spawnCli for the stale file
         resolveSpawn!({
-            stdout: JSON.stringify({ graph_files: { reactflow_html: '/tmp/stale.html' } }),
+            stdout: JSON.stringify({ viewspec: { nodes: [], edges: [] } }),
             stderr: '',
         });
         await new Promise(r => setTimeout(r, 10));
 
-        // readFile would return 'stale content' but the staleness check
-        // after spawnCli should prevent it from being set on the webview.
-        expect(mockState.mockWebview.html).not.toContain('stale');
+        // The staleness check after spawnCli should prevent the stale
+        // viewspec from being buffered or sent to the webview.
+        expect((panel as any).pendingData).toBeNull();
+
+        // Even after webviewReady handshake, stale data must not be delivered
+        const receiveMessageCall = mockState.mockWebview.onDidReceiveMessage.mock.calls[0];
+        expect(receiveMessageCall).toBeDefined();
+        const messageHandler = receiveMessageCall[0];
+        messageHandler({ type: 'webviewReady' });
+
+        expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
 
         panel.dispose();
     });

@@ -15,25 +15,26 @@
 <link rel="stylesheet" href="{{GRAPH_CSS_URI}}">
 </head>
 <body>
+<div class="toolbar">
+    <button id="direction-toggle" class="toolbar-btn" title="Toggle layout direction">
+        <span class="direction-icon lr-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        <span class="direction-icon tb-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span>
+    </button>
+    <label class="toggle-switch" title="Show/hide controller containers">
+        <input type="checkbox" id="controllers-toggle">
+        <span class="toggle-track"><span class="toggle-knob"></span></span>
+        <span class="toggle-label">Controllers</span>
+    </label>
+    <div class="toolbar-spacer"></div>
+    <div class="toolbar-zoom">
+        <button id="zoom-out" class="toolbar-btn" title="Zoom out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <button id="zoom-in" class="toolbar-btn" title="Zoom in"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <button id="zoom-fit" class="toolbar-btn" title="Fit to view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+    </div>
+</div>
 <div id="app-container">
     <div id="root"></div>
 </div>
-
-<footer class="footer">
-    <div class="footer-legend">
-        <div class="legend-item"><div class="legend-dot pipe"></div>Pipe</div>
-        <div class="legend-item"><div class="legend-dot stuff"></div>Data</div>
-        <div class="legend-item"><div class="legend-dot success"></div>Success</div>
-        <div class="legend-item"><div class="legend-dot error"></div>Failed</div>
-    </div>
-    <div class="footer-actions">
-        <button id="direction-toggle" class="footer-btn" title="Toggle layout direction">
-            <span class="direction-icon lr-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
-            <span class="direction-icon tb-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span>
-        </button>
-    </div>
-    <div class="footer-stats" id="footer-stats"></div>
-</footer>
 
 <script nonce="PIPELEX_CSP_NONCE" src="{{GRAPH_JS_URI}}"></script>
 </body>

@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -150,24 +150,11 @@
         {
           "command": "pipelex.runBundle",
           "when": "editorLangId == mthds"
-        },
-        {
-          "command": "pipelex.runPipe",
-          "when": "false"
-        },
-        {
-          "command": "pipelex.toggleRunPipeCodeLens",
-          "when": "editorLangId == mthds"
         }
       ],
       "editor/title": [
         {
           "command": "pipelex.showMethodGraph",
-          "when": "resourceLangId == mthds",
-          "group": "navigation"
-        },
-        {
-          "command": "pipelex.toggleRunPipeCodeLens",
           "when": "resourceLangId == mthds",
           "group": "navigation"
         }
@@ -208,18 +195,9 @@
         "icon": "$(type-hierarchy)"
       },
       {
-        "command": "pipelex.toggleRunPipeCodeLens",
-        "title": "Pipelex: Toggle Run Pipe CodeLens",
-        "icon": "$(play-circle)"
-      },
-      {
         "command": "pipelex.runBundle",
         "title": "Pipelex: Run Bundle",
         "icon": "$(play)"
-      },
-      {
-        "command": "pipelex.runPipe",
-        "title": "Pipelex: Run Pipe"
       }
     ],
     "semanticTokenTypes": [
@@ -517,12 +495,6 @@
           "scope": "resource",
           "default": true
         },
-        "pipelex.mthds.runPipeCodeLens": {
-          "description": "Show 'Run Pipe' CodeLens above pipe headers in MTHDS files.",
-          "type": "boolean",
-          "scope": "resource",
-          "default": true
-        },
         "pipelex.validation.enabled": {
           "description": "Run pipelex-agent validation on save for MTHDS files.",
           "type": "boolean",
@@ -545,19 +517,35 @@
           "scope": "resource",
           "default": 30000
         },
-        "pipelex.graph.renderer": {
-          "description": "Which renderer to use for the method graph.",
+        "pipelex.graph.edgeType": {
           "type": "string",
           "enum": [
-            "classic",
-            "extension"
+            "bezier",
+            "smoothstep",
+            "step",
+            "straight"
           ],
           "enumDescriptions": [
-            "Use the CLI-generated ReactFlow HTML (stable)",
-            "Use the extension-owned webview renderer (experimental)"
+            "Smooth bezier curves (default)",
+            "Rounded right-angle paths",
+            "Sharp right-angle paths",
+            "Straight lines"
           ],
           "scope": "resource",
-          "default": "classic"
+          "description": "Edge curve type for the graph renderer. Overrides pipelex.toml."
+        },
+        "pipelex.graph.palette": {
+          "type": "string",
+          "enum": [
+            "dracula",
+            "yellow_blue"
+          ],
+          "enumDescriptions": [
+            "Vibrant dark palette with salmon pipes, teal data, lemon edges",
+            "Classic blue pipes and amber data"
+          ],
+          "scope": "resource",
+          "description": "Color palette for the graph renderer. Overrides pipelex.toml."
         },
         "pipelex.graph.direction": {
           "description": "Layout direction for the method graph.",
@@ -572,6 +560,12 @@
           ],
           "scope": "resource",
           "default": "top_down"
+        },
+        "pipelex.graph.showControllers": {
+          "description": "Show controller group boxes in the method graph.",
+          "type": "boolean",
+          "scope": "resource",
+          "default": false
         },
         "pipelex.formatter.alignEntries": {
           "scope": "resource",
@@ -715,6 +709,7 @@
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
     "node-fetch": "^3.3.2",
+    "smol-toml": "^1.6.0",
     "vscode-languageclient": "^9.0.1",
     "which": "^5.0.0"
   },
