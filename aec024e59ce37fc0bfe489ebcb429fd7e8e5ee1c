@@ -1,0 +1,27 @@
+editors/vscode/src/pipelex/terminalRunner.ts
+  93af56ca2623d130 13-40,46,71-86
+editors/vscode/src/pipelex/pipeTestProvider.ts
+  93af56ca2623d130 191-192
+editors/vscode/package.json
+  93af56ca2623d130 153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "aec024e59ce37fc0bfe489ebcb429fd7e8e5ee1c",
+  "prompts": {
+    "93af56ca2623d130": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99de8de6-ec35-43f0-bcca-89d417781498",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 48,
+      "total_deletions": 3,
+      "accepted_lines": 48,
+      "overriden_lines": 0
+    }
+  }
+}
