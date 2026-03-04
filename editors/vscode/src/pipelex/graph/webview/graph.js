@@ -791,12 +791,23 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
     // ------------------------------------------------------------------
     // For each controller that has no child controllers (leaf groups),
     // align all member nodes to the group's median center on the order axis.
+    // Skip PipeParallel controllers — their branches should stay side-by-side.
+    const controllerInfoMap = {};
+    for (const node of graphspec.nodes) {
+        if (analysis.controllerNodeIds.has(node.id)) {
+            controllerInfoMap[node.id] = node;
+        }
+    }
     const orderAxis = isHorizontal ? 'y' : 'x';
     for (const ctrlId of analysis.controllerNodeIds) {
         // Skip non-leaf controllers (those that have child controllers)
         const children = analysis.containmentTree[ctrlId] || [];
         const hasChildCtrl = children.some(id => analysis.controllerNodeIds.has(id));
         if (hasChildCtrl) continue;
+
+        // Skip PipeParallel controllers — branches are intentionally side-by-side
+        const ctrlNode = controllerInfoMap[ctrlId];
+        if (ctrlNode && ctrlNode.pipe_type === 'PipeParallel') continue;
 
         const indices = ctrlIndices[ctrlId];
         if (!indices || indices.length < 2) continue;
