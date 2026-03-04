@@ -470,13 +470,9 @@ function buildDataflowGraph(graphspec, analysis) {
         // Mark edges that cross between different sibling controller groups.
         // These get low weight in dagre so they don't pull nodes from different
         // groups toward each other during crossing-minimization.
-        function leafController(nodeId) {
-            // Walk up to the deepest non-root controller
-            return childToCtrl[nodeId] || null;
-        }
         for (const edge of edges) {
-            const srcCtrl = leafController(edge.source);
-            const tgtCtrl = leafController(edge.target);
+            const srcCtrl = childToCtrl[edge.source] || null;
+            const tgtCtrl = childToCtrl[edge.target] || null;
             if (srcCtrl && tgtCtrl && srcCtrl !== tgtCtrl) {
                 edge._crossGroup = true;
             }
@@ -531,13 +527,17 @@ function buildChildToControllerMap(graphspec, analysis) {
 }
 
 /**
- * Post-layout pass that resolves two kinds of overlap caused by controller group padding:
+ * Post-layout pass that resolves overlaps and improves alignment. Direction-aware (TB/LR).
  *
  * Phase 1 — Sibling controller groups: detect overlapping padded bounding boxes of
  *           sibling controllers and push them apart.
  * Phase 2 — Loose nodes vs controller boxes: detect non-grouped nodes (method inputs,
  *           downstream operators) that overlap with a child controller's padded box
- *           and push them outward.
+ *           and push them outward along the rank axis.
+ * Phase 3 — Input alignment: center loose stuff inputs above (TB) or beside (LR)
+ *           their downstream controller group.
+ * Phase 4 — Column alignment: align nodes within each leaf controller to a single
+ *           column on the order axis (X for TB, Y for LR).
  */
 function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
     if (!analysis || !graphspec) return nodes;
@@ -660,10 +660,16 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
             ctrlsMaxX = Math.max(ctrlsMaxX, box.padRight);
         }
         if (ctrlsMinY === Infinity) continue;
-        const ctrlsCenterY = (ctrlsMinY + ctrlsMaxY) / 2;
 
-        // Find the maximum push needed above and below child controllers
-        let maxPushUp = 0, maxPushDown = 0;
+        // For TB layout, push loose nodes along Y (above/below controllers).
+        // For LR layout, push along X (left/right of controllers).
+        // The "cross axis" is the perpendicular one used to check overlap extent.
+        const ctrlsCenter = isHorizontal
+            ? (ctrlsMinX + ctrlsMaxX) / 2
+            : (ctrlsMinY + ctrlsMaxY) / 2;
+
+        // Find the maximum push needed before/after child controllers on the rank axis
+        let maxPushBefore = 0, maxPushAfter = 0;
 
         for (let i = 0; i < result.length; i++) {
             if (inAnyChildCtrl.has(i)) continue;
@@ -679,37 +685,61 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
                 const vOvlp = Math.min(box.padBottom, n.position.y + h) - Math.max(box.padTop, n.position.y);
                 if (hOvlp <= 0 || vOvlp <= 0) continue;
 
-                const nodeCenterY = n.position.y + h / 2;
-                const boxCenterY = (box.padTop + box.padBottom) / 2;
-
-                if (nodeCenterY < boxCenterY) {
-                    const needed = (n.position.y + h) - box.padTop + MIN_GAP;
-                    maxPushUp = Math.max(maxPushUp, needed);
+                if (isHorizontal) {
+                    const nodeCenterX = n.position.x + w / 2;
+                    const boxCenterX = (box.padLeft + box.padRight) / 2;
+                    if (nodeCenterX < boxCenterX) {
+                        const needed = (n.position.x + w) - box.padLeft + MIN_GAP;
+                        maxPushBefore = Math.max(maxPushBefore, needed);
+                    } else {
+                        const needed = box.padRight - n.position.x + MIN_GAP;
+                        maxPushAfter = Math.max(maxPushAfter, needed);
+                    }
                 } else {
-                    const needed = box.padBottom - n.position.y + MIN_GAP;
-                    maxPushDown = Math.max(maxPushDown, needed);
+                    const nodeCenterY = n.position.y + h / 2;
+                    const boxCenterY = (box.padTop + box.padBottom) / 2;
+                    if (nodeCenterY < boxCenterY) {
+                        const needed = (n.position.y + h) - box.padTop + MIN_GAP;
+                        maxPushBefore = Math.max(maxPushBefore, needed);
+                    } else {
+                        const needed = box.padBottom - n.position.y + MIN_GAP;
+                        maxPushAfter = Math.max(maxPushAfter, needed);
+                    }
                 }
             }
         }
 
-        // Apply uniform shift to loose nodes that are within the horizontal span of the
-        // controller zone. Nodes above → up, nodes below → down. Uniform shift per
-        // direction preserves relative ordering among shifted nodes.
-        if (maxPushUp > 0 || maxPushDown > 0) {
+        // Apply uniform shift to loose nodes within the cross-axis span of the
+        // controller zone. Nodes before → push back, nodes after → push forward.
+        if (maxPushBefore > 0 || maxPushAfter > 0) {
             for (let i = 0; i < result.length; i++) {
                 if (inAnyChildCtrl.has(i)) continue;
                 const n = result[i];
                 const w = parseFloat(n.style?.width) || 200;
                 const h = nodeHeight(n);
-                // Only shift nodes whose horizontal extent overlaps the controller zone
-                const nodeRight = n.position.x + w;
-                if (nodeRight <= ctrlsMinX || n.position.x >= ctrlsMaxX) continue;
-                const nodeCenterY = n.position.y + h / 2;
-                if (maxPushUp > 0 && nodeCenterY < ctrlsCenterY) {
-                    result[i].position.y -= maxPushUp;
-                }
-                if (maxPushDown > 0 && nodeCenterY >= ctrlsCenterY) {
-                    result[i].position.y += maxPushDown;
+
+                if (isHorizontal) {
+                    // Only shift nodes whose vertical extent overlaps the controller zone
+                    const nodeBottom = n.position.y + h;
+                    if (nodeBottom <= ctrlsMinY || n.position.y >= ctrlsMaxY) continue;
+                    const nodeCenterX = n.position.x + w / 2;
+                    if (maxPushBefore > 0 && nodeCenterX < ctrlsCenter) {
+                        result[i].position.x -= maxPushBefore;
+                    }
+                    if (maxPushAfter > 0 && nodeCenterX >= ctrlsCenter) {
+                        result[i].position.x += maxPushAfter;
+                    }
+                } else {
+                    // Only shift nodes whose horizontal extent overlaps the controller zone
+                    const nodeRight = n.position.x + w;
+                    if (nodeRight <= ctrlsMinX || n.position.x >= ctrlsMaxX) continue;
+                    const nodeCenterY = n.position.y + h / 2;
+                    if (maxPushBefore > 0 && nodeCenterY < ctrlsCenter) {
+                        result[i].position.y -= maxPushBefore;
+                    }
+                    if (maxPushAfter > 0 && nodeCenterY >= ctrlsCenter) {
+                        result[i].position.y += maxPushAfter;
+                    }
                 }
             }
         }
@@ -721,13 +751,6 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
     // For each node not in any controller, find its outgoing edges and check
     // if all targets belong to the same controller group. If so, center the
     // node horizontally above that group's bounding box.
-    const edgesBySource = {};
-    for (const edge of graphspec.edges) {
-        if (edge.kind === 'data') {
-            // Data edges go: stuff → operator (via digest). We need ReactFlow-level
-            // edges instead. Build from analysis: stuff consumed by operators.
-        }
-    }
     // Use stuffConsumers to find which controller each input feeds
     for (let i = 0; i < result.length; i++) {
         const n = result[i];
