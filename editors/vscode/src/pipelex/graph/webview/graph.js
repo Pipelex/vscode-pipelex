@@ -529,6 +529,17 @@ function buildChildToControllerMap(graphspec, analysis) {
         }
     }
 
+    // Batch item stuff (fan-out) → assign to the PipeBatch controller
+    for (const edge of graphspec.edges) {
+        if (edge.kind === 'batch_item' && edge.target_stuff_digest) {
+            const stuffId = 'stuff_' + edge.target_stuff_digest;
+            // edge.source is the PipeBatch controller node
+            if (analysis.controllerNodeIds.has(edge.source) && !childToController[stuffId]) {
+                childToController[stuffId] = edge.source;
+            }
+        }
+    }
+
     return childToController;
 }
 
@@ -934,15 +945,18 @@ function buildControllerNodes(graphspec, analysis, layoutedNodes) {
         const info = controllerInfo[controllerId] || {};
         const pipeCode = info.pipe_code || controllerId.split(':').pop();
         const pipeType = info.pipe_type || '';
+        const isImplicitBatch = pipeType === 'PipeBatch' && pipeCode.endsWith('_batch');
         const groupNode = {
             id: controllerId,
             type: 'controllerGroup',
             data: {
-                label: pipeCode,
-                pipeType: pipeType,
+                label: isImplicitBatch ? null : pipeCode,
+                pipeType: isImplicitBatch ? 'implicit PipeBatch' : pipeType,
                 isController: true,
                 isPipe: false,
                 isStuff: false,
+                // For navigation: use the branch pipe code (strip _batch suffix) for implicit batch
+                pipeCode: isImplicitBatch ? pipeCode.slice(0, -6) : pipeCode,
             },
             position: { x: groupX, y: groupY },
             style: {
@@ -1163,9 +1177,9 @@ function ControllerGroupNode({ data }) {
     return React.createElement('div', {
         className: 'controller-group-node',
     },
-        React.createElement('div', {
+        data.label ? React.createElement('div', {
             className: 'controller-group-label',
-        }, data.label),
+        }, data.label) : null,
         data.pipeType ? React.createElement('div', {
             className: 'controller-group-type',
         }, data.pipeType) : null
@@ -1317,7 +1331,16 @@ function GraphViewer() {
     // Handle node click — send navigateToPipe message to extension
     const onNodeClick = React.useCallback((event, node) => {
         const nodeData = node.data || {};
-        if (nodeData.isController) return;
+        if (nodeData.isController) {
+            const code = nodeData.pipeCode || nodeData.label;
+            if (code) {
+                vscode.postMessage({
+                    type: 'navigateToPipe',
+                    pipeCode: code,
+                });
+            }
+            // fall through to selection logic below
+        }
         if (nodeData.isPipe && nodeData.pipeCode) {
             vscode.postMessage({
                 type: 'navigateToPipe',

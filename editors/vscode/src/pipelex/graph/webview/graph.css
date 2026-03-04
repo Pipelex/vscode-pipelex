@@ -39,7 +39,7 @@
     --radius-pill: 999px;
     --color-controller-bg: rgba(100, 116, 139, 0.08);
     --color-controller-border: rgba(100, 116, 139, 0.3);
-    --color-controller-text: var(--color-text-dim);
+    --color-controller-text: var(--color-text-muted);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -78,7 +78,7 @@ body.vscode-light {
     --color-bg-dots: #e2e8f0;
     --color-controller-bg: rgba(100, 116, 139, 0.06);
     --color-controller-border: rgba(100, 116, 139, 0.25);
-    --color-controller-text: var(--color-text-dim);
+    --color-controller-text: var(--color-text-muted);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -100,7 +100,7 @@ body.vscode-high-contrast {
     --color-bg-dots: #333333;
     --color-controller-bg: rgba(111, 195, 223, 0.06);
     --color-controller-border: rgba(111, 195, 223, 0.4);
-    --color-controller-text: var(--color-text-dim);
+    --color-controller-text: var(--color-text-muted);
 }
 
 /* High contrast light */
@@ -136,7 +136,7 @@ body.vscode-high-contrast-light {
     --color-bg-dots: #d4d4d4;
     --color-controller-bg: rgba(0, 0, 0, 0.04);
     --color-controller-border: rgba(0, 0, 0, 0.2);
-    --color-controller-text: var(--color-text-dim);
+    --color-controller-text: var(--color-text-muted);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
@@ -187,6 +187,9 @@ body {
 .react-flow__node.selected {
     box-shadow: 0 0 0 3px var(--color-accent), var(--shadow-lg) !important;
     z-index: 1000 !important;
+}
+.react-flow__node-controllerGroup.selected {
+    box-shadow: 0 0 0 2px var(--color-accent), var(--shadow-lg) !important;
 }
 
 /* Toolbar */
@@ -301,7 +304,6 @@ body {
     font-family: var(--font-mono);
     font-weight: 400;
     color: var(--color-controller-text);
-    opacity: 0.7;
     pointer-events: none;
     user-select: none;
     white-space: nowrap;
