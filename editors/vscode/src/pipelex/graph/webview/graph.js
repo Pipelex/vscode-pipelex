@@ -97,8 +97,12 @@ function getLayoutedElements(nodes, edges, direction) {
 
     edges.forEach((edge) => {
         // Cross-group edges get low weight so dagre's crossing-minimization
-        // doesn't pull nodes from different controller groups together
-        const edgeLabel = edge._crossGroup ? { weight: 0 } : {};
+        // doesn't pull nodes from different controller groups together.
+        // Batch edges (batch_item / batch_aggregate) get extra rank spacing
+        // so the dashed edges have breathing room around the controller.
+        const edgeLabel = {};
+        if (edge._crossGroup) edgeLabel.weight = 0;
+        if (edge._batchEdge) edgeLabel.minlen = 3;
         g.setEdge(edge.source, edge.target, edgeLabel);
     });
 
@@ -394,6 +398,7 @@ function buildDataflowGraph(graphspec, analysis) {
             target: targetId,
             type: edgeType,
             animated: false,
+            _batchEdge: true,
             label: edge.label || '',
             labelStyle: {
                 fontSize: '10px',
