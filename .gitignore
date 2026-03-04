@@ -1,4 +1,5 @@
 .local*
+temp/
 # Cargo.lock
 target
 .cargo/config.toml
