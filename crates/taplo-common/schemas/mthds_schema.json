@@ -1486,17 +1486,6 @@
           "default": null,
           "title": "Model"
         },
-        "depth": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/SearchDepth"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
         "include_images": {
           "anyOf": [
             {
@@ -1675,23 +1664,12 @@
       "title": "ReasoningEffort",
       "type": "string"
     },
-    "SearchDepth": {
-      "enum": [
-        "standard",
-        "deep"
-      ],
-      "title": "SearchDepth",
-      "type": "string"
-    },
     "SearchSetting": {
       "additionalProperties": false,
       "properties": {
         "model": {
           "title": "Model",
           "type": "string"
-        },
-        "depth": {
-          "$ref": "#/definitions/SearchDepth"
         },
         "include_images": {
           "default": false,
@@ -1730,8 +1708,7 @@
         }
       },
       "required": [
-        "model",
-        "depth"
+        "model"
       ],
       "title": "SearchSetting",
       "type": "object"
@@ -1922,7 +1899,7 @@
     }
   },
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "$comment": "Generated from PipelexBundleBlueprint v0.18.5. Do not edit manually.",
+  "$comment": "Generated from PipelexBundleBlueprint v0.20.0. Do not edit manually.",
   "x-taplo": {
     "initKeys": [
       "domain"
