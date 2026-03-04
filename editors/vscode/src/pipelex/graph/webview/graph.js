@@ -746,6 +746,14 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
         }
     }
 
+    // Build controller info lookup (used by Phase 3 and Phase 4)
+    const controllerInfoMap = {};
+    for (const node of graphspec.nodes) {
+        if (analysis.controllerNodeIds.has(node.id)) {
+            controllerInfoMap[node.id] = node;
+        }
+    }
+
     // ------------------------------------------------------------------
     // Phase 3: align loose input nodes above their downstream controller
     // ------------------------------------------------------------------
@@ -771,6 +779,11 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
         if (targetCtrls.size !== 1) continue; // ambiguous or no controller
 
         const targetCtrl = targetCtrls.values().next().value;
+
+        // Skip PipeBatch/PipeParallel — inputs should stay spread across branches
+        const targetCtrlNode = controllerInfoMap[targetCtrl];
+        if (targetCtrlNode && (targetCtrlNode.pipe_type === 'PipeParallel' || targetCtrlNode.pipe_type === 'PipeBatch')) continue;
+
         const box = computeBox(targetCtrl);
         if (!box) continue;
 
@@ -791,13 +804,7 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
     // ------------------------------------------------------------------
     // For each controller that has no child controllers (leaf groups),
     // align all member nodes to the group's median center on the order axis.
-    // Skip PipeParallel controllers — their branches should stay side-by-side.
-    const controllerInfoMap = {};
-    for (const node of graphspec.nodes) {
-        if (analysis.controllerNodeIds.has(node.id)) {
-            controllerInfoMap[node.id] = node;
-        }
-    }
+    // Skip PipeParallel/PipeBatch controllers — their branches should stay side-by-side.
     const orderAxis = isHorizontal ? 'y' : 'x';
     for (const ctrlId of analysis.controllerNodeIds) {
         // Skip non-leaf controllers (those that have child controllers)
@@ -807,7 +814,7 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
 
         // Skip PipeParallel controllers — branches are intentionally side-by-side
         const ctrlNode = controllerInfoMap[ctrlId];
-        if (ctrlNode && ctrlNode.pipe_type === 'PipeParallel') continue;
+        if (ctrlNode && (ctrlNode.pipe_type === 'PipeParallel' || ctrlNode.pipe_type === 'PipeBatch')) continue;
 
         const indices = ctrlIndices[ctrlId];
         if (!indices || indices.length < 2) continue;
