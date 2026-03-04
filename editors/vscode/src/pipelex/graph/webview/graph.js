@@ -1199,6 +1199,18 @@ function GraphViewer() {
     const reactFlowRef = React.useRef(null);
     const prevDirectionRef = React.useRef(currentDirection);
     const initialDataRef = React.useRef(null);
+    // Cache post-layout, pre-controller nodes/edges so controller toggle skips re-layout
+    const layoutCacheRef = React.useRef(null);
+
+    // Deep-clone cached nodes so applyControllers can mutate positions/parentNode
+    function cloneCachedNodes(nodes) {
+        return nodes.map(n => ({
+            ...n,
+            position: { ...n.position },
+            data: { ...n.data },
+            style: n.style ? { ...n.style } : undefined,
+        }));
+    }
 
     // Expose setLayoutDirection for direction toggle button
     React.useEffect(() => {
@@ -1217,8 +1229,9 @@ function GraphViewer() {
         const spaced = initialDataRef.current._analysis
             ? ensureControllerSpacing(relayouted.nodes, initialDataRef.current._graphspec, initialDataRef.current._analysis, direction)
             : relayouted.nodes;
+        layoutCacheRef.current = { nodes: spaced, edges: relayouted.edges };
         const withControllers = applyControllers(
-            spaced, relayouted.edges,
+            cloneCachedNodes(spaced), relayouted.edges,
             initialDataRef.current._graphspec, initialDataRef.current._analysis
         );
         setNodes(withControllers.nodes);
@@ -1230,24 +1243,18 @@ function GraphViewer() {
         }, 50);
     }, [direction]);
 
-    // Expose rebuildAndLayout for controllers toggle
+    // Expose rebuildAndLayout for controllers toggle — reuses cached layout positions
     React.useEffect(() => {
         window.rebuildAndLayout = () => {
-            if (!viewspec) return;
-            const { graphData, analysis } = buildGraph(viewspec, graphspec);
-            initialDataRef.current = graphData;
-            initialDataRef.current._analysis = analysis;
-            initialDataRef.current._graphspec = graphspec;
-            const layouted = getLayoutedElements(graphData.nodes, graphData.edges, currentDirection);
-            const spaced = analysis
-                ? ensureControllerSpacing(layouted.nodes, graphspec, analysis, currentDirection)
-                : layouted.nodes;
-            const withControllers = applyControllers(spaced, layouted.edges, graphspec, analysis);
+            if (!layoutCacheRef.current || !initialDataRef.current) return;
+            const cachedNodes = cloneCachedNodes(layoutCacheRef.current.nodes);
+            const cachedEdges = layoutCacheRef.current.edges;
+            const withControllers = applyControllers(
+                cachedNodes, cachedEdges,
+                initialDataRef.current._graphspec, initialDataRef.current._analysis
+            );
             setNodes(withControllers.nodes);
             setEdges(withControllers.edges);
-            setTimeout(() => {
-                if (reactFlowRef.current) reactFlowRef.current.fitView({ padding: 0.1 });
-            }, 50);
         };
         return () => { window.rebuildAndLayout = null; };
     }, [setNodes, setEdges]);
@@ -1293,7 +1300,8 @@ function GraphViewer() {
                 const spaced = analysis
                     ? ensureControllerSpacing(layouted.nodes, graphspec, analysis, currentDirection)
                     : layouted.nodes;
-                const withControllers = applyControllers(spaced, layouted.edges, graphspec, analysis);
+                layoutCacheRef.current = { nodes: spaced, edges: layouted.edges };
+                const withControllers = applyControllers(cloneCachedNodes(spaced), layouted.edges, graphspec, analysis);
 
                 setNodes(withControllers.nodes);
                 setEdges(withControllers.edges);
