@@ -95,7 +95,10 @@ function getLayoutedElements(nodes, edges, direction) {
     });
 
     edges.forEach((edge) => {
-        g.setEdge(edge.source, edge.target);
+        // Cross-group edges get low weight so dagre's crossing-minimization
+        // doesn't pull nodes from different controller groups together
+        const edgeLabel = edge._crossGroup ? { weight: 0 } : {};
+        g.setEdge(edge.source, edge.target, edgeLabel);
     });
 
     dagre.layout(g);
@@ -409,6 +412,77 @@ function buildDataflowGraph(graphspec, analysis) {
         });
     }
 
+    // Sort nodes by controller group so dagre's initial ordering clusters
+    // same-group nodes. This influences dagre's crossing-minimization to
+    // keep sibling groups separate rather than interleaving them.
+    if (analysis) {
+        const childToCtrl = buildChildToControllerMap(graphspec, analysis);
+
+        // For unassigned stuff (method inputs with no producer), assign to
+        // the controller of their first consumer so inputs cluster near their group
+        for (const [digest, consumers] of Object.entries(analysis.stuffConsumers)) {
+            const stuffId = 'stuff_' + digest;
+            if (childToCtrl[stuffId]) continue;
+            for (const consumerId of consumers) {
+                if (childToCtrl[consumerId]) {
+                    childToCtrl[stuffId] = childToCtrl[consumerId];
+                    break;
+                }
+            }
+        }
+
+        // Depth-first order index for controllers
+        const groupOrder = {};
+        let orderIdx = 0;
+        function assignOrder(ctrlId) {
+            groupOrder[ctrlId] = orderIdx++;
+            for (const childId of (analysis.containmentTree[ctrlId] || [])) {
+                if (analysis.controllerNodeIds.has(childId)) {
+                    assignOrder(childId);
+                }
+            }
+        }
+        for (const ctrlId of analysis.controllerNodeIds) {
+            if (!childToCtrl[ctrlId]) assignOrder(ctrlId);
+        }
+
+        // Build sort key from containment path
+        function sortKey(nodeId) {
+            const path = [];
+            let cur = childToCtrl[nodeId];
+            while (cur) {
+                path.unshift(groupOrder[cur] !== undefined ? groupOrder[cur] : 9999);
+                cur = childToCtrl[cur];
+            }
+            while (path.length < 10) path.push(0);
+            return path;
+        }
+
+        nodes.sort((a, b) => {
+            const ka = sortKey(a.id);
+            const kb = sortKey(b.id);
+            for (let i = 0; i < ka.length; i++) {
+                if (ka[i] !== kb[i]) return ka[i] - kb[i];
+            }
+            return 0;
+        });
+
+        // Mark edges that cross between different sibling controller groups.
+        // These get low weight in dagre so they don't pull nodes from different
+        // groups toward each other during crossing-minimization.
+        function leafController(nodeId) {
+            // Walk up to the deepest non-root controller
+            return childToCtrl[nodeId] || null;
+        }
+        for (const edge of edges) {
+            const srcCtrl = leafController(edge.source);
+            const tgtCtrl = leafController(edge.target);
+            if (srcCtrl && tgtCtrl && srcCtrl !== tgtCtrl) {
+                edge._crossGroup = true;
+            }
+        }
+    }
+
     return { nodes, edges };
 }
 
@@ -465,11 +539,12 @@ function buildChildToControllerMap(graphspec, analysis) {
  *           downstream operators) that overlap with a child controller's padded box
  *           and push them outward.
  */
-function ensureControllerSpacing(nodes, graphspec, analysis) {
+function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
     if (!analysis || !graphspec) return nodes;
+    const isHorizontal = direction === 'LR' || direction === 'RL';
 
     const childToCtrl = buildChildToControllerMap(graphspec, analysis);
-    const MIN_GAP = 10;
+    const MIN_GAP = 20;
 
     // Check if a node is a descendant of a controller (traverses parent chain)
     function isDescendantOf(nodeId, ctrlId) {
@@ -637,6 +712,86 @@ function ensureControllerSpacing(nodes, graphspec, analysis) {
                     result[i].position.y += maxPushDown;
                 }
             }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 3: align loose input nodes above their downstream controller
+    // ------------------------------------------------------------------
+    // For each node not in any controller, find its outgoing edges and check
+    // if all targets belong to the same controller group. If so, center the
+    // node horizontally above that group's bounding box.
+    const edgesBySource = {};
+    for (const edge of graphspec.edges) {
+        if (edge.kind === 'data') {
+            // Data edges go: stuff → operator (via digest). We need ReactFlow-level
+            // edges instead. Build from analysis: stuff consumed by operators.
+        }
+    }
+    // Use stuffConsumers to find which controller each input feeds
+    for (let i = 0; i < result.length; i++) {
+        const n = result[i];
+        if (childToCtrl[n.id]) continue; // skip nodes already in a controller
+        if (!n.id.startsWith('stuff_')) continue; // only align stuff inputs
+
+        const digest = n.id.replace('stuff_', '');
+        const consumers = analysis.stuffConsumers[digest];
+        if (!consumers || consumers.length === 0) continue;
+
+        // Find which leaf controller(s) the consumers belong to
+        const targetCtrls = new Set();
+        for (const consumerId of consumers) {
+            const ctrl = childToCtrl[consumerId];
+            if (ctrl) targetCtrls.add(ctrl);
+        }
+        if (targetCtrls.size !== 1) continue; // ambiguous or no controller
+
+        const targetCtrl = targetCtrls.values().next().value;
+        const box = computeBox(targetCtrl);
+        if (!box) continue;
+
+        // Center the node above (TB) or to the left of (LR) the controller group
+        if (isHorizontal) {
+            const groupCenterY = (box.padTop + CONTROLLER_PADDING_TOP + box.padBottom - CONTROLLER_PADDING_BOTTOM) / 2;
+            const h = nodeHeight(n);
+            result[i].position.y = groupCenterY - h / 2;
+        } else {
+            const groupCenterX = (box.padLeft + CONTROLLER_PADDING_X + box.padRight - CONTROLLER_PADDING_X) / 2;
+            const w = parseFloat(n.style?.width) || 200;
+            result[i].position.x = groupCenterX - w / 2;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 4: align nodes within each leaf controller into a single column
+    // ------------------------------------------------------------------
+    // For each controller that has no child controllers (leaf groups),
+    // align all member nodes to the group's median center on the order axis.
+    const orderAxis = isHorizontal ? 'y' : 'x';
+    for (const ctrlId of analysis.controllerNodeIds) {
+        // Skip non-leaf controllers (those that have child controllers)
+        const children = analysis.containmentTree[ctrlId] || [];
+        const hasChildCtrl = children.some(id => analysis.controllerNodeIds.has(id));
+        if (hasChildCtrl) continue;
+
+        const indices = ctrlIndices[ctrlId];
+        if (!indices || indices.length < 2) continue;
+
+        // Compute the median center position on the order axis
+        const centers = indices.map(idx => {
+            const n = result[idx];
+            const w = parseFloat(n.style?.width) || 200;
+            return n.position[orderAxis] + (orderAxis === 'x' ? w / 2 : nodeHeight(n) / 2);
+        });
+        centers.sort((a, b) => a - b);
+        const median = centers[Math.floor(centers.length / 2)];
+
+        // Shift each node so its center aligns with the median
+        for (const idx of indices) {
+            const n = result[idx];
+            const w = parseFloat(n.style?.width) || 200;
+            const halfSize = orderAxis === 'x' ? w / 2 : nodeHeight(n) / 2;
+            result[idx].position[orderAxis] = median - halfSize;
         }
     }
 
@@ -998,8 +1153,8 @@ function GraphViewer() {
         if (!initialDataRef.current) return;
 
         const relayouted = getLayoutedElements(initialDataRef.current.nodes, initialDataRef.current.edges, direction);
-        const spaced = showControllers
-            ? ensureControllerSpacing(relayouted.nodes, initialDataRef.current._graphspec, initialDataRef.current._analysis)
+        const spaced = initialDataRef.current._analysis
+            ? ensureControllerSpacing(relayouted.nodes, initialDataRef.current._graphspec, initialDataRef.current._analysis, direction)
             : relayouted.nodes;
         const withControllers = applyControllers(
             spaced, relayouted.edges,
@@ -1023,8 +1178,8 @@ function GraphViewer() {
             initialDataRef.current._analysis = analysis;
             initialDataRef.current._graphspec = graphspec;
             const layouted = getLayoutedElements(graphData.nodes, graphData.edges, currentDirection);
-            const spaced = showControllers
-                ? ensureControllerSpacing(layouted.nodes, graphspec, analysis)
+            const spaced = analysis
+                ? ensureControllerSpacing(layouted.nodes, graphspec, analysis, currentDirection)
                 : layouted.nodes;
             const withControllers = applyControllers(spaced, layouted.edges, graphspec, analysis);
             setNodes(withControllers.nodes);
@@ -1068,8 +1223,8 @@ function GraphViewer() {
                 const layouted = needsLayout
                     ? getLayoutedElements(graphData.nodes, graphData.edges, currentDirection)
                     : graphData;
-                const spaced = showControllers
-                    ? ensureControllerSpacing(layouted.nodes, graphspec, analysis)
+                const spaced = analysis
+                    ? ensureControllerSpacing(layouted.nodes, graphspec, analysis, currentDirection)
                     : layouted.nodes;
                 const withControllers = applyControllers(spaced, layouted.edges, graphspec, analysis);
 
