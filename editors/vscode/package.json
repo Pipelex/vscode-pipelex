@@ -569,6 +569,12 @@
           "scope": "resource",
           "default": "top_down"
         },
+        "pipelex.graph.showControllers": {
+          "description": "Show controller group boxes in the method graph.",
+          "type": "boolean",
+          "scope": "resource",
+          "default": false
+        },
         "pipelex.formatter.alignEntries": {
           "scope": "resource",
           "type": "boolean",

@@ -139,6 +139,7 @@ export class MethodGraphPanel implements vscode.Disposable {
         const pipelexConfig = vscode.workspace.getConfiguration('pipelex');
         const timeout = pipelexConfig.get<number>('validation.timeout', 30000);
         const direction = pipelexConfig.get<string>('graph.direction', 'top_down');
+        const showControllers = pipelexConfig.get<boolean>('graph.showControllers', false);
         const filePath = uri.fsPath;
         const args = [...resolved.args, 'validate', 'bundle', filePath, '--view', '--direction', direction];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
@@ -188,6 +189,7 @@ export class MethodGraphPanel implements vscode.Disposable {
                 graphspec: result.graphspec || null,
                 config: {
                     direction: dagreDirection,
+                    showControllers,
                     nodesep: graphConfig.nodesep,
                     ranksep: graphConfig.ranksep,
                     edgeType: graphConfig.edgeType,
@@ -265,6 +267,11 @@ export class MethodGraphPanel implements vscode.Disposable {
                 this.panel.webview.postMessage(this.pendingData);
                 this.pendingData = null;
             }
+            return;
+        }
+        if (message.type === 'updateShowControllers' && typeof message.value === 'boolean') {
+            const cfg = vscode.workspace.getConfiguration('pipelex');
+            cfg.update('graph.showControllers', message.value, vscode.ConfigurationTarget.Workspace);
             return;
         }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {

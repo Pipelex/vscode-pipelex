@@ -47,6 +47,7 @@ document.getElementById('zoom-fit').addEventListener('click', () => {
 const controllersToggle = document.getElementById('controllers-toggle');
 controllersToggle.addEventListener('change', () => {
     showControllers = controllersToggle.checked;
+    vscode.postMessage({ type: 'updateShowControllers', value: showControllers });
     if (window.rebuildAndLayout) window.rebuildAndLayout();
 });
 
@@ -1224,6 +1225,8 @@ function GraphViewer() {
                 config = message.config || {};
                 currentDirection = config.direction || 'TB';
                 edgeType = config.edgeType || 'bezier';
+                showControllers = config.showControllers || false;
+                controllersToggle.checked = showControllers;
                 setDirection(currentDirection);
                 prevDirectionRef.current = currentDirection;
                 applyDirectionIcon(currentDirection);
