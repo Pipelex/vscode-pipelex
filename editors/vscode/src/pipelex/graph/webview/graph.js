@@ -700,6 +700,9 @@ function buildControllerNodes(graphspec, analysis, layoutedNodes) {
     const childToParent = {}; // childId -> parentControllerId
 
     for (const controllerId of controllerIds) {
+        // Skip the root controller (main pipe) — it wraps everything and adds no value
+        if (!childToController[controllerId]) continue;
+
         const directChildren = analysis.containmentTree[controllerId] || [];
         // Only include children that are actually rendered
         const renderedChildren = directChildren.filter(cid => nodeById[cid]);
