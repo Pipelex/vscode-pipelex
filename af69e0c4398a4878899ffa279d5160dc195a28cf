@@ -1,0 +1,69 @@
+temp/graph-label-bug-handoff.md
+  a66e9efa1c52c33e 1-59
+editors/vscode/src/pipelex/graph/webview/graph.js
+  5350cbf211c5a2d5 1334,1337-1338,1340-1343
+  770fbf26914f41f2 532-542,948,953-954,958-959,1180,1182,1335-1336,1339
+editors/vscode/src/pipelex/graph/webview/graph.css
+  770fbf26914f41f2 192
+  eb500843f05cefb4 42,81,103,139
+  5350cbf211c5a2d5 191,193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "af69e0c4398a4878899ffa279d5160dc195a28cf",
+  "prompts": {
+    "5350cbf211c5a2d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d86bcafb-9411-4e42-8260-f45098724a5b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 1,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    },
+    "770fbf26914f41f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "595d0d14-c71a-41bc-9a2e-0f5f0b61a30a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 7,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    },
+    "a66e9efa1c52c33e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b36c3eb2-7a52-474d-b69b-9263e0c2e89c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 59,
+      "total_deletions": 0,
+      "accepted_lines": 59,
+      "overriden_lines": 0
+    },
+    "eb500843f05cefb4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0e634d8-3c28-4301-988d-5e9c834ce733",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 5,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
