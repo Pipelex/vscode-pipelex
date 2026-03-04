@@ -1,0 +1,23 @@
+editors/vscode/src/pipelex/graph/webview/graph.js
+  721f41a7097a7e63 1354
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "83b5f79533f4505e52b7b5381993c48bc1eae2bf",
+  "prompts": {
+    "721f41a7097a7e63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "979df5e8-32ff-4c31-9025-f74852136d9c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
