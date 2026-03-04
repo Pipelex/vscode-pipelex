@@ -43,13 +43,17 @@ document.getElementById('zoom-fit').addEventListener('click', () => {
     if (window._reactFlowInstance) window._reactFlowInstance.fitView({ padding: 0.1 });
 });
 
-// Controllers toggle button
-const controllersToggleBtn = document.getElementById('controllers-toggle');
-controllersToggleBtn.addEventListener('click', () => {
-    showControllers = !showControllers;
-    controllersToggleBtn.classList.toggle('active', showControllers);
+// Controllers toggle switch
+const controllersToggle = document.getElementById('controllers-toggle');
+controllersToggle.addEventListener('change', () => {
+    showControllers = controllersToggle.checked;
     if (window.rebuildAndLayout) window.rebuildAndLayout();
 });
+
+// Controller group padding constants (shared between spacing correction and group rendering)
+const CONTROLLER_PADDING_X = 40;
+const CONTROLLER_PADDING_TOP = 48; // room for label
+const CONTROLLER_PADDING_BOTTOM = 20;
 
 // ReactFlow setup
 const { React, ReactDOM } = window;
@@ -409,12 +413,243 @@ function buildDataflowGraph(graphspec, analysis) {
 }
 
 // ====================================================================
+// CONTROLLER HELPERS
+// ====================================================================
+
+/**
+ * Build a map from node id -> controller id for all nodes that belong to a controller.
+ * Includes both direct children (operators) and stuff nodes assigned to controllers.
+ */
+function buildChildToControllerMap(graphspec, analysis) {
+    const childToController = {};
+
+    // Direct children from containment tree
+    for (const [ctrlId, children] of Object.entries(analysis.containmentTree)) {
+        for (const childId of children) {
+            childToController[childId] = ctrlId;
+        }
+    }
+
+    // Stuff nodes produced by operators inside controllers
+    for (const [digest, producerId] of Object.entries(analysis.stuffProducers)) {
+        const stuffId = 'stuff_' + digest;
+        const ctrlId = childToController[producerId];
+        if (ctrlId) {
+            childToController[stuffId] = ctrlId;
+        }
+    }
+
+    // Stuff produced by controllers themselves → assign to parent controller
+    for (const node of graphspec.nodes) {
+        if (!analysis.controllerNodeIds.has(node.id)) continue;
+        const parentCtrlId = childToController[node.id];
+        if (!parentCtrlId) continue;
+        for (const output of (node.io?.outputs || [])) {
+            if (!output.digest) continue;
+            const stuffId = 'stuff_' + output.digest;
+            if (!childToController[stuffId]) {
+                childToController[stuffId] = parentCtrlId;
+            }
+        }
+    }
+
+    return childToController;
+}
+
+/**
+ * Post-layout pass that resolves two kinds of overlap caused by controller group padding:
+ *
+ * Phase 1 — Sibling controller groups: detect overlapping padded bounding boxes of
+ *           sibling controllers and push them apart.
+ * Phase 2 — Loose nodes vs controller boxes: detect non-grouped nodes (method inputs,
+ *           downstream operators) that overlap with a child controller's padded box
+ *           and push them outward.
+ */
+function ensureControllerSpacing(nodes, graphspec, analysis) {
+    if (!analysis || !graphspec) return nodes;
+
+    const childToCtrl = buildChildToControllerMap(graphspec, analysis);
+    const MIN_GAP = 10;
+
+    // Check if a node is a descendant of a controller (traverses parent chain)
+    function isDescendantOf(nodeId, ctrlId) {
+        let c = childToCtrl[nodeId];
+        while (c) {
+            if (c === ctrlId) return true;
+            c = childToCtrl[c];
+        }
+        return false;
+    }
+
+    function nodeHeight(n) {
+        return n.data?.isStuff ? 60 : 70;
+    }
+
+    // Work on a mutable copy of positions
+    const result = nodes.map(n => ({ ...n, position: { ...n.position } }));
+
+    // Build global controller -> node indices map
+    const ctrlIndices = {};
+    for (const ctrlId of analysis.controllerNodeIds) {
+        const indices = [];
+        for (let i = 0; i < result.length; i++) {
+            if (isDescendantOf(result[i].id, ctrlId)) indices.push(i);
+        }
+        if (indices.length > 0) ctrlIndices[ctrlId] = indices;
+    }
+
+    // Compute padded bounding box for a controller's current node positions
+    function computeBox(ctrlId) {
+        const indices = ctrlIndices[ctrlId];
+        if (!indices) return null;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const idx of indices) {
+            const n = result[idx];
+            const w = parseFloat(n.style?.width) || 200;
+            const h = nodeHeight(n);
+            minX = Math.min(minX, n.position.x);
+            minY = Math.min(minY, n.position.y);
+            maxX = Math.max(maxX, n.position.x + w);
+            maxY = Math.max(maxY, n.position.y + h);
+        }
+        return {
+            padLeft: minX - CONTROLLER_PADDING_X,
+            padTop: minY - CONTROLLER_PADDING_TOP,
+            padRight: maxX + CONTROLLER_PADDING_X,
+            padBottom: maxY + CONTROLLER_PADDING_BOTTOM,
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 1: resolve overlaps between sibling controller groups
+    // ------------------------------------------------------------------
+    for (const [_parentId, childIds] of Object.entries(analysis.containmentTree)) {
+        const childCtrls = childIds.filter(id => analysis.controllerNodeIds.has(id) && ctrlIndices[id]);
+        if (childCtrls.length < 2) continue;
+
+        for (let pass = 0; pass < 3; pass++) {
+            let anyShifted = false;
+
+            for (let i = 0; i < childCtrls.length; i++) {
+                for (let j = i + 1; j < childCtrls.length; j++) {
+                    const boxA = computeBox(childCtrls[i]);
+                    const boxB = computeBox(childCtrls[j]);
+                    if (!boxA || !boxB) continue;
+
+                    const hOverlap = Math.min(boxA.padRight, boxB.padRight) - Math.max(boxA.padLeft, boxB.padLeft);
+                    const vOverlap = Math.min(boxA.padBottom, boxB.padBottom) - Math.max(boxA.padTop, boxB.padTop);
+                    if (hOverlap <= 0 || vOverlap <= 0) continue;
+
+                    if (hOverlap <= vOverlap) {
+                        const rightCtrl = boxA.padLeft <= boxB.padLeft ? childCtrls[j] : childCtrls[i];
+                        for (const idx of ctrlIndices[rightCtrl]) {
+                            result[idx].position.x += hOverlap + MIN_GAP;
+                        }
+                    } else {
+                        const bottomCtrl = boxA.padTop <= boxB.padTop ? childCtrls[j] : childCtrls[i];
+                        for (const idx of ctrlIndices[bottomCtrl]) {
+                            result[idx].position.y += vOverlap + MIN_GAP;
+                        }
+                    }
+                    anyShifted = true;
+                }
+            }
+            if (!anyShifted) break;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 2: push loose nodes away from child controller padded boxes
+    // ------------------------------------------------------------------
+    for (const [_parentId, childIds] of Object.entries(analysis.containmentTree)) {
+        const childCtrls = childIds.filter(id => analysis.controllerNodeIds.has(id) && ctrlIndices[id]);
+        if (childCtrls.length === 0) continue;
+
+        // Collect indices of nodes that belong to ANY child controller
+        const inAnyChildCtrl = new Set();
+        for (const ctrlId of childCtrls) {
+            for (const idx of ctrlIndices[ctrlId]) inAnyChildCtrl.add(idx);
+        }
+
+        // Precompute controller boxes and combined spans (positions are stable during detection)
+        const boxes = {};
+        let ctrlsMinY = Infinity, ctrlsMaxY = -Infinity;
+        let ctrlsMinX = Infinity, ctrlsMaxX = -Infinity;
+        for (const ctrlId of childCtrls) {
+            const box = computeBox(ctrlId);
+            if (!box) continue;
+            boxes[ctrlId] = box;
+            ctrlsMinY = Math.min(ctrlsMinY, box.padTop);
+            ctrlsMaxY = Math.max(ctrlsMaxY, box.padBottom);
+            ctrlsMinX = Math.min(ctrlsMinX, box.padLeft);
+            ctrlsMaxX = Math.max(ctrlsMaxX, box.padRight);
+        }
+        if (ctrlsMinY === Infinity) continue;
+        const ctrlsCenterY = (ctrlsMinY + ctrlsMaxY) / 2;
+
+        // Find the maximum push needed above and below child controllers
+        let maxPushUp = 0, maxPushDown = 0;
+
+        for (let i = 0; i < result.length; i++) {
+            if (inAnyChildCtrl.has(i)) continue;
+            const n = result[i];
+            const w = parseFloat(n.style?.width) || 200;
+            const h = nodeHeight(n);
+
+            for (const ctrlId of childCtrls) {
+                const box = boxes[ctrlId];
+                if (!box) continue;
+
+                const hOvlp = Math.min(box.padRight, n.position.x + w) - Math.max(box.padLeft, n.position.x);
+                const vOvlp = Math.min(box.padBottom, n.position.y + h) - Math.max(box.padTop, n.position.y);
+                if (hOvlp <= 0 || vOvlp <= 0) continue;
+
+                const nodeCenterY = n.position.y + h / 2;
+                const boxCenterY = (box.padTop + box.padBottom) / 2;
+
+                if (nodeCenterY < boxCenterY) {
+                    const needed = (n.position.y + h) - box.padTop + MIN_GAP;
+                    maxPushUp = Math.max(maxPushUp, needed);
+                } else {
+                    const needed = box.padBottom - n.position.y + MIN_GAP;
+                    maxPushDown = Math.max(maxPushDown, needed);
+                }
+            }
+        }
+
+        // Apply uniform shift to loose nodes that are within the horizontal span of the
+        // controller zone. Nodes above → up, nodes below → down. Uniform shift per
+        // direction preserves relative ordering among shifted nodes.
+        if (maxPushUp > 0 || maxPushDown > 0) {
+            for (let i = 0; i < result.length; i++) {
+                if (inAnyChildCtrl.has(i)) continue;
+                const n = result[i];
+                const w = parseFloat(n.style?.width) || 200;
+                const h = nodeHeight(n);
+                // Only shift nodes whose horizontal extent overlaps the controller zone
+                const nodeRight = n.position.x + w;
+                if (nodeRight <= ctrlsMinX || n.position.x >= ctrlsMaxX) continue;
+                const nodeCenterY = n.position.y + h / 2;
+                if (maxPushUp > 0 && nodeCenterY < ctrlsCenterY) {
+                    result[i].position.y -= maxPushUp;
+                }
+                if (maxPushDown > 0 && nodeCenterY >= ctrlsCenterY) {
+                    result[i].position.y += maxPushDown;
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+// ====================================================================
 // CONTROLLER CONTAINERS: Build group nodes wrapping child operators
 // ====================================================================
 function buildControllerNodes(graphspec, analysis, layoutedNodes) {
-    const PADDING_X = 40;
-    const PADDING_TOP = 48; // room for label
-    const PADDING_BOTTOM = 20;
+    const PADDING_X = CONTROLLER_PADDING_X;
+    const PADDING_TOP = CONTROLLER_PADDING_TOP;
+    const PADDING_BOTTOM = CONTROLLER_PADDING_BOTTOM;
 
     // Build lookup of layouted nodes by id
     const nodeById = {};
@@ -445,44 +680,15 @@ function buildControllerNodes(graphspec, analysis, layoutedNodes) {
         return depthCache[controllerId];
     }
 
-    // Build child -> parent controller mapping (for all children, not just operators)
-    const childToController = {};
-    for (const [ctrlId, children] of Object.entries(analysis.containmentTree)) {
-        for (const childId of children) {
-            childToController[childId] = ctrlId;
-        }
-    }
-
-    // Map stuff nodes to the controller they belong in
-    const stuffToController = {};
-    // Stuff produced by an operator inside a controller → assign to that controller
-    for (const [digest, producerId] of Object.entries(analysis.stuffProducers)) {
-        const stuffId = 'stuff_' + digest;
-        const ctrlId = childToController[producerId];
-        if (ctrlId && nodeById[stuffId]) {
-            stuffToController[stuffId] = ctrlId;
-        }
-    }
-    // Stuff produced by a controller itself (e.g. PipeParallel combined outputs) is
-    // excluded from stuffProducers. Assign to the controller's parent controller.
-    for (const node of graphspec.nodes) {
-        if (!analysis.controllerNodeIds.has(node.id)) continue;
-        const parentCtrlId = childToController[node.id];
-        if (!parentCtrlId) continue;
-        for (const output of (node.io?.outputs || [])) {
-            if (!output.digest) continue;
-            const stuffId = 'stuff_' + output.digest;
-            if (nodeById[stuffId] && !stuffToController[stuffId]) {
-                stuffToController[stuffId] = parentCtrlId;
-            }
-        }
-    }
-
-    // Build reverse index: controller -> stuff node ids
+    // Reuse the shared helper for child-to-controller mapping, then filter to rendered
+    // nodes and build the reverse index (controller -> stuff node ids)
+    const childToController = buildChildToControllerMap(graphspec, analysis);
     const controllerStuffChildren = {};
-    for (const [stuffId, ctrlId] of Object.entries(stuffToController)) {
+    for (const [nodeId, ctrlId] of Object.entries(childToController)) {
+        if (!nodeId.startsWith('stuff_')) continue;
+        if (!nodeById[nodeId]) continue; // only include rendered stuff nodes
         if (!controllerStuffChildren[ctrlId]) controllerStuffChildren[ctrlId] = [];
-        controllerStuffChildren[ctrlId].push(stuffId);
+        controllerStuffChildren[ctrlId].push(nodeId);
     }
 
     // Sort controllers by depth ascending (process leaves first)
@@ -523,18 +729,15 @@ function buildControllerNodes(graphspec, analysis, layoutedNodes) {
         const info = controllerInfo[controllerId] || {};
         const pipeCode = info.pipe_code || controllerId.split(':').pop();
         const pipeType = info.pipe_type || '';
-        const typeSuffix = pipeType.replace(/^Pipe/, '');
-        const labelText = typeSuffix ? (pipeCode + ' ' + typeSuffix) : pipeCode;
-
         const groupNode = {
             id: controllerId,
-            type: 'group',
+            type: 'controllerGroup',
             data: {
-                label: labelText,
+                label: pipeCode,
+                pipeType: pipeType,
                 isController: true,
                 isPipe: false,
                 isStuff: false,
-                labelText: labelText,
             },
             position: { x: groupX, y: groupY },
             style: {
@@ -544,10 +747,6 @@ function buildControllerNodes(graphspec, analysis, layoutedNodes) {
                 border: '2px dashed var(--color-controller-border)',
                 borderRadius: '12px',
                 padding: '0',
-                fontSize: '12px',
-                fontFamily: 'var(--font-mono)',
-                fontWeight: 500,
-                color: 'var(--color-controller-text)',
             },
         };
 
@@ -753,6 +952,25 @@ function buildGraph(viewspec, graphspec) {
 }
 
 // ====================================================================
+// CUSTOM NODE TYPES
+// ====================================================================
+function ControllerGroupNode({ data }) {
+    return React.createElement('div', {
+        className: 'controller-group-node',
+    },
+        React.createElement('div', {
+            className: 'controller-group-label',
+        }, data.label),
+        data.pipeType ? React.createElement('div', {
+            className: 'controller-group-type',
+        }, data.pipeType) : null
+    );
+}
+
+// Must be defined at module scope for stable reference (avoids ReactFlow re-mount warnings)
+const controllerNodeTypes = { controllerGroup: ControllerGroupNode };
+
+// ====================================================================
 // MAIN REACT COMPONENT
 // ====================================================================
 function GraphViewer() {
@@ -777,8 +995,11 @@ function GraphViewer() {
         if (!initialDataRef.current) return;
 
         const relayouted = getLayoutedElements(initialDataRef.current.nodes, initialDataRef.current.edges, direction);
+        const spaced = showControllers
+            ? ensureControllerSpacing(relayouted.nodes, initialDataRef.current._graphspec, initialDataRef.current._analysis)
+            : relayouted.nodes;
         const withControllers = applyControllers(
-            relayouted.nodes, relayouted.edges,
+            spaced, relayouted.edges,
             initialDataRef.current._graphspec, initialDataRef.current._analysis
         );
         setNodes(withControllers.nodes);
@@ -799,7 +1020,10 @@ function GraphViewer() {
             initialDataRef.current._analysis = analysis;
             initialDataRef.current._graphspec = graphspec;
             const layouted = getLayoutedElements(graphData.nodes, graphData.edges, currentDirection);
-            const withControllers = applyControllers(layouted.nodes, layouted.edges, graphspec, analysis);
+            const spaced = showControllers
+                ? ensureControllerSpacing(layouted.nodes, graphspec, analysis)
+                : layouted.nodes;
+            const withControllers = applyControllers(spaced, layouted.edges, graphspec, analysis);
             setNodes(withControllers.nodes);
             setEdges(withControllers.edges);
             setTimeout(() => {
@@ -841,7 +1065,10 @@ function GraphViewer() {
                 const layouted = needsLayout
                     ? getLayoutedElements(graphData.nodes, graphData.edges, currentDirection)
                     : graphData;
-                const withControllers = applyControllers(layouted.nodes, layouted.edges, graphspec, analysis);
+                const spaced = showControllers
+                    ? ensureControllerSpacing(layouted.nodes, graphspec, analysis)
+                    : layouted.nodes;
+                const withControllers = applyControllers(spaced, layouted.edges, graphspec, analysis);
 
                 setNodes(withControllers.nodes);
                 setEdges(withControllers.edges);
@@ -905,6 +1132,7 @@ function GraphViewer() {
         React.createElement(ReactFlow, {
             nodes: nodes,
             edges: edges,
+            nodeTypes: controllerNodeTypes,
             onNodesChange: onNodesChange,
             onEdgesChange: onEdgesChange,
             onNodeClick: onNodeClick,
