@@ -1,0 +1,23 @@
+editors/vscode/src/pipelex/graph/webview/graph.js
+  3a4c76ea3ed532b0 474-475,530,536-540,664-669,671-672,688-697,699-707,712-714,720-732,737-738,740-742
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "229cb18eea465fcd31359e5b9b8635484e6b635b",
+  "prompts": {
+    "3a4c76ea3ed532b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56e56da5-5bd8-40e0-aa23-f1433c0237df",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 62,
+      "total_deletions": 39,
+      "accepted_lines": 57,
+      "overriden_lines": 0
+    }
+  }
+}
