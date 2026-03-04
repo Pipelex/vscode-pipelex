@@ -271,7 +271,10 @@ export class MethodGraphPanel implements vscode.Disposable {
         }
         if (message.type === 'updateShowControllers' && typeof message.value === 'boolean') {
             const cfg = vscode.workspace.getConfiguration('pipelex');
-            cfg.update('graph.showControllers', message.value, vscode.ConfigurationTarget.Workspace);
+            const target = vscode.workspace.workspaceFolders?.length
+                ? vscode.ConfigurationTarget.Workspace
+                : vscode.ConfigurationTarget.Global;
+            cfg.update('graph.showControllers', message.value, target);
             return;
         }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {
