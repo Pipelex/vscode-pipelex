@@ -1,0 +1,51 @@
+crates/taplo-common/src/schema/mod.rs
+  102cee5dac528e31 1433
+  1ea1cedd4600d2f1 112-131,133-376,401-417,1275-1286,1291,1305,1309-1374,1378-1387,1680-1796
+  ce9fa61a4fc3f4f3 10-12,384-386,388-400,418-437,440-546,1146-1157,1163,1171,1193-1234,1236-1258,1264-1273,1388-1395,1401-1408,1410-1411,1413-1414,1416,1418-1424,1435-1437,1449-1455,1458,1467
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "8b1871065b5a65fd21a5b61c46840d9639e800fb",
+  "prompts": {
+    "102cee5dac528e31": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5d55568-125c-4d8d-830a-1e9db4e650be",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "1ea1cedd4600d2f1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4b275ffb-9d60-4a7c-9a65-f9838e7e0d4f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 595,
+      "total_deletions": 84,
+      "accepted_lines": 511,
+      "overriden_lines": 0
+    },
+    "ce9fa61a4fc3f4f3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f0db7c74-567b-4a71-8fe2-74a8520ebed2",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 414,
+      "total_deletions": 164,
+      "accepted_lines": 279,
+      "overriden_lines": 0
+    }
+  }
+}
