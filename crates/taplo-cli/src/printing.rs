@@ -125,10 +125,10 @@ impl<E: Environment> Taplo<E> {
 
         let mut out_diag = Vec::<u8>::new();
         for err in errors {
-            let msg = err.error.to_string();
+            let msg = err.display_message();
             for text_range in err.text_ranges() {
                 let diag = Diagnostic::error()
-                    .with_message(err.error.to_string())
+                    .with_message(&msg)
                     .with_labels(Vec::from([
                         Label::primary((), std_range(text_range)).with_message(&msg)
                     ]));
