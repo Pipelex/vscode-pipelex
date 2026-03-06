@@ -14,7 +14,7 @@ use jsonschema::{
 use parking_lot::Mutex;
 use regex::Regex;
 use serde_json::Value;
-use std::{borrow::Cow, num::NonZeroUsize, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, num::NonZeroUsize, sync::Arc};
 use taplo::{
     dom::{self, node::Key, KeyOrIndex, Keys},
     rowan::TextRange,
@@ -112,6 +112,9 @@ impl<E: Environment> Schemas<E> {
 /// Build a self-contained sub-schema from a definition name.
 /// Copies the definition as the root and includes all definitions for `$ref` resolution.
 /// Also copies the `$schema` draft indicator so the validator uses the correct draft.
+///
+/// Note: clones the entire definitions map into each sub-schema. This is acceptable —
+/// the map is small (~35 entries) and this only runs at lint time, not in a hot loop.
 fn build_definition_sub_schema(schema: &Value, definition_name: &str) -> Option<Value> {
     let definitions = schema.get("definitions")?.as_object()?;
     let definition = definitions.get(definition_name)?;
@@ -145,14 +148,31 @@ impl<E: Environment> Schemas<E> {
         // Load the full MTHDS schema (already cached)
         let schema = self.cache().get_schema(schema_url)?;
 
-        // Navigate DOM to pipe table
-        let pipe_dom_node = root.as_table()?.get("pipe")?;
+        // Navigate DOM to pipe table and look up the "pipe" key once.
+        // If there's no [pipe.*] section in the .mthds file, the `?` returns None,
+        // which skips the MTHDS path entirely. The generic AnyOf expansion then
+        // handles whatever errors exist (e.g., in the concept section). This is intentional.
+        let root_table = root.as_table()?;
+        let pipe_dom_node = root_table.get("pipe")?;
         let pipe_dom_table = pipe_dom_node.as_table()?;
+
+        let pipe_table_key = {
+            let entries = root_table.entries().read();
+            let found = entries
+                .iter()
+                .find(|(k, _)| k.value() == "pipe")
+                .map(|(k, _)| k.clone());
+            found?
+        };
 
         // Navigate JSON to pipe object
         let pipe_json = value.get("pipe")?.as_object()?;
 
         let mut all_errors = Vec::new();
+
+        // Cache compiled validators by definition name so pipes of the same type
+        // reuse the same compiled schema instead of recompiling per pipe.
+        let mut validator_cache: HashMap<String, Arc<JSONSchema>> = HashMap::new();
 
         // Collect entries upfront to release the read lock before calling validate_single_pipe
         let pipe_entries: Vec<_> = {
@@ -183,60 +203,64 @@ impl<E: Environment> Schemas<E> {
             // Map to definition name: "{type}Blueprint"
             let definition_name = format!("{type_str}Blueprint");
 
-            // Build sub-schema
-            let Some(sub_schema) = build_definition_sub_schema(&schema, &definition_name) else {
-                continue; // Unknown type — let generic validator handle it
+            // Get or compile the validator for this definition
+            let validator = match validator_cache.get(&definition_name) {
+                Some(v) => v.clone(),
+                None => {
+                    let Some(sub_schema) =
+                        build_definition_sub_schema(&schema, &definition_name)
+                    else {
+                        continue; // Unknown type — let generic validator handle it
+                    };
+                    match self.create_validator(&sub_schema) {
+                        Ok(v) => {
+                            let v = Arc::new(v);
+                            validator_cache.insert(definition_name, v.clone());
+                            v
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                %pipe_name, %err,
+                                "failed to compile validator for pipe type"
+                            );
+                            continue;
+                        }
+                    }
+                }
             };
 
             // Validate this pipe against its specific blueprint
-            match self.validate_single_pipe(
-                root,
+            let errors = Self::validate_single_pipe(
+                &pipe_table_key,
                 dom_key,
                 pipe_dom_node,
                 pipe_value,
-                &sub_schema,
-            ) {
-                Ok(errors) => all_errors.extend(errors),
-                Err(_) => continue,
-            }
+                &validator,
+            );
+            all_errors.extend(errors);
         }
 
         Some(all_errors)
     }
 
-    /// Validate a single pipe instance against its resolved blueprint definition.
+    /// Validate a single pipe instance against its pre-compiled blueprint validator.
     /// Returns leaf errors with DOM keys prefixed by the pipe path.
     fn validate_single_pipe(
-        &self,
-        root: &dom::Node,
+        pipe_table_key: &Key,
         pipe_dom_key: &Key,
         pipe_dom_node: &dom::Node,
         pipe_value: &Value,
-        sub_schema: &Value,
-    ) -> Result<Vec<NodeValidationError>, anyhow::Error> {
-        let validator = self.create_validator(sub_schema)?;
-
+        validator: &JSONSchema,
+    ) -> Vec<NodeValidationError> {
         // Build the base keys: [pipe, pipe_name]
-        let pipe_table_key = root
-            .as_table()
-            .and_then(|t| {
-                let entries = t.entries().read();
-                let found = entries
-                    .iter()
-                    .find(|(k, _)| k.value() == "pipe")
-                    .map(|(k, _)| k.clone());
-                found
-            })
-            .ok_or_else(|| anyhow!("no pipe table in DOM"))?;
-
         let base_keys = Keys::empty()
-            .join(pipe_table_key)
+            .join(pipe_table_key.clone())
             .join(pipe_dom_key.clone());
 
         // Run validate() on the pipe value
         let validation_result = validator.validate(pipe_value);
         match validation_result {
-            Ok(()) => Ok(Vec::new()),
+            Ok(()) => Vec::new(),
             Err(errors) => {
                 let errors: Vec<_> = errors
                     .map(|err| ValidationError {
@@ -260,7 +284,7 @@ impl<E: Environment> Schemas<E> {
                     let output = validator.apply(pipe_value).basic();
                     if let BasicOutput::Invalid(units) = output {
                         let expanded =
-                            Self::expand_any_of_errors_with_base(&base_keys, pipe_dom_node, &units);
+                            Self::expand_any_of_errors(&base_keys, pipe_dom_node, &units);
                         if !expanded.is_empty() {
                             // Return expanded errors + non-AnyOf/OneOf direct errors
                             let mut result: Vec<_> = errors
@@ -273,7 +297,7 @@ impl<E: Environment> Schemas<E> {
                                     )
                                 })
                                 .filter_map(|e| {
-                                    NodeValidationError::new_with_base(
+                                    NodeValidationError::new_from(
                                         base_keys.clone(),
                                         pipe_dom_node,
                                         e,
@@ -282,96 +306,25 @@ impl<E: Environment> Schemas<E> {
                                 })
                                 .collect();
                             result.extend(expanded);
-                            return Ok(result);
+                            return result;
                         }
                     }
                 }
 
                 // No AnyOf/OneOf or expansion didn't help — convert errors directly
-                let result: Vec<_> = errors
+                errors
                     .into_iter()
                     .filter_map(|e| {
-                        NodeValidationError::new_with_base(
+                        NodeValidationError::new_from(
                             base_keys.clone(),
                             pipe_dom_node,
                             e,
                         )
                         .ok()
                     })
-                    .collect();
-                Ok(result)
+                    .collect()
             }
         }
-    }
-
-    /// Like `expand_any_of_errors`, but walks from a base node with base keys.
-    fn expand_any_of_errors_with_base(
-        base_keys: &Keys,
-        base_node: &dom::Node,
-        units: &std::collections::VecDeque<OutputUnit<ErrorDescription>>,
-    ) -> Vec<NodeValidationError> {
-        use std::collections::{HashMap, HashSet};
-
-        let mut raw_branches: HashMap<String, usize> = HashMap::new();
-        let mut all_branched: Vec<(&OutputUnit<ErrorDescription>, Option<String>)> = Vec::new();
-
-        for unit in units {
-            let kw = unit.keyword_location().to_string();
-            let msg = unit.error_description().to_string();
-
-            if msg.is_empty() || kw.ends_with("/anyOf") || kw.ends_with("/oneOf") {
-                continue;
-            }
-
-            let branch_key = Self::extract_branch_key(&kw);
-            if let Some(ref key) = branch_key {
-                *raw_branches.entry(key.clone()).or_insert(0) += 1;
-            }
-            all_branched.push((unit, branch_key));
-        }
-
-        let best_branch_key = raw_branches
-            .iter()
-            .min_by_key(|(_, count)| *count)
-            .map(|(key, _)| key.clone());
-
-        let Some(best_key) = best_branch_key else {
-            return Vec::new();
-        };
-
-        let best_candidates: Vec<_> = all_branched
-            .iter()
-            .filter(|(_, branch)| branch.as_deref() == Some(best_key.as_str()))
-            .map(|(unit, _)| *unit)
-            .filter(|unit| {
-                let msg = unit.error_description().to_string();
-                msg.len() <= 200 && !Self::is_intermediate_combinator_message(&msg)
-            })
-            .collect();
-
-        if best_candidates.is_empty() || best_candidates.len() > Self::MAX_LEAF_ERRORS {
-            return Vec::new();
-        }
-
-        let mut seen = HashSet::new();
-        best_candidates
-            .iter()
-            .filter(|unit| {
-                let key = (
-                    unit.instance_location().to_string(),
-                    unit.error_description().to_string(),
-                );
-                seen.insert(key)
-            })
-            .filter_map(|unit| {
-                NodeValidationError::from_apply_output_with_base(
-                    base_keys.clone(),
-                    base_node,
-                    unit,
-                )
-                .ok()
-            })
-            .collect()
     }
 
     #[tracing::instrument(skip_all, fields(%schema_url))]
@@ -408,6 +361,10 @@ impl<E: Environment> Schemas<E> {
                         .collect();
                     node_errors = kept;
                     node_errors.extend(mthds_errors);
+                    // Note: this early return means non-pipe AnyOf errors (e.g., in the
+                    // concept section) won't get expanded in this pass. This is acceptable —
+                    // the user fixes pipe errors first, then concept errors get expanded
+                    // on the next lint run.
                     return Ok(node_errors);
                 }
                 // If mthds_errors is empty, all pipes are valid individually —
@@ -419,7 +376,7 @@ impl<E: Environment> Schemas<E> {
                 let output = validator.apply(&value).basic();
                 if let BasicOutput::Invalid(units) = output {
                     let expanded =
-                        Self::expand_any_of_errors(root, &units);
+                        Self::expand_any_of_errors(&Keys::empty(), root, &units);
                     if !expanded.is_empty() {
                         // Replace AnyOf/OneOf errors with expanded leaf errors,
                         // keep non-AnyOf/OneOf errors from validate() unchanged
@@ -447,8 +404,13 @@ impl<E: Environment> Schemas<E> {
     /// with the fewest errors — that's the closest schema match.
     /// Only returns those errors if the count is small enough to be useful.
     /// Returns an empty Vec if expansion is not worthwhile (caller keeps originals).
+    ///
+    /// `base_keys` and `base_node` set the starting point for DOM walking.
+    /// Pass `Keys::empty()` and root for top-level expansion, or pipe-specific
+    /// keys/node for MTHDS per-pipe expansion.
     fn expand_any_of_errors(
-        root: &dom::Node,
+        base_keys: &Keys,
+        base_node: &dom::Node,
         units: &std::collections::VecDeque<OutputUnit<ErrorDescription>>,
     ) -> Vec<NodeValidationError> {
         use std::collections::{HashMap, HashSet};
@@ -474,48 +436,59 @@ impl<E: Environment> Schemas<E> {
             all_branched.push((unit, branch_key));
         }
 
-        // Step 2: Find the best-matching branch (fewest raw errors).
-        let best_branch_key = raw_branches
-            .iter()
-            .min_by_key(|(_, count)| *count)
-            .map(|(key, _)| key.clone());
-
-        let Some(best_key) = best_branch_key else {
+        // Step 2: Find branches with the fewest raw errors (best-matching).
+        // Multiple branches may tie; we try each in sorted order and pick
+        // the first one that yields actionable leaf errors.
+        let min_count = raw_branches.values().min().copied();
+        let Some(min_count) = min_count else {
             return Vec::new();
         };
 
-        // Step 3: Collect leaf errors from the best branch only, filtering
-        // intermediate combinator messages, JSON dumps, and long messages.
-        let best_candidates: Vec<_> = all_branched
+        let mut candidate_branches: Vec<_> = raw_branches
             .iter()
-            .filter(|(_, branch)| branch.as_deref() == Some(best_key.as_str()))
-            .map(|(unit, _)| *unit)
-            .filter(|unit| {
-                let msg = unit.error_description().to_string();
-                msg.len() <= 200 && !Self::is_intermediate_combinator_message(&msg)
-            })
+            .filter(|(_, count)| **count == min_count)
+            .map(|(key, _)| key.as_str())
             .collect();
+        candidate_branches.sort_unstable(); // deterministic order
 
-        // If the best branch has 0 actionable errors (all were intermediate
-        // anyOf/oneOf through $ref), it means the correct schema matched but
-        // has nested issues we can't expand. Fall back to original message.
-        if best_candidates.is_empty() || best_candidates.len() > Self::MAX_LEAF_ERRORS {
-            return Vec::new();
+        for best_key in candidate_branches {
+            // Step 3: Collect leaf errors from this branch, filtering
+            // intermediate combinator messages, JSON dumps, and long messages.
+            let best_candidates: Vec<_> = all_branched
+                .iter()
+                .filter(|(_, branch)| branch.as_deref() == Some(best_key))
+                .map(|(unit, _)| *unit)
+                .filter(|unit| {
+                    let msg = unit.error_description().to_string();
+                    msg.len() <= 200 && !Self::is_intermediate_combinator_message(&msg)
+                })
+                .collect();
+
+            // If this branch has 0 actionable errors (all were intermediate
+            // anyOf/oneOf through $ref) or too many, try the next branch.
+            if best_candidates.is_empty() || best_candidates.len() > Self::MAX_LEAF_ERRORS {
+                continue;
+            }
+
+            // Step 4: Deduplicate by (instance_location, message).
+            let mut seen = HashSet::new();
+            return best_candidates
+                .iter()
+                .filter(|unit| {
+                    let key = (
+                        unit.instance_location().to_string(),
+                        unit.error_description().to_string(),
+                    );
+                    seen.insert(key)
+                })
+                .filter_map(|unit| {
+                    NodeValidationError::from_apply_output_at(base_keys.clone(), base_node, unit)
+                        .ok()
+                })
+                .collect();
         }
 
-        // Step 4: Deduplicate by (instance_location, message).
-        let mut seen = HashSet::new();
-        best_candidates
-            .iter()
-            .filter(|unit| {
-                let key = (
-                    unit.instance_location().to_string(),
-                    unit.error_description().to_string(),
-                );
-                seen.insert(key)
-            })
-            .filter_map(|unit| NodeValidationError::from_apply_output(root, unit).ok())
-            .collect()
+        Vec::new()
     }
 
     /// Detect intermediate anyOf/oneOf error messages by content pattern.
@@ -1164,15 +1137,14 @@ pub struct NodeValidationError {
 }
 
 impl NodeValidationError {
-    fn new(root: &dom::Node, error: ValidationError<'static>) -> Result<Self, anyhow::Error> {
-        let mut keys = Keys::empty();
-        let mut node = root.clone();
-
-        if let ValidationErrorKind::AdditionalProperties { unexpected } = &error.kind {
-            keys = keys.extend(unexpected.iter().map(Key::from).map(KeyOrIndex::Key));
-        }
-
-        'outer: for path in &error.instance_path {
+    /// Walk the DOM following `instance_path` segments from a starting position.
+    /// Returns the final (keys, node) after walking.
+    fn walk_instance_path(
+        mut keys: Keys,
+        mut node: dom::Node,
+        instance_path: &jsonschema::paths::JSONPointer,
+    ) -> Result<(Keys, dom::Node), anyhow::Error> {
+        'outer: for path in instance_path {
             match path {
                 PathChunk::Property(p) => match node {
                     dom::Node::Table(t) => {
@@ -1195,23 +1167,16 @@ impl NodeValidationError {
                 PathChunk::Keyword(_) => {}
             }
         }
-
-        Ok(Self {
-            keys,
-            node,
-            source: ErrorSource::Validation(error),
-        })
+        Ok((keys, node))
     }
 
-    /// Build from an `apply().basic()` output unit.
-    /// Walks the DOM using `instance_location` segments to find keys and node.
-    fn from_apply_output(
-        root: &dom::Node,
+    /// Walk the DOM following `instance_location` segments from an apply output unit.
+    /// Returns the final (keys, node) after walking.
+    fn walk_apply_location(
+        mut keys: Keys,
+        mut node: dom::Node,
         unit: &OutputUnit<ErrorDescription>,
-    ) -> Result<Self, anyhow::Error> {
-        let mut keys = Keys::empty();
-        let mut node = root.clone();
-
+    ) -> Result<(Keys, dom::Node), anyhow::Error> {
         let keyword_location = unit.keyword_location().to_string();
         let message = unit.error_description().to_string();
 
@@ -1235,7 +1200,6 @@ impl NodeValidationError {
             }
         }
 
-        // Walk the DOM using instance_location segments
         'outer: for chunk in unit.instance_location() {
             match chunk {
                 PathChunk::Property(p) => match node {
@@ -1261,54 +1225,27 @@ impl NodeValidationError {
                 PathChunk::Keyword(_) => {}
             }
         }
-
-        Ok(Self {
-            keys,
-            node,
-            source: ErrorSource::Applied {
-                message,
-                keyword_location,
-            },
-        })
+        Ok((keys, node))
     }
 
-    /// Build from a `validate()` error, walking the DOM from a base node instead of root.
+    /// Build from a `validate()` error, walking the DOM from root.
+    fn new(root: &dom::Node, error: ValidationError<'static>) -> Result<Self, anyhow::Error> {
+        Self::new_from(Keys::empty(), root, error)
+    }
+
+    /// Build from a `validate()` error, walking the DOM from a base node.
     /// Prepends `base_keys` so text ranges point to the correct location in the full document.
-    fn new_with_base(
-        base_keys: Keys,
+    fn new_from(
+        mut keys: Keys,
         base_node: &dom::Node,
         error: ValidationError<'static>,
     ) -> Result<Self, anyhow::Error> {
-        let mut keys = base_keys;
-        let mut node = base_node.clone();
-
         if let ValidationErrorKind::AdditionalProperties { unexpected } = &error.kind {
             keys = keys.extend(unexpected.iter().map(Key::from).map(KeyOrIndex::Key));
         }
 
-        'outer: for path in &error.instance_path {
-            match path {
-                PathChunk::Property(p) => match node {
-                    dom::Node::Table(t) => {
-                        let entries = t.entries().read();
-                        for (k, entry) in entries.iter() {
-                            if k.value() == &**p {
-                                keys = keys.join(k.clone());
-                                node = entry.clone();
-                                continue 'outer;
-                            }
-                        }
-                        return Err(anyhow!("invalid key"));
-                    }
-                    _ => return Err(anyhow!("invalid key")),
-                },
-                PathChunk::Index(idx) => {
-                    node = node.try_get(*idx).map_err(|_| anyhow!("invalid index"))?;
-                    keys = keys.join(*idx);
-                }
-                PathChunk::Keyword(_) => {}
-            }
-        }
+        let (keys, node) =
+            Self::walk_instance_path(keys, base_node.clone(), &error.instance_path)?;
 
         Ok(Self {
             keys,
@@ -1319,61 +1256,15 @@ impl NodeValidationError {
 
     /// Build from an `apply().basic()` output unit, walking from a base node.
     /// Prepends `base_keys` so text ranges point to the correct location in the full document.
-    fn from_apply_output_with_base(
-        base_keys: Keys,
+    fn from_apply_output_at(
+        keys: Keys,
         base_node: &dom::Node,
         unit: &OutputUnit<ErrorDescription>,
     ) -> Result<Self, anyhow::Error> {
-        let mut keys = base_keys;
-        let mut node = base_node.clone();
-
         let keyword_location = unit.keyword_location().to_string();
         let message = unit.error_description().to_string();
 
-        // Check if this is an additionalProperties error
-        let is_additional_props = keyword_location.ends_with("/additionalProperties");
-        if is_additional_props {
-            if let Some(start) = message.find('\'') {
-                let rest = &message[start..];
-                for part in rest.split('\'') {
-                    let trimmed = part.trim();
-                    if !trimmed.is_empty()
-                        && trimmed != ","
-                        && !trimmed.starts_with("was ")
-                        && !trimmed.starts_with("were ")
-                    {
-                        keys = keys.join(Key::from(trimmed));
-                    }
-                }
-            }
-        }
-
-        // Walk the DOM using instance_location segments
-        'outer: for chunk in unit.instance_location() {
-            match chunk {
-                PathChunk::Property(p) => match node {
-                    dom::Node::Table(t) => {
-                        let entries = t.entries().read();
-                        for (k, entry) in entries.iter() {
-                            if k.value() == &**p {
-                                keys = keys.join(k.clone());
-                                node = entry.clone();
-                                continue 'outer;
-                            }
-                        }
-                        return Err(anyhow!("invalid key in apply output"));
-                    }
-                    _ => return Err(anyhow!("expected table in apply output")),
-                },
-                PathChunk::Index(idx) => {
-                    node = node
-                        .try_get(*idx)
-                        .map_err(|_| anyhow!("invalid index in apply output"))?;
-                    keys = keys.join(*idx);
-                }
-                PathChunk::Keyword(_) => {}
-            }
-        }
+        let (keys, node) = Self::walk_apply_location(keys, base_node.clone(), unit)?;
 
         Ok(Self {
             keys,
