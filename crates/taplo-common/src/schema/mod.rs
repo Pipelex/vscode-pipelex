@@ -1324,18 +1324,27 @@ impl NodeValidationError {
     #[must_use]
     pub fn display_message(&self) -> String {
         match &self.source {
-            ErrorSource::Applied { message, .. } => message.clone(),
+            ErrorSource::Applied {
+                message,
+                keyword_location,
+            } => {
+                // Applied AnyOf/OneOf errors dump the full JSON instance — replace
+                // with a concise path-based message, same as we do for Validation errors.
+                if keyword_location.ends_with("/anyOf")
+                    || keyword_location.ends_with("/oneOf")
+                {
+                    return self.concise_schema_mismatch_message();
+                }
+                // For other Applied errors, truncate if the message embeds a large JSON instance.
+                if message.len() <= 200 {
+                    return message.clone();
+                }
+                Self::truncate_json_in_message(message)
+            }
             ErrorSource::Validation(error) => match &error.kind {
                 // AnyOf/OneOf dump the entire instance — replace with path-based message.
                 ValidationErrorKind::AnyOf | ValidationErrorKind::OneOfNotValid => {
-                    if self.keys.is_empty() {
-                        "value does not match any of the allowed schemas".to_string()
-                    } else {
-                        format!(
-                            "'{}' does not match any of the allowed schemas",
-                            self.keys
-                        )
-                    }
+                    self.concise_schema_mismatch_message()
                 }
                 // All other errors: use default Display but truncate if instance is huge.
                 _ => {
@@ -1357,6 +1366,64 @@ impl NodeValidationError {
                 }
             },
         }
+    }
+
+    /// Concise message for AnyOf/OneOf schema mismatch errors.
+    fn concise_schema_mismatch_message(&self) -> String {
+        if self.keys.is_empty() {
+            "value does not match any of the allowed schemas".to_string()
+        } else {
+            format!(
+                "'{}' does not match any of the allowed schemas",
+                self.keys
+            )
+        }
+    }
+
+    /// Truncate a message that embeds a large JSON instance.
+    fn truncate_json_in_message(message: &str) -> String {
+        // Try to find a JSON object/array in the message and truncate it
+        if let Some(json_start) = message.find('{').or_else(|| message.find('[')) {
+            let before = &message[..json_start];
+            let json_part = &message[json_start..];
+            if json_part.len() > 120 {
+                // Find a char boundary at or before byte 80 to avoid slicing mid-char
+                let truncate_at = json_part
+                    .char_indices()
+                    .take_while(|(i, _)| *i < 80)
+                    .last()
+                    .map_or(0, |(i, c)| i + c.len_utf8());
+                let truncated = &json_part[..truncate_at];
+                return format!(
+                    "{}{}... ({} more chars)",
+                    before,
+                    truncated,
+                    json_part.chars().count() - truncated.chars().count()
+                );
+            }
+        }
+        message.to_string()
+    }
+
+    /// Extract pipe name from error keys, if the error is within a pipe section.
+    /// Returns e.g. `generate_infographic` for keys starting with `pipe.generate_infographic`.
+    #[must_use]
+    pub fn pipe_context(&self) -> Option<String> {
+        let mut iter = self.keys.iter();
+        match iter.next() {
+            Some(KeyOrIndex::Key(k)) if k.value() == "pipe" => match iter.next() {
+                Some(KeyOrIndex::Key(pipe_name)) => Some(pipe_name.value().to_string()),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// Return the most specific (narrowest) text range for this error.
+    /// Picks the last range, which is typically the most specific.
+    #[must_use]
+    pub fn primary_text_range(&self) -> Option<TextRange> {
+        self.text_ranges().last()
     }
 }
 

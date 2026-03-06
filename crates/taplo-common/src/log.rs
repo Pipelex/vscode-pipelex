@@ -62,7 +62,14 @@ pub fn setup_stderr_logging(e: impl Environment, spans: bool, verbose: bool, col
 
     let registry = registry.with(match e.env_var("RUST_LOG") {
         Some(log) => EnvFilter::new(log),
-        None => EnvFilter::default().add_directive(tracing::Level::INFO.into()),
+        None => {
+            let level = if verbose {
+                tracing::Level::INFO
+            } else {
+                tracing::Level::WARN
+            };
+            EnvFilter::default().add_directive(level.into())
+        }
     });
 
     let event_format = tracing_subscriber::fmt::format().pretty().with_ansi(colors);

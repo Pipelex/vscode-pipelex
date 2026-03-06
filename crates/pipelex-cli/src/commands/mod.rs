@@ -57,6 +57,8 @@ impl<E: Environment> PlxtCli<E> {
             }
             #[cfg(feature = "lint")]
             PlxtCommand::Lint(cmd) => {
+                // Enable compact one-line error output for plxt when not verbose
+                self.inner.set_compact(!args.verbose);
                 let taplo_args = TaploArgs {
                     colors: args.colors,
                     verbose: args.verbose,

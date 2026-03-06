@@ -8,7 +8,11 @@ use codespan_reporting::{
     },
 };
 use itertools::Itertools;
+#[cfg(feature = "lint")]
+use std::collections::HashSet;
 use std::ops::Range;
+#[cfg(feature = "lint")]
+use std::path::Path;
 use taplo::{dom, parser, rowan::TextRange};
 use taplo_common::environment::Environment;
 #[cfg(feature = "lint")]
@@ -152,4 +156,167 @@ fn std_range(range: TextRange) -> Range<usize> {
     let start: usize = u32::from(range.start()) as _;
     let end: usize = u32::from(range.end()) as _;
     start..end
+}
+
+/// Compute 1-based line and column from a byte offset in source text.
+#[cfg(feature = "lint")]
+fn offset_to_line_col(source: &str, offset: usize) -> (usize, usize) {
+    let offset = offset.min(source.len());
+    let mut line = 1usize;
+    let mut col = 1usize;
+    for (i, ch) in source.char_indices() {
+        if i >= offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col)
+}
+
+/// Make a path relative to cwd, or return as-is if not under cwd.
+#[cfg(feature = "lint")]
+fn relative_path(file_path: &str, cwd: &Path) -> String {
+    let p = Path::new(file_path);
+    p.strip_prefix(cwd)
+        .map(|rel| rel.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| file_path.to_string())
+}
+
+#[cfg(feature = "lint")]
+impl<E: Environment> Taplo<E> {
+    /// Compact one-line format for parse errors: `file:line:col: error[syntax]: message`
+    pub(crate) async fn print_parse_errors_compact(
+        &self,
+        file_path: &str,
+        source: &str,
+        errors: &[parser::Error],
+        cwd: &Path,
+    ) -> Result<(), anyhow::Error> {
+        let rel = relative_path(file_path, cwd);
+        let mut out = Vec::<u8>::new();
+        let mut count = 0usize;
+
+        for error in errors.iter().unique_by(|e| e.range) {
+            count += 1;
+            let start: usize = u32::from(error.range.start()) as _;
+            let (line, col) = offset_to_line_col(source, start);
+            out.extend_from_slice(
+                format!("{}:{}:{}: error[syntax]: {}\n", rel, line, col, error.message).as_bytes(),
+            );
+        }
+
+        if count > 0 {
+            out.extend_from_slice(
+                format!("Found {} error(s) in {}\n", count, rel).as_bytes(),
+            );
+        }
+
+        let mut stderr = self.env.stderr();
+        stderr.write_all(&out).await?;
+        stderr.flush().await?;
+        Ok(())
+    }
+
+    /// Compact one-line format for semantic errors: `file:line:col: error[semantic]: message`
+    pub(crate) async fn print_semantic_errors_compact(
+        &self,
+        file_path: &str,
+        source: &str,
+        errors: impl Iterator<Item = dom::Error>,
+        cwd: &Path,
+    ) -> Result<(), anyhow::Error> {
+        let rel = relative_path(file_path, cwd);
+        let mut out = Vec::<u8>::new();
+        let mut count = 0usize;
+
+        for error in errors {
+            count += 1;
+            let range = match &error {
+                dom::Error::ConflictingKeys { key, .. } => key.text_ranges().next(),
+                dom::Error::ExpectedArrayOfTables {
+                    not_array_of_tables,
+                    ..
+                } => not_array_of_tables.text_ranges().next(),
+                dom::Error::ExpectedTable { not_table, .. } => not_table.text_ranges().next(),
+                dom::Error::InvalidEscapeSequence { string } => Some(string.text_range()),
+                _ => None,
+            };
+            let (line, col) = match range {
+                Some(r) => offset_to_line_col(source, u32::from(r.start()) as usize),
+                None => (1, 1),
+            };
+            out.extend_from_slice(
+                format!(
+                    "{}:{}:{}: error[semantic]: {}\n",
+                    rel, line, col, error
+                )
+                .as_bytes(),
+            );
+        }
+
+        if count > 0 {
+            out.extend_from_slice(format!("Found {} error(s) in {}\n", count, rel).as_bytes());
+        }
+
+        let mut stderr = self.env.stderr();
+        stderr.write_all(&out).await?;
+        stderr.flush().await?;
+        Ok(())
+    }
+
+    /// Compact one-line format for schema errors: `file:line:col: error[schema]: message (in pipe.name)`
+    /// Deduplicates errors with the same message.
+    pub(crate) async fn print_schema_errors_compact(
+        &self,
+        file_path: &str,
+        source: &str,
+        errors: &[NodeValidationError],
+        cwd: &Path,
+    ) -> Result<(), anyhow::Error> {
+        let rel = relative_path(file_path, cwd);
+        let mut out = Vec::<u8>::new();
+        let mut seen_messages = HashSet::new();
+        let mut count = 0usize;
+
+        for err in errors {
+            let msg = err.display_message();
+            // Deduplicate: skip errors with identical messages
+            if !seen_messages.insert(msg.clone()) {
+                continue;
+            }
+            count += 1;
+
+            let (line, col) = match err.primary_text_range() {
+                Some(r) => offset_to_line_col(source, u32::from(r.start()) as usize),
+                None => (1, 1),
+            };
+
+            let pipe_suffix = match err.pipe_context() {
+                Some(pipe_name) => format!(" (in pipe.{})", pipe_name),
+                None => String::new(),
+            };
+
+            out.extend_from_slice(
+                format!(
+                    "{}:{}:{}: error[schema]: {}{}\n",
+                    rel, line, col, msg, pipe_suffix
+                )
+                .as_bytes(),
+            );
+        }
+
+        if count > 0 {
+            out.extend_from_slice(format!("Found {} error(s) in {}\n", count, rel).as_bytes());
+        }
+
+        let mut stderr = self.env.stderr();
+        stderr.write_all(&out).await?;
+        stderr.flush().await?;
+        Ok(())
+    }
 }
