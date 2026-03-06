@@ -1,0 +1,25 @@
+crates/taplo-cli/src/printing.rs
+  3c83de53e0d43ce0 11,14,162,182,190,202,205,213
+crates/taplo-common/src/schema/mod.rs
+  3c83de53e0d43ce0 1390-1396,1401,1409,1412
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "2479e839fa4f4a2287d4efc6751de4a44f504b7f",
+  "prompts": {
+    "3c83de53e0d43ce0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b6c7473-1b56-423d-9785-0d7dd2eb25ed",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 27,
+      "total_deletions": 11,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}
