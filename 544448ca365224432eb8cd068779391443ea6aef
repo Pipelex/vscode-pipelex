@@ -1,0 +1,25 @@
+crates/pipelex-cli/bin/plxt.rs
+  2fb53ec39215afbd 36
+crates/taplo-common/src/schema/mod.rs
+  2fb53ec39215afbd 1375-1380,1384
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "544448ca365224432eb8cd068779391443ea6aef",
+  "prompts": {
+    "2fb53ec39215afbd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7cf5c153-2c28-4a74-873c-fc4f60e56866",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 7,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}
