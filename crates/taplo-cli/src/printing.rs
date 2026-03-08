@@ -206,14 +206,16 @@ impl<E: Environment> Taplo<E> {
             let start: usize = u32::from(error.range.start()) as _;
             let (line, col) = offset_to_line_col(source, start);
             out.extend_from_slice(
-                format!("{}:{}:{}: error[syntax]: {}\n", rel, line, col, error.message).as_bytes(),
+                format!(
+                    "{}:{}:{}: error[syntax]: {}\n",
+                    rel, line, col, error.message
+                )
+                .as_bytes(),
             );
         }
 
         if count > 0 {
-            out.extend_from_slice(
-                format!("Found {} error(s) in {}\n", count, rel).as_bytes(),
-            );
+            out.extend_from_slice(format!("Found {} error(s) in {}\n", count, rel).as_bytes());
         }
 
         let mut stderr = self.env.stderr();
@@ -251,11 +253,7 @@ impl<E: Environment> Taplo<E> {
                 None => (1, 1),
             };
             out.extend_from_slice(
-                format!(
-                    "{}:{}:{}: error[semantic]: {}\n",
-                    rel, line, col, error
-                )
-                .as_bytes(),
+                format!("{}:{}:{}: error[semantic]: {}\n", rel, line, col, error).as_bytes(),
             );
         }
 
@@ -296,15 +294,15 @@ impl<E: Environment> Taplo<E> {
                 None => (1, 1),
             };
 
-            let pipe_suffix = match err.pipe_context() {
-                Some(pipe_name) => format!(" (in pipe.{})", pipe_name),
+            let location_suffix = match err.instance_location() {
+                Some(loc) => format!(" (in {})", loc),
                 None => String::new(),
             };
 
             out.extend_from_slice(
                 format!(
                     "{}:{}:{}: error[schema]: {}{}\n",
-                    rel, line, col, msg, pipe_suffix
+                    rel, line, col, msg, location_suffix
                 )
                 .as_bytes(),
             );

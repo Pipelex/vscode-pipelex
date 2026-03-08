@@ -177,7 +177,10 @@ impl<E: Environment> Schemas<E> {
         // Collect entries upfront to release the read lock before calling validate_single_pipe
         let pipe_entries: Vec<_> = {
             let entries = pipe_dom_table.entries().read();
-            entries.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+            entries
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect()
         };
 
         for (dom_key, pipe_dom_node) in &pipe_entries {
@@ -207,8 +210,7 @@ impl<E: Environment> Schemas<E> {
             let validator = match validator_cache.get(&definition_name) {
                 Some(v) => v.clone(),
                 None => {
-                    let Some(sub_schema) =
-                        build_definition_sub_schema(&schema, &definition_name)
+                    let Some(sub_schema) = build_definition_sub_schema(&schema, &definition_name)
                     else {
                         continue; // Unknown type — let generic validator handle it
                     };
@@ -315,12 +317,7 @@ impl<E: Environment> Schemas<E> {
                 errors
                     .into_iter()
                     .filter_map(|e| {
-                        NodeValidationError::new_from(
-                            base_keys.clone(),
-                            pipe_dom_node,
-                            e,
-                        )
-                        .ok()
+                        NodeValidationError::new_from(base_keys.clone(), pipe_dom_node, e).ok()
                     })
                     .collect()
             }
@@ -349,7 +346,9 @@ impl<E: Environment> Schemas<E> {
         // the branch with the fewest errors — that's the closest schema match.
         // Only expand if the best branch has few errors (≤ MAX_LEAF_ERRORS),
         // otherwise keep the original AnyOf/OneOf message.
-        let has_any_of_errors = node_errors.iter().any(NodeValidationError::is_any_of_or_one_of);
+        let has_any_of_errors = node_errors
+            .iter()
+            .any(NodeValidationError::is_any_of_or_one_of);
         if has_any_of_errors {
             // MTHDS-specific: try type-discriminated pipe validation first
             if let Some(mthds_errors) = self.validate_mthds_pipes(schema_url, root, &value) {
@@ -375,8 +374,7 @@ impl<E: Environment> Schemas<E> {
             if let Some(validator) = self.get_validator(schema_url) {
                 let output = validator.apply(&value).basic();
                 if let BasicOutput::Invalid(units) = output {
-                    let expanded =
-                        Self::expand_any_of_errors(&Keys::empty(), root, &units);
+                    let expanded = Self::expand_any_of_errors(&Keys::empty(), root, &units);
                     if !expanded.is_empty() {
                         // Replace AnyOf/OneOf errors with expanded leaf errors,
                         // keep non-AnyOf/OneOf errors from validate() unchanged
@@ -510,8 +508,7 @@ impl<E: Environment> Schemas<E> {
         let segments: Vec<&str> = keyword_location.split('/').collect();
         let mut last_branch = None;
         for window in segments.windows(2) {
-            if (window[0] == "oneOf" || window[0] == "anyOf")
-                && window[1].parse::<usize>().is_ok()
+            if (window[0] == "oneOf" || window[0] == "anyOf") && window[1].parse::<usize>().is_ok()
             {
                 last_branch = Some(format!("{}/{}", window[0], window[1]));
             }
@@ -1134,6 +1131,10 @@ pub struct NodeValidationError {
     pub keys: Keys,
     pub node: dom::Node,
     source: ErrorSource,
+    /// Dotted path to the error location in the document,
+    /// e.g. `pipe.generate_infographic.model`. Computed at construction
+    /// from base keys + instance path, before error-specific keys are mixed in.
+    error_location: String,
 }
 
 impl NodeValidationError {
@@ -1240,17 +1241,21 @@ impl NodeValidationError {
         base_node: &dom::Node,
         error: ValidationError<'static>,
     ) -> Result<Self, anyhow::Error> {
+        // Compute the clean instance location BEFORE mixing in error-specific keys.
+        // base_keys (e.g. "pipe.foo") + instance_path (e.g. "/model") → "pipe.foo.model"
+        let error_location = Self::build_location(&keys, &error.instance_path);
+
         if let ValidationErrorKind::AdditionalProperties { unexpected } = &error.kind {
             keys = keys.extend(unexpected.iter().map(Key::from).map(KeyOrIndex::Key));
         }
 
-        let (keys, node) =
-            Self::walk_instance_path(keys, base_node.clone(), &error.instance_path)?;
+        let (keys, node) = Self::walk_instance_path(keys, base_node.clone(), &error.instance_path)?;
 
         Ok(Self {
             keys,
             node,
             source: ErrorSource::Validation(error),
+            error_location,
         })
     }
 
@@ -1262,7 +1267,18 @@ impl NodeValidationError {
         unit: &OutputUnit<ErrorDescription>,
     ) -> Result<Self, anyhow::Error> {
         let keyword_location = unit.keyword_location().to_string();
+        let instance_location = unit.instance_location().to_string();
         let message = unit.error_description().to_string();
+
+        // Compute location: base_keys dotted + instance_location segments
+        let base_dotted = keys.dotted().to_string();
+        let inst_dotted = instance_location.trim_start_matches('/').replace('/', ".");
+        let error_location = match (base_dotted.is_empty(), inst_dotted.is_empty()) {
+            (true, true) => String::new(),
+            (true, false) => inst_dotted,
+            (false, true) => base_dotted,
+            (false, false) => format!("{base_dotted}.{inst_dotted}"),
+        };
 
         let (keys, node) = Self::walk_apply_location(keys, base_node.clone(), unit)?;
 
@@ -1273,6 +1289,7 @@ impl NodeValidationError {
                 message,
                 keyword_location,
             },
+            error_location,
         })
     }
 
@@ -1327,12 +1344,11 @@ impl NodeValidationError {
             ErrorSource::Applied {
                 message,
                 keyword_location,
+                ..
             } => {
                 // Applied AnyOf/OneOf errors dump the full JSON instance — replace
                 // with a concise path-based message, same as we do for Validation errors.
-                if keyword_location.ends_with("/anyOf")
-                    || keyword_location.ends_with("/oneOf")
-                {
+                if keyword_location.ends_with("/anyOf") || keyword_location.ends_with("/oneOf") {
                     return self.concise_schema_mismatch_message();
                 }
                 // For other Applied errors, truncate if the message embeds a large JSON instance.
@@ -1357,11 +1373,8 @@ impl NodeValidationError {
                         return msg;
                     }
                     let truncated = &instance_str[..80.min(instance_str.len())];
-                    let replacement = format!(
-                        "{}... ({} more chars)",
-                        truncated,
-                        instance_str.len() - 80
-                    );
+                    let replacement =
+                        format!("{}... ({} more chars)", truncated, instance_str.len() - 80);
                     msg.replacen(&instance_str, &replacement, 1)
                 }
             },
@@ -1373,10 +1386,7 @@ impl NodeValidationError {
         if self.keys.is_empty() {
             "value does not match any of the allowed schemas".to_string()
         } else {
-            format!(
-                "'{}' does not match any of the allowed schemas",
-                self.keys
-            )
+            format!("'{}' does not match any of the allowed schemas", self.keys)
         }
     }
 
@@ -1405,17 +1415,28 @@ impl NodeValidationError {
         message.to_string()
     }
 
-    /// Extract pipe name from error keys, if the error is within a pipe section.
-    /// Returns e.g. `generate_infographic` for keys starting with `pipe.generate_infographic`.
+    /// Return the dotted instance path where this error occurred,
+    /// e.g. `pipe.generate_infographic.model` for an error inside a pipe's model field.
+    /// Returns `None` if the error is at the document root.
     #[must_use]
-    pub fn pipe_context(&self) -> Option<String> {
-        let mut iter = self.keys.iter();
-        match iter.next() {
-            Some(KeyOrIndex::Key(k)) if k.value() == "pipe" => match iter.next() {
-                Some(KeyOrIndex::Key(pipe_name)) => Some(pipe_name.value().to_string()),
-                _ => None,
-            },
-            _ => None,
+    pub fn instance_location(&self) -> Option<String> {
+        if self.error_location.is_empty() {
+            None
+        } else {
+            Some(self.error_location.clone())
+        }
+    }
+
+    /// Build a dotted location string from base keys + a JSON pointer instance path.
+    fn build_location(base_keys: &Keys, instance_path: &jsonschema::paths::JSONPointer) -> String {
+        let base = base_keys.dotted();
+        let path_str = instance_path.to_string();
+        let inst = path_str.trim_start_matches('/').replace('/', ".");
+        match (base.is_empty(), inst.is_empty()) {
+            (true, true) => String::new(),
+            (true, false) => inst,
+            (false, true) => base.to_string(),
+            (false, false) => format!("{base}.{inst}"),
         }
     }
 
@@ -1725,31 +1746,22 @@ prompt      = "$img_prompt"
 
         let errors = schemas.validate_root(&schema_url, &dom).await.unwrap();
 
-        // Print exactly what the extension would show in the Problems panel
-        println!("\n=== Extension Problems Panel Output ===");
-        for (i, error) in errors.iter().enumerate() {
-            let message = error.display_message();
-            let ranges: Vec<_> = error.text_ranges().collect();
-            println!("Error {}: {}", i + 1, message);
-            println!("  Text ranges: {:?}", ranges);
-            println!("  Keys: {}", error.keys);
-        }
-        println!("=== End ===\n");
-
         // The key assertion: we should NOT see the generic "does not match any"
         // message. Instead we should see specific errors about `aspect_ratio`.
-        let messages: Vec<String> = errors.iter().map(|e| e.display_message()).collect();
-        println!("All messages: {:?}", messages);
+        let messages: Vec<String> = errors
+            .iter()
+            .map(super::NodeValidationError::display_message)
+            .collect();
 
         assert!(
-            !messages.iter().any(|m| m.contains("does not match any of the allowed schemas")),
-            "Should NOT see generic 'does not match' — got: {:?}",
-            messages
+            !messages
+                .iter()
+                .any(|m| m.contains("does not match any of the allowed schemas")),
+            "Should NOT see generic 'does not match' — got: {messages:?}",
         );
         assert!(
             messages.iter().any(|m| m.contains("aspect_ratio")),
-            "Should see specific error about 'aspect_ratio' — got: {:?}",
-            messages
+            "Should see specific error about 'aspect_ratio' — got: {messages:?}",
         );
     }
 }
