@@ -246,7 +246,7 @@ impl<E: Environment> Taplo<E> {
                 } => not_array_of_tables.text_ranges().next(),
                 dom::Error::ExpectedTable { not_table, .. } => not_table.text_ranges().next(),
                 dom::Error::InvalidEscapeSequence { string } => Some(string.text_range()),
-                _ => None,
+                dom::Error::UnexpectedSyntax { .. } | dom::Error::Query(_) => None,
             };
             let (line, col) = match range {
                 Some(r) => offset_to_line_col(source, u32::from(r.start()) as usize),
