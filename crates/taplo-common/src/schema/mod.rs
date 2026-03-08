@@ -1395,7 +1395,7 @@ impl NodeValidationError {
                     let replacement = format!(
                         "{}... ({} more chars)",
                         truncated,
-                        instance_str.len() - truncate_at
+                        instance_str.chars().count() - truncated.chars().count()
                     );
                     msg.replacen(&instance_str, &replacement, 1)
                 }
