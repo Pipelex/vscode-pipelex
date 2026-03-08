@@ -304,6 +304,9 @@ impl<E: Environment> Schemas<E> {
                                         pipe_dom_node,
                                         e,
                                     )
+                                    .map_err(|e| {
+                                        tracing::debug!(%e, "skipping validation error: failed to map to DOM position");
+                                    })
                                     .ok()
                                 })
                                 .collect();
@@ -317,7 +320,11 @@ impl<E: Environment> Schemas<E> {
                 errors
                     .into_iter()
                     .filter_map(|e| {
-                        NodeValidationError::new_from(base_keys.clone(), pipe_dom_node, e).ok()
+                        NodeValidationError::new_from(base_keys.clone(), pipe_dom_node, e)
+                            .map_err(|e| {
+                                tracing::debug!(%e, "skipping validation error: failed to map to DOM position");
+                            })
+                            .ok()
                     })
                     .collect()
             }
@@ -335,7 +342,11 @@ impl<E: Environment> Schemas<E> {
 
         let mut node_errors: Vec<NodeValidationError> = errors
             .into_iter()
-            .filter_map(|error| NodeValidationError::new(root, error).ok())
+            .filter_map(|error| {
+                NodeValidationError::new(root, error).map_err(|e| {
+                    tracing::debug!(%e, "skipping validation error: failed to map to DOM position");
+                }).ok()
+            })
             .collect();
 
         // Check if any errors are AnyOf/OneOf — if so, try to expand them
@@ -481,6 +492,9 @@ impl<E: Environment> Schemas<E> {
                 })
                 .filter_map(|unit| {
                     NodeValidationError::from_apply_output_at(base_keys.clone(), base_node, unit)
+                        .map_err(|e| {
+                            tracing::debug!(%e, "skipping apply output error: failed to map to DOM position");
+                        })
                         .ok()
                 })
                 .collect();
