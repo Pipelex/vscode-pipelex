@@ -1372,9 +1372,17 @@ impl NodeValidationError {
                     if instance_str.len() <= 120 {
                         return msg;
                     }
-                    let truncated = &instance_str[..80.min(instance_str.len())];
-                    let replacement =
-                        format!("{}... ({} more chars)", truncated, instance_str.len() - 80);
+                    let truncate_at = instance_str
+                        .char_indices()
+                        .take_while(|(i, _)| *i < 80)
+                        .last()
+                        .map_or(0, |(i, c)| i + c.len_utf8());
+                    let truncated = &instance_str[..truncate_at];
+                    let replacement = format!(
+                        "{}... ({} more chars)",
+                        truncated,
+                        instance_str.len() - truncate_at
+                    );
                     msg.replacen(&instance_str, &replacement, 1)
                 }
             },

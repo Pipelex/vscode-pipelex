@@ -12,7 +12,6 @@ use pipelex_cli::{
 #[tokio::main]
 async fn main() {
     let cli = PlxtArgs::parse();
-    let verbose = cli.verbose;
     setup_stderr_logging(
         NativeEnvironment::new(),
         cli.log_spans,
@@ -34,9 +33,7 @@ async fn main() {
             exit(0);
         }
         Err(error) => {
-            if verbose {
-                tracing::error!(error = %format!("{error:#}"), "operation failed");
-            }
+            tracing::error!(error = %format!("{error:#}"), "operation failed");
             exit(1);
         }
     }
