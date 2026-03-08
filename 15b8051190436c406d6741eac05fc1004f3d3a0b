@@ -1,0 +1,39 @@
+crates/taplo-common/src/schema/mod.rs
+  d4cd8673a3383bab 1753-1754,1760,1764
+  3c83de53e0d43ce0 1134-1137,1244-1247,1258,1270,1273-1282,1292,1347,1418-1420,1422-1439
+crates/taplo-cli/src/printing.rs
+  3c83de53e0d43ce0 297-298,305
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "15b8051190436c406d6741eac05fc1004f3d3a0b",
+  "prompts": {
+    "3c83de53e0d43ce0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b6c7473-1b56-423d-9785-0d7dd2eb25ed",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 103,
+      "total_deletions": 65,
+      "accepted_lines": 49,
+      "overriden_lines": 0
+    },
+    "d4cd8673a3383bab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aaf00092-7c6d-4ecc-b2dc-b87ec7f7e452",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 17,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
