@@ -8,11 +8,11 @@ pub enum Error {
     UnexpectedSyntax { syntax: SyntaxElement },
     #[error("the string contains invalid escape sequence(s): {string:?}")]
     InvalidEscapeSequence { string: SyntaxElement },
-    #[error("conflicting keys: {key:?} and {other:?}")]
+    #[error("conflicting keys: '{key}' and '{other}'")]
     ConflictingKeys { key: Key, other: Key },
-    #[error("expected table for {not_table:?}, required by {required_by:?}")]
+    #[error("expected table for '{not_table}', required by '{required_by}'")]
     ExpectedTable { not_table: Key, required_by: Key },
-    #[error("expected array of tables for {not_array_of_tables:?}, required by {required_by:?}")]
+    #[error("expected array of tables for '{not_array_of_tables}', required by '{required_by}'")]
     ExpectedArrayOfTables {
         not_array_of_tables: Key,
         required_by: Key,

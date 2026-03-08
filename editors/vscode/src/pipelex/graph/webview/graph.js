@@ -798,7 +798,7 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
 
         // Skip PipeBatch/PipeParallel — inputs should stay spread across branches
         const targetCtrlNode = controllerInfoMap[targetCtrl];
-        if (targetCtrlNode && (targetCtrlNode.pipe_type === 'PipeParallel' || targetCtrlNode.pipe_type === 'PipeBatch')) continue;
+        if (targetCtrlNode && (targetCtrlNode.pipe_type === 'PipeParallel' || targetCtrlNode.pipe_type === 'PipeBatch' || targetCtrlNode.pipe_type === 'PipeCondition')) continue;
 
         const box = computeBox(targetCtrl);
         if (!box) continue;
@@ -830,7 +830,7 @@ function ensureControllerSpacing(nodes, graphspec, analysis, direction) {
 
         // Skip PipeParallel controllers — branches are intentionally side-by-side
         const ctrlNode = controllerInfoMap[ctrlId];
-        if (ctrlNode && (ctrlNode.pipe_type === 'PipeParallel' || ctrlNode.pipe_type === 'PipeBatch')) continue;
+        if (ctrlNode && (ctrlNode.pipe_type === 'PipeParallel' || ctrlNode.pipe_type === 'PipeBatch' || ctrlNode.pipe_type === 'PipeCondition')) continue;
 
         const indices = ctrlIndices[ctrlId];
         if (!indices || indices.length < 2) continue;
