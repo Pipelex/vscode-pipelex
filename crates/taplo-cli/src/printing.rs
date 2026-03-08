@@ -268,7 +268,7 @@ impl<E: Environment> Taplo<E> {
     }
 
     /// Compact one-line format for schema errors: `file:line:col: error[schema]: message (in pipe.name)`
-    /// Deduplicates errors with the same message.
+    /// Deduplicates errors with the same message and location.
     pub(crate) async fn print_schema_errors_compact(
         &self,
         file_path: &str,
@@ -283,11 +283,6 @@ impl<E: Environment> Taplo<E> {
 
         for err in errors {
             let msg = err.display_message();
-            // Deduplicate: skip errors with identical messages
-            if !seen_messages.insert(msg.clone()) {
-                continue;
-            }
-            count += 1;
 
             let (line, col) = match err.primary_text_range() {
                 Some(r) => offset_to_line_col(source, u32::from(r.start()) as usize),
@@ -298,6 +293,13 @@ impl<E: Environment> Taplo<E> {
                 Some(loc) => format!(" (in {})", loc),
                 None => String::new(),
             };
+
+            // Deduplicate: skip errors with identical message AND location
+            let dedup_key = format!("{}:{}:{}{}", line, col, msg, location_suffix);
+            if !seen_messages.insert(dedup_key) {
+                continue;
+            }
+            count += 1;
 
             out.extend_from_slice(
                 format!(

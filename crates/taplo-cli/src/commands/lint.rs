@@ -96,9 +96,7 @@ impl<E: Environment> Taplo<E> {
             }
 
             if let Err(error) = self.lint_file(&file, &cwd).await {
-                if !self.compact {
-                    tracing::error!(%error, path = ?file, "invalid file");
-                }
+                tracing::error!(%error, path = ?file, "invalid file");
                 result = Err(anyhow!("some files were not valid"));
             }
         }
