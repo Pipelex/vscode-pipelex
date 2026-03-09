@@ -1209,17 +1209,10 @@ impl NodeValidationError {
         if is_additional_props {
             // Message format: "Additional properties are not allowed ('foo' was unexpected)"
             // or: "Additional properties are not allowed ('foo', 'bar' were unexpected)"
-            if let Some(start) = message.find('\'') {
-                let rest = &message[start..];
-                for part in rest.split('\'') {
-                    let trimmed = part.trim();
-                    if !trimmed.is_empty()
-                        && trimmed != ","
-                        && !trimmed.starts_with("was ")
-                        && !trimmed.starts_with("were ")
-                    {
-                        keys = keys.join(Key::from(trimmed));
-                    }
+            let re = Regex::new(r"'([^']+)'").expect("valid regex");
+            for cap in re.captures_iter(&message) {
+                if let Some(key_name) = cap.get(1) {
+                    keys = keys.join(Key::from(key_name.as_str()));
                 }
             }
         }
