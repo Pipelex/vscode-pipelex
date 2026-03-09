@@ -1,0 +1,27 @@
+CHANGELOG.md
+  b53c87c1b33a2b2e 5-18
+crates/pipelex-cli/Cargo.toml
+  b53c87c1b33a2b2e 4
+editors/vscode/package.json
+  b53c87c1b33a2b2e 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "24c8024fb22971d562eb00518cbdafd8a5a1b8bd",
+  "prompts": {
+    "b53c87c1b33a2b2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc4ff6d4-054b-4bc1-a58e-fa092e26cae1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 2,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    }
+  }
+}
