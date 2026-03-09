@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::{args::LintCommand, Taplo};
 use anyhow::{anyhow, Context};
@@ -65,7 +65,11 @@ impl<E: Environment> Taplo<E> {
     async fn lint_stdin(&self, _cmd: LintCommand) -> Result<(), anyhow::Error> {
         let mut source = String::new();
         self.env.stdin().read_to_string(&mut source).await?;
-        self.lint_source("-", &source).await
+        let cwd = self
+            .env
+            .cwd_normalized()
+            .unwrap_or_else(|| PathBuf::from("."));
+        self.lint_source("-", &source, &cwd).await
     }
 
     #[tracing::instrument(skip_all)]
@@ -91,7 +95,7 @@ impl<E: Environment> Taplo<E> {
                 );
             }
 
-            if let Err(error) = self.lint_file(&file).await {
+            if let Err(error) = self.lint_file(&file, &cwd).await {
                 tracing::error!(%error, path = ?file, "invalid file");
                 result = Err(anyhow!("some files were not valid"));
             }
@@ -100,27 +104,42 @@ impl<E: Environment> Taplo<E> {
         result
     }
 
-    async fn lint_file(&self, file: &Path) -> Result<(), anyhow::Error> {
+    async fn lint_file(&self, file: &Path, cwd: &Path) -> Result<(), anyhow::Error> {
         let source = self.env.read_file(file).await?;
         let source = String::from_utf8(source)?;
-        self.lint_source(&file.to_string_lossy(), &source).await
+        self.lint_source(&file.to_string_lossy(), &source, cwd)
+            .await
     }
 
-    async fn lint_source(&self, file_path: &str, source: &str) -> Result<(), anyhow::Error> {
+    async fn lint_source(
+        &self,
+        file_path: &str,
+        source: &str,
+        cwd: &Path,
+    ) -> Result<(), anyhow::Error> {
         let parse = parser::parse(source);
 
-        self.print_parse_errors(&SimpleFile::new(file_path, source), &parse.errors)
-            .await?;
-
         if !parse.errors.is_empty() {
+            if !self.compact {
+                self.print_parse_errors(&SimpleFile::new(file_path, source), &parse.errors)
+                    .await?;
+            } else {
+                self.print_parse_errors_compact(file_path, source, &parse.errors, cwd)
+                    .await?;
+            }
             return Err(anyhow!("syntax errors found"));
         }
 
         let dom = parse.into_dom();
 
         if let Err(errors) = dom.validate() {
-            self.print_semantic_errors(&SimpleFile::new(file_path, source), errors)
-                .await?;
+            if !self.compact {
+                self.print_semantic_errors(&SimpleFile::new(file_path, source), errors)
+                    .await?;
+            } else {
+                self.print_semantic_errors_compact(file_path, source, errors, cwd)
+                    .await?;
+            }
 
             return Err(anyhow!("semantic errors found"));
         }
@@ -160,8 +179,13 @@ impl<E: Environment> Taplo<E> {
             let errors = self.schemas.validate_root(&schema_url, &dom).await?;
 
             if !errors.is_empty() {
-                self.print_schema_errors(&SimpleFile::new(file_path, source), &errors)
-                    .await?;
+                if !self.compact {
+                    self.print_schema_errors(&SimpleFile::new(file_path, source), &errors)
+                        .await?;
+                } else {
+                    self.print_schema_errors_compact(file_path, source, &errors, cwd)
+                        .await?;
+                }
 
                 return Err(anyhow!("schema validation failed"));
             }

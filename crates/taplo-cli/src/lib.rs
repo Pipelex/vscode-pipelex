@@ -17,12 +17,20 @@ pub mod printing;
 pub struct Taplo<E: Environment> {
     env: E,
     colors: bool,
+    /// When true, lint errors use compact one-line format instead of codespan boxes.
+    /// Default: false (preserves upstream taplo behavior). Set to true by plxt CLI.
+    compact: bool,
     #[cfg(feature = "lint")]
     schemas: Schemas<E>,
     config: Option<Arc<Config>>,
 }
 
 impl<E: Environment> Taplo<E> {
+    /// Enable compact one-line error output for lint commands.
+    pub fn set_compact(&mut self, compact: bool) {
+        self.compact = compact;
+    }
+
     pub fn new(env: E) -> Self {
         #[cfg(all(not(target_arch = "wasm32"), feature = "lint"))]
         let http =
@@ -35,6 +43,7 @@ impl<E: Environment> Taplo<E> {
             #[cfg(feature = "lint")]
             schemas: Schemas::new(env.clone(), http),
             colors: env.atty_stderr(),
+            compact: false,
             config: None,
             env,
         }

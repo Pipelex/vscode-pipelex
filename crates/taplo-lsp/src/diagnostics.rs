@@ -343,7 +343,7 @@ async fn collect_schema_errors<E: Environment>(
                 range,
                 severity: Some(DiagnosticSeverity::ERROR),
                 source: Some("Pipelex".into()),
-                message: error.error.to_string(),
+                message: error.display_message(),
                 ..Default::default()
             });
         }

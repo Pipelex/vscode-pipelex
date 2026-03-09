@@ -38,6 +38,16 @@ Use AskUserQuestion to ask for each affected component:
 - CLI: patch / minor / major (suggest patch)
 - Internal crates (pipelex-common, pipelex-lsp): only ask if they have changes; suggest keeping current unless public API changed
 
+## Step 3b: Create release branch
+
+If not already on a release branch, create one:
+
+```bash
+git checkout -b release/vX.Y.Z
+```
+
+where X.Y.Z is the new extension version (or CLI version if extension wasn't bumped).
+
 ## Step 4: Bump versions
 
 Read `references/version-map.md` for file locations and the dependency cascade.

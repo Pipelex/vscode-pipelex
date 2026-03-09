@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-03-09
+
+### Added
+- Compact one-line lint error output for `plxt lint`: `file:line:col: error[category]: message` format (plxt 0.3.1)
+- Specific schema error messages instead of generic AnyOf/OneOf for MTHDS pipe validation (plxt 0.3.1)
+
+### Fixed
+- Fix PipeCondition branches rendering in single column instead of side-by-side in method graph
+- Fix UTF-8 panic when truncating multi-byte schema error messages (plxt 0.3.1)
+- Fix I/O and UTF-8 errors silently swallowed in compact lint mode (plxt 0.3.1)
+- Fix compact lint dedup collapsing distinct errors at different file locations into one (plxt 0.3.1)
+- Fix "more chars" count inflated for multi-byte UTF-8 content in error truncation (plxt 0.3.1)
+- Fix non-lint command errors suppressed without verbose flag (plxt 0.3.1)
+
 ## [0.5.0] - 2026-03-04
 
 ### Added
