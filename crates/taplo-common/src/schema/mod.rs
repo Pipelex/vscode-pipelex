@@ -339,6 +339,7 @@ impl<E: Environment> Schemas<E> {
     ) -> Result<Vec<NodeValidationError>, anyhow::Error> {
         let value = serde_json::to_value(root)?;
         let errors = self.validate(schema_url, &value).await?;
+        let total_errors = errors.len();
 
         let mut node_errors: Vec<NodeValidationError> = errors
             .into_iter()
@@ -348,6 +349,14 @@ impl<E: Environment> Schemas<E> {
                 }).ok()
             })
             .collect();
+
+        // If the validator found errors but all failed DOM mapping, bail out
+        // rather than silently reporting success.
+        if total_errors > 0 && node_errors.is_empty() {
+            return Err(anyhow!(
+                "{total_errors} schema validation error(s) could not be mapped to document positions"
+            ));
+        }
 
         // Check if any errors are AnyOf/OneOf — if so, try to expand them
         // with detailed leaf errors from apply().basic().
