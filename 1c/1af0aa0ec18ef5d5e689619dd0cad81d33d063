@@ -1,0 +1,23 @@
+crates/taplo-common/src/schema/mod.rs
+  b53c87c1b33a2b2e 342,353-359
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "1c1af0aa0ec18ef5d5e689619dd0cad81d33d063",
+  "prompts": {
+    "b53c87c1b33a2b2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc4ff6d4-054b-4bc1-a58e-fa092e26cae1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 0,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}
