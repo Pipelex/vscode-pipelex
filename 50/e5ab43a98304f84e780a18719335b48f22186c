@@ -1,0 +1,157 @@
+crates/pipelex-cli/Cargo.toml
+  b53c87c1b33a2b2e 4
+editors/vscode/package.json
+  b53c87c1b33a2b2e 5
+CHANGELOG.md
+  b53c87c1b33a2b2e 5-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "50e5ab43a98304f84e780a18719335b48f22186c",
+  "prompts": {
+    "06a5998642682555": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "208789bd-377d-4335-9711-b2b6e62bb1a4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 2,
+      "accepted_lines": 14,
+      "overriden_lines": 0
+    },
+    "3689b815802a9a26": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "62065088-9d2f-4033-886c-0ed0293e0b90",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 2,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    },
+    "586db8663e90066a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3ce967d4-7741-42bc-b767-e1851fbe88ed",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 53,
+      "total_deletions": 4,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    },
+    "770fbf26914f41f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "595d0d14-c71a-41bc-9a2e-0f5f0b61a30a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "93af56ca2623d130": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99de8de6-ec35-43f0-bcca-89d417781498",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 48,
+      "total_deletions": 3,
+      "accepted_lines": 48,
+      "overriden_lines": 0
+    },
+    "b53c87c1b33a2b2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc4ff6d4-054b-4bc1-a58e-fa092e26cae1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 2,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    },
+    "c2d71f6e85c9c180": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83f92951-b678-4a93-8d52-bbb75e0a96de",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 167,
+      "total_deletions": 16,
+      "accepted_lines": 165,
+      "overriden_lines": 0
+    },
+    "db310959c3364f77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7a723926-6b3e-439e-bc43-94b37e7f76c3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 1,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "e345ab888a6e598c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a61f896c-df78-4ac4-81b3-e3f7cb6c9036",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 1,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "f0a2ca5eef14610c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d681e60b-7bbf-4702-a370-913b562bea3d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 17,
+      "total_deletions": 6,
+      "accepted_lines": 14,
+      "overriden_lines": 0
+    },
+    "f5325637e6554829": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fdab320b-29b1-4257-a1de-02ae2d41f675",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 1,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
