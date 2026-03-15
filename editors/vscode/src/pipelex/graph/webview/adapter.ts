@@ -30,7 +30,7 @@ let reactFlowInstance: any = null;
 // Direction icon update
 function applyDirectionIcon(direction: string) {
     document.querySelectorAll('.direction-icon').forEach(icon => icon.classList.remove('active'));
-    const targetIcon = document.querySelector(direction === 'LR' ? '.lr-icon' : '.tb-icon');
+    const targetIcon = document.querySelector(direction === 'LR' ? '.tb-icon' : '.lr-icon');
     if (targetIcon) targetIcon.classList.add('active');
 }
 
