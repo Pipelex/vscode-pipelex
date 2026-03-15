@@ -1,0 +1,49 @@
+editors/vscode/src/pipelex/__tests__/graphControllers.test.ts
+  716dac330e65318a 1-171
+editors/vscode/src/pipelex/__tests__/graphLayout.test.ts
+  716dac330e65318a 1-165
+editors/vscode/src/pipelex/graph/webview/globals.d.ts
+  716dac330e65318a 1-41
+editors/vscode/src/pipelex/graph/webview/graphBuilders.ts
+  716dac330e65318a 1-350
+editors/vscode/tsconfig.webview.json
+  716dac330e65318a 1-14
+editors/vscode/src/pipelex/graph/webview/graphAnalysis.ts
+  716dac330e65318a 1-121
+editors/vscode/src/pipelex/graph/webview/graphLayout.ts
+  716dac330e65318a 1-368
+editors/vscode/src/pipelex/graph/webview/graphControllers.ts
+  716dac330e65318a 1-180
+editors/vscode/src/pipelex/graph/webview/GraphViewer.ts
+  716dac330e65318a 1-358
+editors/vscode/src/pipelex/graph/webview/adapter.ts
+  716dac330e65318a 1-159
+editors/vscode/src/pipelex/graph/webview/types.ts
+  716dac330e65318a 1-154
+editors/vscode/scripts/build.mjs
+  716dac330e65318a 3-4,11-12,14-15,17-31
+editors/vscode/src/pipelex/__tests__/graphAnalysis.test.ts
+  716dac330e65318a 1-164
+editors/vscode/src/pipelex/__tests__/graphBuilders.test.ts
+  716dac330e65318a 1-209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "70227b9e709f03e68a8633853454154e4019af54",
+  "prompts": {
+    "716dac330e65318a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9683de4-838f-4019-8bed-73943b18088e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2475,
+      "total_deletions": 5,
+      "accepted_lines": 2475,
+      "overriden_lines": 0
+    }
+  }
+}
