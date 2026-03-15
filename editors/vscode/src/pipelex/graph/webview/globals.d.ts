@@ -17,19 +17,6 @@ declare const ReactDOM: {
     };
 };
 
-declare const dagre: {
-    graphlib: {
-        Graph: new () => {
-            setDefaultEdgeLabel(fn: () => Record<string, unknown>): void;
-            setGraph(opts: Record<string, unknown>): void;
-            setNode(id: string, opts: Record<string, unknown>): void;
-            setEdge(source: string, target: string, opts?: Record<string, unknown>): void;
-            node(id: string): { x: number; y: number; width: number; height: number };
-        };
-    };
-    layout(graph: ReturnType<typeof dagre.graphlib.Graph['prototype']['setGraph']> extends void ? any : any): void;
-};
-
 // ReactFlow UMD exposes either window.ReactFlow or window.ReactFlowRenderer
 declare const ReactFlowRenderer: Record<string, any> | undefined;
 

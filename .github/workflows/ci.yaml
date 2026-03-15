@@ -89,6 +89,12 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
+      - name: Guard against local file dependencies
+        run: |
+          if grep -q '"file:' editors/vscode/package.json; then
+            echo "::error::package.json contains file: dependencies — run 'make ul' before pushing"
+            exit 1
+          fi
       - name: Test VS Code extension
         run: |
           corepack enable

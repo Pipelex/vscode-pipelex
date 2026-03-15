@@ -1,6 +1,6 @@
 /// <reference path="./globals.d.ts" />
 
-import type { ViewSpec, GraphSpec, GraphConfig } from './types';
+import type { ViewSpec, GraphSpec, GraphConfig } from '@pipelex/mthds-ui';
 import { GraphViewer } from './GraphViewer';
 
 // VS Code webview API

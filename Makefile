@@ -22,6 +22,7 @@ PYTHON_VERSION    ?= 3.13
 
 .PHONY: help sync-grammar s update-schema up
 .PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check fmt-check fmt lint plxt-lint docs
+.PHONY: link-local unlink-local ll ul
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -130,6 +131,19 @@ update-schema: ## Download the latest MTHDS JSON Schema
 	@echo "Downloaded MTHDS schema -> $(MTHDS_SCHEMA_FILE)"
 
 up: update-schema
+
+# --- Local mthds-ui development ---
+
+link-local: ## Switch to local mthds-ui (file: link)
+	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@file:../../../mthds-ui
+	@echo "Switched to local mthds-ui"
+
+unlink-local: ## Switch back to GitHub mthds-ui
+	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@github:Pipelex/mthds-ui
+	@echo "Switched back to GitHub mthds-ui"
+
+ll: link-local  ## Shorthand for link-local
+ul: unlink-local  ## Shorthand for unlink-local
 
 $(GRAMMAR_DST): $(GRAMMAR_SRC)
 	@mkdir -p $(WEBSITE_SHIKI_DIR)
