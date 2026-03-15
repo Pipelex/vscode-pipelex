@@ -29,7 +29,7 @@ After any `Cargo.toml` version change, run `cargo update --workspace` to refresh
 
 - File: `CHANGELOG.md` at repo root
 - Format: [Keep a Changelog](https://keepachangelog.com)
-- `[Unreleased]` section at the top, below the title
+- `[Unreleased]` section may exist at the top when there are unreleased entries; it is removed (renamed to the version heading) at release time and NOT re-added
 - Version headers: `## [X.Y.Z] - YYYY-MM-DD`
 - The header version is the **extension version** (primary artifact)
 - If releasing CLI only (no extension changes), use CLI version as header

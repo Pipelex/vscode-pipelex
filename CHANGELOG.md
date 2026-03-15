@@ -1,6 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
-## [Unreleased]
+## [0.5.2] - 2026-03-15
+
+### Changed
+- Refactor graph webview from monolithic JS into typed TypeScript modules for testability and portability
+- Add esbuild bundling step for webview TypeScript (replaces raw file copy)
+- Add 30 unit tests for pure graph modules (analysis, builders, controllers, layout)
 
 ## [0.5.1] - 2026-03-09
 
