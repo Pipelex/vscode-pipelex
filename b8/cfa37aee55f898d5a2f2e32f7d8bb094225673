@@ -1,0 +1,29 @@
+editors/vscode/package.json
+  716dac330e65318a 5
+CHANGELOG.md
+  716dac330e65318a 3-8
+.claude/skills/release/references/version-map.md
+  716dac330e65318a 32
+.claude/skills/release/SKILL.md
+  716dac330e65318a 68,71-81,84-85,88-97,99-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "b8cfa37aee55f898d5a2f2e32f7d8bb094225673",
+  "prompts": {
+    "716dac330e65318a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9683de4-838f-4019-8bed-73943b18088e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 51,
+      "total_deletions": 27,
+      "accepted_lines": 36,
+      "overriden_lines": 0
+    }
+  }
+}
