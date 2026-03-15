@@ -6,10 +6,8 @@ import type {
     GraphEdge,
     DataflowAnalysis,
     LabelDescriptor,
-} from './types';
-import { buildGraph } from './graphBuilders';
-import { getLayoutedElements, ensureControllerSpacing } from './graphLayout';
-import { applyControllers } from './graphControllers';
+} from '@pipelex/mthds-ui';
+import { buildGraph, getLayoutedElements, ensureControllerSpacing, applyControllers } from '@pipelex/mthds-ui';
 
 // ReactFlow UMD globals (loaded via CDN <script> tags)
 const ReactFlowLib = (typeof ReactFlowRenderer !== 'undefined' && ReactFlowRenderer)

@@ -483,6 +483,19 @@ __metadata:
   languageName: node
   linkType: soft
 
+"@pipelex/mthds-ui@file:../../../mthds-ui::locator=pipelex%40workspace%3A.":
+  version: 0.1.0
+  resolution: "@pipelex/mthds-ui@file:../../../mthds-ui#../../../mthds-ui::hash=1315cb&locator=pipelex%40workspace%3A."
+  peerDependencies:
+    "@types/dagre": ^0.7.54
+    dagre: ^0.8.5
+  peerDependenciesMeta:
+    "@types/dagre":
+      optional: true
+  checksum: 1c3d96b86496edaa2499630cb1fd30bfae4f6aca9a96e9d1154a52ffdde9aa2ca77538d05b17491c2f1bb7d36a5b70792ff2a07461d1155b7e2e9a32e0149287
+  languageName: node
+  linkType: hard
+
 "@pkgjs/parseargs@npm:^0.11.0":
   version: 0.11.0
   resolution: "@pkgjs/parseargs@npm:0.11.0"
@@ -1464,6 +1477,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dagre@npm:^0.8.5":
+  version: 0.8.5
+  resolution: "dagre@npm:0.8.5"
+  dependencies:
+    graphlib: "npm:^2.1.8"
+    lodash: "npm:^4.17.15"
+  checksum: 1c021b66961aa9a700bb6ec51747bcc214720a661ad6cb1878eab7316ecb550a759664a6754081a315b37d0355e3c19ff162813b36f20cbeb2e37f7440364d62
+  languageName: node
+  linkType: hard
+
 "data-uri-to-buffer@npm:^4.0.0":
   version: 4.0.1
   resolution: "data-uri-to-buffer@npm:4.0.1"
@@ -2193,6 +2216,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"graphlib@npm:^2.1.8":
+  version: 2.1.8
+  resolution: "graphlib@npm:2.1.8"
+  dependencies:
+    lodash: "npm:^4.17.15"
+  checksum: 41c525e4d91a6d8b4e8da1883bf4e85689a547e908557ccc53f64db9141bdfb351b9162a79f13cae81c5b3a410027f59e4fc1edc1ea442234ec08e629859b188
+  languageName: node
+  linkType: hard
+
 "gunzip-maybe@npm:^1.4.2":
   version: 1.4.2
   resolution: "gunzip-maybe@npm:1.4.2"
@@ -2742,6 +2774,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lodash@npm:^4.17.15":
+  version: 4.17.23
+  resolution: "lodash@npm:4.17.23"
+  checksum: 1264a90469f5bb95d4739c43eb6277d15b6d9e186df4ac68c3620443160fc669e2f14c11e7d8b2ccf078b81d06147c01a8ccced9aab9f9f63d50dcf8cace6bf6
+  languageName: node
+  linkType: hard
+
 "lru-cache@npm:^10.0.1, lru-cache@npm:^10.2.0":
   version: 10.4.3
   resolution: "lru-cache@npm:10.4.3"
@@ -3252,6 +3291,7 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
+    "@pipelex/mthds-ui": "file:../../../mthds-ui"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
     "@rollup/plugin-replace": "npm:^5.0.5"
@@ -3260,6 +3300,7 @@ __metadata:
     "@types/vscode": "npm:^1.90.0"
     "@types/which": "npm:^3.0.3"
     "@vscode/test-web": "npm:^0.0.51"
+    dagre: "npm:^0.8.5"
     deep-equal: "npm:^2.2.3"
     encoding: "npm:^0.1.13"
     esbuild: "npm:^0.20.0"

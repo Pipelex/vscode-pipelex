@@ -20,8 +20,9 @@ cpSync(
 );
 
 // Bundle webview TypeScript → single IIFE script
-// CDN globals (React, ReactDOM, ReactFlow, dagre) are accessed via window.*
-// and typed through globals.d.ts — no externals needed.
+// CDN globals (React, ReactDOM, ReactFlow) are accessed via window.*
+// and typed through globals.d.ts. dagre is bundled transitively
+// via @pipelex/mthds-ui (npm dependency, not CDN).
 esbuild.buildSync({
   entryPoints: ["./src/pipelex/graph/webview/adapter.ts"],
   outfile: "./dist/pipelex/graph/webview/graph.js",
