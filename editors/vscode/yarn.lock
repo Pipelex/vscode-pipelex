@@ -485,14 +485,14 @@ __metadata:
 
 "@pipelex/mthds-ui@file:../../../mthds-ui::locator=pipelex%40workspace%3A.":
   version: 0.1.0
-  resolution: "@pipelex/mthds-ui@file:../../../mthds-ui#../../../mthds-ui::hash=1315cb&locator=pipelex%40workspace%3A."
+  resolution: "@pipelex/mthds-ui@file:../../../mthds-ui#../../../mthds-ui::hash=555f20&locator=pipelex%40workspace%3A."
   peerDependencies:
     "@types/dagre": ^0.7.54
     dagre: ^0.8.5
   peerDependenciesMeta:
     "@types/dagre":
       optional: true
-  checksum: 1c3d96b86496edaa2499630cb1fd30bfae4f6aca9a96e9d1154a52ffdde9aa2ca77538d05b17491c2f1bb7d36a5b70792ff2a07461d1155b7e2e9a32e0149287
+  checksum: 4fbf71564b000a29a85ea636411f41cadd3993b239816be60e64de6f08bde3dc3e11a9d5e6844b70d101db47f5bce47df8b1d9b52c59f82cd95be89cef84a11f
   languageName: node
   linkType: hard
 
