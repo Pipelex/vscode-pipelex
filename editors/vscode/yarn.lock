@@ -483,16 +483,16 @@ __metadata:
   languageName: node
   linkType: soft
 
-"@pipelex/mthds-ui@file:../../../mthds-ui::locator=pipelex%40workspace%3A.":
+"@pipelex/mthds-ui@github:Pipelex/mthds-ui":
   version: 0.1.0
-  resolution: "@pipelex/mthds-ui@file:../../../mthds-ui#../../../mthds-ui::hash=555f20&locator=pipelex%40workspace%3A."
+  resolution: "@pipelex/mthds-ui@https://github.com/Pipelex/mthds-ui.git#commit=d52317a869ed30bb2e1c31b09feb17f4b6a45b2c"
   peerDependencies:
     "@types/dagre": ^0.7.54
     dagre: ^0.8.5
   peerDependenciesMeta:
     "@types/dagre":
       optional: true
-  checksum: 4fbf71564b000a29a85ea636411f41cadd3993b239816be60e64de6f08bde3dc3e11a9d5e6844b70d101db47f5bce47df8b1d9b52c59f82cd95be89cef84a11f
+  checksum: f978946e83d95694856daef7d14b201a27784007629641f17b58022cbaa9723c69d3a65d74e0c5f27fce8147550eb48202fd1d697783ab6e5b334f260c0ce9bf
   languageName: node
   linkType: hard
 
@@ -3291,7 +3291,7 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
-    "@pipelex/mthds-ui": "file:../../../mthds-ui"
+    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
     "@rollup/plugin-replace": "npm:^5.0.5"

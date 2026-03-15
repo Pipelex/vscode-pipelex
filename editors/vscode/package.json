@@ -705,7 +705,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "file:../../../mthds-ui",
+    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui",
     "dagre": "^0.8.5",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
