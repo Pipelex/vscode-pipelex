@@ -65,7 +65,9 @@ cargo update --workspace
 
 ## Step 5: Update CHANGELOG.md
 
-Read CHANGELOG.md and the commit history since the last release tag (use `git log <last_tag>..HEAD --oneline`).
+Read CHANGELOG.md and the commit history since the last release tag. Use the appropriate tag prefix for the component being released:
+- Extension releases: `git log $(git tag -l 'pipelex-vscode-ext/v*' --sort=-v:refname | head -1)..HEAD --oneline`
+- CLI-only releases: `git log $(git tag -l 'plxt-cli/v*' --sort=-v:refname | head -1)..HEAD --oneline`
 
 The `[Unreleased]` section (if there is one) may already contain some entries, but it is often incomplete or empty. Your job is to **reconcile** it with the actual changes:
 
@@ -78,7 +80,7 @@ Use the standard subsections (`### Added`, `### Changed`, `### Fixed`, `### Remo
 
 Then apply these transformations **as a single edit**:
 
-1. **Rename** `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` where:
+1. If `## [Unreleased]` exists, **rename** it to `## [X.Y.Z] - YYYY-MM-DD`. If there is no `[Unreleased]` section, **create** a new `## [X.Y.Z] - YYYY-MM-DD` section at the top (after the title) with the reconciled entries. Where:
    - X.Y.Z = new extension version (or new CLI version if extension wasn't bumped)
    - YYYY-MM-DD = today's date
 2. **Annotate** CLI-specific entries with `(plxt X.Y.Z)` using the new CLI version

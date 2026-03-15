@@ -111,7 +111,7 @@ export function buildChildToControllerMap(
         if (edge.kind === 'batch_item' && edge.target_stuff_digest) {
             const stuffId = 'stuff_' + edge.target_stuff_digest;
             // edge.source is the PipeBatch controller node
-            if (analysis.controllerNodeIds.has(edge.source) && !childToController[stuffId]) {
+            if (analysis.controllerNodeIds.has(edge.source)) {
                 childToController[stuffId] = edge.source;
             }
         }

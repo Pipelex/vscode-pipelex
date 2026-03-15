@@ -134,6 +134,7 @@ export function buildDataflowGraph(
     for (const edge of graphspec.edges) {
         if (edge.kind !== 'parallel_combine') continue;
         if (!edge.source_stuff_digest || !edge.target_stuff_digest) continue;
+        if (!analysis.stuffRegistry[edge.source_stuff_digest] || !analysis.stuffRegistry[edge.target_stuff_digest]) continue;
         const sourceId = 'stuff_' + edge.source_stuff_digest;
         const targetId = 'stuff_' + edge.target_stuff_digest;
 
@@ -160,6 +161,7 @@ export function buildDataflowGraph(
         if (edge.kind !== 'batch_item' && edge.kind !== 'batch_aggregate') continue;
 
         if (!edge.source_stuff_digest || !edge.target_stuff_digest) continue;
+        if (!analysis.stuffRegistry[edge.source_stuff_digest] || !analysis.stuffRegistry[edge.target_stuff_digest]) continue;
         const sourceId = 'stuff_' + edge.source_stuff_digest;
         const targetId = 'stuff_' + edge.target_stuff_digest;
         const isBatchItem = edge.kind === 'batch_item';
@@ -342,7 +344,7 @@ export function buildGraph(
 ): { graphData: GraphData; analysis: DataflowAnalysis | null } {
     if (graphspec) {
         const analysis = buildDataflowAnalysis(graphspec);
-        if (analysis && Object.keys(analysis.stuffRegistry).length > 0) {
+        if (analysis && (Object.keys(analysis.stuffProducers).length > 0 || Object.keys(analysis.stuffConsumers).length > 0)) {
             return { graphData: buildDataflowGraph(graphspec, analysis, edgeType), analysis };
         }
     }

@@ -54,6 +54,7 @@ export function getLayoutedElements(
 
     dagre.layout(g);
 
+    const isHorizontal = direction === 'LR' || direction === 'RL';
     const result = nodes.map((node) => {
         const nodeWithPosition = g.node(node.id);
         const width = nodeWidths[node.id];
@@ -63,6 +64,8 @@ export function getLayoutedElements(
                 x: nodeWithPosition.x - width / 2,
                 y: nodeWithPosition.y - (node.data?.isStuff ? 30 : 35),
             },
+            sourcePosition: isHorizontal ? (direction === 'LR' ? 'right' : 'left') : 'bottom',
+            targetPosition: isHorizontal ? (direction === 'LR' ? 'left' : 'right') : 'top',
         };
     });
 
@@ -163,15 +166,18 @@ export function ensureControllerSpacing(
                     const vOverlap = Math.min(boxA.padBottom, boxB.padBottom) - Math.max(boxA.padTop, boxB.padTop);
                     if (hOverlap <= 0 || vOverlap <= 0) continue;
 
-                    if (hOverlap <= vOverlap) {
-                        const rightCtrl = boxA.padLeft <= boxB.padLeft ? childCtrls[j] : childCtrls[i];
-                        for (const idx of ctrlIndices[rightCtrl]) {
-                            result[idx].position.x += hOverlap + MIN_GAP;
-                        }
-                    } else {
+                    // Push apart on the cross axis (perpendicular to layout direction)
+                    if (isHorizontal) {
+                        // Horizontal layout: push vertically to separate siblings
                         const bottomCtrl = boxA.padTop <= boxB.padTop ? childCtrls[j] : childCtrls[i];
                         for (const idx of ctrlIndices[bottomCtrl]) {
                             result[idx].position.y += vOverlap + MIN_GAP;
+                        }
+                    } else {
+                        // Vertical layout: push horizontally to separate siblings
+                        const rightCtrl = boxA.padLeft <= boxB.padLeft ? childCtrls[j] : childCtrls[i];
+                        for (const idx of ctrlIndices[rightCtrl]) {
+                            result[idx].position.x += hOverlap + MIN_GAP;
                         }
                     }
                     anyShifted = true;
@@ -213,11 +219,21 @@ export function ensureControllerSpacing(
             ? (ctrlsMinX + ctrlsMaxX) / 2
             : (ctrlsMinY + ctrlsMaxY) / 2;
 
+        // Collect indices of nodes belonging to this parent's subtree (not in any child controller)
+        const parentIndices = new Set<number>();
+        for (let i = 0; i < result.length; i++) {
+            if (inAnyChildCtrl.has(i)) continue;
+            const n = result[i];
+            // Include nodes that are direct children of this parent or not assigned to any controller
+            if (childToCtrl[n.id] === _parentId || !childToCtrl[n.id]) {
+                parentIndices.add(i);
+            }
+        }
+
         // Find the maximum push needed before/after child controllers on the rank axis
         let maxPushBefore = 0, maxPushAfter = 0;
 
-        for (let i = 0; i < result.length; i++) {
-            if (inAnyChildCtrl.has(i)) continue;
+        for (const i of parentIndices) {
             const n = result[i];
             const w = parseFloat(n.style?.width) || 200;
             const h = nodeHeight(n);
@@ -254,10 +270,9 @@ export function ensureControllerSpacing(
             }
         }
 
-        // Apply uniform shift to loose nodes
+        // Apply uniform shift to loose nodes in this parent's subtree
         if (maxPushBefore > 0 || maxPushAfter > 0) {
-            for (let i = 0; i < result.length; i++) {
-                if (inAnyChildCtrl.has(i)) continue;
+            for (const i of parentIndices) {
                 const n = result[i];
                 const w = parseFloat(n.style?.width) || 200;
                 const h = nodeHeight(n);
