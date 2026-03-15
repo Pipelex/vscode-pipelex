@@ -10,6 +10,10 @@ const onwarn = (warning, rollupWarn) => {
       ignoredCode: "CIRCULAR_DEPENDENCY",
       ignoredPath: "node_modules/semver",
     },
+    {
+      ignoredCode: "CIRCULAR_DEPENDENCY",
+      ignoredPath: "node_modules/smol-toml",
+    },
   ];
 
   // only show warning when code and path don't match
