@@ -1,0 +1,31 @@
+editors/vscode/src/pipelex/graph/webview/graphBuilders.ts
+  ee9b09388ad674d4 137,164,347
+.claude/skills/release/SKILL.md
+  ee9b09388ad674d4 68-70,83
+editors/vscode/src/pipelex/graph/webview/graphAnalysis.ts
+  ee9b09388ad674d4 114
+editors/vscode/src/pipelex/graph/webview/graphLayout.ts
+  ee9b09388ad674d4 57,67-68,169-171,176-180,222-232,236,273,275
+editors/vscode/src/pipelex/graph/webview/adapter.ts
+  ee9b09388ad674d4 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "df20147068b4971f3da230f9204b1036b753c3e8",
+  "prompts": {
+    "ee9b09388ad674d4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce97e442-8a05-47fd-9b2c-f8720bfd3777",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 35,
+      "total_deletions": 16,
+      "accepted_lines": 35,
+      "overriden_lines": 0
+    }
+  }
+}
