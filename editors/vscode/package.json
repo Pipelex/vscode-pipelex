@@ -733,7 +733,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "portal:../../../mthds-ui",
+    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui",
     "@xyflow/react": "^12",
     "dagre": "^0.8.5",
     "deep-equal": "^2.2.3",
