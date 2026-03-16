@@ -12,7 +12,7 @@ GRAMMAR_DST       := $(WEBSITE_SHIKI_DIR)/mthds.tmLanguage.json
 MTHDS_SCHEMA_URL  := https://mthds.ai/mthds_schema.json
 MTHDS_SCHEMA_FILE := crates/taplo-common/schemas/mthds_schema.json
 
-EXT_DIR           := editors/vscode
+EXT_DIR           := editors/vscode  # has its own package.json, yarn.lock, node_modules
 JS_LSP_DIR        := js/lsp
 VSIX              := $(EXT_DIR)/pipelex.vsix
 VIRTUAL_ENV       := $(CURDIR)/.venv
@@ -140,13 +140,13 @@ ud: update-deps  ## Shorthand for update-deps
 
 # --- Local mthds-ui development ---
 
-link-local: ## Switch to local mthds-ui (file: link)
-	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@file:../../../mthds-ui
-	@echo "Switched to local mthds-ui"
+link-local: ## Switch to local mthds-ui (portal: link)
+	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@portal:../../../mthds-ui  # ../../../ = repo root's parent (Pipelex/)
+	@echo "Switched to local mthds-ui (portal link)"
 
-unlink-local: ## Switch back to GitHub mthds-ui
-	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@github:Pipelex/mthds-ui
-	@echo "Switched back to GitHub mthds-ui"
+unlink-local: ## Switch back to GitHub mthds-ui (restore checked-in state)
+	cd $(EXT_DIR) && git checkout -- package.json yarn.lock && yarn install --immutable  # restores git-committed deps
+	@echo "Restored checked-in mthds-ui dependency"
 
 ll: link-local  ## Shorthand for link-local
 ul: unlink-local  ## Shorthand for unlink-local

@@ -199,7 +199,7 @@ export class MethodGraphPanel implements vscode.Disposable {
                 ));
                 return;
             }
-            // Map direction setting to Dagre format
+            // Map VS Code setting (left_to_right/top_down) → Dagre format (LR/TB)
             const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
             const graphConfig = await resolveGraphConfig();
 
@@ -291,6 +291,16 @@ export class MethodGraphPanel implements vscode.Disposable {
                 this.panel.webview.postMessage(this.pendingData);
                 this.pendingData = null;
             }
+            return;
+        }
+        if (message.type === 'updateDirection' && typeof message.value === 'string') {
+            const cfg = vscode.workspace.getConfiguration('pipelex');
+            const target = vscode.workspace.workspaceFolders?.length
+                ? vscode.ConfigurationTarget.Workspace
+                : vscode.ConfigurationTarget.Global;
+            // Map Dagre format (LR/TB) back → VS Code setting (left_to_right/top_down)
+            const settingValue = message.value === 'LR' ? 'left_to_right' : 'top_down';
+            cfg.update('graph.direction', settingValue, target);
             return;
         }
         if (message.type === 'updateShowControllers' && typeof message.value === 'boolean') {

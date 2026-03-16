@@ -29,7 +29,7 @@ After any `Cargo.toml` version change, run `cargo update --workspace` to refresh
 
 - File: `CHANGELOG.md` at repo root
 - Format: [Keep a Changelog](https://keepachangelog.com)
-- `[Unreleased]` section may exist at the top when there are unreleased entries; it is removed (renamed to the version heading) at release time and NOT re-added
+- `[Unreleased]` section may exist at the top when there are unreleased entries; at release time, rename it to the version heading (e.g., `## [X.Y.Z] - YYYY-MM-DD`). If no `[Unreleased]` section exists, create a new version heading at the top of the changelog (after the title). Do NOT re-add an empty `[Unreleased]` section after releasing
 - Version headers: `## [X.Y.Z] - YYYY-MM-DD`
 - The header version is the **extension version** (primary artifact)
 - If releasing CLI only (no extension changes), use CLI version as header

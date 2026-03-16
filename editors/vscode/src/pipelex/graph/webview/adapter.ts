@@ -38,6 +38,7 @@ function applyDirectionIcon(direction: string) {
 document.getElementById('direction-toggle')!.addEventListener('click', () => {
     currentDirection = currentDirection === 'LR' ? 'TB' : 'LR';
     applyDirectionIcon(currentDirection);
+    vscode.postMessage({ type: 'updateDirection', value: currentDirection });
     if (renderApp) renderApp();
 });
 
@@ -69,6 +70,7 @@ function onNavigateToPipe(pipeCode: string) {
 function onDirectionChange(dir: string) {
     currentDirection = dir;
     applyDirectionIcon(dir);
+    vscode.postMessage({ type: 'updateDirection', value: dir });
     if (renderApp) renderApp();
 }
 
