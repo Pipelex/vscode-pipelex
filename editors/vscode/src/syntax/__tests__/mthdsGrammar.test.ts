@@ -78,7 +78,7 @@ describe('MTHDS TextMate grammar — pipe ref patterns', () => {
     expect(pipeKey.length).toBeGreaterThan(0);
     expect(pipeKey[0].text).toBe('pipe');
 
-    const pipeName = findTokensByScope(line, 'support.function.pipe-name.mthds');
+    const pipeName = findTokensByScope(line, 'entity.name.tag.pipe-name.mthds');
     expect(pipeName.length).toBe(1);
     expect(pipeName[0].text).toBe('extract_invoice');
   });
@@ -87,7 +87,7 @@ describe('MTHDS TextMate grammar — pipe ref patterns', () => {
   it('tokenizes a domain-qualified pipe ref', () => {
     const line = 'pipe = "documents.extraction.extract_invoice"';
 
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    const domain = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
     expect(domain.length).toBe(1);
     expect(domain[0].text).toBe('documents.extraction');
 
@@ -95,7 +95,7 @@ describe('MTHDS TextMate grammar — pipe ref patterns', () => {
     expect(dot.length).toBe(1);
     expect(dot[0].text).toBe('.');
 
-    const pipeName = findTokensByScope(line, 'support.function.pipe-name.mthds');
+    const pipeName = findTokensByScope(line, 'entity.name.tag.pipe-name.mthds');
     expect(pipeName.length).toBe(1);
     expect(pipeName[0].text).toBe('extract_invoice');
   });
@@ -105,27 +105,25 @@ describe('MTHDS TextMate grammar — pipe ref patterns', () => {
     const line =
       'pipe = "github.com/Pipelex/methods/documents->documents.extraction.extract_page_contents_and_views"';
 
-    const pkgAddr = findTokensByScope(line, 'entity.name.package-address.mthds');
-    expect(pkgAddr.length).toBe(2);
-    expect(pkgAddr[0].text).toBe('github.com/Pipelex/methods');
-    expect(pkgAddr[1].text).toBe('/documents');
+    // Package address, /package, and domain all share the namespace scope
+    const namespace = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
+    expect(namespace.length).toBe(3);
+    expect(namespace[0].text).toBe('github.com/Pipelex/methods');
+    expect(namespace[1].text).toBe('/documents');
+    expect(namespace[2].text).toBe('documents.extraction');
 
     const arrow = findTokensByScope(
       line,
-      'punctuation.separator.pipe-ref-arrow.mthds',
+      'keyword.operator.arrow.mthds',
     );
     expect(arrow.length).toBe(1);
     expect(arrow[0].text).toBe('->');
-
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
-    expect(domain.length).toBe(1);
-    expect(domain[0].text).toBe('documents.extraction');
 
     const dot = findTokensByScope(line, 'punctuation.separator.dot.mthds');
     expect(dot.length).toBe(1);
     expect(dot[0].text).toBe('.');
 
-    const pipeName = findTokensByScope(line, 'support.function.pipe-name.mthds');
+    const pipeName = findTokensByScope(line, 'entity.name.tag.pipe-name.mthds');
     expect(pipeName.length).toBe(1);
     expect(pipeName[0].text).toBe('extract_page_contents_and_views');
   });
@@ -135,13 +133,13 @@ describe('MTHDS TextMate grammar — pipe ref patterns', () => {
     const line =
       'pipe = "github.com/Pipelex/methods/documents->extract_invoice"';
 
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
-    expect(domain.length).toBe(0);
+    // Package address parts still get namespace scope (no domain though)
+    const namespace = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
+    expect(namespace.length).toBe(2);
+    expect(namespace[0].text).toBe('github.com/Pipelex/methods');
+    expect(namespace[1].text).toBe('/documents');
 
-    const dot = findTokensByScope(line, 'punctuation.separator.dot.mthds');
-    expect(dot.length).toBe(0);
-
-    const pipeName = findTokensByScope(line, 'support.function.pipe-name.mthds');
+    const pipeName = findTokensByScope(line, 'entity.name.tag.pipe-name.mthds');
     expect(pipeName.length).toBe(1);
     expect(pipeName[0].text).toBe('extract_invoice');
   });
@@ -151,18 +149,18 @@ describe('MTHDS TextMate grammar — output/refines concept patterns', () => {
   it('tokenizes output = "Text" (simple concept)', () => {
     const line = 'output = "Text"';
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(1);
     expect(concept[0].text).toBe('Text');
 
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    const domain = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
     expect(domain.length).toBe(0);
   });
 
   it('tokenizes output = "Text[]" (multiplicity)', () => {
     const line = 'output = "Text[]"';
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(1);
     expect(concept[0].text).toBe('Text');
 
@@ -174,7 +172,7 @@ describe('MTHDS TextMate grammar — output/refines concept patterns', () => {
   it('tokenizes output = "legal.Contract" (domain prefix)', () => {
     const line = 'output = "legal.Contract"';
 
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    const domain = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
     expect(domain.length).toBe(1);
     expect(domain[0].text).toBe('legal');
 
@@ -182,7 +180,7 @@ describe('MTHDS TextMate grammar — output/refines concept patterns', () => {
     expect(dot.length).toBe(1);
     expect(dot[0].text).toBe('.');
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(1);
     expect(concept[0].text).toBe('Contract');
   });
@@ -190,7 +188,7 @@ describe('MTHDS TextMate grammar — output/refines concept patterns', () => {
   it('tokenizes output = "InvoiceDetails[5]" (specific multiplicity)', () => {
     const line = 'output = "InvoiceDetails[5]"';
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(1);
     expect(concept[0].text).toBe('InvoiceDetails');
 
@@ -202,11 +200,11 @@ describe('MTHDS TextMate grammar — output/refines concept patterns', () => {
   it('tokenizes output = "legal.Contract[]" (domain + multiplicity)', () => {
     const line = 'output = "legal.Contract[]"';
 
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    const domain = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
     expect(domain.length).toBe(1);
     expect(domain[0].text).toBe('legal');
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(1);
     expect(concept[0].text).toBe('Contract');
 
@@ -218,11 +216,11 @@ describe('MTHDS TextMate grammar — output/refines concept patterns', () => {
   it('tokenizes refines = "images.ImgGenPrompt" (domain prefix)', () => {
     const line = 'refines = "images.ImgGenPrompt"';
 
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    const domain = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
     expect(domain.length).toBe(1);
     expect(domain[0].text).toBe('images');
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(1);
     expect(concept[0].text).toBe('ImgGenPrompt');
   });
@@ -232,7 +230,7 @@ describe('MTHDS TextMate grammar — concept-value entry patterns (inputs etc.)'
   it('tokenizes bar = "foo.Bar" with domain coloring', () => {
     const line = 'bar = "foo.Bar"';
 
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    const domain = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
     expect(domain.length).toBe(1);
     expect(domain[0].text).toBe('foo');
 
@@ -240,7 +238,7 @@ describe('MTHDS TextMate grammar — concept-value entry patterns (inputs etc.)'
     expect(dot.length).toBe(1);
     expect(dot[0].text).toBe('.');
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(1);
     expect(concept[0].text).toBe('Bar');
   });
@@ -248,7 +246,7 @@ describe('MTHDS TextMate grammar — concept-value entry patterns (inputs etc.)'
   it('tokenizes names = "Text[]" with concept and multiplicity', () => {
     const line = 'names = "Text[]"';
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(1);
     expect(concept[0].text).toBe('Text');
 
@@ -256,18 +254,18 @@ describe('MTHDS TextMate grammar — concept-value entry patterns (inputs etc.)'
     expect(multiplicity.length).toBe(1);
     expect(multiplicity[0].text).toBe('[]');
 
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    const domain = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
     expect(domain.length).toBe(0);
   });
 
   it('tokenizes contract = "legal.Contract[]" with all parts', () => {
     const line = 'contract = "legal.Contract[]"';
 
-    const domain = findTokensByScope(line, 'entity.other.pipe-domain.mthds');
+    const domain = findTokensByScope(line, 'punctuation.separator.namespace.mthds');
     expect(domain.length).toBe(1);
     expect(domain[0].text).toBe('legal');
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(1);
     expect(concept[0].text).toBe('Contract');
 
@@ -279,28 +277,28 @@ describe('MTHDS TextMate grammar — concept-value entry patterns (inputs etc.)'
   it('does NOT apply concept coloring to description = "SomeText"', () => {
     const line = 'description = "SomeText"';
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(0);
   });
 
   it('does NOT apply concept coloring to prompt = "Analyze"', () => {
     const line = 'prompt = "Analyze"';
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(0);
   });
 
   it('does NOT apply concept coloring to system_prompt = "You"', () => {
     const line = 'system_prompt = "You"';
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(0);
   });
 
   it('does NOT apply concept coloring to name = "MyPipeline"', () => {
     const line = 'name = "MyPipeline"';
 
-    const concept = findTokensByScope(line, 'support.type.concept.mthds');
+    const concept = findTokensByScope(line, 'entity.name.type.concept.mthds');
     expect(concept.length).toBe(0);
   });
 });

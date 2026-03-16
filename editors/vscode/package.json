@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -257,25 +257,25 @@
             "support.type.property-name.table.toml"
           ],
           "mthdsConcept": [
-            "support.type.concept.mthds"
+            "entity.name.type.concept.mthds"
           ],
           "mthdsPipeType": [
-            "support.type.pipe-type.mthds"
+            "entity.name.tag.pipe-type.mthds"
           ],
           "mthdsDataVariable": [
-            "variable.name.data.mthds"
+            "variable.other.readwrite.mthds"
           ],
           "mthdsPipeName": [
-            "support.function.pipe-name.mthds"
+            "entity.name.tag.pipe-name.mthds"
           ],
           "mthdsPipeSection": [
-            "support.type.property-name.pipe.mthds"
+            "entity.name.tag.pipe.mthds"
           ],
           "mthdsConceptSection": [
-            "support.type.property-name.concept.mthds"
+            "entity.name.type.concept.mthds"
           ],
           "mthdsModelRef": [
-            "entity.name.model-ref.mthds"
+            "constant.other.symbol.mthds"
           ]
         }
       }
@@ -285,88 +285,116 @@
       "editor.tokenColorCustomizations": {
         "textMateRules": [
           {
-            "scope": "support.type.property-name.pipe.mthds",
+            "scope": "entity.name.tag.pipe.mthds",
             "settings": {
               "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.pipe-type.mthds",
+            "scope": "entity.name.tag.pipe-type.mthds",
             "settings": {
               "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.property-name.concept.mthds",
+            "scope": "entity.name.tag.pipe-name.mthds",
+            "settings": {
+              "foreground": "#FF6B6B",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "entity.name.type.concept.mthds",
             "settings": {
               "foreground": "#4ECDC4",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.concept.mthds",
-            "settings": {
-              "foreground": "#4ECDC4",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "variable.name.data.mthds",
+            "scope": "variable.other.readwrite.mthds",
             "settings": {
               "foreground": "#98FB98",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.function.pipe-name.mthds",
-            "settings": {
-              "foreground": "#FF6B6B",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "punctuation.definition.data-injection.mthds",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "punctuation.definition.template-variable.mthds",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "punctuation.definition.model-sigil.mthds",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "entity.name.model-ref.mthds",
+            "scope": "constant.other.symbol.mthds",
             "settings": {
               "foreground": "#FFB86C",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "entity.name.package-address.mthds",
-            "settings": {
-              "foreground": "#7C7C9C"
-            }
-          },
-          {
-            "scope": "punctuation.separator.pipe-ref-arrow.mthds",
+            "scope": [
+              "storage.modifier.mthds",
+              "constant.character.escape.mthds"
+            ],
             "settings": {
               "foreground": "#FF79C6"
             }
           },
           {
-            "scope": "entity.other.pipe-domain.mthds",
+            "scope": "keyword.operator.arrow.mthds",
             "settings": {
-              "foreground": "#9E9E9E"
+              "foreground": "#FF79C6"
+            }
+          },
+          {
+            "scope": "punctuation.separator.namespace.mthds",
+            "settings": {
+              "foreground": "#7C7C9C"
+            }
+          },
+          {
+            "scope": "keyword.control.jinja.mthds",
+            "settings": {
+              "foreground": "#FF79C6",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.operator.jinja.mthds",
+            "settings": {
+              "foreground": "#FF79C6"
+            }
+          },
+          {
+            "scope": "entity.name.tag.html.mthds",
+            "settings": {
+              "foreground": "#FF79C6"
+            }
+          },
+          {
+            "scope": "punctuation.definition.jinja.mthds",
+            "settings": {
+              "foreground": "#FFB86C"
+            }
+          },
+          {
+            "scope": [
+              "comment.line.number-sign.mthds",
+              "comment.block.jinja.mthds",
+              "comment.block.html.mthds"
+            ],
+            "settings": {
+              "foreground": "#6a9955",
+              "fontStyle": "italic"
+            }
+          },
+          {
+            "scope": "meta.preprocessor.mthds",
+            "settings": {
+              "foreground": "#6a9955",
+              "fontStyle": "italic"
+            }
+          },
+          {
+            "scope": "invalid.illegal.escape.mthds",
+            "settings": {
+              "foreground": "#FF5555",
+              "fontStyle": "underline"
             }
           }
         ]
@@ -705,10 +733,15 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
+    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui",
+    "@xyflow/react": "^12",
+    "dagre": "^0.8.5",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
     "node-fetch": "^3.3.2",
+    "react": "^19",
+    "react-dom": "^19",
     "smol-toml": "^1.6.0",
     "vscode-languageclient": "^9.0.1",
     "which": "^5.0.0"

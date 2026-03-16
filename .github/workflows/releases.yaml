@@ -76,6 +76,12 @@ jobs:
       - name: Build @pipelex/lsp WASM bundle
         run: yarn install && yarn build
         working-directory: js/lsp
+      - name: Guard against local file dependencies
+        run: |
+          if grep -q '"file:' editors/vscode/package.json; then
+            echo "::error::package.json contains file: dependencies — run 'make ul' before pushing"
+            exit 1
+          fi
       - name: Extension NPM Install
         run: yarn
         working-directory: editors/vscode

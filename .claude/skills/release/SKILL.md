@@ -65,20 +65,41 @@ cargo update --workspace
 
 ## Step 5: Update CHANGELOG.md
 
-Read CHANGELOG.md. Transform the `[Unreleased]` section:
+Read CHANGELOG.md and the commit history since the last release tag. Use the appropriate tag prefix for the component being released:
+- Extension releases: `git log $(git tag -l 'pipelex-vscode-ext/v*' --sort=-v:refname | head -1)..HEAD --oneline`
+- CLI-only releases: `git log $(git tag -l 'plxt-cli/v*' --sort=-v:refname | head -1)..HEAD --oneline`
 
-1. Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` where:
+The `[Unreleased]` section (if there is one) may already contain some entries, but it is often incomplete or empty. Your job is to **reconcile** it with the actual changes:
+
+1. **Review commits** since the last release to understand what changed.
+2. **Keep** any existing `[Unreleased]` entries that are still accurate.
+3. **Add** entries for changes visible in the commit history that are not yet listed.
+4. **Remove or correct** any entries that are outdated or inaccurate.
+
+Use the standard subsections (`### Added`, `### Changed`, `### Fixed`, `### Removed`) as appropriate. Write entries in the same style as existing changelog entries — concise, user-facing descriptions.
+
+Then apply these transformations **as a single edit**:
+
+1. If `## [Unreleased]` exists, **rename** it to `## [X.Y.Z] - YYYY-MM-DD`. If there is no `[Unreleased]` section, **create** a new `## [X.Y.Z] - YYYY-MM-DD` section at the top (after the title) with the reconciled entries. Where:
    - X.Y.Z = new extension version (or new CLI version if extension wasn't bumped)
    - YYYY-MM-DD = today's date
-2. Annotate CLI-specific entries with `(plxt X.Y.Z)` using the new CLI version
-3. Replace any `(plxt >=X.Y.Z)` placeholders with `(plxt X.Y.Z)` using the actual new version
+2. **Annotate** CLI-specific entries with `(plxt X.Y.Z)` using the new CLI version
+3. **Replace** any `(plxt >=X.Y.Z)` placeholders with `(plxt X.Y.Z)` using the actual new version
 4. Entries that are extension-only or affect both: leave without annotation
-5. Add a fresh empty section at the top:
-   ```
-   ## [Unreleased]
-   ```
 
-If `[Unreleased]` is empty, warn the user and ask whether to proceed with a version-only release.
+**Do NOT add a new empty `## [Unreleased]` section.** The versioned heading replaces `[Unreleased]` and becomes the first section in the file (after the title). An `[Unreleased]` section is added manually later when new work begins.
+
+The result should look like:
+```
+# Pipelex IDE Extension and `plxt` CLI Changelog
+
+## [X.Y.Z] - YYYY-MM-DD
+
+### Changed
+- (entries that were under [Unreleased])
+
+## [previous version] - ...
+```
 
 ## Step 6: Validate
 

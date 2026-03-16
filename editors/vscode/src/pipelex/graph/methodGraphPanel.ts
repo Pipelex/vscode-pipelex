@@ -199,7 +199,7 @@ export class MethodGraphPanel implements vscode.Disposable {
                 ));
                 return;
             }
-            // Map direction setting to Dagre format
+            // Map VS Code setting (left_to_right/top_down) → Dagre format (LR/TB)
             const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
             const graphConfig = await resolveGraphConfig();
 
@@ -277,7 +277,11 @@ export class MethodGraphPanel implements vscode.Disposable {
 
         const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph.css'));
         const jsUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph.js'));
+        const xyflowCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'xyflow.css'));
+        const graphCoreCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph-core.css'));
 
+        html = html.replace('{{XYFLOW_CSS_URI}}', xyflowCssUri.toString());
+        html = html.replace('{{GRAPH_CORE_CSS_URI}}', graphCoreCssUri.toString());
         html = html.replace('{{GRAPH_CSS_URI}}', cssUri.toString());
         html = html.replace('{{GRAPH_JS_URI}}', jsUri.toString());
 
@@ -291,6 +295,16 @@ export class MethodGraphPanel implements vscode.Disposable {
                 this.panel.webview.postMessage(this.pendingData);
                 this.pendingData = null;
             }
+            return;
+        }
+        if (message.type === 'updateDirection' && typeof message.value === 'string') {
+            const cfg = vscode.workspace.getConfiguration('pipelex');
+            const target = vscode.workspace.workspaceFolders?.length
+                ? vscode.ConfigurationTarget.Workspace
+                : vscode.ConfigurationTarget.Global;
+            // Map Dagre format (LR/TB) back → VS Code setting (left_to_right/top_down)
+            const settingValue = message.value === 'LR' ? 'left_to_right' : 'top_down';
+            cfg.update('graph.direction', settingValue, target);
             return;
         }
         if (message.type === 'updateShowControllers' && typeof message.value === 'boolean') {
@@ -344,7 +358,7 @@ export class MethodGraphPanel implements vscode.Disposable {
             // Replace all sentinel occurrences with the real nonce
             html = html.replace(new RegExp(MethodGraphPanel.CSP_NONCE_SENTINEL, 'g'), nonce);
             // Inject full CSP meta tag into <head>
-            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' ${cspSource} https://unpkg.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; connect-src 'none';">`;
+            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' ${cspSource} https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; connect-src 'none';">`;
             html = html.replace('<head>', `<head>\n${cspMeta}`);
         } else {
             // Simple HTML (loading/message): add nonce to <style> tags, minimal CSP

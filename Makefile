@@ -12,7 +12,9 @@ GRAMMAR_DST       := $(WEBSITE_SHIKI_DIR)/mthds.tmLanguage.json
 MTHDS_SCHEMA_URL  := https://mthds.ai/mthds_schema.json
 MTHDS_SCHEMA_FILE := crates/taplo-common/schemas/mthds_schema.json
 
+# note that editors/vscode has its own package.json, yarn.lock, node_modules
 EXT_DIR           := editors/vscode
+
 JS_LSP_DIR        := js/lsp
 VSIX              := $(EXT_DIR)/pipelex.vsix
 VIRTUAL_ENV       := $(CURDIR)/.venv
@@ -20,8 +22,9 @@ PYTHON_VERSION    ?= 3.13
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help sync-grammar s update-schema up
+.PHONY: help sync-grammar s update-schema up update-deps ud
 .PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check fmt-check fmt lint plxt-lint docs
+.PHONY: link-local unlink-local ll ul
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -130,6 +133,26 @@ update-schema: ## Download the latest MTHDS JSON Schema
 	@echo "Downloaded MTHDS schema -> $(MTHDS_SCHEMA_FILE)"
 
 up: update-schema
+
+update-deps: ## Update mthds-ui from GitHub
+	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@github:Pipelex/mthds-ui
+	@echo "Updated @pipelex/mthds-ui from GitHub"
+
+ud: update-deps  ## Shorthand for update-deps
+
+# --- Local mthds-ui development ---
+
+link-local: ## Switch to local mthds-ui (portal: link)
+	rm -rf $(EXT_DIR)/node_modules/@pipelex/mthds-ui
+	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@portal:../../../mthds-ui  # ../../../ = repo root's parent (Pipelex/)
+	@echo "Switched to local mthds-ui (portal link)"
+
+unlink-local: ## Switch back to GitHub mthds-ui (restore checked-in state)
+	cd $(EXT_DIR) && git checkout -- package.json yarn.lock && yarn install --immutable  # restores git-committed deps
+	@echo "Restored checked-in mthds-ui dependency"
+
+ll: link-local  ## Shorthand for link-local
+ul: unlink-local  ## Shorthand for unlink-local
 
 $(GRAMMAR_DST): $(GRAMMAR_SRC)
 	@mkdir -p $(WEBSITE_SHIKI_DIR)

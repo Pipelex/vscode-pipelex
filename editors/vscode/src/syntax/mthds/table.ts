@@ -15,7 +15,7 @@ const conceptTable = {
       patterns: [
         {
           match: "concept",
-          name: "support.type.property-name.concept.mthds",
+          name: "entity.name.type.concept.mthds",
         },
         {
           match: "\\.",
@@ -23,7 +23,7 @@ const conceptTable = {
         },
         {
           match: "[A-Z][A-Za-z0-9]*",
-          name: "support.type.property-name.concept.mthds",
+          name: "entity.name.type.concept.mthds",
         },
       ],
     },
@@ -46,7 +46,7 @@ const pipeTable = {
       patterns: [
         {
           match: "pipe",
-          name: "support.type.property-name.pipe.mthds",
+          name: "entity.name.tag.pipe.mthds",
         },
         {
           match: "\\.",
@@ -54,7 +54,7 @@ const pipeTable = {
         },
         {
           match: "[a-z][a-z0-9_]*",
-          name: "support.type.property-name.pipe.mthds",
+          name: "entity.name.tag.pipe.mthds",
         },
       ],
     },

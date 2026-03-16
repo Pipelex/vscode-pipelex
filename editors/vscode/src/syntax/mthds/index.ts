@@ -66,5 +66,5 @@ const syntax = {
 
 writeFileSync(
   path.resolve(__dirname, path.join("..", "..", "..", "mthds.tmLanguage.json")),
-  JSON.stringify(syntax, null, 2)
+  JSON.stringify(syntax, null, 2) + "\n"
 );

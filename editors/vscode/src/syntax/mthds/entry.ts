@@ -12,7 +12,7 @@ const pipeEntry = {
       patterns: [
         {
           match: "pipe",
-          name: "support.type.property-name.pipe.mthds",
+          name: "entity.name.tag.pipe.mthds",
         },
         {
           match: "\\.",
@@ -20,7 +20,7 @@ const pipeEntry = {
         },
         {
           match: `${ANY_KEY}`,
-          name: "support.type.property-name.pipe.mthds",
+          name: "entity.name.tag.pipe.mthds",
         },
       ],
     },
@@ -44,9 +44,9 @@ function makeConceptRefEntry(keyword: 'output' | 'refines') {
       1: { name: "support.type.property-name.mthds" },
       2: { name: "punctuation.eq.mthds" },
       3: { name: "punctuation.definition.string.begin.mthds" },
-      4: { name: "entity.other.pipe-domain.mthds" },
+      4: { name: "punctuation.separator.namespace.mthds" },
       5: { name: "punctuation.separator.dot.mthds" },
-      6: { name: "support.type.concept.mthds" },
+      6: { name: "entity.name.type.concept.mthds" },
       7: { name: "punctuation.definition.multiplicity.mthds" },
       8: { name: "punctuation.definition.string.end.mthds" },
     },
@@ -63,7 +63,7 @@ const typeEntry = {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "support.type.pipe-type.mthds" },
+    4: { name: "entity.name.tag.pipe-type.mthds" },
     5: { name: "punctuation.definition.string.end.mthds" },
   },
 };
@@ -76,8 +76,8 @@ const modelEntry = {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "punctuation.definition.model-sigil.mthds" },
-    5: { name: "entity.name.model-ref.mthds" },
+    4: { name: "storage.modifier.mthds" },
+    5: { name: "constant.other.symbol.mthds" },
     6: { name: "punctuation.definition.string.end.mthds" },
   },
 };
@@ -90,7 +90,7 @@ const modelBareEntry = {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "entity.name.model-ref.mthds" },
+    4: { name: "constant.other.symbol.mthds" },
     5: { name: "punctuation.definition.string.end.mthds" },
   },
 };
@@ -195,12 +195,12 @@ const pipeRefPackageEntry = {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "entity.name.package-address.mthds" },          // muted slate
-    5: { name: "entity.name.package-address.mthds" },          // muted slate
-    6: { name: "punctuation.separator.pipe-ref-arrow.mthds" }, // pink
-    7: { name: "entity.other.pipe-domain.mthds" },             // mid-gray
+    4: { name: "punctuation.separator.namespace.mthds" },       // muted slate
+    5: { name: "punctuation.separator.namespace.mthds" },       // muted slate
+    6: { name: "keyword.operator.arrow.mthds" },               // pink
+    7: { name: "punctuation.separator.namespace.mthds" },       // mid-gray
     8: { name: "punctuation.separator.dot.mthds" },            // dot before pipe_code
-    9: { name: "support.function.pipe-name.mthds" },           // coral bold
+    9: { name: "entity.name.tag.pipe-name.mthds" },            // coral bold
     10: { name: "punctuation.definition.string.end.mthds" },
   },
 };
@@ -217,9 +217,9 @@ const pipeRefEntry = {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "entity.other.pipe-domain.mthds" },             // mid-gray (optional)
+    4: { name: "punctuation.separator.namespace.mthds" },       // mid-gray (optional)
     5: { name: "punctuation.separator.dot.mthds" },             // dot before pipe_code
-    6: { name: "support.function.pipe-name.mthds" },           // coral bold
+    6: { name: "entity.name.tag.pipe-name.mthds" },            // coral bold
     7: { name: "punctuation.definition.string.end.mthds" },
   },
 };
@@ -241,9 +241,9 @@ const conceptValueEntry = {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
     3: { name: "punctuation.definition.string.begin.mthds" },
-    4: { name: "entity.other.pipe-domain.mthds" },
+    4: { name: "punctuation.separator.namespace.mthds" },
     5: { name: "punctuation.separator.dot.mthds" },
-    6: { name: "support.type.concept.mthds" },
+    6: { name: "entity.name.type.concept.mthds" },
     7: { name: "punctuation.definition.multiplicity.mthds" },
     8: { name: "punctuation.definition.string.end.mthds" },
   },

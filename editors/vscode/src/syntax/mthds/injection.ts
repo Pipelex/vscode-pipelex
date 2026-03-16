@@ -2,10 +2,10 @@ export const dataInjection = {
   match: "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
   captures: {
     1: {
-      name: "punctuation.definition.data-injection.mthds",
+      name: "storage.modifier.mthds",
     },
     2: {
-      name: "variable.name.data.mthds",
+      name: "variable.other.readwrite.mthds",
     },
   },
 };
@@ -14,10 +14,10 @@ export const templateVariable = {
   match: "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
   captures: {
     1: {
-      name: "punctuation.definition.template-variable.mthds",
+      name: "storage.modifier.mthds",
     },
     2: {
-      name: "variable.name.data.mthds",
+      name: "variable.other.readwrite.mthds",
     },
   },
 };
