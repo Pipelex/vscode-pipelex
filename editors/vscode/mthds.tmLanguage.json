@@ -60,7 +60,7 @@
               "patterns": [
                 {
                   "match": "concept",
-                  "name": "support.type.property-name.concept.mthds"
+                  "name": "entity.name.type.concept.mthds"
                 },
                 {
                   "match": "\\.",
@@ -68,7 +68,7 @@
                 },
                 {
                   "match": "[A-Z][A-Za-z0-9]*",
-                  "name": "support.type.property-name.concept.mthds"
+                  "name": "entity.name.type.concept.mthds"
                 }
               ]
             },
@@ -88,7 +88,7 @@
               "patterns": [
                 {
                   "match": "pipe",
-                  "name": "support.type.property-name.pipe.mthds"
+                  "name": "entity.name.tag.pipe.mthds"
                 },
                 {
                   "match": "\\.",
@@ -96,7 +96,7 @@
                 },
                 {
                   "match": "[a-z][a-z0-9_]*",
-                  "name": "support.type.property-name.pipe.mthds"
+                  "name": "entity.name.tag.pipe.mthds"
                 }
               ]
             },
@@ -201,22 +201,22 @@
               "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "entity.name.package-address.mthds"
+              "name": "punctuation.separator.namespace.mthds"
             },
             "5": {
-              "name": "entity.name.package-address.mthds"
+              "name": "punctuation.separator.namespace.mthds"
             },
             "6": {
-              "name": "punctuation.separator.pipe-ref-arrow.mthds"
+              "name": "keyword.operator.arrow.mthds"
             },
             "7": {
-              "name": "entity.other.pipe-domain.mthds"
+              "name": "punctuation.separator.namespace.mthds"
             },
             "8": {
               "name": "punctuation.separator.dot.mthds"
             },
             "9": {
-              "name": "support.function.pipe-name.mthds"
+              "name": "entity.name.tag.pipe-name.mthds"
             },
             "10": {
               "name": "punctuation.definition.string.end.mthds"
@@ -237,13 +237,13 @@
               "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "entity.other.pipe-domain.mthds"
+              "name": "punctuation.separator.namespace.mthds"
             },
             "5": {
               "name": "punctuation.separator.dot.mthds"
             },
             "6": {
-              "name": "support.function.pipe-name.mthds"
+              "name": "entity.name.tag.pipe-name.mthds"
             },
             "7": {
               "name": "punctuation.definition.string.end.mthds"
@@ -258,7 +258,7 @@
               "patterns": [
                 {
                   "match": "pipe",
-                  "name": "support.type.property-name.pipe.mthds"
+                  "name": "entity.name.tag.pipe.mthds"
                 },
                 {
                   "match": "\\.",
@@ -266,7 +266,7 @@
                 },
                 {
                   "match": "(?:(?:[A-Za-z0-9_+-]+))|(?:\"[^\"]+\")|(?:'[^']+')",
-                  "name": "support.type.property-name.pipe.mthds"
+                  "name": "entity.name.tag.pipe.mthds"
                 }
               ]
             },
@@ -289,13 +289,13 @@
               "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "entity.other.pipe-domain.mthds"
+              "name": "punctuation.separator.namespace.mthds"
             },
             "5": {
               "name": "punctuation.separator.dot.mthds"
             },
             "6": {
-              "name": "support.type.concept.mthds"
+              "name": "entity.name.type.concept.mthds"
             },
             "7": {
               "name": "punctuation.definition.multiplicity.mthds"
@@ -319,13 +319,13 @@
               "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "entity.other.pipe-domain.mthds"
+              "name": "punctuation.separator.namespace.mthds"
             },
             "5": {
               "name": "punctuation.separator.dot.mthds"
             },
             "6": {
-              "name": "support.type.concept.mthds"
+              "name": "entity.name.type.concept.mthds"
             },
             "7": {
               "name": "punctuation.definition.multiplicity.mthds"
@@ -349,7 +349,7 @@
               "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "support.type.pipe-type.mthds"
+              "name": "entity.name.tag.pipe-type.mthds"
             },
             "5": {
               "name": "punctuation.definition.string.end.mthds"
@@ -370,10 +370,10 @@
               "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "punctuation.definition.model-sigil.mthds"
+              "name": "storage.modifier.mthds"
             },
             "5": {
-              "name": "entity.name.model-ref.mthds"
+              "name": "constant.other.symbol.mthds"
             },
             "6": {
               "name": "punctuation.definition.string.end.mthds"
@@ -394,7 +394,7 @@
               "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "entity.name.model-ref.mthds"
+              "name": "constant.other.symbol.mthds"
             },
             "5": {
               "name": "punctuation.definition.string.end.mthds"
@@ -565,13 +565,13 @@
               "name": "punctuation.definition.string.begin.mthds"
             },
             "4": {
-              "name": "entity.other.pipe-domain.mthds"
+              "name": "punctuation.separator.namespace.mthds"
             },
             "5": {
               "name": "punctuation.separator.dot.mthds"
             },
             "6": {
-              "name": "support.type.concept.mthds"
+              "name": "entity.name.type.concept.mthds"
             },
             "7": {
               "name": "punctuation.definition.multiplicity.mthds"
@@ -1016,10 +1016,10 @@
       "match": "(@)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.data-injection.mthds"
+          "name": "storage.modifier.mthds"
         },
         "2": {
-          "name": "variable.name.data.mthds"
+          "name": "variable.other.readwrite.mthds"
         }
       }
     },
@@ -1027,10 +1027,10 @@
       "match": "(\\$)([a-z][a-zA-Z0-9_]*(?:\\.[a-z][a-zA-Z0-9_]*)*)",
       "captures": {
         "1": {
-          "name": "punctuation.definition.template-variable.mthds"
+          "name": "storage.modifier.mthds"
         },
         "2": {
-          "name": "variable.name.data.mthds"
+          "name": "variable.other.readwrite.mthds"
         }
       }
     },

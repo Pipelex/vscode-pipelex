@@ -46,6 +46,13 @@
     "workspace"
   ],
   "contributes": {
+    "themes": [
+      {
+        "label": "Pipelex Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/pipelex-dark-color-theme.json"
+      }
+    ],
     "grammars": [
       {
         "language": "toml",
@@ -257,25 +264,25 @@
             "support.type.property-name.table.toml"
           ],
           "mthdsConcept": [
-            "support.type.concept.mthds"
+            "entity.name.type.concept.mthds"
           ],
           "mthdsPipeType": [
-            "support.type.pipe-type.mthds"
+            "entity.name.tag.pipe-type.mthds"
           ],
           "mthdsDataVariable": [
-            "variable.name.data.mthds"
+            "variable.other.readwrite.mthds"
           ],
           "mthdsPipeName": [
-            "support.function.pipe-name.mthds"
+            "entity.name.tag.pipe-name.mthds"
           ],
           "mthdsPipeSection": [
-            "support.type.property-name.pipe.mthds"
+            "entity.name.tag.pipe.mthds"
           ],
           "mthdsConceptSection": [
-            "support.type.property-name.concept.mthds"
+            "entity.name.type.concept.mthds"
           ],
           "mthdsModelRef": [
-            "entity.name.model-ref.mthds"
+            "constant.other.symbol.mthds"
           ]
         }
       }
@@ -285,88 +292,39 @@
       "editor.tokenColorCustomizations": {
         "textMateRules": [
           {
-            "scope": "support.type.property-name.pipe.mthds",
+            "scope": "entity.name.tag.pipe.mthds",
             "settings": {
-              "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.pipe-type.mthds",
+            "scope": "entity.name.tag.pipe-type.mthds",
             "settings": {
-              "foreground": "#FF6B6B",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.property-name.concept.mthds",
+            "scope": "entity.name.tag.pipe-name.mthds",
             "settings": {
-              "foreground": "#4ECDC4",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.type.concept.mthds",
+            "scope": "entity.name.type.concept.mthds",
             "settings": {
-              "foreground": "#4ECDC4",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "variable.name.data.mthds",
+            "scope": "variable.other.readwrite.mthds",
             "settings": {
-              "foreground": "#98FB98",
               "fontStyle": "bold"
             }
           },
           {
-            "scope": "support.function.pipe-name.mthds",
+            "scope": "constant.other.symbol.mthds",
             "settings": {
-              "foreground": "#FF6B6B",
               "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "punctuation.definition.data-injection.mthds",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "punctuation.definition.template-variable.mthds",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "punctuation.definition.model-sigil.mthds",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "entity.name.model-ref.mthds",
-            "settings": {
-              "foreground": "#FFB86C",
-              "fontStyle": "bold"
-            }
-          },
-          {
-            "scope": "entity.name.package-address.mthds",
-            "settings": {
-              "foreground": "#7C7C9C"
-            }
-          },
-          {
-            "scope": "punctuation.separator.pipe-ref-arrow.mthds",
-            "settings": {
-              "foreground": "#FF79C6"
-            }
-          },
-          {
-            "scope": "entity.other.pipe-domain.mthds",
-            "settings": {
-              "foreground": "#9E9E9E"
             }
           }
         ]
