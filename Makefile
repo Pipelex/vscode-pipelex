@@ -20,7 +20,7 @@ PYTHON_VERSION    ?= 3.13
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help sync-grammar s update-schema up
+.PHONY: help sync-grammar s update-schema up update-deps ud
 .PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check fmt-check fmt lint plxt-lint docs
 .PHONY: link-local unlink-local ll ul
 
@@ -131,6 +131,12 @@ update-schema: ## Download the latest MTHDS JSON Schema
 	@echo "Downloaded MTHDS schema -> $(MTHDS_SCHEMA_FILE)"
 
 up: update-schema
+
+update-deps: ## Update mthds-ui from GitHub
+	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@github:Pipelex/mthds-ui
+	@echo "Updated @pipelex/mthds-ui from GitHub"
+
+ud: update-deps  ## Shorthand for update-deps
 
 # --- Local mthds-ui development ---
 
