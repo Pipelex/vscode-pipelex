@@ -1,0 +1,29 @@
+editors/vscode/src/pipelex/graph/webview/adapter.ts
+  e95a4842c716818c 41,73
+.claude/skills/release/references/version-map.md
+  e95a4842c716818c 32
+editors/vscode/src/pipelex/graph/methodGraphPanel.ts
+  e95a4842c716818c 202,296-305
+Makefile
+  e95a4842c716818c 15,143-145,147-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "91832f75a60c166754015f743b6bcc2dbc2afddc",
+  "prompts": {
+    "e95a4842c716818c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f2d2541c-fccb-4cb2-8578-1e67ef8882a7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 27,
+      "total_deletions": 15,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    }
+  }
+}
