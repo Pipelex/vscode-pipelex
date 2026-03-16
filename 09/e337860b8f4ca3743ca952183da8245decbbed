@@ -1,0 +1,38 @@
+Makefile
+  ffab6d17aa0a8796 146
+editors/vscode/scripts/build.mjs
+  e0ba663fccf9b2d7 4-5,9-13,47-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "09e337860b8f4ca3743ca952183da8245decbbed",
+  "prompts": {
+    "e0ba663fccf9b2d7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6003f1ff-5f3e-448d-951f-76e0db772076",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 0,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    },
+    "ffab6d17aa0a8796": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18007555-60a2-426a-9522-8927a67f02cf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 5,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
