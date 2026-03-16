@@ -1,7 +1,7 @@
-/// <reference path="./globals.d.ts" />
-
-import type { ViewSpec, GraphSpec, GraphConfig } from '@pipelex/mthds-ui';
-import { GraphViewer } from './GraphViewer';
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import type { ViewSpec, GraphSpec, GraphConfig, GraphDirection } from '@pipelex/mthds-ui';
+import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
 
 // VS Code webview API
 const vscode = acquireVsCodeApi();
@@ -17,7 +17,7 @@ const _globalListener = function(event: MessageEvent) {
 window.addEventListener('message', _globalListener);
 
 // State managed by the adapter, passed as props to GraphViewer
-let currentDirection = 'TB';
+let currentDirection: GraphDirection = 'TB';
 let currentViewspec: ViewSpec | null = null;
 let currentGraphspec: GraphSpec | null = null;
 let currentConfig: GraphConfig = {};
@@ -67,20 +67,6 @@ function onNavigateToPipe(pipeCode: string) {
     vscode.postMessage({ type: 'navigateToPipe', pipeCode });
 }
 
-function onDirectionChange(dir: string) {
-    currentDirection = dir;
-    applyDirectionIcon(dir);
-    vscode.postMessage({ type: 'updateDirection', value: dir });
-    if (renderApp) renderApp();
-}
-
-function onShowControllersChange(show: boolean) {
-    currentShowControllers = show;
-    controllersToggle.checked = show;
-    vscode.postMessage({ type: 'updateShowControllers', value: show });
-    if (renderApp) renderApp();
-}
-
 function onReactFlowInit(instance: any) {
     reactFlowInstance = instance;
     (window as any)._reactFlowInstance = instance;
@@ -98,7 +84,7 @@ function handleMessage(event: { data: any }) {
         currentViewspec = message.viewspec;
         currentGraphspec = message.graphspec || null;
         currentConfig = message.config || {};
-        currentDirection = currentConfig.direction || 'TB';
+        currentDirection = (currentConfig.direction || 'TB') as GraphDirection;
         currentShowControllers = currentConfig.showControllers || false;
         controllersToggle.checked = currentShowControllers;
         applyDirectionIcon(currentDirection);
@@ -116,16 +102,7 @@ function handleMessage(event: { data: any }) {
 
 // --- React mount ---
 
-// Guard component: prevents hooks from running when ReactFlow is unavailable
 function App() {
-    const ReactFlowLib = (typeof ReactFlowRenderer !== 'undefined' && ReactFlowRenderer)
-        || (window as any).ReactFlow
-        || {};
-    if (!ReactFlowLib.ReactFlow) {
-        return React.createElement('div', { style: { padding: '20px', color: 'var(--color-text)' } },
-            React.createElement('p', null, 'Loading ReactFlow...'),
-        );
-    }
     return React.createElement(GraphViewer, {
         viewspec: currentViewspec,
         graphspec: currentGraphspec,
@@ -133,14 +110,12 @@ function App() {
         direction: currentDirection,
         showControllers: currentShowControllers,
         onNavigateToPipe,
-        onDirectionChange,
-        onShowControllersChange,
         onReactFlowInit,
     });
 }
 
 // Mount React
-const root = ReactDOM.createRoot(document.getElementById('root')!);
+const root = createRoot(document.getElementById('root')!);
 
 renderApp = () => {
     root.render(React.createElement(App));
