@@ -12,7 +12,9 @@ GRAMMAR_DST       := $(WEBSITE_SHIKI_DIR)/mthds.tmLanguage.json
 MTHDS_SCHEMA_URL  := https://mthds.ai/mthds_schema.json
 MTHDS_SCHEMA_FILE := crates/taplo-common/schemas/mthds_schema.json
 
-EXT_DIR           := editors/vscode  # has its own package.json, yarn.lock, node_modules
+# note that editors/vscode has its own package.json, yarn.lock, node_modules
+EXT_DIR           := editors/vscode
+
 JS_LSP_DIR        := js/lsp
 VSIX              := $(EXT_DIR)/pipelex.vsix
 VIRTUAL_ENV       := $(CURDIR)/.venv
@@ -141,6 +143,7 @@ ud: update-deps  ## Shorthand for update-deps
 # --- Local mthds-ui development ---
 
 link-local: ## Switch to local mthds-ui (portal: link)
+	rm -rf $(EXT_DIR)/node_modules/@pipelex/mthds-ui
 	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@portal:../../../mthds-ui  # ../../../ = repo root's parent (Pipelex/)
 	@echo "Switched to local mthds-ui (portal link)"
 

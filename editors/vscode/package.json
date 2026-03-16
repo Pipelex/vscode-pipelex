@@ -733,12 +733,15 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui",
+    "@pipelex/mthds-ui": "portal:../../../mthds-ui",
+    "@xyflow/react": "^12",
     "dagre": "^0.8.5",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
     "node-fetch": "^3.3.2",
+    "react": "^18",
+    "react-dom": "^18",
     "smol-toml": "^1.6.0",
     "vscode-languageclient": "^9.0.1",
     "which": "^5.0.0"
