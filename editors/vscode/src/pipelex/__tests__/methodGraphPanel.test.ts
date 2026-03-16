@@ -145,7 +145,7 @@ describe('MethodGraphPanel', () => {
         mockState.mockPanel.viewColumn = 2;
         mockState.resolveCliResult = { command: 'pipelex-agent', args: [] };
         mockState.spawnCliResult = {
-            stdout: JSON.stringify({ viewspec: { nodes: [], edges: [] } }),
+            stdout: JSON.stringify({ graphspec: { nodes: [], edges: [] } }),
             stderr: '',
         };
         mockState.spawnCliResolve = null;
@@ -180,15 +180,15 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    // --- ViewSpec (--view) path ---
+    // --- GraphSpec (--view) path ---
 
-    it('refresh() uses extension-owned webview when viewspec is present', async () => {
-        const viewspec = {
+    it('refresh() uses extension-owned webview when graphspec is present', async () => {
+        const graphspec = {
             nodes: [{ id: 'n1', label: 'test', kind: 'operator', status: 'succeeded', ui: {}, inspector: {} }],
             edges: [],
         };
         mockState.spawnCliResult = {
-            stdout: JSON.stringify({ viewspec, pipe_code: 'main' }),
+            stdout: JSON.stringify({ graphspec, pipe_code: 'main' }),
             stderr: '',
         };
 
@@ -207,7 +207,7 @@ describe('MethodGraphPanel', () => {
         expect(mockState.mockWebview.postMessage).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: 'setData',
-                viewspec: viewspec,
+                graphspec: graphspec,
                 config: expect.objectContaining({ direction: 'TB' }),
             })
         );
@@ -219,12 +219,12 @@ describe('MethodGraphPanel', () => {
     it('handleWebviewMessage navigates to pipe header on navigateToPipe', async () => {
         const vscode = await import('vscode');
 
-        const viewspec = {
+        const graphspec = {
             nodes: [{ id: 'n1', label: 'my_pipe', kind: 'operator', status: 'succeeded', ui: {}, inspector: { pipe_code: 'my_pipe' } }],
             edges: [],
         };
         mockState.spawnCliResult = {
-            stdout: JSON.stringify({ viewspec, pipe_code: 'my_pipe' }),
+            stdout: JSON.stringify({ graphspec, pipe_code: 'my_pipe' }),
             stderr: '',
         };
 
@@ -291,13 +291,13 @@ describe('MethodGraphPanel', () => {
 
         // Resolve spawnCli for the stale file
         resolveSpawn!({
-            stdout: JSON.stringify({ viewspec: { nodes: [], edges: [] } }),
+            stdout: JSON.stringify({ graphspec: { nodes: [], edges: [] } }),
             stderr: '',
         });
         await new Promise(r => setTimeout(r, 10));
 
         // The staleness check after spawnCli should prevent the stale
-        // viewspec from being buffered or sent to the webview.
+        // graphspec from being buffered or sent to the webview.
         expect((panel as any).pendingData).toBeNull();
 
         // Even after webviewReady handshake, stale data must not be delivered

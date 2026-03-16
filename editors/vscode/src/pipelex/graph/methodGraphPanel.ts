@@ -183,10 +183,10 @@ export class MethodGraphPanel implements vscode.Disposable {
             }
             const result = JSON.parse(json);
 
-            if (!result?.viewspec) {
+            if (!result?.graphspec) {
                 this.setHtml(messageHtml(
                     'No Graph Available',
-                    'The CLI did not return a viewspec.'
+                    'The CLI did not return a graphspec.'
                 ));
                 return;
             }
@@ -209,8 +209,7 @@ export class MethodGraphPanel implements vscode.Disposable {
             const setDataPayload = {
                 type: 'setData',
                 uri: uri.toString(),
-                viewspec: result.viewspec,
-                graphspec: result.graphspec || null,
+                graphspec: result.graphspec,
                 config: {
                     direction: dagreDirection,
                     showControllers,

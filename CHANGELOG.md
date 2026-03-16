@@ -1,5 +1,12 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.5.3] - 2026-03-16
+
+### Changed
+- Adopt standard TextMate scopes and add Pipelex Dark color theme
+- Bundle React and ReactFlow locally from mthds-ui instead of loading from CDN
+- Upgrade React and ReactDOM from v18 to v19
+
 ## [0.5.2] - 2026-03-15
 
 ### Changed
