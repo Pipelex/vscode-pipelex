@@ -1,0 +1,38 @@
+editors/vscode/package.json
+  037a80589526a25f 290,297,304,311,318,325,327-353,356-397
+Makefile
+  fa4714f00379c17a 23,135-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "1a2568ba76ffe3cfe1b6d618395f96f23b78948c",
+  "prompts": {
+    "037a80589526a25f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "26ae1b47-ba9d-4203-a230-71544feb4f92",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 79,
+      "total_deletions": 7,
+      "accepted_lines": 79,
+      "overriden_lines": 0
+    },
+    "fa4714f00379c17a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41f557af-063f-445e-a431-5c2f45062d75",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 1,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}
