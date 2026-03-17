@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import type { ViewSpec, GraphSpec, GraphConfig, GraphDirection } from '@pipelex/mthds-ui';
+import type { GraphSpec, GraphConfig, GraphDirection } from '@pipelex/mthds-ui';
 import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
 
 // VS Code webview API
@@ -18,7 +18,6 @@ window.addEventListener('message', _globalListener);
 
 // State managed by the adapter, passed as props to GraphViewer
 let currentDirection: GraphDirection = 'TB';
-let currentViewspec: ViewSpec | null = null;
 let currentGraphspec: GraphSpec | null = null;
 let currentConfig: GraphConfig = {};
 let currentShowControllers = false;
@@ -81,7 +80,6 @@ function handleMessage(event: { data: any }) {
         if (message.uri) {
             vscode.setState({ uri: message.uri });
         }
-        currentViewspec = message.viewspec;
         currentGraphspec = message.graphspec || null;
         currentConfig = message.config || {};
         currentDirection = (currentConfig.direction || 'TB') as GraphDirection;
@@ -104,7 +102,6 @@ function handleMessage(event: { data: any }) {
 
 function App() {
     return React.createElement(GraphViewer, {
-        viewspec: currentViewspec,
         graphspec: currentGraphspec,
         config: currentConfig,
         direction: currentDirection,
