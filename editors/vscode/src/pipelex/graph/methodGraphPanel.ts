@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { resolveCli } from '../validation/cliResolver';
 import { spawnCli, cancelAllInflight } from '../validation/processUtils';
 import { extractJson } from '../validation/pipelexValidator';
+import type { ValidationFailure } from '../validation/types';
 import { findTableHeader } from '../validation/sourceLocator';
 import { resolveGraphConfig, getPaletteColors } from './graphConfig';
 
@@ -232,19 +233,34 @@ export class MethodGraphPanel implements vscode.Disposable {
 
             if (err.exitCode === 1 && err.stderr) {
                 const stderr = err.stderr as string;
-                if (stderr.includes('PipelexInterpreterError') || stderr.includes('main_pipe')) {
-                    this.setHtml(messageHtml(
-                        'No Main Pipe Declared',
-                        'This bundle does not declare a main pipe. Add ' +
-                        '<code>main_pipe = "your_pipe"</code> to generate a method graph.'
-                    ));
-                    return;
+                const json = extractJson(stderr);
+                if (json) {
+                    try {
+                        const failure: ValidationFailure = JSON.parse(json);
+                        if (failure.validation_errors && Array.isArray(failure.validation_errors) && failure.validation_errors.length > 0) {
+                            const errors = failure.validation_errors.map(ve => ({
+                                message: ve.message,
+                                context: ve.pipe_code
+                                    ? `pipe.${ve.pipe_code}`
+                                    : ve.concept_code
+                                        ? `concept.${ve.concept_code}`
+                                        : undefined,
+                            }));
+                            this.setHtml(errorListHtml('Validation Errors', errors));
+                        } else {
+                            this.setHtml(messageHtml(
+                                failure.error_type ?? 'Error',
+                                escapeHtml(failure.message),
+                            ));
+                        }
+                        this.output.appendLine(`pipelex-agent graph: ${stderr.slice(0, 500)}`);
+                        return;
+                    } catch {
+                        // JSON parse failed — fall through
+                    }
                 }
-                // General validation failure
-                this.setHtml(messageHtml(
-                    'Validation Failed',
-                    'The bundle has validation errors. Fix them and save to retry.'
-                ));
+                // Non-JSON stderr: show raw error
+                this.setHtml(messageHtml('Validation Failed', escapeHtml(stderr.trim().slice(0, 500))));
                 this.output.appendLine(`pipelex-agent graph: ${stderr.slice(0, 500)}`);
                 return;
             }
@@ -393,4 +409,38 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 h2 { margin-bottom: 0.5em; }
 code { background: var(--vscode-textCodeBlock-background, #2d2d2d); padding: 2px 6px; border-radius: 3px; }
 </style></head><body><div class="msg"><h2>${title}</h2><p>${body}</p></div></body></html>`;
+}
+
+function errorListHtml(title: string, errors: { message: string; context?: string }[]): string {
+    const items = errors.map(e => {
+        const ctx = e.context
+            ? `<span class="ctx">${escapeHtml(e.context)}</span> `
+            : '';
+        return `<li>${ctx}${escapeHtml(e.message)}</li>`;
+    }).join('\n');
+    return `<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; margin: 0; padding: 24px;
+       font-family: var(--vscode-font-family, sans-serif); color: var(--vscode-foreground, #ccc);
+       background: var(--vscode-editor-background, #1e1e1e); box-sizing: border-box; }
+.msg { max-width: 600px; width: 100%; }
+h2 { margin-bottom: 0.5em; }
+ul { list-style: none; padding: 0; margin: 0; }
+li { padding: 6px 10px; margin-bottom: 4px; border-left: 3px solid var(--vscode-errorForeground, #f44); border-radius: 2px;
+     background: var(--vscode-textCodeBlock-background, #2d2d2d); }
+.ctx { font-weight: 600; color: var(--vscode-symbolIcon-fieldForeground, #75beff); margin-right: 6px; }
+.ctx::after { content: ":"; }
+</style></head><body><div class="msg"><h2>${escapeHtml(title)}</h2><ul>
+${items}
+</ul></div></body></html>`;
+}
+
+function escapeHtml(text: string): string {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
