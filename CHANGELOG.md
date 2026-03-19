@@ -1,5 +1,12 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.5.4] - 2026-03-19
+
+### Added
+- `--quiet` / `-q` global flag to suppress tracing and log output, printing only lint diagnostics (plxt 0.3.2)
+- Integration tests for `plxt lint` quiet-mode behavior (plxt 0.3.2)
+- `pipelex-cli` crate added to `make test` target
+
 ## [0.5.3] - 2026-03-16
 
 ### Changed

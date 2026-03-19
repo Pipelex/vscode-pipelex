@@ -106,6 +106,7 @@ plxt-lint: ## Lint TOML/MTHDS files with plxt
 
 test: ## Run all tests (Rust + VS Code extension)
 	cargo test -p pipelex-common
+	cargo test -p pipelex-cli
 	cargo test -p taplo
 	cargo test -p taplo-lsp
 	cd $(EXT_DIR) && yarn test

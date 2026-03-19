@@ -13,6 +13,9 @@ pub use taplo_cli::args::{LspCommand, LspCommandIo};
 pub struct PlxtArgs {
     #[clap(long, value_enum, global = true, default_value = "auto")]
     pub colors: Colors,
+    /// Suppress all log/tracing output (only lint diagnostics are printed).
+    #[clap(long, short = 'q', global = true)]
+    pub quiet: bool,
     /// Enable a verbose logging format.
     #[clap(long, global = true)]
     pub verbose: bool,
