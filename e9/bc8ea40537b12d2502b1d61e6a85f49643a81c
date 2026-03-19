@@ -1,0 +1,39 @@
+test-data/mthds/lint/invalid_schema.mthds
+  e8d554af65fb64b4 1-15
+crates/pipelex-cli/bin/plxt.rs
+  e8d554af65fb64b4 15-18,40,42
+test-data/mthds/lint/valid.mthds
+  e8d554af65fb64b4 1-15
+crates/pipelex-cli/Cargo.toml
+  e8d554af65fb64b4 4
+CHANGELOG.md
+  e8d554af65fb64b4 3-9
+editors/vscode/package.json
+  e8d554af65fb64b4 5
+Makefile
+  e8d554af65fb64b4 109
+crates/pipelex-cli/src/args.rs
+  e8d554af65fb64b4 16-18
+crates/pipelex-cli/tests/quiet_flag.rs
+  e8d554af65fb64b4 1-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "e9bc8ea40537b12d2502b1d61e6a85f49643a81c",
+  "prompts": {
+    "e8d554af65fb64b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "74b15eba-a660-40f0-9f5e-40490a390e12",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 160,
+      "total_deletions": 14,
+      "accepted_lines": 148,
+      "overriden_lines": 0
+    }
+  }
+}
