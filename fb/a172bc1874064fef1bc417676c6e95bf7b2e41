@@ -1,0 +1,27 @@
+editors/vscode/src/pipelex/graph/methodGraphPanel.ts
+  443e9937e4e61300 23,37-48,140-142,150-152,154-157,187-189,191,256-260,263,401
+editors/vscode/src/pipelex/__tests__/methodGraphPanel.test.ts
+  443e9937e4e61300 34,51-54,160,374-470
+editors/vscode/src/pipelex/graph/webview/adapter.ts
+  443e9937e4e61300 83-90,106-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "fba172bc1874064fef1bc417676c6e95bf7b2e41",
+  "prompts": {
+    "443e9937e4e61300": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4ad00963-f04b-4d34-addd-23c069721534",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 203,
+      "total_deletions": 48,
+      "accepted_lines": 157,
+      "overriden_lines": 0
+    }
+  }
+}
