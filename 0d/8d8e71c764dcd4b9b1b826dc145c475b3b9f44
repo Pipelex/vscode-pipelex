@@ -1,0 +1,23 @@
+editors/vscode/src/pipelex/graph/methodGraphPanel.ts
+  443e9937e4e61300 131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "0d8d8e71c764dcd4b9b1b826dc145c475b3b9f44",
+  "prompts": {
+    "443e9937e4e61300": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4ad00963-f04b-4d34-addd-23c069721534",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
