@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { resolveCli } from '../validation/cliResolver';
 import { spawnCli, cancelAllInflight } from '../validation/processUtils';
 import { extractJson } from '../validation/pipelexValidator';
+import type { ValidationFailure } from '../validation/types';
 import { findTableHeader } from '../validation/sourceLocator';
 import { resolveGraphConfig, getPaletteColors } from './graphConfig';
 
@@ -19,6 +20,7 @@ export class MethodGraphPanel implements vscode.Disposable {
     private cliWarningShown = false;
     private webviewReady = false;
     private pendingData: any = null;
+    private fileWatcherDebounce: ReturnType<typeof setTimeout> | undefined;
 
     constructor(output: vscode.OutputChannel, extensionUri: vscode.Uri) {
         this.output = output;
@@ -28,6 +30,18 @@ export class MethodGraphPanel implements vscode.Disposable {
             vscode.workspace.onDidSaveTextDocument(doc => {
                 if (this.currentUri && doc.uri.toString() === this.currentUri.toString()) {
                     this.refresh(doc.uri);
+                }
+            })
+        );
+
+        this.disposables.push(
+            vscode.workspace.onDidChangeTextDocument(event => {
+                if (this.currentUri
+                    && event.document.uri.toString() === this.currentUri.toString()
+                    && !event.document.isDirty) {
+                    // Document changed but is not dirty → external tool wrote to disk
+                    // and the editor reloaded it. Debounce to coalesce rapid writes.
+                    this.debouncedRefresh(event.document.uri);
                 }
             })
         );
@@ -114,6 +128,7 @@ export class MethodGraphPanel implements vscode.Disposable {
         this.panel.onDidDispose(() => {
             this.panel = undefined;
             this.currentUri = undefined;
+            this.webviewReady = false;
         });
         this.panel.webview.onDidReceiveMessage(
             message => this.handleWebviewMessage(message),
@@ -123,11 +138,24 @@ export class MethodGraphPanel implements vscode.Disposable {
     }
 
     dispose() {
+        if (this.fileWatcherDebounce) {
+            clearTimeout(this.fileWatcherDebounce);
+        }
         cancelAllInflight(this.inflight);
         this.panel?.dispose();
         for (const d of this.disposables) {
             d.dispose();
         }
+    }
+
+    private debouncedRefresh(uri: vscode.Uri) {
+        if (this.fileWatcherDebounce) {
+            clearTimeout(this.fileWatcherDebounce);
+        }
+        this.fileWatcherDebounce = setTimeout(() => {
+            this.fileWatcherDebounce = undefined;
+            this.refresh(uri);
+        }, 500);
     }
 
     private async refresh(uri: vscode.Uri) {
@@ -157,7 +185,11 @@ export class MethodGraphPanel implements vscode.Disposable {
         const uriKey = uri.toString();
         this.inflight.set(uriKey, controller);
 
-        this.setHtml(loadingHtml());
+        // Show loading screen only on first load; keep the current graph visible
+        // during subsequent refreshes so the viewport position is preserved.
+        if (!this.webviewReady) {
+            this.setHtml(loadingHtml());
+        }
 
         const pipelexConfig = vscode.workspace.getConfiguration('pipelex');
         const timeout = pipelexConfig.get<number>('validation.timeout', 30000);
@@ -222,29 +254,48 @@ export class MethodGraphPanel implements vscode.Disposable {
                 },
             };
 
-            // Reset webviewReady — the new HTML will reload the webview
-            this.webviewReady = false;
-            this.pendingData = setDataPayload;
-            this.setHtml(webviewHtml);
+            if (this.webviewReady && this.panel) {
+                // Webview already loaded — send new data without replacing HTML,
+                // which preserves the ReactFlow viewport (zoom + pan position).
+                this.panel.webview.postMessage(setDataPayload);
+            } else {
+                this.pendingData = setDataPayload;
+                this.setHtml(webviewHtml);
+            }
         } catch (err: any) {
             if (controller.signal.aborted) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
 
             if (err.exitCode === 1 && err.stderr) {
                 const stderr = err.stderr as string;
-                if (stderr.includes('PipelexInterpreterError') || stderr.includes('main_pipe')) {
-                    this.setHtml(messageHtml(
-                        'No Main Pipe Declared',
-                        'This bundle does not declare a main pipe. Add ' +
-                        '<code>main_pipe = "your_pipe"</code> to generate a method graph.'
-                    ));
-                    return;
+                const json = extractJson(stderr);
+                if (json) {
+                    try {
+                        const failure: ValidationFailure = JSON.parse(json);
+                        if (failure.validation_errors && Array.isArray(failure.validation_errors) && failure.validation_errors.length > 0) {
+                            const errors = failure.validation_errors.map(ve => ({
+                                message: ve.message,
+                                context: ve.pipe_code
+                                    ? `pipe.${ve.pipe_code}`
+                                    : ve.concept_code
+                                        ? `concept.${ve.concept_code}`
+                                        : undefined,
+                            }));
+                            this.setHtml(errorListHtml('Validation Errors', errors));
+                        } else {
+                            this.setHtml(messageHtml(
+                                failure.error_type ?? 'Error',
+                                escapeHtml(failure.message),
+                            ));
+                        }
+                        this.output.appendLine(`pipelex-agent graph: ${stderr.slice(0, 500)}`);
+                        return;
+                    } catch {
+                        // JSON parse failed — fall through
+                    }
                 }
-                // General validation failure
-                this.setHtml(messageHtml(
-                    'Validation Failed',
-                    'The bundle has validation errors. Fix them and save to retry.'
-                ));
+                // Non-JSON stderr: show raw error
+                this.setHtml(messageHtml('Validation Failed', escapeHtml(stderr.trim().slice(0, 500))));
                 this.output.appendLine(`pipelex-agent graph: ${stderr.slice(0, 500)}`);
                 return;
             }
@@ -348,6 +399,7 @@ export class MethodGraphPanel implements vscode.Disposable {
 
     private setHtml(html: string) {
         if (!this.panel) return;
+        this.webviewReady = false;
 
         const nonce = crypto.randomBytes(16).toString('base64');
         const cspSource = this.panel.webview.cspSource;
@@ -393,4 +445,38 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 h2 { margin-bottom: 0.5em; }
 code { background: var(--vscode-textCodeBlock-background, #2d2d2d); padding: 2px 6px; border-radius: 3px; }
 </style></head><body><div class="msg"><h2>${title}</h2><p>${body}</p></div></body></html>`;
+}
+
+function errorListHtml(title: string, errors: { message: string; context?: string }[]): string {
+    const items = errors.map(e => {
+        const ctx = e.context
+            ? `<span class="ctx">${escapeHtml(e.context)}</span> `
+            : '';
+        return `<li>${ctx}${escapeHtml(e.message)}</li>`;
+    }).join('\n');
+    return `<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; margin: 0; padding: 24px;
+       font-family: var(--vscode-font-family, sans-serif); color: var(--vscode-foreground, #ccc);
+       background: var(--vscode-editor-background, #1e1e1e); box-sizing: border-box; }
+.msg { max-width: 600px; width: 100%; }
+h2 { margin-bottom: 0.5em; }
+ul { list-style: none; padding: 0; margin: 0; }
+li { padding: 6px 10px; margin-bottom: 4px; border-left: 3px solid var(--vscode-errorForeground, #f44); border-radius: 2px;
+     background: var(--vscode-textCodeBlock-background, #2d2d2d); }
+.ctx { font-weight: 600; color: var(--vscode-symbolIcon-fieldForeground, #75beff); margin-right: 6px; }
+.ctx::after { content: ":"; }
+</style></head><body><div class="msg"><h2>${escapeHtml(title)}</h2><ul>
+${items}
+</ul></div></body></html>`;
+}
+
+function escapeHtml(text: string): string {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }

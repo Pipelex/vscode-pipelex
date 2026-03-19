@@ -31,6 +31,7 @@ const mockState = vi.hoisted(() => {
         // Event handler captures
         onSaveHandler: null as ((doc: any) => void) | null,
         onEditorChangeHandler: null as ((editor: any) => void) | null,
+        onDocChangeHandler: null as ((event: any) => void) | null,
     };
 });
 
@@ -47,6 +48,10 @@ vi.mock('vscode', () => ({
     TextEditorRevealType: { InCenter: 2 },
     workspace: {
         getConfiguration: () => ({ get: (key: string, def: any) => mockState.configOverrides[key] ?? def }),
+        onDidChangeTextDocument: vi.fn((handler: any) => {
+            mockState.onDocChangeHandler = handler;
+            return { dispose: vi.fn() };
+        }),
         onDidSaveTextDocument: vi.fn((handler: any) => {
             mockState.onSaveHandler = handler;
             return { dispose: vi.fn() };
@@ -152,6 +157,7 @@ describe('MethodGraphPanel', () => {
         mockState.spawnCliReject = null;
         mockState.onSaveHandler = null;
         mockState.onEditorChangeHandler = null;
+        mockState.onDocChangeHandler = null;
         mockState.configOverrides = {};
     });
 
@@ -364,5 +370,102 @@ describe('MethodGraphPanel', () => {
         expect(mockState.executeCommand).not.toHaveBeenCalledWith('workbench.action.closeActiveEditor');
 
         panel.dispose();
+    });
+
+    // --- onDidChangeTextDocument: external file changes ---
+
+    it('external file change triggers debounced refresh after 500ms', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        vi.mocked(processUtils.spawnCli).mockClear();
+
+        // Simulate external change: isDirty=false means editor reloaded from disk
+        expect(mockState.onDocChangeHandler).not.toBeNull();
+        mockState.onDocChangeHandler!({ document: { uri, isDirty: false } });
+
+        // Should NOT have called spawnCli yet (debounce pending)
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
+
+        // Advance past debounce
+        await vi.waitFor(() => {
+            expect(processUtils.spawnCli).toHaveBeenCalled();
+        }, { timeout: 1000 });
+
+        panel.dispose();
+    });
+
+    it('user typing (isDirty=true) does not trigger refresh', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        vi.mocked(processUtils.spawnCli).mockClear();
+
+        // Simulate user typing: isDirty=true
+        mockState.onDocChangeHandler!({ document: { uri, isDirty: true } });
+
+        await new Promise(r => setTimeout(r, 600));
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
+
+        panel.dispose();
+    });
+
+    it('rapid external changes coalesce into a single refresh', async () => {
+        vi.useFakeTimers();
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await vi.advanceTimersByTimeAsync(50);
+
+        vi.mocked(processUtils.spawnCli).mockClear();
+
+        // Simulate two rapid external changes
+        mockState.onDocChangeHandler!({ document: { uri, isDirty: false } });
+        await vi.advanceTimersByTimeAsync(200);
+        mockState.onDocChangeHandler!({ document: { uri, isDirty: false } });
+        await vi.advanceTimersByTimeAsync(600);
+
+        // Only one spawnCli call from the second (debounce reset)
+        expect(processUtils.spawnCli).toHaveBeenCalledTimes(1);
+
+        panel.dispose();
+        vi.useRealTimers();
+    });
+
+    it('external change to unrelated file does not trigger refresh', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        vi.mocked(processUtils.spawnCli).mockClear();
+
+        const otherUri = makeUri('/project/other.mthds');
+        mockState.onDocChangeHandler!({ document: { uri: otherUri, isDirty: false } });
+
+        await new Promise(r => setTimeout(r, 600));
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
+
+        panel.dispose();
+    });
+
+    it('external change after panel closed does not crash', () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.dispose();
+
+        const uri = makeUri('/project/file.mthds');
+        expect(() => mockState.onDocChangeHandler!({ document: { uri, isDirty: false } })).not.toThrow();
     });
 });

@@ -12,6 +12,10 @@ use pipelex_cli::{
 #[tokio::main]
 async fn main() {
     let cli = PlxtArgs::parse();
+    let quiet = cli.quiet;
+    if quiet {
+        std::env::set_var("RUST_LOG", "off");
+    }
     setup_stderr_logging(
         NativeEnvironment::new(),
         cli.log_spans,
@@ -33,7 +37,9 @@ async fn main() {
             exit(0);
         }
         Err(error) => {
-            tracing::error!(error = %format!("{error:#}"), "operation failed");
+            if !quiet {
+                tracing::error!(error = %format!("{error:#}"), "operation failed");
+            }
             exit(1);
         }
     }

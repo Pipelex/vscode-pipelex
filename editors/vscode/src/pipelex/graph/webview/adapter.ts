@@ -80,6 +80,14 @@ function handleMessage(event: { data: any }) {
         if (message.uri) {
             vscode.setState({ uri: message.uri });
         }
+
+        // Save viewport before updating — GraphViewer re-layouts and calls
+        // fitView on every graphspec change. We restore it afterwards so
+        // in-place refreshes preserve the user's zoom & pan position.
+        const savedViewport = currentGraphspec && reactFlowInstance
+            ? reactFlowInstance.getViewport()
+            : null;
+
         currentGraphspec = message.graphspec || null;
         currentConfig = message.config || {};
         currentDirection = (currentConfig.direction || 'TB') as GraphDirection;
@@ -95,6 +103,15 @@ function handleMessage(event: { data: any }) {
         }
 
         if (renderApp) renderApp();
+
+        // Restore viewport after GraphViewer's layout timeout (100ms)
+        if (savedViewport) {
+            setTimeout(() => {
+                if (reactFlowInstance) {
+                    reactFlowInstance.setViewport(savedViewport);
+                }
+            }, 200);
+        }
     }
 }
 

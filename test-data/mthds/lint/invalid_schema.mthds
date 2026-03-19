@@ -1,0 +1,15 @@
+domain      = "test_lint_invalid"
+description = "An MTHDS file with schema errors for lint tests"
+
+[concept]
+
+[concept.Greeting]
+description = "A simple greeting"
+
+[pipe]
+
+[pipe.bad_pipe]
+type        = "UnknownPipeType"
+description = "This pipe has an invalid type"
+output      = "Greeting"
+model       = "$default"

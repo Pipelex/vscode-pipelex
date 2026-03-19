@@ -1,0 +1,15 @@
+domain      = "test_lint"
+description = "A minimal valid MTHDS file for lint tests"
+
+[concept]
+
+[concept.Greeting]
+description = "A simple greeting"
+
+[pipe]
+
+[pipe.say_hello]
+type        = "PipeLLM"
+description = "Generate a greeting"
+output      = "Greeting"
+model       = "$default"
