@@ -128,6 +128,7 @@ export class MethodGraphPanel implements vscode.Disposable {
         this.panel.onDidDispose(() => {
             this.panel = undefined;
             this.currentUri = undefined;
+            this.webviewReady = false;
         });
         this.panel.webview.onDidReceiveMessage(
             message => this.handleWebviewMessage(message),
