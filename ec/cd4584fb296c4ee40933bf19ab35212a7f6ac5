@@ -1,0 +1,25 @@
+editors/vscode/scripts/build.mjs
+  0b3472aa66fbbd23 3,33-35,37-40,52-55
+editors/vscode/src/pipelex/graph/webview/graph.css
+  0b3472aa66fbbd23 160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "eccd4584fb296c4ee40933bf19ab35212a7f6ac5",
+  "prompts": {
+    "0b3472aa66fbbd23": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "936a1975-4b8c-40fb-91ab-1a9ae24d0cbe",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
