@@ -14,9 +14,7 @@ The reference toolchain for the MTHDS open standard — editing, formatting, lin
 The Pipelex CLI for formatting and linting MTHDS and TOML files. Install via PyPI:
 
 ```bash
-pip install pipelex-tools
-# or
-uv add pipelex-tools
+uv tool install pipelex-tools
 ```
 
 | Command | Description |
