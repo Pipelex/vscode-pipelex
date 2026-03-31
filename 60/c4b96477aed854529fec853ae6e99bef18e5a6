@@ -1,0 +1,36 @@
+Makefile
+  7e71e1a34426a834 25,27,138-140,142,144,146,148-150,152-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "60c4b96477aed854529fec853ae6e99bef18e5a6",
+  "prompts": {
+    "0b3472aa66fbbd23": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "936a1975-4b8c-40fb-91ab-1a9ae24d0cbe",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 3,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    },
+    "7e71e1a34426a834": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "864f1204-0cbc-4fb3-bef1-fcd212feb3eb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 18,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}
