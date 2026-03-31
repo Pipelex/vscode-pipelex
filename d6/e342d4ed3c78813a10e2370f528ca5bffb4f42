@@ -1,0 +1,29 @@
+README.md
+  c2486f6f68b1f8db 17
+docs/pipelex/README.header.md
+  c2486f6f68b1f8db 14
+docs/pipelex/PYPI_README.md
+  c2486f6f68b1f8db 10
+docs/guide/plxt-usage-guide.md
+  c2486f6f68b1f8db 19,22,329
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "d6e342d4ed3c78813a10e2370f528ca5bffb4f42",
+  "prompts": {
+    "c2486f6f68b1f8db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0525cc66-2ea7-4673-ae56-4bd05220980d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 16,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
