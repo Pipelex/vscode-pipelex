@@ -1,0 +1,23 @@
+editors/vscode/package.json
+  0d3a711b98377d1c 736
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "e8c0716b26b36c4c90636adb99bcb08ecdfb7e3c",
+  "prompts": {
+    "0d3a711b98377d1c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d302a61e-5b97-47b8-966c-c3dcb03b7b3a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 4,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
