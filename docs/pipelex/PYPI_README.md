@@ -7,11 +7,7 @@ CLI for formatting, linting, and language-server support for MTHDS and TOML file
 ## Installation
 
 ```bash
-pip install pipelex-tools
-```
-
-```bash
-uv add pipelex-tools
+uv tool install pipelex-tools
 ```
 
 ```bash

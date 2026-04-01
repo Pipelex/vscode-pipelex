@@ -16,12 +16,10 @@ The Pipelex toolchain provides formatting, linting, and language-server support 
 
 ## Installation
 
-### CLI via pip (recommended)
+### CLI via uv (recommended)
 
 ```sh
-pip install pipelex-tools
-# or
-uv add pipelex-tools
+uv tool install pipelex-tools
 ```
 
 This installs the `plxt` binary.
@@ -328,7 +326,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install plxt
-        run: pip install pipelex-tools
+        run: uv tool install pipelex-tools
 
       - name: Check formatting
         run: plxt fmt --check --diff

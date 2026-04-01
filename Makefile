@@ -22,9 +22,9 @@ PYTHON_VERSION    ?= 3.13
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help sync-grammar s update-schema up update-deps ud
+.PHONY: help sync-grammar s update-schema up
 .PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check fmt-check fmt lint plxt-lint docs
-.PHONY: link-local unlink-local ll ul
+.PHONY: use-github use-local ug ul
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -135,25 +135,20 @@ update-schema: ## Download the latest MTHDS JSON Schema
 
 up: update-schema
 
-update-deps: ## Update mthds-ui from GitHub
-	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@github:Pipelex/mthds-ui
-	@echo "Updated @pipelex/mthds-ui from GitHub"
+# --- Switch mthds-ui source ---
+# use-local: portal link to sibling ../mthds-ui for live development
+# use-github: install from GitHub to test the published version
 
-ud: update-deps  ## Shorthand for update-deps
+use-github: ## Switch back to pinned GitHub mthds-ui
+	cd $(EXT_DIR) && git checkout -- package.json yarn.lock && yarn install --immutable
+	@echo "Restored pinned GitHub mthds-ui. Run 'make use-local' to switch back."
 
-# --- Local mthds-ui development ---
+use-local: ## Switch to local mthds-ui (portal link)
+	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@portal:../../../mthds-ui
+	@echo "Switched to local mthds-ui (portal link). Run 'make use-github' to switch back."
 
-link-local: ## Switch to local mthds-ui (portal: link)
-	rm -rf $(EXT_DIR)/node_modules/@pipelex/mthds-ui
-	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@portal:../../../mthds-ui  # ../../../ = repo root's parent (Pipelex/)
-	@echo "Switched to local mthds-ui (portal link)"
-
-unlink-local: ## Switch back to GitHub mthds-ui (restore checked-in state)
-	cd $(EXT_DIR) && git checkout -- package.json yarn.lock && yarn install --immutable  # restores git-committed deps
-	@echo "Restored checked-in mthds-ui dependency"
-
-ll: link-local  ## Shorthand for link-local
-ul: unlink-local  ## Shorthand for unlink-local
+ug: use-github
+ul: use-local
 
 $(GRAMMAR_DST): $(GRAMMAR_SRC)
 	@mkdir -p $(WEBSITE_SHIKI_DIR)

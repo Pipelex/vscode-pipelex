@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { cpSync, mkdirSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import esbuild from "esbuild";
@@ -30,9 +30,14 @@ cpSync(
   "./node_modules/@xyflow/react/dist/style.css",
   "./dist/pipelex/graph/webview/xyflow.css",
 );
-cpSync(
-  "./node_modules/@pipelex/mthds-ui/dist/graph/react/graph-core.css",
+// Strip bare-module @import that can't resolve in the webview context
+// (xyflow styles are already loaded via a separate <link> tag)
+writeFileSync(
   "./dist/pipelex/graph/webview/graph-core.css",
+  readFileSync(
+    "./node_modules/@pipelex/mthds-ui/dist/graph/react/graph-core.css",
+    "utf-8",
+  ).replace(/@import\s+["'][^"']*["'];?\s*\n?/g, ""),
 );
 
 // Bundle webview TypeScript → single IIFE script
@@ -44,6 +49,10 @@ esbuild.buildSync({
   format: "iife",
   target: "es2020",
   jsx: "automatic",
+  // Treat CSS imports as no-ops — CSS is loaded via <link> tags in graph.html,
+  // not bundled. Without this, esbuild emits a graph.css that overwrites the
+  // manually-copied extension CSS (toolbar styles, theme vars, layout).
+  loader: { ".css": "empty" },
   alias: {
     "react": reactDir,
     "react-dom": reactDomDir,
