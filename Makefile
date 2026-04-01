@@ -139,9 +139,9 @@ up: update-schema
 # use-local: symlink to sibling ../mthds-ui for live development
 # use-github: install from GitHub to test the published version
 
-use-github: ## Switch to GitHub mthds-ui
-	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@github:Pipelex/mthds-ui
-	@echo "Now using GitHub mthds-ui. Run 'make use-local' to switch back."
+use-github: ## Switch back to pinned GitHub mthds-ui
+	cd $(EXT_DIR) && git checkout -- package.json yarn.lock && yarn install --immutable
+	@echo "Restored pinned GitHub mthds-ui. Run 'make use-local' to switch back."
 
 use-local: ## Switch to local mthds-ui (symlink)
 	rm -rf $(EXT_DIR)/node_modules/@pipelex/mthds-ui
