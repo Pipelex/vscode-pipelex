@@ -329,10 +329,12 @@ export class MethodGraphPanel implements vscode.Disposable {
         const jsUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph.js'));
         const xyflowCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'xyflow.css'));
         const graphCoreCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph-core.css'));
+        const stuffViewerCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'stuff-viewer.css'));
 
         html = html.replace('{{XYFLOW_CSS_URI}}', xyflowCssUri.toString());
         html = html.replace('{{GRAPH_CORE_CSS_URI}}', graphCoreCssUri.toString());
         html = html.replace('{{GRAPH_CSS_URI}}', cssUri.toString());
+        html = html.replace('{{STUFF_VIEWER_CSS_URI}}', stuffViewerCssUri.toString());
         html = html.replace('{{GRAPH_JS_URI}}', jsUri.toString());
 
         return html;
@@ -409,7 +411,7 @@ export class MethodGraphPanel implements vscode.Disposable {
             // Replace all sentinel occurrences with the real nonce
             html = html.replace(new RegExp(MethodGraphPanel.CSP_NONCE_SENTINEL, 'g'), nonce);
             // Inject full CSP meta tag into <head>
-            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' ${cspSource} https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; connect-src 'none';">`;
+            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' ${cspSource} https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; object-src ${cspSource} data: blob:; connect-src 'none';">`;
             html = html.replace('<head>', `<head>\n${cspMeta}`);
         } else {
             // Simple HTML (loading/message): add nonce to <style> tags, minimal CSP

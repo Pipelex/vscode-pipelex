@@ -1,7 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import type { GraphSpec, GraphConfig, GraphDirection } from '@pipelex/mthds-ui';
-import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
+import { GraphViewer, StuffViewer } from '@pipelex/mthds-ui/graph/react';
+import type { StuffViewerData } from '@pipelex/mthds-ui/graph/react';
 
 // VS Code webview API
 const vscode = acquireVsCodeApi();
@@ -23,6 +24,10 @@ let currentConfig: GraphConfig = {};
 let currentShowControllers = false;
 let renderApp: (() => void) | null = null;
 
+// Stuff inspector state
+let currentStuffData: StuffViewerData | null = null;
+let stuffRoot: ReturnType<typeof createRoot> | null = null;
+
 // Expose ReactFlow instance for zoom toolbar buttons
 let reactFlowInstance: any = null;
 
@@ -31,6 +36,12 @@ function applyDirectionIcon(direction: string) {
     document.querySelectorAll('.direction-icon').forEach(icon => icon.classList.remove('active'));
     const targetIcon = document.querySelector(direction === 'LR' ? '.tb-icon' : '.lr-icon');
     if (targetIcon) targetIcon.classList.add('active');
+}
+
+// Show/hide the stuff inspector panel
+function showInspector(visible: boolean) {
+    const el = document.getElementById('stuff-inspector');
+    if (el) el.style.display = visible ? 'flex' : 'none';
 }
 
 // Direction toggle button
@@ -60,6 +71,13 @@ controllersToggle.addEventListener('change', () => {
     if (renderApp) renderApp();
 });
 
+// Stuff inspector close button
+document.getElementById('stuff-inspector-close')!.addEventListener('click', () => {
+    currentStuffData = null;
+    showInspector(false);
+    if (renderApp) renderApp();
+});
+
 // --- Callbacks passed to GraphViewer ---
 
 function onNavigateToPipe(pipeCode: string) {
@@ -69,6 +87,12 @@ function onNavigateToPipe(pipeCode: string) {
 function onReactFlowInit(instance: any) {
     reactFlowInstance = instance;
     (window as any)._reactFlowInstance = instance;
+}
+
+function onStuffNodeClick(stuffData: StuffViewerData) {
+    currentStuffData = stuffData;
+    showInspector(true);
+    if (renderApp) renderApp();
 }
 
 // --- Message handling ---
@@ -94,6 +118,10 @@ function handleMessage(event: { data: any }) {
         currentShowControllers = currentConfig.showControllers || false;
         controllersToggle.checked = currentShowControllers;
         applyDirectionIcon(currentDirection);
+
+        // Clear stuff inspector on new graph data
+        currentStuffData = null;
+        showInspector(false);
 
         // Apply palette colors as CSS custom properties on <body>
         if (currentConfig.paletteColors) {
@@ -124,6 +152,7 @@ function App() {
         direction: currentDirection,
         showControllers: currentShowControllers,
         onNavigateToPipe,
+        onStuffNodeClick,
         onReactFlowInit,
     });
 }
@@ -133,6 +162,16 @@ const root = createRoot(document.getElementById('root')!);
 
 renderApp = () => {
     root.render(React.createElement(App));
+
+    // Render StuffViewer in inspector panel
+    if (currentStuffData) {
+        if (!stuffRoot) {
+            stuffRoot = createRoot(document.getElementById('stuff-viewer-root')!);
+        }
+        stuffRoot.render(React.createElement(StuffViewer, { stuff: currentStuffData }));
+    } else if (stuffRoot) {
+        stuffRoot.render(null);
+    }
 };
 renderApp();
 
