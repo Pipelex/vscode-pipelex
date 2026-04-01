@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.5.5] - 2026-04-01
+
+### Changed
+- Pin @pipelex/mthds-ui to v0.2.0 and remove redundant or obsolete dependencies
+- Improve Makefile dependency switcher for mthds-ui (local vs GitHub)
+
 ## [0.5.4] - 2026-03-19
 
 ### Added
