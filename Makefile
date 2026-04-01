@@ -136,18 +136,16 @@ update-schema: ## Download the latest MTHDS JSON Schema
 up: update-schema
 
 # --- Switch mthds-ui source ---
-# use-local: symlink to sibling ../mthds-ui for live development
+# use-local: portal link to sibling ../mthds-ui for live development
 # use-github: install from GitHub to test the published version
 
 use-github: ## Switch back to pinned GitHub mthds-ui
 	cd $(EXT_DIR) && git checkout -- package.json yarn.lock && yarn install --immutable
 	@echo "Restored pinned GitHub mthds-ui. Run 'make use-local' to switch back."
 
-use-local: ## Switch to local mthds-ui (symlink)
-	rm -rf $(EXT_DIR)/node_modules/@pipelex/mthds-ui
-	mkdir -p $(EXT_DIR)/node_modules/@pipelex
-	ln -s ../../../../../mthds-ui $(EXT_DIR)/node_modules/@pipelex/mthds-ui
-	@echo "Now using local mthds-ui (symlink). Run 'make use-github' to switch back."
+use-local: ## Switch to local mthds-ui (portal link)
+	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@portal:../../../mthds-ui
+	@echo "Switched to local mthds-ui (portal link). Run 'make use-github' to switch back."
 
 ug: use-github
 ul: use-local
