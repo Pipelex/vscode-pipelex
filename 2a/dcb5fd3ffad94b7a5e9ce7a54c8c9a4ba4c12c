@@ -1,0 +1,25 @@
+.githooks/pre-commit
+  dc766de622014526 1-8
+Makefile
+  dc766de622014526 26-27,114-121,153,157-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "2adcb5fd3ffad94b7a5e9ce7a54c8c9a4ba4c12c",
+  "prompts": {
+    "dc766de622014526": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc7d5025-27c0-4243-8b75-8c0c0c57fa4d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 44,
+      "total_deletions": 16,
+      "accepted_lines": 32,
+      "overriden_lines": 0
+    }
+  }
+}
