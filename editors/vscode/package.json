@@ -733,7 +733,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#3ca1ec735559e4788c8675dc27d83e21dd66fa98",
+    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#51144fdbc4756ec03d29d554eb5d9c5cd9cf51c3",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
