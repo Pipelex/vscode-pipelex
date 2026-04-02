@@ -150,12 +150,21 @@
         {
           "command": "pipelex.runBundle",
           "when": "editorLangId == mthds"
+        },
+        {
+          "command": "pipelex.showGraphSpec",
+          "when": "editorLangId == json && pipelex.isGraphspecJson"
         }
       ],
       "editor/title": [
         {
           "command": "pipelex.showMethodGraph",
           "when": "resourceLangId == mthds",
+          "group": "navigation"
+        },
+        {
+          "command": "pipelex.showGraphSpec",
+          "when": "editorLangId == json && pipelex.isGraphspecJson",
           "group": "navigation"
         }
       ],
@@ -192,6 +201,11 @@
       {
         "command": "pipelex.showMethodGraph",
         "title": "Pipelex: Show Method Graph",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "pipelex.showGraphSpec",
+        "title": "Pipelex: Show Run Graph",
         "icon": "$(type-hierarchy)"
       },
       {
@@ -733,7 +747,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#feature/Stuff-viewer",
+    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#82d413a0800b565a7eb4965500e1aa01129d63d0",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",

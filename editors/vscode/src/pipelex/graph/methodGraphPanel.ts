@@ -7,12 +7,14 @@ import { extractJson } from '../validation/pipelexValidator';
 import type { ValidationFailure } from '../validation/types';
 import { findTableHeader } from '../validation/sourceLocator';
 import { resolveGraphConfig, getPaletteColors } from './graphConfig';
+import { parseGraphspecFile } from './graphspecDetector';
 
 export class MethodGraphPanel implements vscode.Disposable {
     private static readonly CSP_NONCE_SENTINEL = 'PIPELEX_CSP_NONCE';
 
     private panel: vscode.WebviewPanel | undefined;
     private currentUri: vscode.Uri | undefined;
+    private sourceKind: 'mthds' | 'graphspec-json' | undefined;
     private readonly disposables: vscode.Disposable[] = [];
     private readonly inflight = new Map<string, AbortController>();
     private readonly output: vscode.OutputChannel;
@@ -29,7 +31,11 @@ export class MethodGraphPanel implements vscode.Disposable {
         this.disposables.push(
             vscode.workspace.onDidSaveTextDocument(doc => {
                 if (this.currentUri && doc.uri.toString() === this.currentUri.toString()) {
-                    this.refresh(doc.uri);
+                    if (this.sourceKind === 'graphspec-json') {
+                        this.refreshJson(doc.uri);
+                    } else {
+                        this.refresh(doc.uri);
+                    }
                 }
             })
         );
@@ -41,7 +47,7 @@ export class MethodGraphPanel implements vscode.Disposable {
                     && !event.document.isDirty) {
                     // Document changed but is not dirty → external tool wrote to disk
                     // and the editor reloaded it. Debounce to coalesce rapid writes.
-                    this.debouncedRefresh(event.document.uri);
+                    this.debouncedRefresh(event.document.uri, this.sourceKind === 'graphspec-json');
                 }
             })
         );
@@ -73,6 +79,14 @@ export class MethodGraphPanel implements vscode.Disposable {
                     if (!this.currentUri || newUri.toString() !== this.currentUri.toString()) {
                         this.show(newUri);
                     }
+                } else if (editor.document.languageId === 'json' && editor.document.uri.scheme === 'file') {
+                    const graphspec = parseGraphspecFile(editor.document.getText());
+                    if (graphspec) {
+                        const newUri = editor.document.uri;
+                        if (!this.currentUri || newUri.toString() !== this.currentUri.toString()) {
+                            this.showGraphspecJson(newUri);
+                        }
+                    }
                 }
             })
         );
@@ -80,6 +94,7 @@ export class MethodGraphPanel implements vscode.Disposable {
 
     show(uri: vscode.Uri) {
         this.currentUri = uri;
+        this.sourceKind = 'mthds';
         const filename = uri.fsPath.replace(/^.*[\\/]/, '');
 
         if (this.panel) {
@@ -105,6 +120,7 @@ export class MethodGraphPanel implements vscode.Disposable {
     restore(panel: vscode.WebviewPanel, uri: vscode.Uri) {
         this.panel = panel;
         this.currentUri = uri;
+        this.sourceKind = 'mthds';
 
         const filename = uri.fsPath.replace(/^.*[\\/]/, '');
         this.panel.title = `Method Graph — ${filename}`;
@@ -119,6 +135,48 @@ export class MethodGraphPanel implements vscode.Disposable {
         this.refresh(uri);
     }
 
+    showGraphspecJson(uri: vscode.Uri) {
+        this.currentUri = uri;
+        this.sourceKind = 'graphspec-json';
+        const filename = uri.fsPath.replace(/^.*[\\/]/, '');
+
+        if (this.panel) {
+            this.panel.title = `Run Graph — ${filename}`;
+            this.panel.reveal(undefined, true);
+        } else {
+            this.panel = vscode.window.createWebviewPanel(
+                'pipelexMethodGraph',
+                `Run Graph — ${filename}`,
+                { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: [this.webviewDir()],
+                }
+            );
+            this.wirePanel();
+        }
+
+        this.refreshJson(uri);
+    }
+
+    restoreGraphspecJson(panel: vscode.WebviewPanel, uri: vscode.Uri) {
+        this.panel = panel;
+        this.currentUri = uri;
+        this.sourceKind = 'graphspec-json';
+
+        const filename = uri.fsPath.replace(/^.*[\\/]/, '');
+        this.panel.title = `Run Graph — ${filename}`;
+
+        this.panel.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [this.webviewDir()],
+        };
+
+        this.wirePanel();
+        this.refreshJson(uri);
+    }
+
     private webviewDir(): vscode.Uri {
         return vscode.Uri.joinPath(this.extensionUri, 'dist', 'pipelex', 'graph', 'webview');
     }
@@ -128,6 +186,7 @@ export class MethodGraphPanel implements vscode.Disposable {
         this.panel.onDidDispose(() => {
             this.panel = undefined;
             this.currentUri = undefined;
+            this.sourceKind = undefined;
             this.webviewReady = false;
         });
         this.panel.webview.onDidReceiveMessage(
@@ -148,13 +207,17 @@ export class MethodGraphPanel implements vscode.Disposable {
         }
     }
 
-    private debouncedRefresh(uri: vscode.Uri) {
+    private debouncedRefresh(uri: vscode.Uri, isJson = false) {
         if (this.fileWatcherDebounce) {
             clearTimeout(this.fileWatcherDebounce);
         }
         this.fileWatcherDebounce = setTimeout(() => {
             this.fileWatcherDebounce = undefined;
-            this.refresh(uri);
+            if (isJson) {
+                this.refreshJson(uri);
+            } else {
+                this.refresh(uri);
+            }
         }, 500);
     }
 
@@ -223,45 +286,10 @@ export class MethodGraphPanel implements vscode.Disposable {
                 return;
             }
 
-            const webviewHtml = this.buildWebviewHtml();
-            if (!webviewHtml) {
-                this.setHtml(messageHtml(
-                    'Webview Error',
-                    'Could not load graph webview assets.'
-                ));
-                return;
-            }
-            // Map VS Code setting (left_to_right/top_down) → Dagre format (LR/TB)
-            const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
-            const graphConfig = await resolveGraphConfig();
-
             if (controller.signal.aborted) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
 
-            const setDataPayload = {
-                type: 'setData',
-                uri: uri.toString(),
-                graphspec: result.graphspec,
-                config: {
-                    direction: dagreDirection,
-                    showControllers,
-                    nodesep: graphConfig.nodesep,
-                    ranksep: graphConfig.ranksep,
-                    edgeType: graphConfig.edgeType,
-                    initialZoom: graphConfig.initialZoom,
-                    panToTop: graphConfig.panToTop,
-                    paletteColors: getPaletteColors(graphConfig.palette),
-                },
-            };
-
-            if (this.webviewReady && this.panel) {
-                // Webview already loaded — send new data without replacing HTML,
-                // which preserves the ReactFlow viewport (zoom + pan position).
-                this.panel.webview.postMessage(setDataPayload);
-            } else {
-                this.pendingData = setDataPayload;
-                this.setHtml(webviewHtml);
-            }
+            await this.sendGraphspecToWebview(uri, result.graphspec, direction, showControllers);
         } catch (err: any) {
             if (controller.signal.aborted) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
@@ -309,6 +337,96 @@ export class MethodGraphPanel implements vscode.Disposable {
             if (this.inflight.get(uriKey) === controller) {
                 this.inflight.delete(uriKey);
             }
+        }
+    }
+
+    private async refreshJson(uri: vscode.Uri) {
+        if (!this.panel) return;
+
+        // Show loading screen only on first load, same as the .mthds path.
+        // This covers the initial ReactFlow layout pass so the user doesn't
+        // see the graph flash at natural zoom before fitView kicks in.
+        if (!this.webviewReady) {
+            this.setHtml(loadingHtml());
+        }
+
+        let content: string;
+        const openDoc = vscode.workspace.textDocuments.find(
+            d => d.uri.toString() === uri.toString()
+        );
+        if (openDoc) {
+            content = openDoc.getText();
+        } else {
+            try {
+                content = await fs.promises.readFile(uri.fsPath, 'utf-8');
+            } catch (err: any) {
+                this.setHtml(messageHtml('Read Error', `Could not read file: ${escapeHtml(err.message ?? String(err))}`));
+                return;
+            }
+        }
+
+        const graphspec = parseGraphspecFile(content);
+        if (!graphspec) {
+            this.setHtml(messageHtml(
+                'Invalid GraphSpec',
+                'File does not contain a valid MTHDS GraphSpec JSON (missing <code>meta.format</code>, <code>nodes</code>, or <code>edges</code>).'
+            ));
+            return;
+        }
+
+        if (this.currentUri?.toString() !== uri.toString()) return;
+
+        const pipelexConfig = vscode.workspace.getConfiguration('pipelex');
+        const direction = pipelexConfig.get<string>('graph.direction', 'top_down');
+        const showControllers = pipelexConfig.get<boolean>('graph.showControllers', false);
+
+        await this.sendGraphspecToWebview(uri, graphspec, direction, showControllers);
+    }
+
+    private async sendGraphspecToWebview(
+        uri: vscode.Uri,
+        graphspec: unknown,
+        direction: string,
+        showControllers: boolean,
+    ) {
+        if (!this.panel) return;
+
+        const webviewHtml = this.buildWebviewHtml();
+        if (!webviewHtml) {
+            this.setHtml(messageHtml(
+                'Webview Error',
+                'Could not load graph webview assets.'
+            ));
+            return;
+        }
+
+        const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
+        const graphConfig = await resolveGraphConfig();
+
+        if (this.currentUri?.toString() !== uri.toString()) return;
+
+        const setDataPayload = {
+            type: 'setData',
+            uri: uri.toString(),
+            sourceKind: this.sourceKind,
+            graphspec,
+            config: {
+                direction: dagreDirection,
+                showControllers,
+                nodesep: graphConfig.nodesep,
+                ranksep: graphConfig.ranksep,
+                edgeType: graphConfig.edgeType,
+                initialZoom: graphConfig.initialZoom,
+                panToTop: graphConfig.panToTop,
+                paletteColors: getPaletteColors(graphConfig.palette),
+            },
+        };
+
+        if (this.webviewReady && this.panel) {
+            this.panel.webview.postMessage(setDataPayload);
+        } else {
+            this.pendingData = setDataPayload;
+            this.setHtml(webviewHtml);
         }
     }
 
@@ -368,6 +486,7 @@ export class MethodGraphPanel implements vscode.Disposable {
             return;
         }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {
+            if (this.sourceKind === 'graphspec-json') return;
             this.navigateToPipe(message.pipeCode);
         }
     }

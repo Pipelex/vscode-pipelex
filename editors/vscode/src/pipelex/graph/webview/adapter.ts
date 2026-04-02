@@ -22,6 +22,7 @@ let currentDirection: GraphDirection = 'TB';
 let currentGraphspec: GraphSpec | null = null;
 let currentConfig: GraphConfig = {};
 let currentShowControllers = false;
+let currentUri: string | null = null;
 let renderApp: (() => void) | null = null;
 
 // Stuff inspector state
@@ -102,15 +103,25 @@ function handleMessage(event: { data: any }) {
     if (message.type === 'setData') {
         // Persist the source file URI so VS Code can restore after reload
         if (message.uri) {
-            vscode.setState({ uri: message.uri });
+            vscode.setState({ uri: message.uri, sourceKind: message.sourceKind });
         }
 
-        // Save viewport before updating — GraphViewer re-layouts and calls
-        // fitView on every graphspec change. We restore it afterwards so
-        // in-place refreshes preserve the user's zoom & pan position.
-        const savedViewport = currentGraphspec && reactFlowInstance
+        // Only preserve viewport for same-file refreshes (e.g., on save).
+        // When switching to a different file, let fitView run fresh so the
+        // new graph is properly sized instead of inheriting the old zoom.
+        const isSameFile = currentUri !== null && message.uri === currentUri;
+        const savedViewport = isSameFile && currentGraphspec && reactFlowInstance
             ? reactFlowInstance.getViewport()
             : null;
+
+        // Hide graph during layout to prevent flash (nodes appear at natural
+        // zoom before fitView kicks in). Revealed after layout + fitView settle.
+        const rootEl = document.getElementById('root');
+        if (!savedViewport && rootEl) {
+            rootEl.style.visibility = 'hidden';
+        }
+
+        currentUri = message.uri || null;
 
         currentGraphspec = message.graphspec || null;
         currentConfig = message.config || {};
@@ -132,12 +143,17 @@ function handleMessage(event: { data: any }) {
 
         if (renderApp) renderApp();
 
-        // Restore viewport after GraphViewer's layout timeout (100ms)
+        // Restore viewport or reveal after GraphViewer's layout timeout (100ms)
+        // plus its fitView. 200ms gives enough time for both to settle.
         if (savedViewport) {
             setTimeout(() => {
                 if (reactFlowInstance) {
                     reactFlowInstance.setViewport(savedViewport);
                 }
+            }, 200);
+        } else if (rootEl) {
+            setTimeout(() => {
+                rootEl.style.visibility = 'visible';
             }, 200);
         }
     }

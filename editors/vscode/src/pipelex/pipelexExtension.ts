@@ -100,13 +100,33 @@ async function registerNodeFeatures(
 
     // Method graph webview panel
     const { MethodGraphPanel } = await import('./graph/methodGraphPanel');
+    const { isGraphspecJson } = await import('./graph/graphspecDetector');
     const graphPanel = new MethodGraphPanel(getOutput(), context.extensionUri);
     context.subscriptions.push(graphPanel);
+
+    // Context key: set pipelex.isGraphspecJson when the active editor is a valid GraphSpec JSON
+    context.subscriptions.push(
+        vscode.window.onDidChangeActiveTextEditor(editor => {
+            let isGraphspec = false;
+            if (editor?.document.languageId === 'json' && editor.document.uri.scheme === 'file') {
+                try {
+                    isGraphspec = isGraphspecJson(editor.document.getText());
+                } catch { /* ignore */ }
+            }
+            vscode.commands.executeCommand('setContext', 'pipelex.isGraphspecJson', isGraphspec);
+        })
+    );
+
     context.subscriptions.push(
         vscode.window.registerWebviewPanelSerializer('pipelexMethodGraph', {
             async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: any) {
                 if (state?.uri) {
-                    graphPanel.restore(panel, vscode.Uri.parse(state.uri));
+                    const uri = vscode.Uri.parse(state.uri);
+                    if (state.sourceKind === 'graphspec-json') {
+                        graphPanel.restoreGraphspecJson(panel, uri);
+                    } else {
+                        graphPanel.restore(panel, uri);
+                    }
                 } else {
                     panel.dispose();
                 }
@@ -121,6 +141,22 @@ async function registerNodeFeatures(
                 return;
             }
             graphPanel.show(editor.document.uri);
+        })
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('pipelex.showGraphSpec', () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.languageId !== 'json') {
+                vscode.window.showWarningMessage('Open a GraphSpec JSON file to view the run graph.');
+                return;
+            }
+            if (!isGraphspecJson(editor.document.getText())) {
+                vscode.window.showWarningMessage(
+                    'This JSON file is not a valid MTHDS GraphSpec (missing meta.format = "mthds").'
+                );
+                return;
+            }
+            graphPanel.showGraphspecJson(editor.document.uri);
         })
     );
 }

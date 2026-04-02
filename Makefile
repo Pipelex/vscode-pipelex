@@ -169,6 +169,7 @@ pin-mthds-ui: ## Pin mthds-ui to a tag (default: latest). Usage: make pin-mthds-
 
 ug: use-github
 ul: use-local
+pmu: pin-mthds-ui
 
 $(GRAMMAR_DST): $(GRAMMAR_SRC)
 	@mkdir -p $(WEBSITE_SHIKI_DIR)
