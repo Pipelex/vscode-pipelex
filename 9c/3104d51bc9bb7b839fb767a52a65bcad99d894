@@ -1,0 +1,31 @@
+CHANGELOG.md
+  bf4e774e06618677 3-8
+editors/vscode/package.json
+  bf4e774e06618677 5
+editors/vscode/src/pipelex/pipelexExtension.ts
+  bf4e774e06618677 120-131
+.githooks/pre-commit
+  bf4e774e06618677 4
+Makefile
+  bf4e774e06618677 115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "9c3104d51bc9bb7b839fb767a52a65bcad99d894",
+  "prompts": {
+    "bf4e774e06618677": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3569080-2f90-478e-8bb5-dab86a09b9e6",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 23,
+      "total_deletions": 5,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    }
+  }
+}
