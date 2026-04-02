@@ -1,5 +1,22 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.6.0] - 2026-04-02
+
+### Added
+- GraphSpec JSON viewer: display run-result graphs directly from GraphSpec JSON files without the CLI — detected via `meta.format = "mthds"`
+- New command "Pipelex: Show Run Graph" with editor title button for GraphSpec JSON files
+- StuffViewer inspector panel in the graph webview: click a data node to inspect its content in a side panel
+- Makefile shortcut `make pmu` for `pin-mthds-ui`
+
+### Changed
+- Upgrade @pipelex/mthds-ui to v0.2.1 (StuffViewer support, graph improvements)
+- Pre-commit hook now blocks `portal:` and `file:` dependency links from being committed
+
+### Fixed
+- Fix viewport flash when switching between graphs: hide graph during layout, reveal after fitView settles
+- Fix zoom level incorrectly preserved across different files — each file switch now runs fitView fresh
+- Strip VS Code default webview padding from graph panel for full-bleed rendering
+
 ## [0.5.5] - 2026-04-01
 
 ### Changed

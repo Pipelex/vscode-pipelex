@@ -30,9 +30,11 @@ vi.mock('vscode', () => ({
         activeTextEditor: undefined,
         createOutputChannel: vi.fn(() => ({ appendLine: vi.fn(), dispose: vi.fn() })),
         registerWebviewPanelSerializer: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
     },
     commands: {
         registerCommand: mockState.registerCommand,
+        executeCommand: vi.fn(),
     },
     languages: {
         registerDocumentSemanticTokensProvider: mockState.registerDocumentSemanticTokensProvider,
@@ -70,10 +72,16 @@ vi.mock('../graph/methodGraphPanel', () => {
         MethodGraphPanel: class {
             constructor() { mockState.graphPanelConstructed = true; }
             show() {}
+            showGraphspecJson() {}
+            restoreGraphspecJson() {}
             dispose() {}
         },
     };
 });
+
+vi.mock('../graph/graphspecDetector', () => ({
+    isGraphspecJson: vi.fn(() => false),
+}));
 
 // ---------- Import SUT ----------
 import { registerPipelexFeatures } from '../pipelexExtension';

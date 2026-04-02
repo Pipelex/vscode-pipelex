@@ -23,8 +23,8 @@ PYTHON_VERSION    ?= 3.13
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s update-schema up
-.PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check fmt-check fmt lint plxt-lint docs
-.PHONY: use-github use-local ug ul
+.PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
+.PHONY: use-github use-local ug ul pin-mthds-ui
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -111,7 +111,14 @@ test: ## Run all tests (Rust + VS Code extension)
 	cargo test -p taplo-lsp
 	cd $(EXT_DIR) && yarn test
 
-check: fmt-check lint test ## Full quality gate (format + lint + test + compilation)
+check-no-local-deps: ## Fail if a local mthds-ui link would be committed
+	@! grep -q 'mthds-ui.*portal:\|mthds-ui.*file:' $(EXT_DIR)/package.json || \
+		{ echo "ERROR: Local mthds-ui link in $(EXT_DIR)/package.json. Run 'make use-github' first."; exit 1; }
+
+setup-hooks: ## Configure git to use .githooks/ for hooks
+	@git config core.hooksPath .githooks
+
+check: check-no-local-deps fmt-check lint test ## Full quality gate (format + lint + test + compilation)
 	cargo check -p pipelex-cli --locked
 	cargo check -p pipelex-wasm --target wasm32-unknown-unknown --locked
 
@@ -143,12 +150,26 @@ use-github: ## Switch back to pinned GitHub mthds-ui
 	cd $(EXT_DIR) && git checkout -- package.json yarn.lock && yarn install --immutable
 	@echo "Restored pinned GitHub mthds-ui. Run 'make use-local' to switch back."
 
-use-local: ## Switch to local mthds-ui (portal link)
+use-local: setup-hooks ## Switch to local mthds-ui (portal link)
 	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@portal:../../../mthds-ui
 	@echo "Switched to local mthds-ui (portal link). Run 'make use-github' to switch back."
 
+pin-mthds-ui: ## Pin mthds-ui to a tag (default: latest). Usage: make pin-mthds-ui [TAG=v0.3.0]
+	@if [ -n "$${TAG:-}" ]; then \
+		SHA=$$(gh api repos/Pipelex/mthds-ui/tags --jq ".[] | select(.name == \"$$TAG\") | .commit.sha") && \
+		if [ -z "$$SHA" ]; then echo "ERROR: Tag $$TAG not found in Pipelex/mthds-ui"; exit 1; fi; \
+	else \
+		PAIR=$$(gh api repos/Pipelex/mthds-ui/tags --jq '.[0] | "\(.name) \(.commit.sha)"') && \
+		TAG=$$(echo "$$PAIR" | cut -d' ' -f1) && SHA=$$(echo "$$PAIR" | cut -d' ' -f2) && \
+		if [ -z "$$TAG" ]; then echo "ERROR: No tags found in Pipelex/mthds-ui"; exit 1; fi; \
+	fi && \
+	echo "Pinning @pipelex/mthds-ui to $$TAG ($$SHA)" && \
+	cd $(EXT_DIR) && yarn add "@pipelex/mthds-ui@github:Pipelex/mthds-ui#$$SHA" && \
+	echo "Done. Review the diff, then commit package.json + yarn.lock."
+
 ug: use-github
 ul: use-local
+pmu: pin-mthds-ui
 
 $(GRAMMAR_DST): $(GRAMMAR_SRC)
 	@mkdir -p $(WEBSITE_SHIKI_DIR)

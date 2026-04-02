@@ -143,6 +143,11 @@ body.vscode-high-contrast-light {
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100vw;
+}
 body {
     font-family: var(--font-sans);
     height: 100vh;
@@ -152,15 +157,47 @@ body {
 }
 #app-container {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     margin-top: 37px;
     height: calc(100vh - 37px); /* Leave room for toolbar */
 }
 #root {
     position: relative;
     flex: 1;
-    width: 100%;
+    min-width: 0;
     overflow: hidden;
+}
+/* Stuff Inspector Panel
+   Visibility is toggled by adapter.ts: display:none (hidden) / display:flex (shown).
+   All other flex properties are set here; display is managed by JS inline style. */
+.stuff-inspector {
+    flex-direction: column;
+    width: 380px;
+    min-width: 300px;
+    height: 100%;
+    border-left: 1px solid var(--color-border);
+    background: var(--color-surface);
+    overflow: hidden;
+}
+.stuff-inspector-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+.stuff-inspector-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+#stuff-viewer-root {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
 }
 /* Toolbar */
 .toolbar {
