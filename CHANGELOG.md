@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.6.1] - 2026-04-02
+
+### Fixed
+- Fix GraphSpec JSON context key not initialized when extension activates with a JSON file already open — "Show Run Graph" button was invisible until switching editors
+- Fix pre-commit hook and Makefile local-deps guard using GNU-only grep syntax that silently passes on macOS
+
 ## [0.6.0] - 2026-04-02
 
 ### Added

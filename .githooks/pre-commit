@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if grep -q 'mthds-ui.*portal:\|mthds-ui.*file:' editors/vscode/package.json 2>/dev/null; then
+if grep -qE 'mthds-ui.*(portal:|file:)' editors/vscode/package.json 2>/dev/null; then
     echo "ERROR: Local mthds-ui link detected in editors/vscode/package.json."
     echo "Run 'make use-github' before committing."
     exit 1

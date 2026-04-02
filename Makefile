@@ -112,7 +112,7 @@ test: ## Run all tests (Rust + VS Code extension)
 	cd $(EXT_DIR) && yarn test
 
 check-no-local-deps: ## Fail if a local mthds-ui link would be committed
-	@! grep -q 'mthds-ui.*portal:\|mthds-ui.*file:' $(EXT_DIR)/package.json || \
+	@! grep -qE 'mthds-ui.*(portal:|file:)' $(EXT_DIR)/package.json || \
 		{ echo "ERROR: Local mthds-ui link in $(EXT_DIR)/package.json. Run 'make use-github' first."; exit 1; }
 
 setup-hooks: ## Configure git to use .githooks/ for hooks
