@@ -1,0 +1,25 @@
+CHANGELOG.md
+  8fdc8d77b51c41df 3-19
+editors/vscode/package.json
+  8fdc8d77b51c41df 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "47d6cd2fbce0cba3c90ca152e726e971529fb43a",
+  "prompts": {
+    "8fdc8d77b51c41df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ebdcac7f-7297-4a16-8a25-08cce9a71565",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 1,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}
