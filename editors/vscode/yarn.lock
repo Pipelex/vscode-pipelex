@@ -483,9 +483,9 @@ __metadata:
   languageName: node
   linkType: soft
 
-"@pipelex/mthds-ui@github:Pipelex/mthds-ui#82d413a0800b565a7eb4965500e1aa01129d63d0":
-  version: 0.2.1
-  resolution: "@pipelex/mthds-ui@https://github.com/Pipelex/mthds-ui.git#commit=82d413a0800b565a7eb4965500e1aa01129d63d0"
+"@pipelex/mthds-ui@github:Pipelex/mthds-ui#8f8e7ff1d4ca56b51051de11dfc9d614cf64c7aa":
+  version: 0.2.2
+  resolution: "@pipelex/mthds-ui@https://github.com/Pipelex/mthds-ui.git#commit=8f8e7ff1d4ca56b51051de11dfc9d614cf64c7aa"
   dependencies:
     "@xyflow/react": "npm:^12"
     dompurify: "npm:^3.3.3"
@@ -501,7 +501,7 @@ __metadata:
       optional: true
     shiki:
       optional: true
-  checksum: b98c17eb5ef49e2d00d879afaec4b1ad2d29e7a7fc46acbcd382b18fca1fc554692c54b66695a890160f954e36fbf0644fd128071b876e040715179148d3864e
+  checksum: 0622a74a2dbc7657a1ae262f8aa8f816c15881162df7b4cd62a4be2587e427342a80800d0bc01f5383f00248538fc83789318c97b597946a6c48de5939a16f6c
   languageName: node
   linkType: hard
 
@@ -3471,7 +3471,7 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
-    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#82d413a0800b565a7eb4965500e1aa01129d63d0"
+    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#8f8e7ff1d4ca56b51051de11dfc9d614cf64c7aa"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
     "@rollup/plugin-replace": "npm:^5.0.5"

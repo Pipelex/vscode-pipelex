@@ -2,6 +2,9 @@
 
 ## [0.6.1] - 2026-04-02
 
+### Changed
+- Upgrade @pipelex/mthds-ui to v0.2.2 (fix bullet alignment in StuffViewer HTML lists)
+
 ### Fixed
 - Fix GraphSpec JSON context key not initialized when extension activates with a JSON file already open — "Show Run Graph" button was invisible until switching editors
 - Fix pre-commit hook and Makefile local-deps guard using GNU-only grep syntax that silently passes on macOS
