@@ -1,0 +1,46 @@
+editors/vscode/package.json
+  8fdc8d77b51c41df 153-156,164-167,207-210
+editors/vscode/src/pipelex/graph/webview/adapter.ts
+  8fdc8d77b51c41df 25,106,109-113,117-125,146-147,154-156
+editors/vscode/src/pipelex/pipelexExtension.ts
+  8fdc8d77b51c41df 103,106-107,109-119,124-129,146-159
+editors/vscode/src/pipelex/__tests__/pipelexExtension.test.ts
+  8fdc8d77b51c41df 33,37,75-76,82-84
+editors/vscode/src/pipelex/graph/methodGraphPanel.ts
+  8fdc8d77b51c41df 10,17,34-38,50,82-89,97,123,138-177,189,210,216-220,292,343-432,489
+editors/vscode/src/pipelex/graph/graphspecDetector.ts
+  8fdc8d77b51c41df 1-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "857a1ec47c780d450298eb2bd76d03e1468bff70",
+  "prompts": {
+    "18ccb840cfe74a5e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1ada7c5-346d-4d64-8370-7b37fc229339",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "8fdc8d77b51c41df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ebdcac7f-7297-4a16-8a25-08cce9a71565",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 276,
+      "total_deletions": 54,
+      "accepted_lines": 269,
+      "overriden_lines": 0
+    }
+  }
+}
