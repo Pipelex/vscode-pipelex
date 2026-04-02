@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -747,7 +747,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#82d413a0800b565a7eb4965500e1aa01129d63d0",
+    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#8f8e7ff1d4ca56b51051de11dfc9d614cf64c7aa",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",

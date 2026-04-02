@@ -117,6 +117,18 @@ async function registerNodeFeatures(
         })
     );
 
+    // Initialize context key for the already-active editor (the event doesn't fire for it)
+    {
+        const activeEditor = vscode.window.activeTextEditor;
+        let isGraphspec = false;
+        if (activeEditor?.document.languageId === 'json' && activeEditor.document.uri.scheme === 'file') {
+            try {
+                isGraphspec = isGraphspecJson(activeEditor.document.getText());
+            } catch { /* ignore */ }
+        }
+        vscode.commands.executeCommand('setContext', 'pipelex.isGraphspecJson', isGraphspec);
+    }
+
     context.subscriptions.push(
         vscode.window.registerWebviewPanelSerializer('pipelexMethodGraph', {
             async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: any) {
