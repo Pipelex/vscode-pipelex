@@ -448,11 +448,13 @@ export class MethodGraphPanel implements vscode.Disposable {
         const xyflowCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'xyflow.css'));
         const graphCoreCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph-core.css'));
         const stuffViewerCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'stuff-viewer.css'));
+        const detailPanelCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'detail-panel.css'));
 
         html = html.replace('{{XYFLOW_CSS_URI}}', xyflowCssUri.toString());
         html = html.replace('{{GRAPH_CORE_CSS_URI}}', graphCoreCssUri.toString());
         html = html.replace('{{GRAPH_CSS_URI}}', cssUri.toString());
         html = html.replace('{{STUFF_VIEWER_CSS_URI}}', stuffViewerCssUri.toString());
+        html = html.replace('{{DETAIL_PANEL_CSS_URI}}', detailPanelCssUri.toString());
         html = html.replace('{{GRAPH_JS_URI}}', jsUri.toString());
 
         return html;
