@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="{{GRAPH_CORE_CSS_URI}}">
 <link rel="stylesheet" href="{{GRAPH_CSS_URI}}">
 <link rel="stylesheet" href="{{STUFF_VIEWER_CSS_URI}}">
+<link rel="stylesheet" href="{{DETAIL_PANEL_CSS_URI}}">
 </head>
 <body>
 <div class="toolbar">
@@ -29,15 +30,6 @@
 </div>
 <div id="app-container">
     <div id="root"></div>
-    <div id="stuff-inspector" class="stuff-inspector" style="display: none;">
-        <div class="stuff-inspector-header">
-            <span class="stuff-inspector-title">Inspector</span>
-            <button id="stuff-inspector-close" class="toolbar-btn" title="Close inspector">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-        </div>
-        <div id="stuff-viewer-root"></div>
-    </div>
 </div>
 
 <script nonce="PIPELEX_CSP_NONCE" src="{{GRAPH_JS_URI}}"></script>
