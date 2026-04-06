@@ -1,5 +1,10 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.6.2] - 2026-04-06
+
+### Changed
+- Replace custom Stuff Inspector side panel with mthds-ui's built-in Detail Panel inside GraphViewer — node details now render inline without a separate panel
+
 ## [0.6.1] - 2026-04-02
 
 ### Changed
