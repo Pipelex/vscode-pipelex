@@ -131,7 +131,7 @@ impl<E: Environment> WorkspaceState<E> {
             root,
             documents: Default::default(),
             taplo_config: Default::default(),
-            schemas: Schemas::new(env, client),
+            schemas: Schemas::new(env, Some(client)),
             config: LspConfig::default(),
         }
     }

@@ -21,7 +21,7 @@ pub struct Taplo<E: Environment> {
     /// Default: false (preserves upstream taplo behavior). Set to true by plxt CLI.
     compact: bool,
     #[cfg(feature = "lint")]
-    schemas: Schemas<E>,
+    schemas: Option<Schemas<E>>,
     config: Option<Arc<Config>>,
 }
 
@@ -32,21 +32,41 @@ impl<E: Environment> Taplo<E> {
     }
 
     pub fn new(env: E) -> Self {
-        #[cfg(all(not(target_arch = "wasm32"), feature = "lint"))]
-        let http =
-            taplo_common::util::get_reqwest_client(std::time::Duration::from_secs(5)).unwrap();
-
-        #[cfg(all(target_arch = "wasm32", feature = "lint"))]
-        let http = reqwest::Client::default();
-
         Self {
             #[cfg(feature = "lint")]
-            schemas: Schemas::new(env.clone(), http),
+            schemas: None,
             colors: env.atty_stderr(),
             compact: false,
             config: None,
             env,
         }
+    }
+
+    #[cfg(feature = "lint")]
+    fn schemas(&mut self) -> Result<&mut Schemas<E>, anyhow::Error> {
+        if self.schemas.is_none() {
+            self.schemas = Some(Schemas::new(self.env.clone(), None));
+        }
+
+        Ok(self.schemas.as_mut().expect("schemas initialized"))
+    }
+
+    #[cfg(feature = "lint")]
+    fn schemas_with_http(&mut self) -> Result<&mut Schemas<E>, anyhow::Error> {
+        let schemas = self.schemas()?;
+
+        if !schemas.has_http_client() {
+            #[cfg(not(target_arch = "wasm32"))]
+            let http = taplo_common::util::get_reqwest_client(std::time::Duration::from_secs(5))
+                .context("failed to create schema HTTP client")?;
+
+            #[cfg(target_arch = "wasm32")]
+            let http = reqwest::Client::default();
+
+            schemas.set_http_client(http);
+        }
+
+        Ok(schemas)
     }
 
     #[tracing::instrument(skip_all)]
