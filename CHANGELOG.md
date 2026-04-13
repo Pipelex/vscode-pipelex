@@ -1,5 +1,12 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.6.3] - 2026-04-13
+
+### Fixed
+- Fix `plxt` crashing in sandboxed environments (Codex, CI containers) due to eager HTTP client initialization — `plxt lint`, `plxt fmt`, and `plxt config which` no longer require network/proxy access on startup (plxt 0.3.3)
+- Make schema HTTP client lazy: `Schemas` and `SchemaAssociations` now accept `Option<reqwest::Client>` and only build the client when lint actually encounters `http://` or `https://` schema sources (plxt 0.3.3)
+- Normal `.mthds` linting uses the builtin `pipelex://mthds.schema.json` schema without touching the network (plxt 0.3.3)
+
 ## [0.6.2] - 2026-04-06
 
 ### Changed

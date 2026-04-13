@@ -43,14 +43,14 @@ pub mod source {
 #[derive(Clone)]
 pub struct SchemaAssociations<E: Environment> {
     concurrent_requests: Arc<Semaphore>,
-    http: reqwest::Client,
+    http: Option<reqwest::Client>,
     env: E,
     associations: Arc<RwLock<Vec<(AssociationRule, SchemaAssociation)>>>,
     cache: Cache<E>,
 }
 
 impl<E: Environment> SchemaAssociations<E> {
-    pub(crate) fn new(env: E, cache: Cache<E>, http: reqwest::Client) -> Self {
+    pub(crate) fn new(env: E, cache: Cache<E>, http: Option<reqwest::Client>) -> Self {
         let this = Self {
             concurrent_requests: Arc::new(Semaphore::new(10)),
             cache,
@@ -80,6 +80,10 @@ impl<E: Environment> SchemaAssociations<E> {
     /// even built-in ones that will have to be added again.
     pub fn clear(&self) {
         self.associations.write().clear();
+    }
+
+    pub fn set_http_client(&mut self, http: reqwest::Client) {
+        self.http = Some(http);
     }
 
     pub fn add_builtins(&self) {
@@ -361,13 +365,13 @@ impl<E: Environment> SchemaAssociations<E> {
     async fn fetch_external(&self, index_url: &Url) -> Result<SchemaCatalog, anyhow::Error> {
         let _permit = self.concurrent_requests.acquire().await?;
         match index_url.scheme() {
-            "http" | "https" => Ok(self
-                .http
-                .get(index_url.clone())
-                .send()
-                .await?
-                .json()
-                .await?),
+            "http" | "https" => {
+                let http = self
+                    .http
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("HTTP schema catalog fetching is not enabled"))?;
+                Ok(http.get(index_url.clone()).send().await?.json().await?)
+            }
             "file" => Ok(serde_json::from_slice(
                 &self
                     .env

@@ -65,13 +65,13 @@ pub struct Schemas<E: Environment> {
     env: E,
     associations: SchemaAssociations<E>,
     concurrent_requests: Arc<Semaphore>,
-    http: reqwest::Client,
+    http: Option<reqwest::Client>,
     validators: Arc<Mutex<LruCache<Url, Arc<JSONSchema>>>>,
     cache: Cache<E>,
 }
 
 impl<E: Environment> Schemas<E> {
-    pub fn new(env: E, http: reqwest::Client) -> Self {
+    pub fn new(env: E, http: Option<reqwest::Client>) -> Self {
         let cache = Cache::new(env.clone());
 
         Self {
@@ -99,6 +99,15 @@ impl<E: Environment> Schemas<E> {
 
     pub fn env(&self) -> &E {
         &self.env
+    }
+
+    pub fn has_http_client(&self) -> bool {
+        self.http.is_some()
+    }
+
+    pub fn set_http_client(&mut self, http: reqwest::Client) {
+        self.associations.set_http_client(http.clone());
+        self.http = Some(http);
     }
 
     /// Clear all in-memory schema caches (LRU cache and compiled validators).
@@ -738,13 +747,13 @@ impl<E: Environment> Schemas<E> {
     async fn fetch_external(&self, schema_url: &Url) -> Result<Value, anyhow::Error> {
         let _permit = self.concurrent_requests.acquire().await?;
         match schema_url.scheme() {
-            "http" | "https" => Ok(self
-                .http
-                .get(schema_url.clone())
-                .send()
-                .await?
-                .json()
-                .await?),
+            "http" | "https" => {
+                let http = self
+                    .http
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("HTTP schema fetching is not enabled"))?;
+                Ok(http.get(schema_url.clone()).send().await?.json().await?)
+            }
             "file" => Ok(serde_json::from_slice(
                 &self
                     .env
@@ -1585,7 +1594,7 @@ mod tests {
         files.insert(PathBuf::from("/schemas/good.json"), minimal_schema_json());
         let env = MockEnv { files };
         let http = reqwest::Client::new();
-        let schemas = super::Schemas::new(env, http);
+        let schemas = super::Schemas::new(env, Some(http));
 
         let assoc = SchemaAssociation {
             url: "file:///schemas/good.json".parse().unwrap(),
@@ -1604,7 +1613,7 @@ mod tests {
             files: std::collections::HashMap::new(),
         };
         let http = reqwest::Client::new();
-        let schemas = super::Schemas::new(env, http);
+        let schemas = super::Schemas::new(env, Some(http));
 
         let assoc = SchemaAssociation {
             url: "file:///schemas/missing.json".parse().unwrap(),
@@ -1626,7 +1635,7 @@ mod tests {
         );
         let env = MockEnv { files };
         let http = reqwest::Client::new();
-        let schemas = super::Schemas::new(env, http);
+        let schemas = super::Schemas::new(env, Some(http));
 
         let assoc = SchemaAssociation {
             url: "file:///schemas/missing.json".parse().unwrap(),
@@ -1646,7 +1655,7 @@ mod tests {
         files.insert(PathBuf::from("/schemas/second.json"), minimal_schema_json());
         let env = MockEnv { files };
         let http = reqwest::Client::new();
-        let schemas = super::Schemas::new(env, http);
+        let schemas = super::Schemas::new(env, Some(http));
 
         let assoc = SchemaAssociation {
             url: "file:///schemas/first.json".parse().unwrap(),
@@ -1666,7 +1675,7 @@ mod tests {
             files: std::collections::HashMap::new(),
         };
         let http = reqwest::Client::new();
-        let schemas = super::Schemas::new(env, http);
+        let schemas = super::Schemas::new(env, Some(http));
 
         let assoc = SchemaAssociation {
             url: "file:///schemas/a.json".parse().unwrap(),
@@ -1689,7 +1698,7 @@ mod tests {
             files: std::collections::HashMap::new(),
         };
         let http = reqwest::Client::new();
-        let schemas = super::Schemas::new(env, http);
+        let schemas = super::Schemas::new(env, Some(http));
 
         // The actual bundle.mthds content from pipelex-demo
         let mthds_content = r#"
