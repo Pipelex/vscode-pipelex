@@ -7,10 +7,6 @@ use crate::{
 
 impl<E: Environment> Taplo<E> {
     pub async fn execute_lsp(&mut self, cmd: LspCommand) -> Result<(), anyhow::Error> {
-        self.schemas
-            .cache()
-            .set_cache_path(cmd.general.cache_path.clone());
-
         let config = self.load_config(&cmd.general).await?;
 
         let server = taplo_lsp::create_server();

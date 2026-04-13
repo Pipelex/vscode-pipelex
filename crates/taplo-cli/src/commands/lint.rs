@@ -6,6 +6,7 @@ use codespan_reporting::files::SimpleFile;
 use serde_json::json;
 use taplo::parser;
 use taplo_common::{
+    config::{Config, SchemaOptions},
     environment::Environment,
     schema::associations::{AssociationRule, SchemaAssociation, DEFAULT_CATALOGS},
 };
@@ -14,7 +15,7 @@ use url::Url;
 
 impl<E: Environment> Taplo<E> {
     pub async fn execute_lint(&mut self, cmd: LintCommand) -> Result<(), anyhow::Error> {
-        self.schemas
+        self.schemas()?
             .cache()
             .set_cache_path(cmd.general.cache_path.clone());
 
@@ -22,7 +23,10 @@ impl<E: Environment> Taplo<E> {
 
         if !cmd.no_schema {
             if let Some(schema_url) = cmd.schema.clone() {
-                self.schemas.associations().add(
+                if url_needs_http(&schema_url) {
+                    self.schemas_with_http()?;
+                }
+                self.schemas()?.associations().add(
                     AssociationRule::regex(".*")?,
                     SchemaAssociation {
                         meta: json!({"source": "command-line"}),
@@ -32,10 +36,13 @@ impl<E: Environment> Taplo<E> {
                     },
                 );
             } else {
-                self.schemas.associations().add_from_config(&config);
+                if config_needs_http(&config) {
+                    self.schemas_with_http()?;
+                }
+                self.schemas()?.associations().add_from_config(&config);
 
                 for catalog in &cmd.schema_catalog {
-                    self.schemas
+                    self.schemas_with_http()?
                         .associations()
                         .add_from_catalog(catalog)
                         .await
@@ -44,7 +51,7 @@ impl<E: Environment> Taplo<E> {
 
                 if cmd.default_schema_catalogs {
                     for catalog in DEFAULT_CATALOGS {
-                        self.schemas
+                        self.schemas_with_http()?
                             .associations()
                             .add_from_catalog(&Url::parse(catalog).unwrap())
                             .await
@@ -62,7 +69,7 @@ impl<E: Environment> Taplo<E> {
     }
 
     #[tracing::instrument(skip_all)]
-    async fn lint_stdin(&self, _cmd: LintCommand) -> Result<(), anyhow::Error> {
+    async fn lint_stdin(&mut self, _cmd: LintCommand) -> Result<(), anyhow::Error> {
         let mut source = String::new();
         self.env.stdin().read_to_string(&mut source).await?;
         let cwd = self
@@ -104,7 +111,7 @@ impl<E: Environment> Taplo<E> {
         result
     }
 
-    async fn lint_file(&self, file: &Path, cwd: &Path) -> Result<(), anyhow::Error> {
+    async fn lint_file(&mut self, file: &Path, cwd: &Path) -> Result<(), anyhow::Error> {
         let source = self.env.read_file(file).await?;
         let source = String::from_utf8(source)?;
         self.lint_source(&file.to_string_lossy(), &source, cwd)
@@ -112,7 +119,7 @@ impl<E: Environment> Taplo<E> {
     }
 
     async fn lint_source(
-        &self,
+        &mut self,
         file_path: &str,
         source: &str,
         cwd: &Path,
@@ -153,11 +160,17 @@ impl<E: Environment> Taplo<E> {
 
         let file_uri: Url = format!("file://{file_path}").parse().unwrap();
 
-        self.schemas
+        self.schemas()?
             .associations()
             .add_from_document(&file_uri, &dom);
 
-        if let Some(schema_association) = self.schemas.associations().association_for(&file_uri) {
+        if let Some(schema_association) = self.schemas()?.associations().association_for(&file_uri)
+        {
+            if url_needs_http(&schema_association.url)
+                || schema_association.fallback_urls.iter().any(url_needs_http)
+            {
+                self.schemas_with_http()?;
+            }
             tracing::debug!(
                 schema.url = %schema_association.url,
                 schema.name = schema_association.meta["name"].as_str().unwrap_or(""),
@@ -168,7 +181,11 @@ impl<E: Environment> Taplo<E> {
             let schema_url = if schema_association.fallback_urls.is_empty() {
                 schema_association.url.clone()
             } else {
-                match self.schemas.resolve_association(&schema_association).await {
+                match self
+                    .schemas()?
+                    .resolve_association(&schema_association)
+                    .await
+                {
                     Ok((url, _)) => url,
                     Err(error) => {
                         return Err(error.context("schema waterfall resolution failed"));
@@ -176,7 +193,7 @@ impl<E: Environment> Taplo<E> {
                 }
             };
 
-            let errors = self.schemas.validate_root(&schema_url, &dom).await?;
+            let errors = self.schemas()?.validate_root(&schema_url, &dom).await?;
 
             if !errors.is_empty() {
                 if !self.compact {
@@ -193,4 +210,30 @@ impl<E: Environment> Taplo<E> {
 
         Ok(())
     }
+}
+
+fn url_needs_http(url: &Url) -> bool {
+    matches!(url.scheme(), "http" | "https")
+}
+
+fn schema_options_need_http(schema_opts: &SchemaOptions) -> bool {
+    schema_opts
+        .resolved_sources
+        .as_ref()
+        .is_some_and(|sources| sources.iter().any(url_needs_http))
+        || schema_opts.url.as_ref().is_some_and(url_needs_http)
+}
+
+fn config_needs_http(config: &Config) -> bool {
+    config
+        .global_options
+        .schema
+        .as_ref()
+        .is_some_and(schema_options_need_http)
+        || config.rule.iter().any(|rule| {
+            rule.options
+                .schema
+                .as_ref()
+                .is_some_and(schema_options_need_http)
+        })
 }
