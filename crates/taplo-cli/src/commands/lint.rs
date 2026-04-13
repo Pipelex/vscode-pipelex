@@ -169,6 +169,7 @@ impl<E: Environment> Taplo<E> {
             if url_needs_http(&schema_association.url)
                 || schema_association.fallback_urls.iter().any(url_needs_http)
             {
+                // Ensure HTTP client is ready before resolve/validate below
                 self.schemas_with_http()?;
             }
             tracing::debug!(

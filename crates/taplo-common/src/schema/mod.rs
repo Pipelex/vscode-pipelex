@@ -106,8 +106,8 @@ impl<E: Environment> Schemas<E> {
     }
 
     pub fn set_http_client(&mut self, http: reqwest::Client) {
-        self.http = Some(http.clone());
-        self.associations.set_http_client(http);
+        self.associations.set_http_client(http.clone());
+        self.http = Some(http);
     }
 
     /// Clear all in-memory schema caches (LRU cache and compiled validators).
