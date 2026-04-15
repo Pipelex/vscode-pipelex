@@ -1,5 +1,10 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.6.4] - 2026-04-15
+
+### Changed
+- Upgrade @pipelex/mthds-ui to v0.3.4
+
 ## [0.6.3] - 2026-04-13
 
 ### Fixed
