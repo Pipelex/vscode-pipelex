@@ -24,7 +24,7 @@ PYTHON_VERSION    ?= 3.13
 
 .PHONY: help sync-grammar s update-schema up
 .PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
-.PHONY: use-github use-local ug ul pin-mthds-ui
+.PHONY: use-github use-local use-npm ug ul un pin-mthds-ui
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -143,18 +143,27 @@ update-schema: ## Download the latest MTHDS JSON Schema
 up: update-schema
 
 # --- Switch mthds-ui source ---
-# use-local: portal link to sibling ../mthds-ui for live development
-# use-github: install from GitHub to test the published version
+# use-local:  portal link to sibling ../mthds-ui for live development
+# use-github: revert package.json to the pinned GitHub spec at HEAD
+# use-npm:    install from the npm registry (latest by default, or VERSION=x.y.z)
 
 use-github: ## Switch back to pinned GitHub mthds-ui
 	cd $(EXT_DIR) && git checkout -- package.json yarn.lock && yarn install --immutable
-	@echo "Restored pinned GitHub mthds-ui. Run 'make use-local' to switch back."
+	@echo "Restored pinned GitHub mthds-ui. Run 'make use-local' or 'make use-npm' to switch back."
 
 use-local: setup-hooks ## Switch to local mthds-ui (portal link)
+	@if [ ! -d ../mthds-ui ]; then echo "ERROR: ../mthds-ui not found. Clone it next to vscode-pipelex."; exit 1; fi
+	cd ../mthds-ui && yarn install && yarn build
 	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@portal:../../../mthds-ui
 	@echo "Switched to local mthds-ui (portal link). Run 'make use-github' to switch back."
 
-pin-mthds-ui: ## Pin mthds-ui to a tag (default: latest). Usage: make pin-mthds-ui [TAG=v0.3.0]
+use-npm: ## Switch to @pipelex/mthds-ui from npm registry (default: latest). Usage: make use-npm [VERSION=0.5.0]
+	@VERSION="$${VERSION:-latest}" && \
+	echo "Installing @pipelex/mthds-ui@$$VERSION from npm" && \
+	cd $(EXT_DIR) && yarn add "@pipelex/mthds-ui@npm:$$VERSION" && \
+	echo "Switched to npm @pipelex/mthds-ui@$$VERSION. Review the diff, then commit package.json + yarn.lock."
+
+pin-mthds-ui: ## Pin mthds-ui to a GitHub tag (default: latest). Usage: make pin-mthds-ui [TAG=v0.3.0]
 	@if [ -n "$${TAG:-}" ]; then \
 		SHA=$$(gh api repos/Pipelex/mthds-ui/tags --jq ".[] | select(.name == \"$$TAG\") | .commit.sha") && \
 		if [ -z "$$SHA" ]; then echo "ERROR: Tag $$TAG not found in Pipelex/mthds-ui"; exit 1; fi; \
@@ -169,6 +178,7 @@ pin-mthds-ui: ## Pin mthds-ui to a tag (default: latest). Usage: make pin-mthds-
 
 ug: use-github
 ul: use-local
+un: use-npm
 pmu: pin-mthds-ui
 
 $(GRAMMAR_DST): $(GRAMMAR_SRC)

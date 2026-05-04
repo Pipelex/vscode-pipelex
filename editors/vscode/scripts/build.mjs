@@ -47,6 +47,10 @@ cpSync(
   "./node_modules/@pipelex/mthds-ui/dist/graph/react/detail/DetailPanel.css",
   "./dist/pipelex/graph/webview/detail-panel.css",
 );
+cpSync(
+  "./node_modules/@pipelex/mthds-ui/dist/graph/react/viewer/GraphToolbar.css",
+  "./dist/pipelex/graph/webview/graph-toolbar.css",
+);
 
 // Bundle webview TypeScript → single IIFE script
 // React, ReactDOM, @xyflow/react v12, dagre, and mthds-ui are all bundled.
