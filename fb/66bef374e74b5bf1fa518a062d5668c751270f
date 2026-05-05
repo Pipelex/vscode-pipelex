@@ -1,0 +1,25 @@
+crates/taplo/src/lib.rs
+  11655e46d544cbd8 2-5
+crates/taplo-lsp/src/lib.rs
+  11655e46d544cbd8 19-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "fb66bef374e74b5bf1fa518a062d5668c751270f",
+  "prompts": {
+    "11655e46d544cbd8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6c6d780-3591-4928-a822-255d8b224ac0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 1,
+      "accepted_lines": 19,
+      "overriden_lines": 0
+    }
+  }
+}
