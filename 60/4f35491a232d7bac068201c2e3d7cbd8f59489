@@ -1,0 +1,29 @@
+editors/vscode/src/pipelex/__tests__/methodGraphPanel.test.ts
+  6806dcf0a871dddd 46-55,481-588
+editors/vscode/src/pipelex/graph/methodGraphPanel.ts
+  6806dcf0a871dddd 483-503
+Makefile
+  6806dcf0a871dddd 27,114-116,153
+.githooks/pre-commit
+  6806dcf0a871dddd 4-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "604f35491a232d7bac068201c2e3d7cbd8f59489",
+  "prompts": {
+    "6806dcf0a871dddd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "91315cda-bef2-4a89-828d-e963a8d5ac68",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 1553,
+      "total_deletions": 1255,
+      "accepted_lines": 1529,
+      "overriden_lines": 0
+    }
+  }
+}
