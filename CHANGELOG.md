@@ -1,5 +1,14 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.6.5] - 2026-05-05
+
+### Fixed
+- PDFs in the Method Graph viewer now display a clickable "Open externally" tile instead of a blank `<embed>` frame when previewing live-run GraphSpecs that contain PDF stuff (e.g. presigned S3 URLs). VS Code webviews run in Electron without the Chromium PDFium plugin, so inline PDF rendering was never going to work; clicking the tile hands the URL to `vscode.env.openExternal` so the OS PDF viewer or default browser takes over
+
+### Changed
+- Upgrade @pipelex/mthds-ui to v0.5.1 — adds `canEmbedPdf` and `onOpenExternally` props on `StuffViewer`/`ConceptDetailPanel`/`GraphViewer` so hosts that can't render `<embed type="application/pdf">` can fall back to a clickable open-externally tile
+- Switch `@pipelex/mthds-ui` from GitHub-pinned to the npm registry; clean up the webview toolbar wiring on the way
+
 ## [0.6.4] - 2026-04-15
 
 ### Changed

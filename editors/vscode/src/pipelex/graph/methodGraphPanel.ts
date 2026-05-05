@@ -474,6 +474,18 @@ export class MethodGraphPanel implements vscode.Disposable {
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {
             if (this.sourceKind === 'graphspec-json') return;
             this.navigateToPipe(message.pipeCode);
+            return;
+        }
+        if (message.type === 'openExternally' && typeof message.url === 'string') {
+            // Webviews can't `window.open` or render <embed type="application/pdf">,
+            // so the StuffViewer routes both through here. Hand off to the OS via
+            // VS Code so the user gets their default browser/PDF viewer.
+            try {
+                const uri = vscode.Uri.parse(message.url, true);
+                vscode.env.openExternal(uri);
+            } catch (err: any) {
+                this.output.appendLine(`openExternally: invalid URL "${message.url}" — ${err.message ?? err}`);
+            }
         }
     }
 

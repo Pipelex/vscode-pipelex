@@ -38,6 +38,14 @@ function onReactFlowInit(instance: any) {
     reactFlowInstance = instance;
 }
 
+// VS Code webviews run in Electron, which ships without Chromium's PDFium
+// plugin (electron/electron#12337). `<embed type="application/pdf">` and
+// `window.open` therefore don't work — route through the extension host
+// (vscode.env.openExternal) via postMessage instead.
+function onOpenExternally(url: string, filename?: string) {
+    vscode.postMessage({ type: 'openExternally', url, filename });
+}
+
 // --- Message handling ---
 
 function handleMessage(event: { data: any }) {
@@ -101,6 +109,8 @@ function App() {
         config: currentConfig,
         onNavigateToPipe,
         onReactFlowInit,
+        canEmbedPdf: false,
+        onOpenExternally,
     });
 }
 
