@@ -480,12 +480,27 @@ export class MethodGraphPanel implements vscode.Disposable {
             // Webviews can't `window.open` or render <embed type="application/pdf">,
             // so the StuffViewer routes both through here. Hand off to the OS via
             // VS Code so the user gets their default browser/PDF viewer.
-            try {
-                const uri = vscode.Uri.parse(message.url, true);
-                vscode.env.openExternal(uri);
-            } catch (err: any) {
-                this.output.appendLine(`openExternally: invalid URL "${message.url}" — ${err.message ?? err}`);
-            }
+            this.openExternally(message.url);
+        }
+    }
+
+    private async openExternally(url: string) {
+        let uri: vscode.Uri;
+        try {
+            uri = vscode.Uri.parse(url, true);
+        } catch (err: any) {
+            this.output.appendLine(`openExternally: invalid URL "${url}" — ${err.message ?? err}`);
+            return;
+        }
+        // Only http(s) — refuse file:, vscode:, and other registered-handler schemes
+        // that could be triggered by a malicious or accidental GraphSpec payload.
+        if (uri.scheme !== 'http' && uri.scheme !== 'https') {
+            this.output.appendLine(`openExternally: refused non-http(s) URL "${url}" (scheme: ${uri.scheme})`);
+            return;
+        }
+        const opened = await vscode.env.openExternal(uri);
+        if (!opened) {
+            this.output.appendLine(`openExternally: OS declined to open "${url}"`);
         }
     }
 

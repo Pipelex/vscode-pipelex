@@ -43,6 +43,16 @@ vi.mock('vscode', () => ({
             fsPath: parts.map((p: any) => p.fsPath || p).join('/'),
             toString: () => parts.map((p: any) => p.fsPath || p).join('/'),
         })),
+        parse: vi.fn((value: string, _strict?: boolean) => {
+            const match = /^([a-zA-Z][a-zA-Z0-9+\-.]*):/.exec(value);
+            if (!match) {
+                throw new Error(`invalid URI: ${value}`);
+            }
+            return { scheme: match[1].toLowerCase(), toString: () => value } as any;
+        }),
+    },
+    env: {
+        openExternal: vi.fn(() => Promise.resolve(true)),
     },
     Selection: vi.fn(),
     TextEditorRevealType: { InCenter: 2 },
@@ -467,5 +477,113 @@ describe('MethodGraphPanel', () => {
 
         const uri = makeUri('/project/file.mthds');
         expect(() => mockState.onDocChangeHandler!({ document: { uri, isDirty: false } })).not.toThrow();
+    });
+
+    // --- openExternally message handling ---
+
+    it('openExternally opens https URLs via vscode.env.openExternal', async () => {
+        const vscode = await import('vscode');
+        const output = mockOutput();
+        const panel = new MethodGraphPanel(output, makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'openExternally', url: 'https://example.com/foo.pdf' });
+        await new Promise(r => setTimeout(r, 10));
+
+        expect(vscode.env.openExternal).toHaveBeenCalledTimes(1);
+        const calledWith = vi.mocked(vscode.env.openExternal).mock.calls[0][0] as any;
+        expect(calledWith.scheme).toBe('https');
+        panel.dispose();
+    });
+
+    it('openExternally opens http URLs', async () => {
+        const vscode = await import('vscode');
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'openExternally', url: 'http://example.com/foo.pdf' });
+        await new Promise(r => setTimeout(r, 10));
+
+        expect(vscode.env.openExternal).toHaveBeenCalledTimes(1);
+        panel.dispose();
+    });
+
+    it('openExternally refuses non-http(s) schemes (file:)', async () => {
+        const vscode = await import('vscode');
+        const output = mockOutput();
+        const panel = new MethodGraphPanel(output, makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'openExternally', url: 'file:///etc/passwd' });
+        await new Promise(r => setTimeout(r, 10));
+
+        expect(vscode.env.openExternal).not.toHaveBeenCalled();
+        expect(output.appendLine).toHaveBeenCalledWith(
+            expect.stringContaining('refused')
+        );
+        panel.dispose();
+    });
+
+    it('openExternally refuses vscode: scheme', async () => {
+        const vscode = await import('vscode');
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'openExternally', url: 'vscode://settings' });
+        await new Promise(r => setTimeout(r, 10));
+
+        expect(vscode.env.openExternal).not.toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    it('openExternally logs when openExternal returns false', async () => {
+        const vscode = await import('vscode');
+        vi.mocked(vscode.env.openExternal).mockResolvedValueOnce(false as any);
+
+        const output = mockOutput();
+        const panel = new MethodGraphPanel(output, makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'openExternally', url: 'https://example.com/x.pdf' });
+        await new Promise(r => setTimeout(r, 10));
+
+        expect(output.appendLine).toHaveBeenCalledWith(
+            expect.stringContaining('OS declined')
+        );
+        panel.dispose();
+    });
+
+    it('openExternally logs and skips when URL is unparseable', async () => {
+        const vscode = await import('vscode');
+        const output = mockOutput();
+        const panel = new MethodGraphPanel(output, makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'openExternally', url: 'not a url' });
+        await new Promise(r => setTimeout(r, 10));
+
+        expect(vscode.env.openExternal).not.toHaveBeenCalled();
+        expect(output.appendLine).toHaveBeenCalledWith(
+            expect.stringContaining('invalid URL')
+        );
+        panel.dispose();
     });
 });

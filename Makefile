@@ -24,7 +24,7 @@ PYTHON_VERSION    ?= 3.13
 
 .PHONY: help sync-grammar s update-schema up
 .PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
-.PHONY: use-github use-local use-npm ug ul un pin-mthds-ui
+.PHONY: use-local use-npm ul un pin-mthds-ui
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -111,9 +111,9 @@ test: ## Run all tests (Rust + VS Code extension)
 	cargo test -p taplo-lsp
 	cd $(EXT_DIR) && yarn test
 
-check-no-local-deps: ## Fail if a local mthds-ui link would be committed
-	@! grep -qE 'mthds-ui.*(portal:|file:)' $(EXT_DIR)/package.json || \
-		{ echo "ERROR: Local mthds-ui link in $(EXT_DIR)/package.json. Run 'make use-github' first."; exit 1; }
+check-no-local-deps: ## Fail if mthds-ui is not the npm spec
+	@grep -qE '"@pipelex/mthds-ui":[[:space:]]*"npm:' $(EXT_DIR)/package.json || \
+		{ echo "ERROR: @pipelex/mthds-ui in $(EXT_DIR)/package.json is not the npm spec. Run 'make use-npm' first."; exit 1; }
 
 setup-hooks: ## Configure git to use .githooks/ for hooks
 	@git config core.hooksPath .githooks
@@ -144,18 +144,13 @@ up: update-schema
 
 # --- Switch mthds-ui source ---
 # use-local:  portal link to sibling ../mthds-ui for live development
-# use-github: revert package.json to the pinned GitHub spec at HEAD
 # use-npm:    install from the npm registry (latest by default, or VERSION=x.y.z)
-
-use-github: ## Switch back to pinned GitHub mthds-ui
-	cd $(EXT_DIR) && git checkout -- package.json yarn.lock && yarn install --immutable
-	@echo "Restored pinned GitHub mthds-ui. Run 'make use-local' or 'make use-npm' to switch back."
 
 use-local: setup-hooks ## Switch to local mthds-ui (portal link)
 	@if [ ! -d ../mthds-ui ]; then echo "ERROR: ../mthds-ui not found. Clone it next to vscode-pipelex."; exit 1; fi
 	cd ../mthds-ui && yarn install && yarn build
 	cd $(EXT_DIR) && yarn add @pipelex/mthds-ui@portal:../../../mthds-ui
-	@echo "Switched to local mthds-ui (portal link). Run 'make use-github' to switch back."
+	@echo "Switched to local mthds-ui (portal link). Run 'make use-npm' to switch back."
 
 use-npm: ## Switch to @pipelex/mthds-ui from npm registry (default: latest). Usage: make use-npm [VERSION=0.5.0]
 	@VERSION="$${VERSION:-latest}" && \
@@ -176,7 +171,6 @@ pin-mthds-ui: ## Pin mthds-ui to a GitHub tag (default: latest). Usage: make pin
 	cd $(EXT_DIR) && yarn add "@pipelex/mthds-ui@github:Pipelex/mthds-ui#$$SHA" && \
 	echo "Done. Review the diff, then commit package.json + yarn.lock."
 
-ug: use-github
 ul: use-local
 un: use-npm
 pmu: pin-mthds-ui
