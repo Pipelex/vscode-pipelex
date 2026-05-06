@@ -1,0 +1,23 @@
+Makefile
+  a8042fb3215f4357 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "27b189f239b4ce76385abbbb2396ab3b19db9d1a",
+  "prompts": {
+    "a8042fb3215f4357": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "422b9733-0fd2-401a-8e7b-542c1fa882c5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 30,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
