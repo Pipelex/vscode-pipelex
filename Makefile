@@ -24,7 +24,7 @@ PYTHON_VERSION    ?= 3.13
 
 .PHONY: help sync-grammar s update-schema up
 .PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
-.PHONY: use-local use-npm ul un pin-mthds-ui
+.PHONY: use-local use-npm ul un
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -158,22 +158,8 @@ use-npm: ## Switch to @pipelex/mthds-ui from npm registry (default: latest). Usa
 	cd $(EXT_DIR) && yarn add "@pipelex/mthds-ui@npm:$$VERSION" && \
 	echo "Switched to npm @pipelex/mthds-ui@$$VERSION. Review the diff, then commit package.json + yarn.lock."
 
-pin-mthds-ui: ## Pin mthds-ui to a GitHub tag (default: latest). Usage: make pin-mthds-ui [TAG=v0.3.0]
-	@if [ -n "$${TAG:-}" ]; then \
-		SHA=$$(gh api repos/Pipelex/mthds-ui/tags --jq ".[] | select(.name == \"$$TAG\") | .commit.sha") && \
-		if [ -z "$$SHA" ]; then echo "ERROR: Tag $$TAG not found in Pipelex/mthds-ui"; exit 1; fi; \
-	else \
-		PAIR=$$(gh api repos/Pipelex/mthds-ui/tags --jq '.[0] | "\(.name) \(.commit.sha)"') && \
-		TAG=$$(echo "$$PAIR" | cut -d' ' -f1) && SHA=$$(echo "$$PAIR" | cut -d' ' -f2) && \
-		if [ -z "$$TAG" ]; then echo "ERROR: No tags found in Pipelex/mthds-ui"; exit 1; fi; \
-	fi && \
-	echo "Pinning @pipelex/mthds-ui to $$TAG ($$SHA)" && \
-	cd $(EXT_DIR) && yarn add "@pipelex/mthds-ui@github:Pipelex/mthds-ui#$$SHA" && \
-	echo "Done. Review the diff, then commit package.json + yarn.lock."
-
 ul: use-local
 un: use-npm
-pmu: pin-mthds-ui
 
 $(GRAMMAR_DST): $(GRAMMAR_SRC)
 	@mkdir -p $(WEBSITE_SHIKI_DIR)
