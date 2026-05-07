@@ -447,11 +447,13 @@ export class MethodGraphPanel implements vscode.Disposable {
         const jsUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph.js'));
         const xyflowCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'xyflow.css'));
         const graphCoreCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph-core.css'));
+        const graphToolbarCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph-toolbar.css'));
         const stuffViewerCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'stuff-viewer.css'));
         const detailPanelCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'detail-panel.css'));
 
         html = html.replace('{{XYFLOW_CSS_URI}}', xyflowCssUri.toString());
         html = html.replace('{{GRAPH_CORE_CSS_URI}}', graphCoreCssUri.toString());
+        html = html.replace('{{GRAPH_TOOLBAR_CSS_URI}}', graphToolbarCssUri.toString());
         html = html.replace('{{GRAPH_CSS_URI}}', cssUri.toString());
         html = html.replace('{{STUFF_VIEWER_CSS_URI}}', stuffViewerCssUri.toString());
         html = html.replace('{{DETAIL_PANEL_CSS_URI}}', detailPanelCssUri.toString());
@@ -469,27 +471,36 @@ export class MethodGraphPanel implements vscode.Disposable {
             }
             return;
         }
-        if (message.type === 'updateDirection' && typeof message.value === 'string') {
-            const cfg = vscode.workspace.getConfiguration('pipelex');
-            const target = vscode.workspace.workspaceFolders?.length
-                ? vscode.ConfigurationTarget.Workspace
-                : vscode.ConfigurationTarget.Global;
-            // Map Dagre format (LR/TB) back → VS Code setting (left_to_right/top_down)
-            const settingValue = message.value === 'LR' ? 'left_to_right' : 'top_down';
-            cfg.update('graph.direction', settingValue, target);
-            return;
-        }
-        if (message.type === 'updateShowControllers' && typeof message.value === 'boolean') {
-            const cfg = vscode.workspace.getConfiguration('pipelex');
-            const target = vscode.workspace.workspaceFolders?.length
-                ? vscode.ConfigurationTarget.Workspace
-                : vscode.ConfigurationTarget.Global;
-            cfg.update('graph.showControllers', message.value, target);
-            return;
-        }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {
             if (this.sourceKind === 'graphspec-json') return;
             this.navigateToPipe(message.pipeCode);
+            return;
+        }
+        if (message.type === 'openExternally' && typeof message.url === 'string') {
+            // Webviews can't `window.open` or render <embed type="application/pdf">,
+            // so the StuffViewer routes both through here. Hand off to the OS via
+            // VS Code so the user gets their default browser/PDF viewer.
+            this.openExternally(message.url);
+        }
+    }
+
+    private async openExternally(url: string) {
+        let uri: vscode.Uri;
+        try {
+            uri = vscode.Uri.parse(url, true);
+        } catch (err: any) {
+            this.output.appendLine(`openExternally: invalid URL "${url}" — ${err.message ?? err}`);
+            return;
+        }
+        // Only http(s) — refuse file:, vscode:, and other registered-handler schemes
+        // that could be triggered by a malicious or accidental GraphSpec payload.
+        if (uri.scheme !== 'http' && uri.scheme !== 'https') {
+            this.output.appendLine(`openExternally: refused non-http(s) URL "${url}" (scheme: ${uri.scheme})`);
+            return;
+        }
+        const opened = await vscode.env.openExternal(uri);
+        if (!opened) {
+            this.output.appendLine(`openExternally: OS declined to open "${url}"`);
         }
     }
 

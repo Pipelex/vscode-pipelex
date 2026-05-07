@@ -1,4 +1,8 @@
 #![allow(clippy::single_match)]
+// Suppressed for upstream taplo code: keeps the source byte-for-byte identical
+// with tamasfe/taplo so future syncs stay clean. New lints from clippy 1.95.0.
+#![allow(clippy::unnecessary_sort_by)]
+#![allow(clippy::collapsible_match)]
 //! # About
 //!
 //! The main purpose of the library is to provide tools for analyzing TOML data where the

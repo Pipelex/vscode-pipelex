@@ -16,7 +16,9 @@
     clippy::manual_let_else,
     clippy::map_unwrap_or,
     clippy::redundant_closure_for_method_calls,
-    clippy::uninlined_format_args
+    clippy::uninlined_format_args,
+    // New in clippy 1.95.0 — keep upstream folding_ranges.rs match arms as-is.
+    clippy::collapsible_match
 )]
 
 use lsp_async_stub::Server;
