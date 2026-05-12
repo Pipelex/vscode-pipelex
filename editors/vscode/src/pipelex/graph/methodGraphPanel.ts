@@ -257,7 +257,8 @@ export class MethodGraphPanel implements vscode.Disposable {
         const pipelexConfig = vscode.workspace.getConfiguration('pipelex');
         const timeout = pipelexConfig.get<number>('validation.timeout', 30000);
         const direction = pipelexConfig.get<string>('graph.direction', 'top_down');
-        const showControllers = pipelexConfig.get<boolean>('graph.showControllers', false);
+        const showControllers = pipelexConfig.get<boolean>('graph.showControllers', true);
+        const foldMode = pipelexConfig.get<string>('graph.foldMode', 'folded');
         const filePath = uri.fsPath;
         const args = [...resolved.args, 'validate', 'bundle', filePath, '--view', '--direction', direction];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
@@ -289,7 +290,7 @@ export class MethodGraphPanel implements vscode.Disposable {
             if (controller.signal.aborted) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
 
-            await this.sendGraphspecToWebview(uri, result.graphspec, direction, showControllers);
+            await this.sendGraphspecToWebview(uri, result.graphspec, direction, showControllers, foldMode);
         } catch (err: any) {
             if (controller.signal.aborted) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
@@ -378,9 +379,10 @@ export class MethodGraphPanel implements vscode.Disposable {
 
         const pipelexConfig = vscode.workspace.getConfiguration('pipelex');
         const direction = pipelexConfig.get<string>('graph.direction', 'top_down');
-        const showControllers = pipelexConfig.get<boolean>('graph.showControllers', false);
+        const showControllers = pipelexConfig.get<boolean>('graph.showControllers', true);
+        const foldMode = pipelexConfig.get<string>('graph.foldMode', 'folded');
 
-        await this.sendGraphspecToWebview(uri, graphspec, direction, showControllers);
+        await this.sendGraphspecToWebview(uri, graphspec, direction, showControllers, foldMode);
     }
 
     private async sendGraphspecToWebview(
@@ -388,6 +390,7 @@ export class MethodGraphPanel implements vscode.Disposable {
         graphspec: unknown,
         direction: string,
         showControllers: boolean,
+        foldMode: string,
     ) {
         if (!this.panel) return;
 
@@ -413,6 +416,7 @@ export class MethodGraphPanel implements vscode.Disposable {
             config: {
                 direction: dagreDirection,
                 showControllers,
+                foldMode,
                 nodesep: graphConfig.nodesep,
                 ranksep: graphConfig.ranksep,
                 edgeType: graphConfig.edgeType,

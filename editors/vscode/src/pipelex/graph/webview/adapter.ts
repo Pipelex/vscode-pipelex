@@ -104,6 +104,12 @@ function handleMessage(event: { data: any }) {
 // --- React mount ---
 
 function App() {
+    // Defer mounting GraphViewer until setData arrives. The viewer reads
+    // `config.direction`, `config.showControllers`, and `config.foldMode` in
+    // useState initializers that only run on first render; if we mount with an
+    // empty config (the pre-message state), those toggles latch to the
+    // mthds-ui defaults and never pick up the host's preferences.
+    if (currentGraphspec === null) return null;
     return React.createElement(GraphViewer, {
         graphspec: currentGraphspec,
         config: currentConfig,
