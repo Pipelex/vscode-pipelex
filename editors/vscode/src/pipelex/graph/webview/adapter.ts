@@ -109,8 +109,16 @@ function App() {
     // useState initializers that only run on first render; if we mount with an
     // empty config (the pre-message state), those toggles latch to the
     // mthds-ui defaults and never pick up the host's preferences.
+    //
+    // Keying on `currentUri` forces a remount when the panel is reused for a
+    // different file (methodGraphPanel.show() reveals the existing panel
+    // instead of recreating it). Without the key, React reconciles a single
+    // GraphViewer instance across files and the useState-seeded toggles stay
+    // latched to the first graph's config. Same-URI refreshes (save) keep the
+    // same key, preserving viewport + interactive state as before.
     if (currentGraphspec === null) return null;
     return React.createElement(GraphViewer, {
+        key: currentUri ?? 'graphviewer',
         graphspec: currentGraphspec,
         config: currentConfig,
         onNavigateToPipe,
