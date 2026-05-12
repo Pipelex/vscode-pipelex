@@ -1,5 +1,10 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.4.0] - 2026-05-12
+
+### Changed
+- Update bundled MTHDS schema to v0.27.0 — adds `PipeStructure` blueprint, new `render_js`/`include_raw_html` PDF options, and `xhigh` reasoning effort level (plxt 0.4.0)
+
 ## [0.7.0] - 2026-05-12
 
 ### Added
