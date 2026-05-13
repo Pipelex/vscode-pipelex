@@ -1,5 +1,18 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.7.0] - 2026-05-12
+
+### Added
+- New setting `pipelex.graph.foldMode` (`folded` / `expanded` / `auto`, default `folded`) controls the initial fold state of pipe controllers when a method graph opens. Users can still fold/unfold individual controllers via the in-graph toolbar afterwards. `auto` is reserved for future renderer-defined heuristics and currently behaves like `expanded`
+
+### Changed
+- `pipelex.graph.showControllers` default flipped from `false` to `true` — controller group boxes are now shown by default in the method graph. Users who previously relied on the default-off behavior will need to set this to `false` in their settings
+- Upgrade @pipelex/mthds-ui to v0.6.1 — adds `initialFoldMode` prop on `GraphViewer` and `foldMode` field on `GraphConfig` so the extension can seed the controller fold state on first render
+- Update bundled MTHDS schema to v0.27.0 — adds `PipeStructure` blueprint, new `render_js`/`include_raw_html` PDF options, and `xhigh` reasoning effort level (plxt 0.4.0)
+
+### Fixed
+- Method graph webview no longer ignores `pipelex.graph.direction`, `pipelex.graph.showControllers`, and `pipelex.graph.foldMode` when opening a method graph. The webview adapter previously mounted `GraphViewer` once with an empty config before the host's `setData` arrived and then reconciled the same instance across file switches; those settings are `useState` values seeded only on first render, so they latched to mthds-ui defaults (or to the first graph's config) and never picked up the host's preferences on subsequent opens. The adapter now defers the mount until config arrives and remounts the viewer when the panel is reused for a different file URI
+
 ## [0.6.5] - 2026-05-05
 
 ### Fixed

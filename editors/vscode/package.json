@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -607,7 +607,23 @@
           "description": "Show controller group boxes in the method graph.",
           "type": "boolean",
           "scope": "resource",
-          "default": false
+          "default": true
+        },
+        "pipelex.graph.foldMode": {
+          "description": "Initial fold state for pipe controllers when a method graph opens. Users can still toggle individual controllers via the in-graph toolbar.",
+          "type": "string",
+          "enum": [
+            "folded",
+            "expanded",
+            "auto"
+          ],
+          "enumDescriptions": [
+            "Fold all controllers into single pipe cards",
+            "Expand all controllers as group wrappers",
+            "Let the graph renderer decide (reserved for future heuristics)"
+          ],
+          "scope": "resource",
+          "default": "folded"
         },
         "pipelex.formatter.alignEntries": {
           "scope": "resource",
@@ -747,7 +763,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "npm:0.5.1",
+    "@pipelex/mthds-ui": "npm:0.6.3",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
