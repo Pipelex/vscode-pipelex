@@ -483,9 +483,9 @@ __metadata:
   languageName: node
   linkType: soft
 
-"@pipelex/mthds-ui@npm:0.6.1":
-  version: 0.6.1
-  resolution: "@pipelex/mthds-ui@npm:0.6.1"
+"@pipelex/mthds-ui@npm:0.6.3":
+  version: 0.6.3
+  resolution: "@pipelex/mthds-ui@npm:0.6.3"
   dependencies:
     "@xyflow/react": "npm:^12"
     dompurify: "npm:^3.3.3"
@@ -501,7 +501,7 @@ __metadata:
       optional: true
     shiki:
       optional: true
-  checksum: 78f774bd73bd0ebb692c8cda8b7e77c564c1c4842d2d313359b77618a24207f456536269a46a9a5dd72b4bb7c601a396b9a2d93a84f68387d09f3bbe7db096c4
+  checksum: 8cb2772cf19a83501e34c13e362eae5ff5b005802fbfe93345d4dabe88e597cc5707bb940f8ad2e544d3f46aa6085cc52749f29b880962f7a4ded6b914256466
   languageName: node
   linkType: hard
 
@@ -3471,7 +3471,7 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
-    "@pipelex/mthds-ui": "npm:0.6.1"
+    "@pipelex/mthds-ui": "npm:0.6.3"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
     "@rollup/plugin-replace": "npm:^5.0.5"
