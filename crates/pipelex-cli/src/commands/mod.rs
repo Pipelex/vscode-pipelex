@@ -11,20 +11,25 @@ mod config;
 mod lsp;
 
 #[cfg(feature = "lint")]
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 #[cfg(feature = "lint")]
 use std::path::Path;
 #[cfg(feature = "lint")]
 use url::Url;
 
 #[cfg(feature = "lint")]
-fn resolve_schema_path(path: &Path) -> Result<Url, anyhow::Error> {
-    let absolute = path.canonicalize().with_context(|| {
-        format!(
-            "could not resolve --schema-path {} (file not found or unreadable)",
-            path.display()
-        )
-    })?;
+fn resolve_schema_path<E: Environment>(env: &E, path: &Path) -> Result<Url, anyhow::Error> {
+    let absolute = if env.is_absolute(path) {
+        path.to_path_buf()
+    } else {
+        let cwd = env.cwd_normalized().ok_or_else(|| {
+            anyhow!(
+                "could not determine working directory to resolve --schema-path {}",
+                path.display()
+            )
+        })?;
+        cwd.join(path)
+    };
     Url::from_file_path(&absolute).map_err(|_| {
         anyhow!(
             "could not convert schema path {} to a file:// URL",
@@ -82,7 +87,7 @@ impl<E: Environment> PlxtCli<E> {
             PlxtCommand::Lint(cmd) => {
                 let mut lint_cmd = cmd.inner;
                 if let Some(schema_path) = cmd.schema_path {
-                    lint_cmd.schema = Some(resolve_schema_path(&schema_path)?);
+                    lint_cmd.schema = Some(resolve_schema_path(&self.env, &schema_path)?);
                 }
                 // Enable compact one-line error output for plxt when not verbose
                 self.inner.set_compact(!args.verbose);

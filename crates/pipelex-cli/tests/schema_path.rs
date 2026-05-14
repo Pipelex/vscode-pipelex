@@ -92,7 +92,8 @@ fn schema_path_missing_file_errors_cleanly() {
     assert!(!output.status.success(), "expected non-zero exit");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("could not resolve --schema-path"),
-        "expected resolve error in stderr, got: {stderr}"
+        stderr.contains("failed to load schema")
+            && stderr.contains("file:///definitely/does/not/exist.json"),
+        "expected schema-load failure for the file:// URL in stderr, got: {stderr}"
     );
 }
