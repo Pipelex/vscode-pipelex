@@ -31,7 +31,7 @@ pub enum PlxtCommand {
     /// Lint TOML documents.
     #[clap(visible_aliases = &["check", "validate"])]
     #[cfg(feature = "lint")]
-    Lint(LintCommand),
+    Lint(PlxtLintCommand),
 
     /// Format TOML documents.
     ///
@@ -70,6 +70,21 @@ pub enum PlxtConfigCommand {
     Schema,
     /// Print the path of the resolved configuration file.
     Which,
+}
+
+/// Pipelex-flavored lint command: wraps taplo's `LintCommand` and adds a path-based schema override.
+#[cfg(feature = "lint")]
+#[derive(Clone, clap::Args)]
+pub struct PlxtLintCommand {
+    #[clap(flatten)]
+    pub inner: LintCommand,
+
+    /// Path to a JSON schema file to use for validation, overriding the normal schema resolution rules.
+    ///
+    /// The path can be relative (resolved against the current working directory) or absolute.
+    /// Mutually exclusive with `--schema`.
+    #[clap(long, value_name = "PATH", conflicts_with = "schema")]
+    pub schema_path: Option<PathBuf>,
 }
 
 /// Pipelex-specific GeneralArgs.

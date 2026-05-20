@@ -1,5 +1,15 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.8.0] - 2026-05-20
+
+### Added
+- `plxt lint --schema-path <path>` overrides the resolved schema with a local file, so MTHDS bundles can be linted against an in-development schema without publishing it (plxt 0.5.0)
+- Method graph panel now detects outdated `pipelex-agent` (< 0.29.0) and surfaces a targeted upgrade message with install commands instead of a generic error
+
+### Changed
+- Method graph panel passes `--format json` to `pipelex-agent validate bundle`; this is required by `pipelex-agent` 0.29.0+, which now defaults to markdown output
+- Upgrade @pipelex/mthds-ui to v0.6.5
+
 ## [0.7.1] - 2026-05-13
 
 ### Changed
