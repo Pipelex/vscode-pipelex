@@ -301,7 +301,7 @@ export class MethodGraphPanel implements vscode.Disposable {
 
             // Before falling into the generic error paths, check whether the failure
             // is just an outdated `pipelex-agent` that predates `--format json` (0.29.0).
-            const installedVersion = await getAgentCliVersion(resolved.command, resolved.args);
+            const installedVersion = await getAgentCliVersion(resolved.command, resolved.args, cwd);
             if (installedVersion && compareSemver(installedVersion, MIN_FORMAT_JSON_VERSION) < 0) {
                 if (controller.signal.aborted) return;
                 if (this.currentUri?.toString() !== uri.toString()) return;

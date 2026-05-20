@@ -30,13 +30,17 @@ export function formatSemver(v: Semver): string {
     return `${v[0]}.${v[1]}.${v[2]}`;
 }
 
-export function getAgentCliVersion(command: string, baseArgs: string[]): Promise<Semver | null> {
-    const key = JSON.stringify([command, baseArgs]);
+export function getAgentCliVersion(command: string, baseArgs: string[], cwd?: string): Promise<Semver | null> {
+    // Include cwd in the cache key: for `uv run pipelex-agent`, the resolved
+    // project environment (and therefore the agent version) depends on the
+    // working directory, so the same command+args can map to different
+    // versions across workspace folders in a multi-root workspace.
+    const key = JSON.stringify([command, baseArgs, cwd ?? null]);
     const cached = cache.get(key);
     if (cached) return cached;
 
     const probe = new Promise<Semver | null>((resolve) => {
-        execFile(command, [...baseArgs, '--version'], { timeout: 5000, maxBuffer: 64 * 1024 }, (err, stdout, stderr) => {
+        execFile(command, [...baseArgs, '--version'], { cwd, timeout: 5000, maxBuffer: 64 * 1024 }, (err, stdout, stderr) => {
             if (err) {
                 resolve(null);
                 return;
