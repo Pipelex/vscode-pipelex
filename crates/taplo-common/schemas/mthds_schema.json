@@ -789,7 +789,8 @@
         "output",
         "branch_pipe_code",
         "input_list_name",
-        "input_item_name"
+        "input_item_name",
+        "type"
       ],
       "title": "PipeBatchBlueprint",
       "type": "object"
@@ -857,7 +858,8 @@
       },
       "required": [
         "description",
-        "output"
+        "output",
+        "type"
       ],
       "title": "PipeComposeBlueprint",
       "type": "object"
@@ -955,7 +957,8 @@
         "description",
         "output",
         "default_outcome",
-        "outcomes"
+        "outcomes",
+        "type"
       ],
       "title": "PipeConditionBlueprint",
       "type": "object"
@@ -1087,7 +1090,8 @@
       },
       "required": [
         "description",
-        "output"
+        "output",
+        "type"
       ],
       "title": "PipeExtractBlueprint",
       "type": "object"
@@ -1135,7 +1139,8 @@
       "required": [
         "description",
         "output",
-        "function_name"
+        "function_name",
+        "type"
       ],
       "title": "PipeFuncBlueprint",
       "type": "object"
@@ -1275,7 +1280,8 @@
       "required": [
         "description",
         "output",
-        "prompt"
+        "prompt",
+        "type"
       ],
       "title": "PipeImgGenBlueprint",
       "type": "object"
@@ -1388,7 +1394,8 @@
       },
       "required": [
         "description",
-        "output"
+        "output",
+        "type"
       ],
       "title": "PipeLLMBlueprint",
       "type": "object"
@@ -1455,7 +1462,8 @@
       "required": [
         "description",
         "output",
-        "branches"
+        "branches",
+        "type"
       ],
       "title": "PipeParallelBlueprint",
       "type": "object"
@@ -1598,7 +1606,8 @@
       "required": [
         "description",
         "output",
-        "prompt"
+        "prompt",
+        "type"
       ],
       "title": "PipeSearchBlueprint",
       "type": "object"
@@ -1648,7 +1657,8 @@
       "required": [
         "description",
         "output",
-        "steps"
+        "steps",
+        "type"
       ],
       "title": "PipeSequenceBlueprint",
       "type": "object"
@@ -1703,7 +1713,8 @@
       },
       "required": [
         "description",
-        "output"
+        "output",
+        "type"
       ],
       "title": "PipeSignatureBlueprint",
       "type": "object"
@@ -1763,7 +1774,8 @@
       },
       "required": [
         "description",
-        "output"
+        "output",
+        "type"
       ],
       "title": "PipeStructureBlueprint",
       "type": "object"
