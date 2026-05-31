@@ -1,5 +1,10 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.9.0] - 2026-05-31
+
+### Changed
+- Update bundled MTHDS schema to v0.31.0 — adds the `PipeSignature` blueprint (a contract-only pipe that declares inputs and output with no implementation, so an in-progress pipeline can be dry-run validated before all its pipes are implemented) and a `PipeType` enum (plxt 0.6.0)
+
 ## [0.8.0] - 2026-05-20
 
 ### Added

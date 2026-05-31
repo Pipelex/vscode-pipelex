@@ -99,6 +99,9 @@
               },
               {
                 "$ref": "#/definitions/PipeSequenceBlueprint"
+              },
+              {
+                "$ref": "#/definitions/PipeSignatureBlueprint"
               }
             ]
           },
@@ -786,7 +789,8 @@
         "output",
         "branch_pipe_code",
         "input_list_name",
-        "input_item_name"
+        "input_item_name",
+        "type"
       ],
       "title": "PipeBatchBlueprint",
       "type": "object"
@@ -854,7 +858,8 @@
       },
       "required": [
         "description",
-        "output"
+        "output",
+        "type"
       ],
       "title": "PipeComposeBlueprint",
       "type": "object"
@@ -952,7 +957,8 @@
         "description",
         "output",
         "default_outcome",
-        "outcomes"
+        "outcomes",
+        "type"
       ],
       "title": "PipeConditionBlueprint",
       "type": "object"
@@ -1084,7 +1090,8 @@
       },
       "required": [
         "description",
-        "output"
+        "output",
+        "type"
       ],
       "title": "PipeExtractBlueprint",
       "type": "object"
@@ -1132,7 +1139,8 @@
       "required": [
         "description",
         "output",
-        "function_name"
+        "function_name",
+        "type"
       ],
       "title": "PipeFuncBlueprint",
       "type": "object"
@@ -1272,7 +1280,8 @@
       "required": [
         "description",
         "output",
-        "prompt"
+        "prompt",
+        "type"
       ],
       "title": "PipeImgGenBlueprint",
       "type": "object"
@@ -1385,7 +1394,8 @@
       },
       "required": [
         "description",
-        "output"
+        "output",
+        "type"
       ],
       "title": "PipeLLMBlueprint",
       "type": "object"
@@ -1452,7 +1462,8 @@
       "required": [
         "description",
         "output",
-        "branches"
+        "branches",
+        "type"
       ],
       "title": "PipeParallelBlueprint",
       "type": "object"
@@ -1595,7 +1606,8 @@
       "required": [
         "description",
         "output",
-        "prompt"
+        "prompt",
+        "type"
       ],
       "title": "PipeSearchBlueprint",
       "type": "object"
@@ -1645,9 +1657,66 @@
       "required": [
         "description",
         "output",
-        "steps"
+        "steps",
+        "type"
       ],
       "title": "PipeSequenceBlueprint",
+      "type": "object"
+    },
+    "PipeSignatureBlueprint": {
+      "additionalProperties": false,
+      "description": "Contract-only pipe blueprint.\n\nA `PipeSignature` declares inputs and output but has no implementation. It exists so\nthat an in-progress pipeline can be validated (dry-run mocks the declared output)\nbefore all its pipes are implemented.",
+      "properties": {
+        "type": {
+          "default": "PipeSignature",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeSignature"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "signature_for": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PipeType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Intended downstream pipe type when this signature is implemented (optional hint for agents)."
+        }
+      },
+      "required": [
+        "description",
+        "output",
+        "type"
+      ],
+      "title": "PipeSignatureBlueprint",
       "type": "object"
     },
     "PipeStructureBlueprint": {
@@ -1705,10 +1774,29 @@
       },
       "required": [
         "description",
-        "output"
+        "output",
+        "type"
       ],
       "title": "PipeStructureBlueprint",
       "type": "object"
+    },
+    "PipeType": {
+      "enum": [
+        "PipeFunc",
+        "PipeImgGen",
+        "PipeCompose",
+        "PipeLLM",
+        "PipeExtract",
+        "PipeSearch",
+        "PipeStructure",
+        "PipeBatch",
+        "PipeCondition",
+        "PipeParallel",
+        "PipeSequence",
+        "PipeSignature"
+      ],
+      "title": "PipeType",
+      "type": "string"
     },
     "PromptImageDetail": {
       "enum": [
@@ -1987,7 +2075,7 @@
     }
   },
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "$comment": "Generated from PipelexBundleBlueprint v0.27.0. Do not edit manually.",
+  "$comment": "Generated from PipelexBundleBlueprint v0.31.0. Do not edit manually.",
   "x-taplo": {
     "initKeys": [
       "domain"
