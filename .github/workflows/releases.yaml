@@ -85,6 +85,11 @@ jobs:
       - name: Extension NPM Install
         run: yarn
         working-directory: editors/vscode
+        env:
+          # @vscode/test-web pulls @playwright/browser-chromium, whose postinstall downloads a
+          # ~173 MiB browser. This job only packages the extension (no browser tests run here),
+          # and that download was hanging the install step. Skip the browser binary download.
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
       - name: Install vsce
         run: npm install -g @vscode/vsce
       - name: Package Extension
