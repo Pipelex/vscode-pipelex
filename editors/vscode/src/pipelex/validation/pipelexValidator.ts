@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { resolveCli } from './cliResolver';
 import { locateError } from './sourceLocator';
 import { spawnCli, cancelInflightByKey } from './processUtils';
@@ -76,7 +77,7 @@ export class PipelexValidator implements vscode.Disposable {
 
         const timeout = config.get<number>('validation.timeout', 30000);
         const filePath = document.uri.fsPath;
-        const args = [...resolved.args, 'validate', 'bundle', filePath];
+        const args = [...resolved.args, 'validate', 'bundle', filePath, '--library-dir', path.dirname(filePath)];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
         const cwd = workspaceFolder?.uri.fsPath;
 

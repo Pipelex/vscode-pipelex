@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import * as path from 'path';
 import { resolveCli } from '../validation/cliResolver';
 import { spawnCli, cancelAllInflight } from '../validation/processUtils';
 import { getAgentCliVersion, compareSemver, formatSemver, MIN_FORMAT_JSON_VERSION } from '../validation/agentCliVersion';
@@ -264,7 +265,7 @@ export class MethodGraphPanel implements vscode.Disposable {
         // pipelex-agent >= 0.29.0 defaults to markdown output and needs `--format json` to emit
         // structured JSON. Always pass it; if the CLI predates 0.29.0 the invocation will fail
         // and the catch block surfaces a targeted upgrade message.
-        const args = [...resolved.args, 'validate', 'bundle', filePath, '--view', '--direction', direction, '--format', 'json'];
+        const args = [...resolved.args, 'validate', 'bundle', filePath, '--library-dir', path.dirname(filePath), '--view', '--direction', direction, '--format', 'json'];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
         const cwd = workspaceFolder?.uri.fsPath;
 
