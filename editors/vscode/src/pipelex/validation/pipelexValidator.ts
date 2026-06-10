@@ -77,6 +77,7 @@ export class PipelexValidator implements vscode.Disposable {
 
         const timeout = config.get<number>('validation.timeout', 30000);
         const filePath = document.uri.fsPath;
+        // `--library-dir` is supported by pipelex-agent since 0.18.2 — safe to pass unconditionally.
         const args = [...resolved.args, 'validate', 'bundle', filePath, '--library-dir', path.dirname(filePath)];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
         const cwd = workspaceFolder?.uri.fsPath;

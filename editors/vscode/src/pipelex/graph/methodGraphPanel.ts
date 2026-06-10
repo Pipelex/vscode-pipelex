@@ -264,7 +264,8 @@ export class MethodGraphPanel implements vscode.Disposable {
         const filePath = uri.fsPath;
         // pipelex-agent >= 0.29.0 defaults to markdown output and needs `--format json` to emit
         // structured JSON. Always pass it; if the CLI predates 0.29.0 the invocation will fail
-        // and the catch block surfaces a targeted upgrade message.
+        // and the catch block surfaces a targeted upgrade message. `--library-dir` landed in
+        // 0.18.2, so the same 0.29.0 floor covers it — no separate version check needed.
         const args = [...resolved.args, 'validate', 'bundle', filePath, '--library-dir', path.dirname(filePath), '--view', '--direction', direction, '--format', 'json'];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
         const cwd = workspaceFolder?.uri.fsPath;
