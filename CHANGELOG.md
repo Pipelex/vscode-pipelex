@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Changed
+- On-save validation and the method graph pass `--allow-signatures` to `pipelex-agent validate bundle`, so work-in-progress bundles containing `PipeSignature` stubs validate and render instead of failing with `SignaturesNotAllowedError`
+- Minimum supported `pipelex-agent` raised to 0.31.0 — required for `--allow-signatures`
+
 ## [0.9.0] - 2026-05-31
 
 ### Changed

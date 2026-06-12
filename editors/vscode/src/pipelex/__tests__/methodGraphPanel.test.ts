@@ -296,6 +296,19 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it('refresh() passes --allow-signatures so stub pipes still render', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const args = vi.mocked(processUtils.spawnCli).mock.calls[0][1] as string[];
+        expect(args).toContain('--allow-signatures');
+        panel.dispose();
+    });
+
     // --- Regression: staleness after spawnCli (previous Bug 1) ---
 
     it('refresh() discards spawnCli result when file switched during spawn', async () => {

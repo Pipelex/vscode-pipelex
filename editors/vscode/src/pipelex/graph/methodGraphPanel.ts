@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { resolveCli } from '../validation/cliResolver';
 import { spawnCli, cancelAllInflight } from '../validation/processUtils';
-import { getAgentCliVersion, compareSemver, formatSemver, MIN_FORMAT_JSON_VERSION } from '../validation/agentCliVersion';
+import { getAgentCliVersion, compareSemver, formatSemver, MIN_AGENT_VERSION } from '../validation/agentCliVersion';
 import { extractJson } from '../validation/pipelexValidator';
 import type { ValidationFailure } from '../validation/types';
 import { findTableHeader } from '../validation/sourceLocator';
@@ -262,11 +262,12 @@ export class MethodGraphPanel implements vscode.Disposable {
         const showControllers = pipelexConfig.get<boolean>('graph.showControllers', true);
         const foldMode = pipelexConfig.get<string>('graph.foldMode', 'folded');
         const filePath = uri.fsPath;
-        // pipelex-agent >= 0.29.0 defaults to markdown output and needs `--format json` to emit
-        // structured JSON. Always pass it; if the CLI predates 0.29.0 the invocation will fail
-        // and the catch block surfaces a targeted upgrade message. `--library-dir` landed in
-        // 0.18.2, so the same 0.29.0 floor covers it — no separate version check needed.
-        const args = [...resolved.args, 'validate', 'bundle', filePath, '--library-dir', path.dirname(filePath), '--view', '--direction', direction, '--format', 'json'];
+        // `--allow-signatures` (0.31.0) lets the graph render bundles that still contain
+        // PipeSignature stubs. Always pass it; if the CLI predates the floor the invocation
+        // will fail and the catch block surfaces a targeted upgrade message. `--format json`
+        // (0.29.0) and `--library-dir` (0.18.2) landed earlier, so the same floor covers
+        // them — no separate version checks needed.
+        const args = [...resolved.args, 'validate', 'bundle', filePath, '--library-dir', path.dirname(filePath), '--allow-signatures', '--view', '--direction', direction, '--format', 'json'];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
         const cwd = workspaceFolder?.uri.fsPath;
 
@@ -302,20 +303,20 @@ export class MethodGraphPanel implements vscode.Disposable {
             if (this.currentUri?.toString() !== uri.toString()) return;
 
             // Before falling into the generic error paths, check whether the failure
-            // is just an outdated `pipelex-agent` that predates `--format json` (0.29.0).
+            // is just an outdated `pipelex-agent` that predates `--allow-signatures` (0.31.0).
             const installedVersion = await getAgentCliVersion(resolved.command, resolved.args, cwd);
-            if (installedVersion && compareSemver(installedVersion, MIN_FORMAT_JSON_VERSION) < 0) {
+            if (installedVersion && compareSemver(installedVersion, MIN_AGENT_VERSION) < 0) {
                 if (controller.signal.aborted) return;
                 if (this.currentUri?.toString() !== uri.toString()) return;
                 this.output.appendLine(
                     `pipelex-agent ${formatSemver(installedVersion)} is too old for the graph panel ` +
-                    `(needs ≥ ${formatSemver(MIN_FORMAT_JSON_VERSION)}).`
+                    `(needs ≥ ${formatSemver(MIN_AGENT_VERSION)}).`
                 );
                 this.setHtml(messageHtml(
                     'Update Pipelex',
                     `Your installed <code>pipelex-agent</code> is <strong>${escapeHtml(formatSemver(installedVersion))}</strong>, ` +
-                    `but the method graph requires <strong>≥ ${escapeHtml(formatSemver(MIN_FORMAT_JSON_VERSION))}</strong> ` +
-                    `(the <code>--format json</code> option landed in that release).` +
+                    `but the method graph requires <strong>≥ ${escapeHtml(formatSemver(MIN_AGENT_VERSION))}</strong> ` +
+                    `(the <code>--allow-signatures</code> option landed in that release).` +
                     `</p><p>` +
                     `Upgrade Pipelex and try again:<br>` +
                     `<code>mthds runner setup pipelex</code> (mthds-managed install)<br>` +

@@ -77,8 +77,10 @@ export class PipelexValidator implements vscode.Disposable {
 
         const timeout = config.get<number>('validation.timeout', 30000);
         const filePath = document.uri.fsPath;
-        // `--library-dir` is supported by pipelex-agent since 0.18.2 — safe to pass unconditionally.
-        const args = [...resolved.args, 'validate', 'bundle', filePath, '--library-dir', path.dirname(filePath)];
+        // `--allow-signatures` (pipelex-agent 0.31.0, the extension's version floor) keeps
+        // on-save validation lenient about PipeSignature stubs in work-in-progress bundles.
+        // `--library-dir` (0.18.2) is covered by the same floor.
+        const args = [...resolved.args, 'validate', 'bundle', filePath, '--library-dir', path.dirname(filePath), '--allow-signatures'];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
         const cwd = workspaceFolder?.uri.fsPath;
 
