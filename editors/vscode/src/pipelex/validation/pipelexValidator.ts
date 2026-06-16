@@ -5,7 +5,7 @@ import { gatherBundleFiles } from './bundleGather';
 import { buildBundleDiagnostics } from './crossFileDiagnostics';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { BackendFactory } from './backendFactory';
-import type { BundleAnalysis, GraphAnalysisSink } from './backend';
+import type { BackendErrorAction, BundleAnalysis, GraphAnalysisSink } from './backend';
 
 const DIAGNOSTIC_SOURCE = 'pipelex';
 
@@ -179,7 +179,13 @@ export class PipelexValidator implements vscode.Disposable {
                     `≥ ${err.minVersion}. Upgrade pipelex and reload.`
                 );
                 return;
+            case 'auth':
+                if (err.userMessage) {
+                    this.notifyOnce(err.userMessage, err.actions ?? []);
+                }
+                return;
             case 'unreachable':
+            case 'api-error':
             case 'infra':
                 if (err.userMessage) {
                     this.notifyOnce(err.userMessage);
@@ -188,11 +194,27 @@ export class PipelexValidator implements vscode.Disposable {
         }
     }
 
-    /** Show a notification at most once per error streak (deduped until the next success). */
-    private notifyOnce(message: string): void {
+    /**
+     * Show a notification at most once per error streak (deduped until the next
+     * success). When `actions` are given they become toast buttons; selecting one
+     * runs its command or opens its URL.
+     */
+    private notifyOnce(message: string, actions: BackendErrorAction[] = []): void {
         if (this.lastNotifiedMessage === message) return;
         this.lastNotifiedMessage = message;
-        vscode.window.showWarningMessage(message);
+        if (actions.length === 0) {
+            void vscode.window.showWarningMessage(message);
+            return;
+        }
+        void vscode.window.showWarningMessage(message, ...actions.map(a => a.label)).then(choice => {
+            const action = actions.find(a => a.label === choice);
+            if (!action) return;
+            if ('command' in action) {
+                void vscode.commands.executeCommand(action.command);
+            } else {
+                void vscode.env.openExternal(vscode.Uri.parse(action.externalUrl));
+            }
+        });
     }
 
     private setDiagnosticsForDir(dir: string, fileDiags: { uri: vscode.Uri; diagnostics: vscode.Diagnostic[] }[]): void {

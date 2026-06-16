@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import { MthdsApiClient, ApiResponseError, ApiUnreachableError } from 'mthds';
 import type { PipelexValidationReport } from 'mthds';
 import { AnalyzeAbortError, BackendError } from './backend';
-import type { AnalyzeOptions, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
+import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
 import type { ValidationErrorItem } from './types';
 import { isHostedPipelexApi, type ApiVersionGate } from './apiVersionGate';
+import { PIPELEX_PLATFORM_URL, SET_API_KEY_COMMAND } from './apiKey';
 
 export interface ApiBackendDeps {
     /** Base URL of the API server (read fresh per analysis so a settings change takes effect). */
@@ -125,10 +126,21 @@ export class ApiValidationBackend implements ValidationBackend {
                     ? { validation: validationOutcome, graph: null }
                     : { validation: validationOutcome };
             }
-            // A non-validation API response (auth, request-shape, 5xx). Notify, no diagnostics.
+            // A non-validation API response. The server WAS reached — this is not
+            // "unreachable". An auth rejection (401/403) gets its own kind + one-click
+            // remedies; everything else (bad request, 5xx) is a generic api-error.
+            const logMessage = `Pipelex API ${err.status} at ${baseUrl}: ${err.serverMessage ?? err.statusText}`;
+            if (err.status === 401 || err.status === 403) {
+                throw new BackendError({
+                    kind: 'auth',
+                    logMessage,
+                    userMessage: authMessage(baseUrl, err.status),
+                    actions: authActions(baseUrl),
+                });
+            }
             throw new BackendError({
-                kind: 'unreachable',
-                logMessage: `Pipelex API ${err.status} at ${baseUrl}: ${err.serverMessage ?? err.statusText}`,
+                kind: 'api-error',
+                logMessage,
                 userMessage: apiResponseMessage(err, baseUrl),
             });
         }
@@ -195,10 +207,33 @@ function unreachableMessage(baseUrl: string): string {
     return `Pipelex API unreachable at ${baseUrl} — is pipelex-api running?`;
 }
 
+/** Non-auth API response (bad request, 5xx). Auth (401/403) is handled by {@link authMessage}. */
 function apiResponseMessage(err: ApiResponseError, baseUrl: string): string {
-    if (err.status === 401 || err.status === 403) {
-        return `Pipelex API at ${baseUrl} rejected the request (HTTP ${err.status}). ` +
-            'Check your hosted API key (run "Pipelex: Set Hosted API Key").';
-    }
     return `Pipelex API error at ${baseUrl} (HTTP ${err.status}): ${err.serverMessage ?? err.statusText}.`;
+}
+
+/**
+ * Guidance for a 401/403. The remedies differ by host: a user on the hosted API
+ * gets a key from the platform (or runs locally), whereas a self-hosted operator
+ * configures auth on the server they run. The "validate locally with `cli`"
+ * escape hatch rides the text so the two buttons stay focused.
+ */
+function authMessage(baseUrl: string, status: number): string {
+    if (isHostedPipelexApi(baseUrl)) {
+        return `The hosted Pipelex API at ${baseUrl} rejected the request (HTTP ${status}) — the \`api\` backend ` +
+            `needs an API key. Set your key, get one at ${PIPELEX_PLATFORM_URL}, or switch \`pipelex.backend\` ` +
+            `to \`cli\` to validate locally without a key.`;
+    }
+    return `The Pipelex API at ${baseUrl} rejected the request (HTTP ${status}) — it requires authentication. ` +
+        `Set a key with the "Pipelex: Set Hosted API Key" command (or set the MTHDS_API_KEY environment variable). ` +
+        `You can also switch \`pipelex.backend\` to \`cli\` to validate locally.`;
+}
+
+/** One-click remedies for a 401/403, shown as pane buttons and toast actions. */
+function authActions(baseUrl: string): BackendErrorAction[] {
+    const actions: BackendErrorAction[] = [{ label: 'Set API Key', command: SET_API_KEY_COMMAND }];
+    if (isHostedPipelexApi(baseUrl)) {
+        actions.push({ label: 'Get an API Key', externalUrl: PIPELEX_PLATFORM_URL });
+    }
+    return actions;
 }

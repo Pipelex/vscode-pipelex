@@ -129,6 +129,7 @@ vi.mock('../validation/sourceLocator', () => ({
 
 // ---------- Import SUT after mocks ----------
 import { MethodGraphPanel } from '../graph/methodGraphPanel';
+import { BackendError } from '../validation/backend';
 
 // Helper to create a mock output channel
 function mockOutput() {
@@ -422,6 +423,54 @@ describe('MethodGraphPanel', () => {
 
         // Success path swaps in the graph webview HTML (no error message / Retry button).
         expect(mockState.mockWebview.html).not.toContain('id="pipelex-retry"');
+        panel.dispose();
+    });
+
+    it('renders a non-auth api-error (e.g. HTTP 503) under "Pipelex API Error", not "Unreachable"', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        panel.applyBackendError(uri, new BackendError({
+            kind: 'api-error',
+            logMessage: 'Pipelex API 503 at https://api.pipelex.com: service unavailable',
+            userMessage: 'Pipelex API error at https://api.pipelex.com (HTTP 503): service unavailable.',
+        }));
+
+        const html = mockState.mockWebview.html;
+        expect(html).toContain('Pipelex API Error');
+        expect(html).not.toContain('Pipelex API Unreachable');
+        expect(html).toContain('HTTP 503');
+        panel.dispose();
+    });
+
+    it('renders an auth error under "Pipelex API Key Required" with Set/Get buttons posting whitelisted messages', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        panel.applyBackendError(uri, new BackendError({
+            kind: 'auth',
+            logMessage: 'Pipelex API 401 at https://api.pipelex.com: unauthorized',
+            userMessage: 'The hosted Pipelex API at https://api.pipelex.com rejected the request (HTTP 401) — the api backend needs an API key.',
+            actions: [
+                { label: 'Set API Key', command: 'pipelex.setApiKey' },
+                { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
+            ],
+        }));
+
+        const html = mockState.mockWebview.html;
+        expect(html).toContain('Pipelex API Key Required');
+        expect(html).not.toContain('Pipelex API Unreachable');
+        // Both remedy buttons plus Retry are rendered.
+        expect(html).toContain('Set API Key');
+        expect(html).toContain('Get an API Key');
+        expect(html).toContain('Retry');
+        // Buttons post the safe, whitelisted message shapes (command dispatch + http open).
+        expect(html).toContain('"type":"runCommand","command":"pipelex.setApiKey"');
+        expect(html).toContain('"type":"openExternally","url":"https://app.pipelex.com/"');
         panel.dispose();
     });
 

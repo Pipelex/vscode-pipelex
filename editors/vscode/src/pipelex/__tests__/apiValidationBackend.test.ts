@@ -117,12 +117,35 @@ describe('ApiValidationBackend', () => {
         expect(analysis.validation.errors).toEqual([{ category: 'blueprint_validation', message: 'whole bundle failed dry-run', error_type: 'ValidateBundleError' }]);
     });
 
-    it('treats an auth error as a transport BackendError (notify, no diagnostics)', async () => {
+    it('maps a self-hosted 401 to an auth BackendError with a single Set-API-Key action', async () => {
         apiState.validate = async () => { throw new ApiResponseError(401, 'AuthError', 'unauthorized', undefined); };
-        await expect(analyze(makeBackend())).rejects.toMatchObject({ kind: 'unreachable' });
-        const err = await analyze(makeBackend()).catch(e => e);
+        const err = await analyze(makeBackend()).catch(e => e); // default baseUrl is localhost (self-hosted)
         expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('auth');
         expect(err.userMessage).toMatch(/Set Hosted API Key/);
+        // Self-hosted: only the "Set API Key" remedy (no platform "Get a key" link).
+        expect(err.actions).toEqual([{ label: 'Set API Key', command: 'pipelex.setApiKey' }]);
+    });
+
+    it('maps a hosted 401/403 to an auth BackendError with Set + Get-a-key actions and host-aware text', async () => {
+        apiState.validate = async () => { throw new ApiResponseError(403, 'AuthError', 'forbidden', undefined); };
+        const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('auth');
+        expect(err.userMessage).toMatch(/HTTP 403/);
+        expect(err.userMessage).toMatch(/app\.pipelex\.com/);
+        expect(err.userMessage).toMatch(/`cli`/);
+        expect(err.actions).toEqual([
+            { label: 'Set API Key', command: 'pipelex.setApiKey' },
+            { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
+        ]);
+    });
+
+    it('maps a 5xx to an api-error BackendError (server reached, errored)', async () => {
+        apiState.validate = async () => { throw new ApiResponseError(503, undefined, 'service unavailable', undefined, 'https://api.pipelex.com', 'Service Unavailable'); };
+        const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
     });
 
     it('maps ApiUnreachableError to a transport BackendError', async () => {

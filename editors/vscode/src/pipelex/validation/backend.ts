@@ -101,12 +101,25 @@ export type BackendErrorKind =
     | 'not-found'
     /** The resolved CLI / API server predates a required feature. */
     | 'too-old'
-    /** The API server could not be reached, or answered with something that is not a validation result. */
+    /** The API server could not be reached (network error, timeout, or an unparseable/non-`problem+json` response). */
     | 'unreachable'
+    /** The API server WAS reached but answered with a non-validation error (bad request, or 5xx). */
+    | 'api-error'
+    /** The API server WAS reached but rejected the request for authentication/authorization (401/403). */
+    | 'auth'
     /** The backend ran but failed for an infrastructural reason (setup error, spawn failure, unparseable output). */
     | 'infra'
     /** The user declined to send bundle contents to a remote API. */
     | 'declined';
+
+/**
+ * A one-click remedy a consumer can surface as a button (method pane) or a
+ * notification action (toast). Either runs a VS Code command or opens an
+ * external URL — nothing else, so both surfaces can dispatch it safely.
+ */
+export type BackendErrorAction =
+    | { label: string; command: string }
+    | { label: string; externalUrl: string };
 
 /**
  * A backend-level failure: the backend could not produce a validation verdict.
@@ -123,6 +136,8 @@ export class BackendError extends Error {
     /** Populated for `too-old` so a consumer can render an upgrade hint. */
     readonly installedVersion?: string;
     readonly minVersion?: string;
+    /** One-click remedies, rendered as pane buttons / toast actions when present. */
+    readonly actions?: BackendErrorAction[];
 
     constructor(args: {
         kind: BackendErrorKind;
@@ -130,6 +145,7 @@ export class BackendError extends Error {
         userMessage?: string;
         installedVersion?: string;
         minVersion?: string;
+        actions?: BackendErrorAction[];
     }) {
         super(args.userMessage ?? args.logMessage);
         this.name = 'BackendError';
@@ -138,6 +154,7 @@ export class BackendError extends Error {
         this.userMessage = args.userMessage;
         this.installedVersion = args.installedVersion;
         this.minVersion = args.minVersion;
+        this.actions = args.actions;
     }
 }
 

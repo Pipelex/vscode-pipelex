@@ -7,7 +7,8 @@
 - Commands `Pipelex: Set Hosted API Key` / `Pipelex: Clear Hosted API Key` store a hosted Pipelex API key in VS Code SecretStorage (never in plaintext settings); the `api` backend resolves the token as SecretStorage → `MTHDS_API_KEY` env.
 - Cross-file diagnostics: a bundle-validation error is now placed on its declaring file (resolved from the error's `source`), not only on the saved file, for directory-wide bundles on both backends.
 - One-time confirmation before the `api` backend sends bundle contents to a non-localhost host (the whole directory's `.mthds` contents are sent on each save).
-- The method graph view now shows a **Retry** button on its error states (CLI not found / too old, API unreachable, send declined, unexpected error) that re-runs the analysis for the open file, so a transient failure recovers without reopening the panel.
+- The method graph view now shows a **Retry** button on its error states (CLI not found / too old, API unreachable, API error, API key required, send declined, unexpected error) that re-runs the analysis for the open file, so a transient failure recovers without reopening the panel.
+- A Pipelex API auth rejection (HTTP 401/403) is now reported as its own "API key required" state — separate from "unreachable" and generic API errors — with one-click remedies on both the notification and the method graph view: **Set API Key** (runs `Pipelex: Set Hosted API Key`) and, against the hosted endpoint, **Get an API Key** (opens `app.pipelex.com`); the message also points to the `cli` backend for local validation without a key.
 
 ### Changed
 - On-save validation and the method graph pass `--allow-signatures` to `pipelex-agent validate bundle`, so work-in-progress bundles containing `PipeSignature` stubs validate and render instead of failing with `SignaturesNotAllowedError`

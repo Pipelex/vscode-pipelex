@@ -3,6 +3,12 @@ import * as vscode from 'vscode';
 /** SecretStorage key under which the hosted Pipelex API token is stored. */
 const SECRET_KEY = 'pipelex.api.token';
 
+/** Command id for the "Pipelex: Set Hosted API Key" command (shared by registration, pane button, and toast action). */
+export const SET_API_KEY_COMMAND = 'pipelex.setApiKey';
+
+/** Where users obtain a hosted API key. Surfaced as the "Get an API Key" remedy on a 401/403. */
+export const PIPELEX_PLATFORM_URL = 'https://app.pipelex.com/';
+
 /**
  * Resolve the API token with SecretStorage → environment precedence.
  *
@@ -20,7 +26,7 @@ export async function resolveApiToken(secrets: vscode.SecretStorage): Promise<st
 /** Register the Set / Clear hosted API key commands. */
 export function registerApiKeyCommands(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('pipelex.setApiKey', async () => {
+        vscode.commands.registerCommand(SET_API_KEY_COMMAND, async () => {
             const value = await vscode.window.showInputBox({
                 title: 'Pipelex Hosted API Key',
                 prompt: 'Stored securely in VS Code SecretStorage — used when pipelex.backend is "api" against a hosted endpoint.',

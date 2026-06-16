@@ -4,8 +4,9 @@ import * as fs from 'fs';
 import { cancelAllInflight } from '../validation/processUtils';
 import { gatherBundleFiles } from '../validation/bundleGather';
 import { AnalyzeAbortError, BackendError } from '../validation/backend';
-import type { BundleAnalysis, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
+import type { BackendErrorAction, BundleAnalysis, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
 import { CliValidationBackend } from '../validation/cliValidationBackend';
+import { SET_API_KEY_COMMAND } from '../validation/apiKey';
 import { findTableHeader } from '../validation/sourceLocator';
 import type { ValidationErrorItem } from '../validation/types';
 import { resolveGraphConfig, getPaletteColors } from './graphConfig';
@@ -20,6 +21,9 @@ import { parseGraphspecFile } from './graphspecDetector';
  * for the rich graph webview.
  */
 const RETRY_NONCE_SENTINEL = 'PIPELEX_RETRY_NONCE';
+
+/** Commands the message-view buttons may dispatch — a closed allowlist, not arbitrary command execution. */
+const WEBVIEW_ALLOWED_COMMANDS = new Set<string>([SET_API_KEY_COMMAND]);
 
 export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     private static readonly CSP_NONCE_SENTINEL = 'PIPELEX_CSP_NONCE';
@@ -386,6 +390,18 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                     this.output.appendLine(err.logMessage);
                     this.setHtml(messageHtml('Pipelex API Unreachable', escapeHtml(err.userMessage ?? err.logMessage), { retry: true }));
                     return;
+                case 'api-error':
+                    this.output.appendLine(err.logMessage);
+                    this.setHtml(messageHtml('Pipelex API Error', escapeHtml(err.userMessage ?? err.logMessage), { retry: true }));
+                    return;
+                case 'auth':
+                    this.output.appendLine(err.logMessage);
+                    this.setHtml(messageHtml(
+                        'Pipelex API Key Required',
+                        escapeHtml(err.userMessage ?? err.logMessage),
+                        { retry: true, actions: (err.actions ?? []).map(toPanelAction) },
+                    ));
+                    return;
                 case 'declined':
                     this.setHtml(messageHtml('Not Sent', 'Sending bundle contents to the remote Pipelex API was declined.', { retry: true }));
                     return;
@@ -558,6 +574,15 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             this.retry();
             return;
         }
+        if (message.type === 'runCommand' && typeof message.command === 'string') {
+            // Only commands we explicitly expose — never an arbitrary command from the webview.
+            if (WEBVIEW_ALLOWED_COMMANDS.has(message.command)) {
+                void vscode.commands.executeCommand(message.command);
+            } else {
+                this.output.appendLine(`runCommand: refused non-whitelisted command "${message.command}"`);
+            }
+            return;
+        }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {
             if (this.sourceKind === 'graphspec-json') return;
             this.navigateToPipe(message.pipeCode);
@@ -663,17 +688,52 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 </style></head><body><p>Loading method graph...</p></body></html>`;
 }
 
-function messageHtml(title: string, body: string, options?: { retry?: boolean }): string {
-    // The Retry button posts back to the extension (see handleWebviewMessage); its
+/** A button rendered in a message view; clicking it posts `message` back to the extension. */
+interface PanelAction {
+    label: string;
+    message: Record<string, unknown>;
+}
+
+/**
+ * Convert a backend remedy into a pane button. The posted message is one the
+ * webview handler explicitly allows (a whitelisted command, or an http(s) open);
+ * the webview never gets to run an arbitrary command.
+ */
+function toPanelAction(action: BackendErrorAction): PanelAction {
+    if ('command' in action) {
+        return { label: action.label, message: { type: 'runCommand', command: action.command } };
+    }
+    return { label: action.label, message: { type: 'openExternally', url: action.externalUrl } };
+}
+
+function messageHtml(title: string, body: string, options?: { retry?: boolean; actions?: PanelAction[] }): string {
+    // Buttons post back to the extension (see handleWebviewMessage); the single
     // inline <script> runs under the nonce that setHtml() injects for simple HTML.
-    const retry = options?.retry
-        ? `<p class="actions"><button id="pipelex-retry" type="button">Retry</button></p>
+    // Remedy buttons come first, Retry last.
+    const actions = options?.actions ?? [];
+    const buttons: string[] = actions.map(
+        (a, i) => `<button class="pipelex-action" data-action-index="${i}" type="button">${escapeHtml(a.label)}</button>`,
+    );
+    if (options?.retry) {
+        buttons.push(`<button id="pipelex-retry" type="button">Retry</button>`);
+    }
+    // JSON of each action's message, hardened against a `</script>` breakout even
+    // though every message here is built from our own constants, not server input.
+    const actionMessagesJson = JSON.stringify(actions.map(a => a.message)).replace(/</g, '\\u003c');
+    const actionsBlock = buttons.length
+        ? `<p class="actions">${buttons.join(' ')}</p>
 <script nonce="${RETRY_NONCE_SENTINEL}">
 (function () {
   var vscode = acquireVsCodeApi();
-  document.getElementById('pipelex-retry').addEventListener('click', function () {
-    vscode.postMessage({ type: 'retry' });
-  });
+  var retry = document.getElementById('pipelex-retry');
+  if (retry) { retry.addEventListener('click', function () { vscode.postMessage({ type: 'retry' }); }); }
+  var messages = ${actionMessagesJson};
+  var actionButtons = document.querySelectorAll('.pipelex-action');
+  for (var i = 0; i < actionButtons.length; i++) {
+    (function (idx) {
+      actionButtons[idx].addEventListener('click', function () { vscode.postMessage(messages[idx]); });
+    })(i);
+  }
 }());
 </script>`
         : '';
@@ -693,7 +753,7 @@ button { font-family: inherit; font-size: 13px; padding: 4px 14px; cursor: point
          border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; }
 button:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
 button:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 2px; }
-</style></head><body><div class="msg"><h2>${title}</h2><p>${body}</p>${retry}</div></body></html>`;
+</style></head><body><div class="msg"><h2>${title}</h2><p>${body}</p>${actionsBlock}</div></body></html>`;
 }
 
 /** Shape a structured validation error into the panel's error-list entry. */

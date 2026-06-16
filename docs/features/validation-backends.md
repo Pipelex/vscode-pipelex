@@ -56,11 +56,16 @@ For a saved `.mthds` file, the extension gathers every `.mthds` file in the **sa
 A backend failure is distinct from "the bundle is invalid":
 
 - **CLI** — if `pipelex-agent` can't be found you get a one-time warning; if it is too old (below the required minimum) you get a targeted upgrade message; setup/infrastructure errors are logged to the Pipelex output channel.
-- **API** — a server-unreachable, auth, timeout, or non-`problem+json` response shows an actionable notification ("Pipelex API unreachable at …"), clears any stale diagnostics, and does **not** silently fall back to the CLI. Only a real validation failure (HTTP 422 with structured errors) becomes diagnostics.
+- **API** — any failure to produce a verdict shows an actionable notification, clears any stale diagnostics, and does **not** silently fall back to the CLI. The wording distinguishes three cases by what actually happened:
+    - **Unreachable** — the extension never got an answer (network error, timeout, or an unparseable/non-`problem+json` body): "Pipelex API unreachable at …".
+    - **Authentication required** (HTTP 401/403) — the server answered but rejected the request for auth. This is its own case with one-click remedies: a **Set API Key** button (runs `Pipelex: Set Hosted API Key`) and, against the hosted endpoint, a **Get an API Key** button that opens [app.pipelex.com](https://app.pipelex.com/). The message also notes you can switch `pipelex.backend` to `cli` to validate locally without a key. (Against a self-hosted server the platform link is omitted — you configure auth on the server you run.)
+    - **API error** (other 4xx / 5xx) — the server answered with a non-validation error: "Pipelex API error at … (HTTP 5xx) …". Not "unreachable", since the server was reached.
+
+    Only a real validation failure (HTTP 422 with structured errors) becomes diagnostics.
 
 In every failure case stale diagnostics are cleared, so the Problems panel never shows a wrong-but-leftover verdict.
 
-When the **method graph view** can't render because the backend failed (CLI missing or too old, API unreachable, send declined, or an unexpected error), it shows the reason with a **Retry** button that re-runs the analysis for the open file — so a transient failure (server still starting, a network blip, a just-installed CLI) recovers without reopening the panel.
+When the **method graph view** can't render because the backend failed (CLI missing or too old, API unreachable, API key required, an API error, send declined, or an unexpected error), it shows the reason with a **Retry** button — plus, for the API-key case, **Set API Key** / **Get an API Key** buttons — that re-run the analysis for the open file, so a transient failure (server still starting, a network blip, a just-installed CLI, a key just set) recovers without reopening the panel.
 
 ## Version expectations
 
