@@ -318,6 +318,27 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         this.setHtml(messageHtml('No Graph Available', 'The bundle did not produce a method graph.'));
     }
 
+    /**
+     * The on-save analysis threw. Render the failure rather than leave a stale
+     * graph — with validation enabled the panel no longer self-refreshes on save,
+     * so the validator drives this for the file it is showing.
+     */
+    applyBackendError(uri: vscode.Uri, err: unknown): void {
+        if (!this.panel) return;
+        if (this.currentUri?.toString() !== uri.toString()) return;
+        this.renderBackendError(err);
+    }
+
+    /**
+     * The on-save validation was skipped for this file (another tool reported
+     * errors). Replace the stale graph with a short notice.
+     */
+    applySkipped(uri: vscode.Uri, message: string): void {
+        if (!this.panel) return;
+        if (this.currentUri?.toString() !== uri.toString()) return;
+        this.setHtml(messageHtml('Graph Unavailable', escapeHtml(message)));
+    }
+
     private renderBackendError(err: unknown): void {
         if (err instanceof BackendError) {
             switch (err.kind) {

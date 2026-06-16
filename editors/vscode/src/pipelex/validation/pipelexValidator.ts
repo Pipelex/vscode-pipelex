@@ -69,6 +69,12 @@ export class PipelexValidator implements vscode.Disposable {
         const config = vscode.workspace.getConfiguration('pipelex', document.uri);
         if (!config.get<boolean>('validation.enabled', true)) return;
 
+        // A new save supersedes any in-flight analysis for this file. Cancel it
+        // BEFORE the early-return guards below — otherwise a stale run could resolve
+        // afterwards and re-publish diagnostics we are about to clear.
+        const uriKey = document.uri.toString();
+        cancelInflightByKey(this.inflight, uriKey);
+
         // Skip if the file has existing Error-severity diagnostics from other sources (e.g. LSP syntax errors)
         const existingDiags = vscode.languages.getDiagnostics(document.uri);
         const hasOtherErrors = existingDiags.some(
@@ -76,11 +82,16 @@ export class PipelexValidator implements vscode.Disposable {
         );
         if (hasOtherErrors) {
             this.clearDir(path.dirname(document.uri.fsPath));
+            // Keep an open graph panel in sync: it no longer self-refreshes on save
+            // when validation is enabled, so tell it this save was skipped rather
+            // than let it keep showing a stale graph.
+            this.graphSink?.applySkipped(
+                document.uri,
+                'This file has errors reported by another extension (e.g. syntax errors). Fix them and save to update the graph.',
+            );
             return;
         }
 
-        const uriKey = document.uri.toString();
-        cancelInflightByKey(this.inflight, uriKey);
         const controller = new AbortController();
         this.inflight.set(uriKey, controller);
 
@@ -109,6 +120,10 @@ export class PipelexValidator implements vscode.Disposable {
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
             this.handleBackendError(err, dir);
+            // Keep an open graph panel in sync — with validation enabled it does not
+            // self-refresh on save, so without this it would keep showing the last
+            // good graph after a transport/backend failure. No-ops if not showing.
+            this.graphSink?.applyBackendError(document.uri, err);
         } finally {
             if (this.inflight.get(uriKey) === controller) {
                 this.inflight.delete(uriKey);

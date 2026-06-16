@@ -81,6 +81,18 @@ export interface ValidationBackend {
 export interface GraphAnalysisSink {
     isShowingMthds(uri: vscode.Uri): boolean;
     applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): void;
+    /**
+     * The on-save analysis threw (backend / transport error). The panel renders
+     * the failure instead of keeping the previous (now stale) graph. A no-op when
+     * the panel is not currently showing `uri`.
+     */
+    applyBackendError(uri: vscode.Uri, err: unknown): void;
+    /**
+     * The on-save validation was skipped for `uri` (another tool reported errors,
+     * so the validator deferred). The panel shows a short notice rather than keep a
+     * stale graph. A no-op when the panel is not currently showing `uri`.
+     */
+    applySkipped(uri: vscode.Uri, message: string): void;
 }
 
 /** Why a backend could not produce a verdict (as opposed to producing a "bundle is invalid" verdict). */

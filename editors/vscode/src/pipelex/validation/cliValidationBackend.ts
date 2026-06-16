@@ -37,6 +37,15 @@ export class CliValidationBackend implements ValidationBackend {
             });
         }
 
+        // Enforce the version floor BEFORE trusting the CLI's output. The structured
+        // `source` / `field_name` fields cross-file diagnostics rely on only exist from
+        // MIN_AGENT_VERSION; a CLI in [0.31.0, 0.34.0) still exits 0 / emits a structured
+        // error list, just without those fields. Checking only on a spawn failure (the
+        // earlier behavior) let such a CLI through silently, degrading cross-file mapping
+        // with no "too old" warning. The version probe is cached per command, so only the
+        // first analysis of a session pays for it.
+        await this.throwIfTooOld(resolved, request, signal);
+
         const primaryPath = request.primaryUri.fsPath;
         const dir = path.dirname(primaryPath);
         const args = [
@@ -65,7 +74,7 @@ export class CliValidationBackend implements ValidationBackend {
             if (signal.aborted) {
                 throw new AnalyzeAbortError();
             }
-            return await this.handleSpawnError(err, resolved, request, options, signal);
+            return this.handleSpawnError(err, options);
         }
     }
 
@@ -82,13 +91,12 @@ export class CliValidationBackend implements ValidationBackend {
         }
     }
 
-    private async handleSpawnError(
-        err: any,
-        resolved: { command: string; args: string[] },
-        request: BundleRequest,
-        options: AnalyzeOptions,
-        signal: AbortSignal,
-    ): Promise<BundleAnalysis> {
+    /**
+     * Map a non-zero CLI exit to a validation outcome or a {@link BackendError}.
+     * The version floor is enforced up front in {@link analyze}, so a too-old CLI
+     * (including one that argparse-errors on an unknown flag) never reaches here.
+     */
+    private handleSpawnError(err: any, options: AnalyzeOptions): BundleAnalysis {
         if (err.exitCode === 1 && typeof err.stderr === 'string') {
             const json = extractJson(err.stderr);
             if (json) {
@@ -97,17 +105,14 @@ export class CliValidationBackend implements ValidationBackend {
                     return options.withGraph ? { validation: outcome, graph: null } : { validation: outcome };
                 }
             }
-            // exit 1 but the stderr is not a parseable validation failure — could be an
-            // outdated CLI (argparse error on an unknown flag). Probe the version.
-            await this.throwIfTooOld(resolved, request, signal);
+            // exit 1 but the stderr is not a parseable validation failure.
             throw new BackendError({
                 kind: 'infra',
                 logMessage: `pipelex-agent: ${err.stderr.slice(0, 500)}`,
             });
         }
 
-        // Non-exit-1 failure (spawn error, timeout, …). Check for an outdated CLI first.
-        await this.throwIfTooOld(resolved, request, signal);
+        // Non-exit-1 failure (spawn error, timeout, …).
         throw new BackendError({
             kind: 'infra',
             logMessage: `pipelex-agent error: ${err.message ?? err}`,

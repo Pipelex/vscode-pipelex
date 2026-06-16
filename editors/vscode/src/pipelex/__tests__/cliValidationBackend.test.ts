@@ -96,12 +96,26 @@ describe('CliValidationBackend', () => {
         expect(err.kind).toBe('infra');
     });
 
-    it('detects an outdated CLI on a non-JSON failure', async () => {
+    it('detects an outdated CLI that argparse-errors on an unknown flag', async () => {
         cliState.version = [0, 30, 0];
         cliState.spawnReject = { exitCode: 1, stderr: 'usage: pipelex-agent ... unrecognized arguments: --allow-signatures' };
         const err = await analyze().catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('too-old');
         expect(err.installedVersion).toBe('0.30.0');
+    });
+
+    it('rejects a CLI below the floor up front, even when it would validate cleanly', async () => {
+        // A CLI in [0.31.0, 0.34.0) supports --allow-signatures/--view/--format json,
+        // so it exits 0 — but emits source-less errors. The floor must be enforced
+        // before we trust its output, not only on a spawn failure.
+        cliState.version = [0, 32, 0];
+        cliState.spawnResolve = { stdout: JSON.stringify({ graphspec: { nodes: [], edges: [] } }), stderr: '' };
+        const err = await analyze(true).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('too-old');
+        expect(err.installedVersion).toBe('0.32.0');
+        const processUtils = await import('../validation/processUtils');
+        expect(vi.mocked(processUtils.spawnCli)).not.toHaveBeenCalled();
     });
 });

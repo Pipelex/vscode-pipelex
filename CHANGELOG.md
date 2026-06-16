@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-- Selectable analysis backend via `pipelex.backend` (`cli` default — zero-config preserved; `api` opt-in). The `api` backend validates bundles and renders method graphs by calling a Pipelex API server (`pipelex.api.baseUrl`, default `http://localhost:8081`) over HTTP via the `mthds` client, with full structured-diagnostics parity. See [Validation backends](docs/features/validation-backends.md).
+- Selectable analysis backend via `pipelex.backend` (`cli` default — zero-config preserved; `api` opt-in). The `api` backend validates bundles and renders method graphs by calling a Pipelex API server (`pipelex.api.baseUrl`, default the hosted `https://api.pipelex.com`; point it at e.g. `http://localhost:8081` for a self-hosted runner) over HTTP via the `mthds` client, with full structured-diagnostics parity. See [Validation backends](docs/features/validation-backends.md).
 - Commands `Pipelex: Set Hosted API Key` / `Pipelex: Clear Hosted API Key` store a hosted Pipelex API key in VS Code SecretStorage (never in plaintext settings); the `api` backend resolves the token as SecretStorage → `MTHDS_API_KEY` env.
 - Cross-file diagnostics: a bundle-validation error is now placed on its declaring file (resolved from the error's `source`), not only on the saved file, for directory-wide bundles on both backends.
 - One-time confirmation before the `api` backend sends bundle contents to a non-localhost host (the whole directory's `.mthds` contents are sent on each save).
@@ -12,6 +12,11 @@
 - On-save validation and the method graph pass `--allow-signatures` to `pipelex-agent validate bundle`, so work-in-progress bundles containing `PipeSignature` stubs validate and render instead of failing with `SignaturesNotAllowedError`
 - Minimum supported `pipelex-agent` raised to 0.34.0 — required for the structured `validation_errors[]` fields (`source` / `field_name`) that power cross-file diagnostics and parity with the API backend. This is a compatibility-floor break: an older `pipelex-agent` is reported as too old (the extension's behavior is otherwise unchanged).
 - Validation diagnostics now use the source label `pipelex` (was `pipelex-agent`), reflecting that either backend can produce them.
+
+### Fixed
+- The `pipelex-agent` version floor is now enforced before trusting the CLI's output, not only on a spawn failure. A CLI in the `[0.31.0, 0.34.0)` range still validates and emits a structured error list (without the `source` / `field_name` fields), so the previous lazy check let it through silently and degraded cross-file diagnostics; an under-floor CLI is now reported as too old up front on both the validation and graph paths.
+- An open method-graph panel no longer keeps showing a stale graph when an on-save analysis fails or is skipped: a backend/transport failure now renders the error in the panel, and a save skipped because another extension reported errors shows a short notice. Previously, with validation enabled, only the success path updated the panel.
+- A save that is skipped because another extension already reported errors now cancels any in-flight analysis for that file first, so a slow prior run can no longer resolve afterward and re-publish diagnostics the skip just cleared.
 
 ## [0.9.0] - 2026-05-31
 

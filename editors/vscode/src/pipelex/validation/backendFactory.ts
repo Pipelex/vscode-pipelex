@@ -5,7 +5,7 @@ import { ApiValidationBackend } from './apiValidationBackend';
 import { ApiVersionGate } from './apiVersionGate';
 import { resolveApiToken } from './apiKey';
 
-const DEFAULT_API_BASE_URL = 'http://localhost:8081';
+const DEFAULT_API_BASE_URL = 'https://api.pipelex.com';
 
 /**
  * Builds the configured {@link ValidationBackend} for a document.

@@ -15,35 +15,35 @@ Set it in Settings (UI or `settings.json`):
 {
   // "cli" (default) or "api"
   "pipelex.backend": "api",
-  // Host only, no version path. Default targets a locally self-hosted pipelex-api.
-  "pipelex.api.baseUrl": "http://localhost:8081"
+  // Host only, no version path. Defaults to the hosted Pipelex API.
+  "pipelex.api.baseUrl": "https://api.pipelex.com"
 }
 ```
 
 `pipelex.backend` and `pipelex.api.baseUrl` are resource-scoped, so a multi-root workspace can mix backends per folder.
 
-## Running a local `pipelex-api`
-
-The `api` backend's default `baseUrl` points at a locally self-hosted runner:
-
-```bash
-docker run --rm -p 8081:8080 pipelex/pipelex-api
-```
-
-Point `pipelex.api.baseUrl` at wherever your server listens (host only — the client composes `{baseUrl}/v1/...`). Everything stays on your machine with the localhost default.
-
 ## Hosted endpoint and API keys
 
-To use the hosted API, set `pipelex.api.baseUrl` to `https://api.pipelex.com` and store a key:
+The `api` backend's default `baseUrl` is the hosted Pipelex API (`https://api.pipelex.com`). To use it, store a key:
 
 - Run **`Pipelex: Set Hosted API Key`** from the Command Palette — the key is saved in VS Code **SecretStorage**, never in plaintext settings.
 - **`Pipelex: Clear Hosted API Key`** removes it.
 
 Token resolution is **SecretStorage → `MTHDS_API_KEY` environment variable**: a stored key wins; with none stored, the client falls back to the env var.
 
+## Running a local `pipelex-api`
+
+To validate against a locally self-hosted runner instead of the hosted API, start one:
+
+```bash
+docker run --rm -p 8081:8080 pipelex/pipelex-api
+```
+
+Then point `pipelex.api.baseUrl` at wherever your server listens — e.g. `http://localhost:8081` (host only — the client composes `{baseUrl}/v1/...`). With a localhost URL everything stays on your machine and no API key is needed.
+
 ## Privacy
 
-The `api` backend sends file contents to `baseUrl` on each save. With the localhost default this never leaves your machine. Before the **first** request to a **non-localhost** host, the extension asks for confirmation once, and states clearly that it sends the **whole directory's `.mthds` contents** (not just the active file) — mirroring how the CLI resolves a bundle via `--library-dir`.
+The `api` backend sends file contents to `baseUrl` on each save. The default `baseUrl` is the hosted endpoint, so before the **first** request to a **non-localhost** host, the extension asks for confirmation once, and states clearly that it sends the **whole directory's `.mthds` contents** (not just the active file) — mirroring how the CLI resolves a bundle via `--library-dir`. Point `baseUrl` at a localhost runner and contents never leave your machine (no confirmation prompt).
 
 ## Multi-file bundles and cross-file diagnostics
 

@@ -560,10 +560,10 @@
           "default": "cli"
         },
         "pipelex.api.baseUrl": {
-          "description": "Base URL of the Pipelex API server used when `pipelex.backend` is `api`. Host only, no version path. Defaults to a locally self-hosted pipelex-api. For the hosted API set this to `https://api.pipelex.com` and store a key via `Pipelex: Set Hosted API Key`.",
+          "description": "Base URL of the Pipelex API server used when `pipelex.backend` is `api`. Host only, no version path. Defaults to the hosted Pipelex API (`https://api.pipelex.com`) — store a key via `Pipelex: Set Hosted API Key`. For a locally self-hosted pipelex-api, set this to e.g. `http://localhost:8081`.",
           "type": "string",
           "scope": "resource",
-          "default": "http://localhost:8081"
+          "default": "https://api.pipelex.com"
         },
         "pipelex.validation.enabled": {
           "description": "Run validation on save for MTHDS files.",
