@@ -11,6 +11,16 @@ import type { ValidationErrorItem } from '../validation/types';
 import { resolveGraphConfig, getPaletteColors } from './graphConfig';
 import { parseGraphspecFile } from './graphspecDetector';
 
+/**
+ * Placeholder for the CSP nonce inside the error view's Retry `<script>`.
+ * `setHtml()` swaps ONLY this exact token for the real per-render nonce — it never
+ * blesses a bare `<script>` tag — so escaped page content can never smuggle in an
+ * executable (nonce-bearing) script even if a future interpolation forgets to escape.
+ * Distinct from {@link MethodGraphPanel.CSP_NONCE_SENTINEL} so it can't be mistaken
+ * for the rich graph webview.
+ */
+const RETRY_NONCE_SENTINEL = 'PIPELEX_RETRY_NONCE';
+
 export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     private static readonly CSP_NONCE_SENTINEL = 'PIPELEX_CSP_NONCE';
 
@@ -353,7 +363,8 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                     this.setHtml(messageHtml(
                         'CLI Not Found',
                         'Could not find <code>pipelex-agent</code>. Install it or set ' +
-                        '<code>pipelex.validation.agentCliPath</code> in settings.'
+                        '<code>pipelex.validation.agentCliPath</code> in settings.',
+                        { retry: true }
                     ));
                     return;
                 case 'too-old':
@@ -367,19 +378,20 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                         `Upgrade Pipelex and try again:<br>` +
                         `<code>mthds runner setup pipelex</code> (mthds-managed install)<br>` +
                         `<code>uv tool upgrade pipelex</code> (uv tool install)<br>` +
-                        `<code>uv pip install -U pipelex</code> or <code>pip install -U pipelex</code> (project virtualenv)`
+                        `<code>uv pip install -U pipelex</code> or <code>pip install -U pipelex</code> (project virtualenv)`,
+                        { retry: true }
                     ));
                     return;
                 case 'unreachable':
                     this.output.appendLine(err.logMessage);
-                    this.setHtml(messageHtml('Pipelex API Unreachable', escapeHtml(err.userMessage ?? err.logMessage)));
+                    this.setHtml(messageHtml('Pipelex API Unreachable', escapeHtml(err.userMessage ?? err.logMessage), { retry: true }));
                     return;
                 case 'declined':
-                    this.setHtml(messageHtml('Not Sent', 'Sending bundle contents to the remote Pipelex API was declined.'));
+                    this.setHtml(messageHtml('Not Sent', 'Sending bundle contents to the remote Pipelex API was declined.', { retry: true }));
                     return;
                 case 'infra':
                     this.output.appendLine(err.logMessage);
-                    this.setHtml(messageHtml('Validation Failed', escapeHtml(err.logMessage.slice(0, 500))));
+                    this.setHtml(messageHtml('Validation Failed', escapeHtml(err.logMessage.slice(0, 500)), { retry: true }));
                     return;
             }
         }
@@ -387,7 +399,8 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         this.output.appendLine(`pipelex graph error: ${message}`);
         this.setHtml(messageHtml(
             'Error',
-            'An error occurred while generating the method graph. Check the output panel for details.'
+            'An error occurred while generating the method graph. Check the output panel for details.',
+            { retry: true }
         ));
     }
 
@@ -411,7 +424,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             try {
                 content = await fs.promises.readFile(uri.fsPath, 'utf-8');
             } catch (err: any) {
-                this.setHtml(messageHtml('Read Error', `Could not read file: ${escapeHtml(err.message ?? String(err))}`));
+                this.setHtml(messageHtml('Read Error', `Could not read file: ${escapeHtml(err.message ?? String(err))}`, { retry: true }));
                 return;
             }
         }
@@ -448,7 +461,8 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         if (!webviewHtml) {
             this.setHtml(messageHtml(
                 'Webview Error',
-                'Could not load graph webview assets.'
+                'Could not load graph webview assets.',
+                { retry: true }
             ));
             return;
         }
@@ -516,6 +530,21 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         return html;
     }
 
+    /**
+     * Re-run the analysis for the file the panel is showing. Wired to the Retry
+     * button on the error views so a transient failure (server starting, network
+     * blip, a just-installed CLI) can be recovered without re-opening the panel.
+     */
+    private retry(): void {
+        const uri = this.currentUri;
+        if (!uri) return;
+        if (this.sourceKind === 'graphspec-json') {
+            void this.refreshJson(uri);
+        } else {
+            void this.refresh(uri);
+        }
+    }
+
     private handleWebviewMessage(message: any) {
         if (message.type === 'webviewReady') {
             this.webviewReady = true;
@@ -523,6 +552,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 this.panel.webview.postMessage(this.pendingData);
                 this.pendingData = null;
             }
+            return;
+        }
+        if (message.type === 'retry') {
+            this.retry();
             return;
         }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {
@@ -600,9 +633,18 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}' ${cspSource} https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src ${cspSource} https: data:; object-src ${cspSource} data: blob:; connect-src 'none';">`;
             html = html.replace('<head>', `<head>\n${cspMeta}`);
         } else {
-            // Simple HTML (loading/message): add nonce to <style> tags, minimal CSP
+            // Simple HTML (loading/message). Nonce the <style> tags. The only script
+            // here is the error view's Retry button, whose <script> carries
+            // RETRY_NONCE_SENTINEL: we substitute the nonce for that exact token only —
+            // never a blanket <script> match — so escaped page content can't acquire a
+            // runnable nonce, and script-src is added solely when our own script is present.
             html = html.replace(/<style>/g, `<style nonce="${nonce}">`);
-            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';">`;
+            let scriptDirective = '';
+            if (html.includes(RETRY_NONCE_SENTINEL)) {
+                html = html.split(RETRY_NONCE_SENTINEL).join(nonce);
+                scriptDirective = ` script-src 'nonce-${nonce}';`;
+            }
+            const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';${scriptDirective}">`;
             html = html.replace('<head>', `<head>\n${cspMeta}`);
         }
 
@@ -621,7 +663,20 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 </style></head><body><p>Loading method graph...</p></body></html>`;
 }
 
-function messageHtml(title: string, body: string): string {
+function messageHtml(title: string, body: string, options?: { retry?: boolean }): string {
+    // The Retry button posts back to the extension (see handleWebviewMessage); its
+    // inline <script> runs under the nonce that setHtml() injects for simple HTML.
+    const retry = options?.retry
+        ? `<p class="actions"><button id="pipelex-retry" type="button">Retry</button></p>
+<script nonce="${RETRY_NONCE_SENTINEL}">
+(function () {
+  var vscode = acquireVsCodeApi();
+  document.getElementById('pipelex-retry').addEventListener('click', function () {
+    vscode.postMessage({ type: 'retry' });
+  });
+}());
+</script>`
+        : '';
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -632,7 +687,13 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 .msg { text-align: center; max-width: 480px; }
 h2 { margin-bottom: 0.5em; }
 code { background: var(--vscode-textCodeBlock-background, #2d2d2d); padding: 2px 6px; border-radius: 3px; }
-</style></head><body><div class="msg"><h2>${title}</h2><p>${body}</p></div></body></html>`;
+.actions { margin-top: 1.25em; }
+button { font-family: inherit; font-size: 13px; padding: 4px 14px; cursor: pointer;
+         color: var(--vscode-button-foreground, #fff); background: var(--vscode-button-background, #0e639c);
+         border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; }
+button:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
+button:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 2px; }
+</style></head><body><div class="msg"><h2>${title}</h2><p>${body}</p>${retry}</div></body></html>`;
 }
 
 /** Shape a structured validation error into the panel's error-list entry. */

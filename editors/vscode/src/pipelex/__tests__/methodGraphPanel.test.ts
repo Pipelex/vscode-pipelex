@@ -384,6 +384,73 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    // --- Retry button on the error view ---
+
+    it('renders a Retry button on the error view and re-runs the analysis when clicked', async () => {
+        const processUtils = await import('../validation/processUtils');
+        mockState.resolveCliResult = null; // → CLI Not Found error view
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // The error view carries a Retry button wired to post { type: 'retry' }.
+        expect(mockState.mockWebview.html).toContain('CLI Not Found');
+        expect(mockState.mockWebview.html).toContain('id="pipelex-retry"');
+        expect(mockState.mockWebview.html).toMatch(/postMessage\(\s*\{\s*type:\s*'retry'/);
+        expect(mockState.mockWebview.html).toContain("script-src 'nonce-");
+        // resolveCli returned null, so the analysis never reached spawnCli.
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
+
+        // CLI becomes available; clicking Retry re-runs and now reaches spawnCli.
+        mockState.resolveCliResult = { command: 'pipelex-agent', args: [] };
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'retry' });
+        await vi.waitFor(() => {
+            expect(processUtils.spawnCli).toHaveBeenCalled();
+        });
+
+        panel.dispose();
+    });
+
+    it('does not render a Retry button on a successful graph render', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // Success path swaps in the graph webview HTML (no error message / Retry button).
+        expect(mockState.mockWebview.html).not.toContain('id="pipelex-retry"');
+        panel.dispose();
+    });
+
+    it('never blesses attacker-influenced error text with a nonce (only the trusted Retry script gets one)', async () => {
+        // A backend failure carrying server-influenced text (here via the CLI's stderr;
+        // the same body path serves the API "unreachable" message, whose text a malicious
+        // baseUrl controls). Even WITH the Retry script's script-src active, a <script>
+        // smuggled into the body must stay inert.
+        const processUtils = await import('../validation/processUtils');
+        vi.mocked(processUtils.spawnCli).mockRejectedValueOnce({
+            exitCode: 1,
+            stderr: '<script>globalThis.pwned = 1;</script>',
+        });
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const html = mockState.mockWebview.html;
+        // Our own Retry script is the ONLY thing that got a nonce, and the sentinel is consumed.
+        expect(html).toMatch(/<script nonce="[^"]+">[\s\S]*postMessage/);
+        expect(html).not.toContain('PIPELEX_RETRY_NONCE');
+        // The injected payload is escaped (not a live <script>), so it can never execute.
+        expect(html).not.toContain('<script>globalThis.pwned');
+        expect(html).toContain('&lt;script&gt;globalThis.pwned');
+        panel.dispose();
+    });
+
     // --- Regression: infinite loop guard (previous Bug 4) ---
 
     it('onDidChangeActiveTextEditor does not redirect when panel is in column 1', async () => {

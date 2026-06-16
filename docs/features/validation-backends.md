@@ -60,6 +60,8 @@ A backend failure is distinct from "the bundle is invalid":
 
 In every failure case stale diagnostics are cleared, so the Problems panel never shows a wrong-but-leftover verdict.
 
+When the **method graph view** can't render because the backend failed (CLI missing or too old, API unreachable, send declined, or an unexpected error), it shows the reason with a **Retry** button that re-runs the analysis for the open file — so a transient failure (server still starting, a network blip, a just-installed CLI) recovers without reopening the panel.
+
 ## Version expectations
 
 - **CLI** — the `pipelex-agent` floor is enforced at runtime by probing `--version`; an older CLI is reported as too old.
