@@ -9,6 +9,9 @@ export const SET_API_KEY_COMMAND = 'pipelex.setApiKey';
 /** Where users obtain a hosted API key. Surfaced as the "Get an API Key" remedy on a 401/403. */
 export const PIPELEX_PLATFORM_URL = 'https://app.pipelex.com/';
 
+/** Prefix every hosted Pipelex API key carries — used for the input placeholder and validation. */
+const PIPELEX_API_KEY_PREFIX = 'plx_sk_';
+
 /**
  * Resolve the API token with SecretStorage → environment precedence.
  *
@@ -29,10 +32,20 @@ export function registerApiKeyCommands(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand(SET_API_KEY_COMMAND, async () => {
             const value = await vscode.window.showInputBox({
                 title: 'Pipelex Hosted API Key',
-                prompt: 'Stored securely in VS Code SecretStorage — used when pipelex.backend is "api" against a hosted endpoint.',
-                placeHolder: 'sk-…',
+                prompt: 'Stored securely in VS Code SecretStorage — used when connecting to the Pipelex API.',
+                placeHolder: `${PIPELEX_API_KEY_PREFIX}…`,
                 password: true,
                 ignoreFocusOut: true,
+                validateInput: value => {
+                    const candidate = value.trim();
+                    // Empty is allowed through (the user can submit to cancel); the
+                    // post-submit check reports "nothing stored". Only flag a clearly
+                    // wrong format so a mistyped/wrong key is caught before storing.
+                    if (candidate.length === 0 || candidate.startsWith(PIPELEX_API_KEY_PREFIX)) {
+                        return undefined;
+                    }
+                    return `Pipelex API keys start with "${PIPELEX_API_KEY_PREFIX}".`;
+                },
             });
             if (value === undefined) {
                 return; // cancelled
