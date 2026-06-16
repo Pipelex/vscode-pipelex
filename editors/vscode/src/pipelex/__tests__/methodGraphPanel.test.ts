@@ -457,7 +457,7 @@ describe('MethodGraphPanel', () => {
             userMessage: 'plain text fallback (should not be used when detailHtml is present)',
             detailHtml: 'The hosted Pipelex API needs an API key.</p><p>Get it at ' +
                 '<a class="pipelex-link" href="https://app.pipelex.com/">app.pipelex.com</a>, or self-host the ' +
-                '<a class="pipelex-link" href="https://github.com/Pipelex/pipelex-api">pipelex-api on GitHub</a> — ' +
+                '<a class="pipelex-link" href="https://github.com/Pipelex/pipelex-api">pipelex-api</a> — ' +
                 '<code>docker run -p 8081:8081 pipelex/pipelex-api</code>.',
             actions: [
                 { label: 'Set API Key', command: 'pipelex.setApiKey' },

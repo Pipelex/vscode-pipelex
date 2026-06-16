@@ -246,7 +246,7 @@ function authDetailHtml(baseUrl: string, status: number): string {
     const host = `<code>${escapeHtml(baseUrl)}</code>`;
     const docker = `<code>${escapeHtml(PIPELEX_API_DOCKER_HINT)}</code>`;
     const platformLink = `<a class="pipelex-link" href="${PIPELEX_PLATFORM_URL}">app.pipelex.com</a>`;
-    const repoLink = `<a class="pipelex-link" href="${PIPELEX_API_REPO_URL}">pipelex-api on GitHub</a>`;
+    const repoLink = `<a class="pipelex-link" href="${PIPELEX_API_REPO_URL}">pipelex-api</a>`;
     if (isHostedPipelexApi(baseUrl)) {
         return `The hosted Pipelex API at ${host} rejected the request (HTTP ${status}) — the <code>api</code> ` +
             `backend needs an API key.` +
