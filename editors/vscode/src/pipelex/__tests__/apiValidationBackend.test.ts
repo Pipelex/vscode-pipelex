@@ -125,13 +125,18 @@ describe('ApiValidationBackend', () => {
         expect(err.userMessage).toMatch(/Set Hosted API Key/);
         // Self-hosted: only the "Set API Key" remedy (no platform "Get a key" link).
         expect(err.actions).toEqual([{ label: 'Set API Key', command: 'pipelex.setApiKey' }]);
+        // No platform/self-host pointers — you already run the server.
+        expect(err.detailHtml).toBeTruthy();
+        expect(err.detailHtml).not.toContain('app.pipelex.com');
+        expect(err.detailHtml).not.toContain('github.com');
     });
 
-    it('maps a hosted 401/403 to an auth BackendError with Set + Get-a-key actions and host-aware text', async () => {
+    it('maps a hosted 401/403 to an auth BackendError with Set + Get-a-key actions and clickable rich detail', async () => {
         apiState.validate = async () => { throw new ApiResponseError(403, 'AuthError', 'forbidden', undefined); };
         const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('auth');
+        // Plain-text (toast) message covers all three paths.
         expect(err.userMessage).toMatch(/HTTP 403/);
         expect(err.userMessage).toMatch(/app\.pipelex\.com/);
         expect(err.userMessage).toMatch(/`cli`/);
@@ -139,6 +144,10 @@ describe('ApiValidationBackend', () => {
             { label: 'Set API Key', command: 'pipelex.setApiKey' },
             { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
         ]);
+        // Rich (pane) detail has clickable links + the exact Docker command.
+        expect(err.detailHtml).toContain('class="pipelex-link" href="https://app.pipelex.com/"');
+        expect(err.detailHtml).toContain('class="pipelex-link" href="https://github.com/Pipelex/pipelex-api"');
+        expect(err.detailHtml).toContain('docker run -p 8081:8081 pipelex/pipelex-api');
     });
 
     it('maps a 5xx to an api-error BackendError (server reached, errored)', async () => {

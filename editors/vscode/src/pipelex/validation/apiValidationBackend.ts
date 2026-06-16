@@ -6,6 +6,12 @@ import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest,
 import type { ValidationErrorItem } from './types';
 import { isHostedPipelexApi, type ApiVersionGate } from './apiVersionGate';
 import { PIPELEX_PLATFORM_URL, SET_API_KEY_COMMAND } from './apiKey';
+import { escapeHtml } from '../htmlEscape';
+
+/** Open-source runner users can self-host instead of using the hosted API. */
+const PIPELEX_API_REPO_URL = 'https://github.com/Pipelex/pipelex-api';
+/** Quickest way to run the open-source runner locally (container listens on 8081). */
+const PIPELEX_API_DOCKER_HINT = 'docker run -p 8081:8081 pipelex/pipelex-api';
 
 export interface ApiBackendDeps {
     /** Base URL of the API server (read fresh per analysis so a settings change takes effect). */
@@ -135,6 +141,7 @@ export class ApiValidationBackend implements ValidationBackend {
                     kind: 'auth',
                     logMessage,
                     userMessage: authMessage(baseUrl, err.status),
+                    detailHtml: authDetailHtml(baseUrl, err.status),
                     actions: authActions(baseUrl),
                 });
             }
@@ -213,20 +220,44 @@ function apiResponseMessage(err: ApiResponseError, baseUrl: string): string {
 }
 
 /**
- * Guidance for a 401/403. The remedies differ by host: a user on the hosted API
- * gets a key from the platform (or runs locally), whereas a self-hosted operator
- * configures auth on the server they run. The "validate locally with `cli`"
- * escape hatch rides the text so the two buttons stay focused.
+ * Plain-text guidance for a 401/403 (used by the notification toast, which can't
+ * render links/code). The remedies differ by host: a hosted-API user gets a key
+ * from the platform or self-hosts the open-source runner, whereas a self-hosted
+ * operator configures auth on the server they run. {@link authDetailHtml} is the
+ * richer pane equivalent with clickable links and the exact Docker command.
  */
 function authMessage(baseUrl: string, status: number): string {
     if (isHostedPipelexApi(baseUrl)) {
         return `The hosted Pipelex API at ${baseUrl} rejected the request (HTTP ${status}) — the \`api\` backend ` +
-            `needs an API key. Set your key, get one at ${PIPELEX_PLATFORM_URL}, or switch \`pipelex.backend\` ` +
-            `to \`cli\` to validate locally without a key.`;
+            `needs an API key. Set one, get a key at ${PIPELEX_PLATFORM_URL}, run the open-source pipelex-api ` +
+            `locally with Docker, or switch \`pipelex.backend\` to \`cli\` to validate without a key.`;
     }
     return `The Pipelex API at ${baseUrl} rejected the request (HTTP ${status}) — it requires authentication. ` +
         `Set a key with the "Pipelex: Set Hosted API Key" command (or set the MTHDS_API_KEY environment variable). ` +
         `You can also switch \`pipelex.backend\` to \`cli\` to validate locally.`;
+}
+
+/**
+ * Rich HTML body for the method pane: same guidance as {@link authMessage} but
+ * with clickable links (opened via the pane's `openExternally` bridge) and a
+ * copyable Docker command. The only dynamic value, `baseUrl`, is escaped.
+ */
+function authDetailHtml(baseUrl: string, status: number): string {
+    const host = `<code>${escapeHtml(baseUrl)}</code>`;
+    const docker = `<code>${escapeHtml(PIPELEX_API_DOCKER_HINT)}</code>`;
+    const platformLink = `<a class="pipelex-link" href="${PIPELEX_PLATFORM_URL}">app.pipelex.com</a>`;
+    const repoLink = `<a class="pipelex-link" href="${PIPELEX_API_REPO_URL}">pipelex-api on GitHub</a>`;
+    if (isHostedPipelexApi(baseUrl)) {
+        return `The hosted Pipelex API at ${host} rejected the request (HTTP ${status}) — the <code>api</code> ` +
+            `backend needs an API key.` +
+            `</p><p>Have a key? Click <strong>Set API Key</strong> below. Need one? Get it at ${platformLink}.` +
+            `</p><p>Prefer to run it yourself? Start the open-source ${repoLink} — ${docker} — then point ` +
+            `<code>pipelex.api.baseUrl</code> at it, or switch <code>pipelex.backend</code> to <code>cli</code> ` +
+            `to validate locally.`;
+    }
+    return `The Pipelex API at ${host} rejected the request (HTTP ${status}) — it requires authentication.` +
+        `</p><p>Click <strong>Set API Key</strong> below, or set the <code>MTHDS_API_KEY</code> environment ` +
+        `variable. You can also switch <code>pipelex.backend</code> to <code>cli</code> to validate locally.`;
 }
 
 /** One-click remedies for a 401/403, shown as pane buttons and toast actions. */

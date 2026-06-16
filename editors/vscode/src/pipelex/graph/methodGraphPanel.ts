@@ -11,6 +11,7 @@ import { findTableHeader } from '../validation/sourceLocator';
 import type { ValidationErrorItem } from '../validation/types';
 import { resolveGraphConfig, getPaletteColors } from './graphConfig';
 import { parseGraphspecFile } from './graphspecDetector';
+import { escapeHtml } from '../htmlEscape';
 
 /**
  * Placeholder for the CSP nonce inside the error view's Retry `<script>`.
@@ -398,7 +399,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                     this.output.appendLine(err.logMessage);
                     this.setHtml(messageHtml(
                         'Pipelex API Key Required',
-                        escapeHtml(err.userMessage ?? err.logMessage),
+                        err.detailHtml ?? escapeHtml(err.userMessage ?? err.logMessage),
                         { retry: true, actions: (err.actions ?? []).map(toPanelAction) },
                     ));
                     return;
@@ -734,6 +735,16 @@ function messageHtml(title: string, body: string, options?: { retry?: boolean; a
       actionButtons[idx].addEventListener('click', function () { vscode.postMessage(messages[idx]); });
     })(i);
   }
+  // Inline links open externally via the extension (preventDefault stops the
+  // webview from trying to navigate to them itself).
+  var links = document.querySelectorAll('a.pipelex-link');
+  for (var j = 0; j < links.length; j++) {
+    links[j].addEventListener('click', function (e) {
+      e.preventDefault();
+      var href = this.getAttribute('href');
+      if (href) { vscode.postMessage({ type: 'openExternally', url: href }); }
+    });
+  }
 }());
 </script>`
         : '';
@@ -747,6 +758,8 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 .msg { text-align: center; max-width: 480px; }
 h2 { margin-bottom: 0.5em; }
 code { background: var(--vscode-textCodeBlock-background, #2d2d2d); padding: 2px 6px; border-radius: 3px; }
+a.pipelex-link { color: var(--vscode-textLink-foreground, #3794ff); text-decoration: underline; cursor: pointer; }
+a.pipelex-link:hover { color: var(--vscode-textLink-activeForeground, #4daafc); }
 .actions { margin-top: 1.25em; }
 button { font-family: inherit; font-size: 13px; padding: 4px 14px; cursor: pointer;
          color: var(--vscode-button-foreground, #fff); background: var(--vscode-button-background, #0e639c);
@@ -792,10 +805,3 @@ ${items}
 </ul></div></body></html>`;
 }
 
-function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}

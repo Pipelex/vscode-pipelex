@@ -138,6 +138,12 @@ export class BackendError extends Error {
     readonly minVersion?: string;
     /** One-click remedies, rendered as pane buttons / toast actions when present. */
     readonly actions?: BackendErrorAction[];
+    /**
+     * Optional pre-rendered, safe HTML body for the rich method-pane view (links,
+     * code snippets). Plain-text surfaces (the toast) ignore it and use
+     * {@link userMessage}. Producers MUST escape any dynamic value they interpolate.
+     */
+    readonly detailHtml?: string;
 
     constructor(args: {
         kind: BackendErrorKind;
@@ -146,6 +152,7 @@ export class BackendError extends Error {
         installedVersion?: string;
         minVersion?: string;
         actions?: BackendErrorAction[];
+        detailHtml?: string;
     }) {
         super(args.userMessage ?? args.logMessage);
         this.name = 'BackendError';
@@ -155,6 +162,7 @@ export class BackendError extends Error {
         this.installedVersion = args.installedVersion;
         this.minVersion = args.minVersion;
         this.actions = args.actions;
+        this.detailHtml = args.detailHtml;
     }
 }
 

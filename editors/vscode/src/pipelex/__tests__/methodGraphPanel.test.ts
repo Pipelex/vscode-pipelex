@@ -445,7 +445,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it('renders an auth error under "Pipelex API Key Required" with Set/Get buttons posting whitelisted messages', async () => {
+    it('renders an auth error under "Pipelex API Key Required" with buttons + clickable inline links', async () => {
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/file.mthds');
         panel.show(uri);
@@ -454,7 +454,11 @@ describe('MethodGraphPanel', () => {
         panel.applyBackendError(uri, new BackendError({
             kind: 'auth',
             logMessage: 'Pipelex API 401 at https://api.pipelex.com: unauthorized',
-            userMessage: 'The hosted Pipelex API at https://api.pipelex.com rejected the request (HTTP 401) — the api backend needs an API key.',
+            userMessage: 'plain text fallback (should not be used when detailHtml is present)',
+            detailHtml: 'The hosted Pipelex API needs an API key.</p><p>Get it at ' +
+                '<a class="pipelex-link" href="https://app.pipelex.com/">app.pipelex.com</a>, or self-host the ' +
+                '<a class="pipelex-link" href="https://github.com/Pipelex/pipelex-api">pipelex-api on GitHub</a> — ' +
+                '<code>docker run -p 8081:8081 pipelex/pipelex-api</code>.',
             actions: [
                 { label: 'Set API Key', command: 'pipelex.setApiKey' },
                 { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
@@ -471,6 +475,13 @@ describe('MethodGraphPanel', () => {
         // Buttons post the safe, whitelisted message shapes (command dispatch + http open).
         expect(html).toContain('"type":"runCommand","command":"pipelex.setApiKey"');
         expect(html).toContain('"type":"openExternally","url":"https://app.pipelex.com/"');
+        // detailHtml is rendered as real HTML (not escaped), with clickable links + the Docker command.
+        expect(html).toContain('<a class="pipelex-link" href="https://app.pipelex.com/"');
+        expect(html).toContain('<a class="pipelex-link" href="https://github.com/Pipelex/pipelex-api"');
+        expect(html).toContain('docker run -p 8081:8081 pipelex/pipelex-api');
+        // The script wires inline-link clicks to open externally.
+        expect(html).toContain("querySelectorAll('a.pipelex-link')");
+        expect(html).not.toContain('plain text fallback');
         panel.dispose();
     });
 
