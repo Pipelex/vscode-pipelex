@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { MthdsApiClient, ApiResponseError, ApiUnreachableError } from 'mthds';
+import { MthdsApiClient, ApiResponseError, ApiUnreachableError, PipelineRequestError } from 'mthds';
 import type { PipelexValidationReport } from 'mthds';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
@@ -47,6 +47,19 @@ export class ApiValidationBackend implements ValidationBackend {
     async analyze(request: BundleRequest, options: AnalyzeOptions, signal: AbortSignal): Promise<BundleAnalysis> {
         const { baseUrl } = this.deps;
 
+        // Build the client first — reading the token (SecretStorage) and constructing
+        // the client are local, and the constructor validates the base URL (rejecting a
+        // non-host-only `pipelex.api.baseUrl`, e.g. one with a `/v1` path). Doing it here,
+        // inside a try, turns a misconfiguration into an actionable BackendError instead
+        // of a throw that escapes `handleError` — and fails fast, before the privacy modal.
+        let client: MthdsApiClient;
+        try {
+            const token = await this.deps.getToken();
+            client = new MthdsApiClient({ baseUrl, apiToken: token });
+        } catch (err: unknown) {
+            throw setupError(err, baseUrl);
+        }
+
         // Privacy gate — fire BEFORE the first remote request, not after a send.
         if (!isLocalhost(baseUrl)) {
             const proceed = await this.deps.confirmRemote(baseUrl);
@@ -54,9 +67,6 @@ export class ApiValidationBackend implements ValidationBackend {
                 throw new BackendError({ kind: 'declined', logMessage: `remote send declined for ${baseUrl}` });
             }
         }
-
-        const token = await this.deps.getToken();
-        const client = new MthdsApiClient({ baseUrl, apiToken: token });
 
         // Best-effort, warn-once version gate (never blocks).
         await this.deps.versionGate.ensureCapable(client, baseUrl);
@@ -193,6 +203,38 @@ export class ApiValidationBackend implements ValidationBackend {
         }
         return undefined;
     }
+}
+
+/**
+ * Map a failure from building the client (token read / constructor) to an
+ * actionable {@link BackendError}. The constructor throws `PipelineRequestError`
+ * when `baseUrl` is not host-only (a path, query, or embedded credentials) — a
+ * pure configuration problem, surfaced as an `api-error` with a fix-it message.
+ * Anything else (a SecretStorage read failure) is an `infra` setup error.
+ */
+function setupError(err: unknown, baseUrl: string): BackendError {
+    const message = err instanceof Error ? err.message : String(err);
+    if (err instanceof PipelineRequestError) {
+        return new BackendError({
+            kind: 'api-error',
+            logMessage: `Pipelex API base URL rejected for ${baseUrl}: ${message}`,
+            userMessage: invalidBaseUrlMessage(baseUrl),
+        });
+    }
+    return new BackendError({
+        kind: 'infra',
+        logMessage: `Pipelex API client setup failed for ${baseUrl}: ${message}`,
+        userMessage:
+            `Pipelex API: could not initialize the client for ${baseUrl} (${message}). ` +
+            `Check \`pipelex.api.baseUrl\`, or switch \`pipelex.backend\` to \`cli\`.`,
+    });
+}
+
+/** Guidance for a base URL the client rejected as not host-only. */
+function invalidBaseUrlMessage(baseUrl: string): string {
+    return `Invalid Pipelex API base URL "${baseUrl}" — it must be host-only (no path, query, or ` +
+        `credentials), e.g. https://api.pipelex.com or http://localhost:8081. ` +
+        `Fix \`pipelex.api.baseUrl\` in settings, or switch \`pipelex.backend\` to \`cli\`.`;
 }
 
 /** Localhost / loopback host → privacy confirmation is skipped. */

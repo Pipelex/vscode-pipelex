@@ -34,8 +34,22 @@ vi.mock('mthds', () => {
             this.name = 'ApiUnreachableError';
         }
     }
+    class PipelineRequestError extends Error {
+        constructor(message: string) {
+            super(message);
+            this.name = 'PipelineRequestError';
+        }
+    }
     class MthdsApiClient {
-        constructor(options: any) { apiState.lastConstructorOptions = options; }
+        constructor(options: any) {
+            apiState.lastConstructorOptions = options;
+            // Mirror the real client: reject a non-host-only base URL (the common
+            // trigger is a pasted `/v1` path), throwing PipelineRequestError.
+            const url = new URL(options.baseUrl);
+            if (url.pathname !== '/' && url.pathname !== '') {
+                throw new PipelineRequestError(`Invalid API base URL "${options.baseUrl}": must be host-only.`);
+            }
+        }
         async validate(contents: string[], allow: boolean, names?: string[]) {
             apiState.lastValidateArgs = [contents, allow, names];
             return apiState.validate!(contents, allow, names);
@@ -44,7 +58,7 @@ vi.mock('mthds', () => {
             return apiState.version ? apiState.version() : { protocol_version: '1', implementation_version: '0.4.0' };
         }
     }
-    return { MthdsApiClient, ApiResponseError, ApiUnreachableError };
+    return { MthdsApiClient, ApiResponseError, ApiUnreachableError, PipelineRequestError };
 });
 
 import { ApiResponseError, ApiUnreachableError } from 'mthds';
@@ -197,5 +211,37 @@ describe('ApiValidationBackend', () => {
         const analysis = await analyze(backend);
         expect(analysis.validation.ok).toBe(true);
         expect(apiState.lastValidateArgs).not.toBeNull();
+    });
+
+    it('maps a non-host-only base URL to an actionable api-error BackendError, before prompting or sending', async () => {
+        apiState.validate = async () => ({ success: true });
+        const confirmRemote = vi.fn(async () => true);
+        // A pasted `/v1` path — the client constructor rejects it; this used to escape
+        // handleError as a silent throw (validator: no toast; panel: generic error).
+        const backend = makeBackend({ baseUrl: 'https://api.pipelex.com/v1', confirmRemote });
+        const err = await analyze(backend).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        expect(err.userMessage).toMatch(/must be host-only/);
+        expect(err.userMessage).toMatch(/pipelex\.api\.baseUrl/);
+        // Fails fast: no privacy modal, no request sent.
+        expect(confirmRemote).not.toHaveBeenCalled();
+        expect(apiState.lastValidateArgs).toBeNull();
+    });
+
+    it('maps a token-read (SecretStorage) failure to an infra BackendError, not a silent throw', async () => {
+        const output = mockOutput();
+        const backend = new ApiValidationBackend({
+            baseUrl: 'http://localhost:8081',
+            getToken: async () => { throw new Error('keychain locked'); },
+            versionGate: new ApiVersionGate(output),
+            confirmRemote: async () => true,
+            output,
+        });
+        const err = await analyze(backend).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('infra');
+        expect(err.userMessage).toMatch(/could not initialize the client/);
+        expect(apiState.lastValidateArgs).toBeNull();
     });
 });
