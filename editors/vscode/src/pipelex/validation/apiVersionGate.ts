@@ -64,9 +64,7 @@ export class ApiVersionGate {
                 `older than the required ${formatSemver(MIN_API_IMPLEMENTATION_VERSION)}.`
             );
             vscode.window.showWarningMessage(
-                `The Pipelex API at ${baseUrl} is ${implementationVersion}, but the extension expects ` +
-                `≥ ${formatSemver(MIN_API_IMPLEMENTATION_VERSION)} for structured validation diagnostics. ` +
-                `Upgrade the pipelex-api server (or its pipelex pin).`
+                tooOldMessage({ baseUrl, implementationVersion })
             );
         }
     }
@@ -75,4 +73,35 @@ export class ApiVersionGate {
     reset(): void {
         this.checked.clear();
     }
+}
+
+/** The host the hosted Pipelex API is served from. */
+const HOSTED_PIPELEX_API_HOST = 'api.pipelex.com';
+
+/** True when `baseUrl` points at the managed, hosted Pipelex API (not a self-hosted server). */
+export function isHostedPipelexApi(baseUrl: string): boolean {
+    try {
+        return new URL(baseUrl).hostname === HOSTED_PIPELEX_API_HOST;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Warning shown when the API advertises a version below the floor. The remedy
+ * differs by who runs the server: a self-hosted operator can upgrade it, but a
+ * user on the hosted API cannot — so we point them at the `cli` backend instead
+ * of telling them to "upgrade the server" (which they don't control).
+ */
+export function tooOldMessage(args: { baseUrl: string; implementationVersion: string | undefined }): string {
+    const { baseUrl, implementationVersion } = args;
+    const floor = formatSemver(MIN_API_IMPLEMENTATION_VERSION);
+    if (isHostedPipelexApi(baseUrl)) {
+        return `The hosted Pipelex API (${baseUrl}) is ${implementationVersion}, which does not yet support the ` +
+            `structured validation diagnostics this feature needs (≥ ${floor}). This is rolling out — in the ` +
+            `meantime, switch \`pipelex.backend\` to \`cli\` for local validation, or point \`pipelex.api.baseUrl\` ` +
+            `at a self-hosted pipelex-api ≥ ${floor}.`;
+    }
+    return `The Pipelex API at ${baseUrl} is ${implementationVersion}, but the extension expects ` +
+        `≥ ${floor} for structured validation diagnostics. Upgrade the pipelex-api server (or its pipelex pin).`;
 }

@@ -63,4 +63,4 @@ In every failure case stale diagnostics are cleared, so the Problems panel never
 ## Version expectations
 
 - **CLI** — the `pipelex-agent` floor is enforced at runtime by probing `--version`; an older CLI is reported as too old.
-- **API** — on first use against a base URL, the extension probes `GET /v1/version` and warns once if the server's `implementation_version` is a clean release below the expected minimum. Prerelease / dev / non-semver versions are treated as capable (no hard block).
+- **API** — on first use against a base URL, the extension probes `GET /v1/version` and warns once if the server's `implementation_version` is a clean release below the expected minimum. Prerelease / dev / non-semver versions are treated as capable (no hard block). The remedy in the warning depends on the host: against a self-hosted server it asks you to upgrade pipelex-api (or its pipelex pin); against the hosted `api.pipelex.com` — which you don't operate — it instead suggests switching `pipelex.backend` to `cli` (or pointing at a self-hosted server) until the capability has rolled out.

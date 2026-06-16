@@ -4,7 +4,7 @@ import type { PipelexValidationReport } from 'mthds';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
 import type { ValidationErrorItem } from './types';
-import type { ApiVersionGate } from './apiVersionGate';
+import { isHostedPipelexApi, type ApiVersionGate } from './apiVersionGate';
 
 export interface ApiBackendDeps {
     /** Base URL of the API server (read fresh per analysis so a settings change takes effect). */
@@ -188,6 +188,10 @@ export function isLocalhost(baseUrl: string): boolean {
 }
 
 function unreachableMessage(baseUrl: string): string {
+    if (isHostedPipelexApi(baseUrl)) {
+        return `Pipelex API unreachable at ${baseUrl} — check your network connection; ` +
+            `the hosted Pipelex API may be temporarily unavailable.`;
+    }
     return `Pipelex API unreachable at ${baseUrl} — is pipelex-api running?`;
 }
 

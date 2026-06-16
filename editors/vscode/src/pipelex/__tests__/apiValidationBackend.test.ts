@@ -133,6 +133,15 @@ describe('ApiValidationBackend', () => {
         expect(err.userMessage).toMatch(/is pipelex-api running/);
     });
 
+    it('uses a network-flavored unreachable message for the hosted API (not "is pipelex-api running")', async () => {
+        apiState.validate = async () => { throw new ApiUnreachableError('https://api.pipelex.com', 'ENOTFOUND'); };
+        const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('unreachable');
+        expect(err.userMessage).not.toMatch(/is pipelex-api running/);
+        expect(err.userMessage).toMatch(/hosted Pipelex API may be temporarily unavailable/);
+    });
+
     it('maps a non-problem+json / unparseable failure to a transport BackendError', async () => {
         apiState.validate = async () => { throw new SyntaxError('Unexpected token < in JSON'); };
         const err = await analyze(makeBackend()).catch(e => e);
