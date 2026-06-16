@@ -1,0 +1,108 @@
+import { describe, it, expect, vi } from 'vitest';
+
+// ---------- vscode mock ----------
+vi.mock('vscode', () => {
+    class Range {
+        start: { line: number; character: number };
+        end: { line: number; character: number };
+        constructor(sl: number, sc: number, el: number, ec: number) {
+            this.start = { line: sl, character: sc };
+            this.end = { line: el, character: ec };
+        }
+    }
+    class Diagnostic {
+        source?: string;
+        code?: string;
+        constructor(public range: any, public message: string, public severity: number) {}
+    }
+    return {
+        Range,
+        Diagnostic,
+        DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
+        Uri: {
+            file: (p: string) => ({ fsPath: p, scheme: 'file', toString: () => `file://${p}` }),
+        },
+    };
+});
+
+import * as vscode from 'vscode';
+import { buildBundleDiagnostics } from '../validation/crossFileDiagnostics';
+import type { BundleFile } from '../validation/backend';
+import type { ValidationErrorItem } from '../validation/types';
+
+const DIR = '/project/methods';
+
+function makeFile(name: string, content: string): BundleFile {
+    return { uri: vscode.Uri.file(`${DIR}/${name}`) as any, name, content };
+}
+
+const PRIMARY = makeFile('main.mthds', 'domain = "d"\n[pipe.main_pipe]\ntype = "PipeLLM"\noutput = "Foo"\n');
+const SIBLING = makeFile('concepts.mthds', 'domain = "d"\n[concept.Foo]\ndescription = "a foo"\n[pipe.helper]\ntype = "PipeLLM"\noutput = "Foo"\n');
+
+function build(errors: ValidationErrorItem[]) {
+    return buildBundleDiagnostics({
+        errors,
+        files: [PRIMARY, SIBLING],
+        primaryUri: PRIMARY.uri as any,
+        diagnosticSource: 'pipelex',
+    });
+}
+
+describe('buildBundleDiagnostics — owner resolution', () => {
+    it('places an error on the file named by its `source`', () => {
+        const result = build([{ category: 'pipe_validation', message: 'bad helper', source: 'concepts.mthds', pipe_code: 'helper' }]);
+        expect(result).toHaveLength(1);
+        expect(result[0].uri.toString()).toBe(SIBLING.uri.toString());
+        expect(result[0].diagnostics[0].message).toBe('bad helper');
+    });
+
+    it('matches `source` by basename when it is a full path', () => {
+        const result = build([{ category: 'pipe_validation', message: 'bad', source: `${DIR}/concepts.mthds` }]);
+        expect(result[0].uri.toString()).toBe(SIBLING.uri.toString());
+    });
+
+    it('falls back to declaration scan (pipe_code) when there is no source', () => {
+        const result = build([{ category: 'pipe_factory', message: 'helper broke', pipe_code: 'helper' }]);
+        expect(result[0].uri.toString()).toBe(SIBLING.uri.toString());
+    });
+
+    it('falls back to the concept-declaring file when only concept_code is known', () => {
+        const result = build([{ category: 'pipe_factory', message: 'Foo missing', concept_code: 'Foo' }]);
+        expect(result[0].uri.toString()).toBe(SIBLING.uri.toString());
+    });
+
+    it('falls back to the primary file when nothing resolves', () => {
+        const result = build([{ category: 'blueprint_validation', message: 'mystery error' }]);
+        expect(result[0].uri.toString()).toBe(PRIMARY.uri.toString());
+    });
+
+    it('falls back to the primary file when `source` names a file outside the gathered set', () => {
+        const result = build([{ category: 'pipe_validation', message: 'external', source: '/elsewhere/lib.mthds' }]);
+        expect(result[0].uri.toString()).toBe(PRIMARY.uri.toString());
+    });
+
+    it('groups multiple errors by their owning files', () => {
+        const result = build([
+            { category: 'pipe_validation', message: 'on primary', source: 'main.mthds' },
+            { category: 'pipe_validation', message: 'on sibling', source: 'concepts.mthds' },
+            { category: 'pipe_validation', message: 'also sibling', source: 'concepts.mthds' },
+        ]);
+        const byUri = new Map(result.map(r => [r.uri.toString(), r.diagnostics.length]));
+        expect(byUri.get(PRIMARY.uri.toString())).toBe(1);
+        expect(byUri.get(SIBLING.uri.toString())).toBe(2);
+    });
+
+    it('sets the diagnostic source and code', () => {
+        const result = build([{ category: 'pipe_validation', message: 'x', error_type: 'PipeValidationError', source: 'main.mthds' }]);
+        const diag = result[0].diagnostics[0];
+        expect(diag.source).toBe('pipelex');
+        expect(diag.code).toBe('PipeValidationError');
+        expect(diag.severity).toBe(vscode.DiagnosticSeverity.Error);
+    });
+
+    it('locates the error on the declaring table-header line of the owning file', () => {
+        // [pipe.helper] is on line index 3 of the sibling file.
+        const result = build([{ category: 'pipe_validation', message: 'bad', source: 'concepts.mthds', pipe_code: 'helper' }]);
+        expect(result[0].diagnostics[0].range.start.line).toBe(3);
+    });
+});

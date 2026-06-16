@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import * as path from 'path';
-import { resolveCli } from '../validation/cliResolver';
-import { spawnCli, cancelAllInflight } from '../validation/processUtils';
-import { getAgentCliVersion, compareSemver, formatSemver, MIN_AGENT_VERSION } from '../validation/agentCliVersion';
-import { extractJson } from '../validation/pipelexValidator';
-import type { ValidationFailure } from '../validation/types';
+import { cancelAllInflight } from '../validation/processUtils';
+import { gatherBundleFiles } from '../validation/bundleGather';
+import { AnalyzeAbortError, BackendError } from '../validation/backend';
+import type { BundleAnalysis, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
+import { CliValidationBackend } from '../validation/cliValidationBackend';
 import { findTableHeader } from '../validation/sourceLocator';
+import type { ValidationErrorItem } from '../validation/types';
 import { resolveGraphConfig, getPaletteColors } from './graphConfig';
 import { parseGraphspecFile } from './graphspecDetector';
 
-export class MethodGraphPanel implements vscode.Disposable {
+export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     private static readonly CSP_NONCE_SENTINEL = 'PIPELEX_CSP_NONCE';
 
     private panel: vscode.WebviewPanel | undefined;
@@ -21,23 +21,36 @@ export class MethodGraphPanel implements vscode.Disposable {
     private readonly inflight = new Map<string, AbortController>();
     private readonly output: vscode.OutputChannel;
     private readonly extensionUri: vscode.Uri;
+    private readonly getBackend: (uri: vscode.Uri) => ValidationBackend;
     private cliWarningShown = false;
     private webviewReady = false;
     private pendingData: any = null;
     private fileWatcherDebounce: ReturnType<typeof setTimeout> | undefined;
 
-    constructor(output: vscode.OutputChannel, extensionUri: vscode.Uri) {
+    constructor(
+        output: vscode.OutputChannel,
+        extensionUri: vscode.Uri,
+        getBackend: (uri: vscode.Uri) => ValidationBackend = () => new CliValidationBackend(),
+    ) {
         this.output = output;
         this.extensionUri = extensionUri;
+        this.getBackend = getBackend;
 
         this.disposables.push(
             vscode.workspace.onDidSaveTextDocument(doc => {
-                if (this.currentUri && doc.uri.toString() === this.currentUri.toString()) {
-                    if (this.sourceKind === 'graphspec-json') {
-                        this.refreshJson(doc.uri);
-                    } else {
-                        this.refresh(doc.uri);
-                    }
+                if (!this.currentUri || doc.uri.toString() !== this.currentUri.toString()) return;
+                if (this.sourceKind === 'graphspec-json') {
+                    this.refreshJson(doc.uri);
+                    return;
+                }
+                // For .mthds, the on-save validator drives ONE analyze call and hands us the
+                // graph (see setGraphSink). Only self-refresh when validation is disabled, so
+                // the panel still updates on save without the validator running.
+                const validationEnabled = vscode.workspace
+                    .getConfiguration('pipelex', doc.uri)
+                    .get<boolean>('validation.enabled', true);
+                if (!validationEnabled) {
+                    this.refresh(doc.uri);
                 }
             })
         );
@@ -226,23 +239,6 @@ export class MethodGraphPanel implements vscode.Disposable {
     private async refresh(uri: vscode.Uri) {
         if (!this.panel) return;
 
-        const resolved = resolveCli(uri);
-        if (!resolved) {
-            if (!this.cliWarningShown) {
-                this.cliWarningShown = true;
-                vscode.window.showWarningMessage(
-                    'Pipelex graph: could not find pipelex-agent. ' +
-                    'Install it or set pipelex.validation.agentCliPath in settings.'
-                );
-            }
-            this.setHtml(messageHtml(
-                'CLI Not Found',
-                'Could not find <code>pipelex-agent</code>. Install it or set ' +
-                '<code>pipelex.validation.agentCliPath</code> in settings.'
-            ));
-            return;
-        }
-
         // Cancel ALL inflight jobs — the panel only serves one URI at a time
         cancelAllInflight(this.inflight);
 
@@ -256,120 +252,122 @@ export class MethodGraphPanel implements vscode.Disposable {
             this.setHtml(loadingHtml());
         }
 
-        const pipelexConfig = vscode.workspace.getConfiguration('pipelex');
+        const pipelexConfig = vscode.workspace.getConfiguration('pipelex', uri);
         const timeout = pipelexConfig.get<number>('validation.timeout', 30000);
         const direction = pipelexConfig.get<string>('graph.direction', 'top_down');
-        const showControllers = pipelexConfig.get<boolean>('graph.showControllers', true);
-        const foldMode = pipelexConfig.get<string>('graph.foldMode', 'folded');
-        const filePath = uri.fsPath;
-        // `--allow-signatures` (0.31.0) lets the graph render bundles that still contain
-        // PipeSignature stubs. Always pass it; if the CLI predates the floor the invocation
-        // will fail and the catch block surfaces a targeted upgrade message. `--format json`
-        // (0.29.0) and `--library-dir` (0.18.2) landed earlier, so the same floor covers
-        // them — no separate version checks needed.
-        const args = [...resolved.args, 'validate', 'bundle', filePath, '--library-dir', path.dirname(filePath), '--allow-signatures', '--view', '--direction', direction, '--format', 'json'];
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
-        const cwd = workspaceFolder?.uri.fsPath;
 
         try {
-            const { stdout } = await spawnCli(resolved.command, args, timeout, controller.signal, cwd);
+            const backend = this.getBackend(uri);
+            // The CLI reads siblings via `--library-dir` itself; only the API path needs contents.
+            const files = backend.kind === 'api' ? await gatherBundleFiles(uri) : [];
+            const analysis = await backend.analyze(
+                { primaryUri: uri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
+                { withGraph: true, direction },
+                controller.signal,
+            );
 
             if (controller.signal.aborted) return;
             // Staleness check: if the user switched files while we were waiting,
             // discard this result so it doesn't overwrite the new file's graph.
             if (this.currentUri?.toString() !== uri.toString()) return;
 
-            const json = extractJson(stdout);
-            if (!json) {
-                this.setHtml(messageHtml('No Output', 'The CLI did not return valid JSON.'));
-                return;
-            }
-            const result = JSON.parse(json);
-
-            if (!result?.graphspec) {
-                this.setHtml(messageHtml(
-                    'No Graph Available',
-                    'The CLI did not return a graphspec.'
-                ));
-                return;
-            }
-
-            if (controller.signal.aborted) return;
+            this.applyAnalysis(uri, analysis);
+        } catch (err: unknown) {
+            if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
-
-            await this.sendGraphspecToWebview(uri, result.graphspec, direction, showControllers, foldMode);
-        } catch (err: any) {
-            if (controller.signal.aborted) return;
-            if (this.currentUri?.toString() !== uri.toString()) return;
-
-            // Before falling into the generic error paths, check whether the failure
-            // is just an outdated `pipelex-agent` that predates `--allow-signatures` (0.31.0).
-            const installedVersion = await getAgentCliVersion(resolved.command, resolved.args, cwd);
-            if (installedVersion && compareSemver(installedVersion, MIN_AGENT_VERSION) < 0) {
-                if (controller.signal.aborted) return;
-                if (this.currentUri?.toString() !== uri.toString()) return;
-                this.output.appendLine(
-                    `pipelex-agent ${formatSemver(installedVersion)} is too old for the graph panel ` +
-                    `(needs ≥ ${formatSemver(MIN_AGENT_VERSION)}).`
-                );
-                this.setHtml(messageHtml(
-                    'Update Pipelex',
-                    `Your installed <code>pipelex-agent</code> is <strong>${escapeHtml(formatSemver(installedVersion))}</strong>, ` +
-                    `but the method graph requires <strong>≥ ${escapeHtml(formatSemver(MIN_AGENT_VERSION))}</strong> ` +
-                    `(the <code>--allow-signatures</code> option landed in that release).` +
-                    `</p><p>` +
-                    `Upgrade Pipelex and try again:<br>` +
-                    `<code>mthds runner setup pipelex</code> (mthds-managed install)<br>` +
-                    `<code>uv tool upgrade pipelex</code> (uv tool install)<br>` +
-                    `<code>uv pip install -U pipelex</code> or <code>pip install -U pipelex</code> (project virtualenv)`
-                ));
-                return;
-            }
-
-            if (err.exitCode === 1 && err.stderr) {
-                const stderr = err.stderr as string;
-                const json = extractJson(stderr);
-                if (json) {
-                    try {
-                        const failure: ValidationFailure = JSON.parse(json);
-                        if (failure.validation_errors && Array.isArray(failure.validation_errors) && failure.validation_errors.length > 0) {
-                            const errors = failure.validation_errors.map(ve => ({
-                                message: ve.message,
-                                context: ve.pipe_code
-                                    ? `pipe.${ve.pipe_code}`
-                                    : ve.concept_code
-                                        ? `concept.${ve.concept_code}`
-                                        : undefined,
-                            }));
-                            this.setHtml(errorListHtml('Validation Errors', errors));
-                        } else {
-                            this.setHtml(messageHtml(
-                                failure.error_type ?? 'Error',
-                                escapeHtml(failure.message),
-                            ));
-                        }
-                        this.output.appendLine(`pipelex-agent graph: ${stderr.slice(0, 500)}`);
-                        return;
-                    } catch {
-                        // JSON parse failed — fall through
-                    }
-                }
-                // Non-JSON stderr: show raw error
-                this.setHtml(messageHtml('Validation Failed', escapeHtml(stderr.trim().slice(0, 500))));
-                this.output.appendLine(`pipelex-agent graph: ${stderr.slice(0, 500)}`);
-                return;
-            }
-
-            this.output.appendLine(`pipelex-agent graph error: ${err.message ?? err}`);
-            this.setHtml(messageHtml(
-                'Error',
-                'An error occurred while generating the method graph. Check the output panel for details.'
-            ));
+            this.renderBackendError(err);
         } finally {
             if (this.inflight.get(uriKey) === controller) {
                 this.inflight.delete(uriKey);
             }
         }
+    }
+
+    /** Whether the panel currently shows the method graph of this `.mthds` file. */
+    isShowingMthds(uri: vscode.Uri): boolean {
+        return !!this.panel
+            && this.sourceKind === 'mthds'
+            && this.currentUri?.toString() === uri.toString();
+    }
+
+    /**
+     * Render a backend analysis: the graph when present, the validation errors
+     * when the bundle is invalid, otherwise a "no graph" notice. Public so the
+     * on-save validator can hand it the analysis from its single backend call.
+     */
+    applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): void {
+        if (!this.panel) return;
+        if (this.currentUri?.toString() !== uri.toString()) return;
+
+        if (analysis.graph) {
+            const config = vscode.workspace.getConfiguration('pipelex', uri);
+            const direction = config.get<string>('graph.direction', 'top_down');
+            const showControllers = config.get<boolean>('graph.showControllers', true);
+            const foldMode = config.get<string>('graph.foldMode', 'folded');
+            void this.sendGraphspecToWebview(uri, analysis.graph, direction, showControllers, foldMode);
+            return;
+        }
+
+        const validation = analysis.validation;
+        if (!validation.ok && validation.errors.length > 0) {
+            this.setHtml(errorListHtml('Validation Errors', validation.errors.map(toErrorListEntry)));
+            return;
+        }
+
+        this.setHtml(messageHtml('No Graph Available', 'The bundle did not produce a method graph.'));
+    }
+
+    private renderBackendError(err: unknown): void {
+        if (err instanceof BackendError) {
+            switch (err.kind) {
+                case 'not-found':
+                    if (!this.cliWarningShown) {
+                        this.cliWarningShown = true;
+                        vscode.window.showWarningMessage(
+                            'Pipelex graph: could not find pipelex-agent. ' +
+                            'Install it or set pipelex.validation.agentCliPath in settings.'
+                        );
+                    }
+                    this.setHtml(messageHtml(
+                        'CLI Not Found',
+                        'Could not find <code>pipelex-agent</code>. Install it or set ' +
+                        '<code>pipelex.validation.agentCliPath</code> in settings.'
+                    ));
+                    return;
+                case 'too-old':
+                    this.output.appendLine(err.logMessage);
+                    this.setHtml(messageHtml(
+                        'Update Pipelex',
+                        `Your installed <code>pipelex-agent</code> is <strong>${escapeHtml(err.installedVersion ?? '?')}</strong>, ` +
+                        `but the method graph requires <strong>≥ ${escapeHtml(err.minVersion ?? '?')}</strong> ` +
+                        `(structured validation errors landed in that release).` +
+                        `</p><p>` +
+                        `Upgrade Pipelex and try again:<br>` +
+                        `<code>mthds runner setup pipelex</code> (mthds-managed install)<br>` +
+                        `<code>uv tool upgrade pipelex</code> (uv tool install)<br>` +
+                        `<code>uv pip install -U pipelex</code> or <code>pip install -U pipelex</code> (project virtualenv)`
+                    ));
+                    return;
+                case 'unreachable':
+                    this.output.appendLine(err.logMessage);
+                    this.setHtml(messageHtml('Pipelex API Unreachable', escapeHtml(err.userMessage ?? err.logMessage)));
+                    return;
+                case 'declined':
+                    this.setHtml(messageHtml('Not Sent', 'Sending bundle contents to the remote Pipelex API was declined.'));
+                    return;
+                case 'infra':
+                    this.output.appendLine(err.logMessage);
+                    this.setHtml(messageHtml('Validation Failed', escapeHtml(err.logMessage.slice(0, 500))));
+                    return;
+            }
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        this.output.appendLine(`pipelex graph error: ${message}`);
+        this.setHtml(messageHtml(
+            'Error',
+            'An error occurred while generating the method graph. Check the output panel for details.'
+        ));
     }
 
     private async refreshJson(uri: vscode.Uri) {
@@ -614,6 +612,16 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 h2 { margin-bottom: 0.5em; }
 code { background: var(--vscode-textCodeBlock-background, #2d2d2d); padding: 2px 6px; border-radius: 3px; }
 </style></head><body><div class="msg"><h2>${title}</h2><p>${body}</p></div></body></html>`;
+}
+
+/** Shape a structured validation error into the panel's error-list entry. */
+function toErrorListEntry(error: ValidationErrorItem): { message: string; context?: string } {
+    const context = error.pipe_code
+        ? `pipe.${error.pipe_code}`
+        : error.concept_code
+            ? `concept.${error.concept_code}`
+            : undefined;
+    return { message: error.message, context };
 }
 
 function errorListHtml(title: string, errors: { message: string; context?: string }[]): string {

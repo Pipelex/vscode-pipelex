@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
 import { getOutput } from '../util';
+import { registerApiKeyCommands } from './validation/apiKey';
 
 /**
  * Register all Pipelex-specific features for MTHDS support
@@ -8,6 +9,10 @@ import { getOutput } from '../util';
 export async function registerPipelexFeatures(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('pipelex');
     const semanticTokensEnabled = config.get<boolean>('mthds.semanticTokens', true);
+
+    // Hosted API key commands (SecretStorage). Available in any host — SecretStorage
+    // does not depend on child_process, unlike the validator/graph features below.
+    registerApiKeyCommands(context);
 
     if (semanticTokensEnabled) {
         const provider = new PipelexSemanticTokensProvider();
@@ -66,11 +71,17 @@ async function registerNodeFeatures(
         return;
     }
 
-    // Pipelex-agent validation on save
+    // The backend factory selects CLI vs API per `pipelex.backend`; it is shared by
+    // the validator and the graph panel so version-gate / remote-consent state is one copy.
+    const { BackendFactory } = await import('./validation/backendFactory');
+    const factory = new BackendFactory(context, getOutput());
+
+    // Bundle validation on save
     const validationEnabled = config.get<boolean>('validation.enabled', true);
+    let validator: import('./validation/pipelexValidator').PipelexValidator | undefined;
     if (validationEnabled) {
         const { PipelexValidator } = await import('./validation/pipelexValidator');
-        const validator = new PipelexValidator(getOutput());
+        validator = new PipelexValidator(getOutput(), factory);
         context.subscriptions.push(validator);
     }
 
@@ -101,8 +112,12 @@ async function registerNodeFeatures(
     // Method graph webview panel
     const { MethodGraphPanel } = await import('./graph/methodGraphPanel');
     const { isGraphspecJson } = await import('./graph/graphspecDetector');
-    const graphPanel = new MethodGraphPanel(getOutput(), context.extensionUri);
+    const graphPanel = new MethodGraphPanel(getOutput(), context.extensionUri, uri => factory.getBackend(uri));
     context.subscriptions.push(graphPanel);
+
+    // On save, the validator drives ONE analyze call and hands the graph to the panel
+    // (no second backend round-trip when the panel is open).
+    validator?.setGraphSink(graphPanel);
 
     // Context key: set pipelex.isGraphspecJson when the active editor is a valid GraphSpec JSON
     context.subscriptions.push(

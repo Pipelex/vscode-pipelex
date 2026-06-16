@@ -49,6 +49,7 @@ vi.mock('../validation/pipelexValidator', () => {
     return {
         PipelexValidator: class {
             constructor() { mockState.validatorConstructed = true; }
+            setGraphSink() {}
             dispose() {}
         },
     };
