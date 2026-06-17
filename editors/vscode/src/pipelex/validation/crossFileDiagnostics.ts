@@ -17,7 +17,7 @@ export interface FileDiagnostics {
  * file. Each error is placed on its OWNING file, resolved in priority order:
  *
  * 1. `error.source` — the declaring file (CLI: a real path; API: the per-content
- *    `mthds_names` name). Matched against the gathered files by name / path /
+ *    `mthds_sources` name). Matched against the gathered files by name / path /
  *    basename. This is the populated-whenever-possible path.
  * 2. Declaration scan — for errors with no `source` (e.g. `pipe_factory`), find
  *    the file that declares the referenced `[pipe.<code>]` / `[concept.<code>]`.

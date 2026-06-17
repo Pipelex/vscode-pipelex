@@ -22,7 +22,7 @@ export interface BundleFile {
     /** On-disk URI — where diagnostics for errors owned by this file are placed. */
     uri: vscode.Uri;
     /**
-     * The name sent to the backend (API `mthds_names[]` entry) and matched against
+     * The name sent to the backend (API `mthds_sources[]` entry) and matched against
      * an error's `source`. Stable across backends so cross-file mapping is uniform.
      */
     name: string;

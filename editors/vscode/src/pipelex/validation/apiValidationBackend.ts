@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { MthdsApiClient, ApiResponseError, ApiUnreachableError, PipelineRequestError } from 'mthds';
-import type { PipelexValidationReport } from 'mthds';
+import type { PipelexInvalidReport, PipelexValidationReport, PipelexValidationResult } from 'mthds';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
 import type { ValidationErrorItem } from './types';
@@ -30,14 +30,17 @@ export interface ApiBackendDeps {
 
 /**
  * API backend — one `POST /v1/validate` per `analyze()` always returns both the
- * validation verdict and (when asked) the graph. An invalid bundle is an HTTP 422
- * carrying structured `validation_errors`, mapped to the same diagnostics shape
- * the CLI path produces.
+ * validation verdict and (when asked) the graph. `/validate` is 200-diagnostic:
+ * the produced verdict rides the response body discriminated on `is_valid`. An
+ * `is_valid: false` body carries the structured `validation_errors[]` (mapped to
+ * the same diagnostics shape the CLI path produces); a valid bundle with pending
+ * signatures is `is_valid: true` / `is_runnable: false` — a runnability fact, not
+ * an error (the `--allow-signatures` sweep tolerates them).
  *
- * Transport / non-validation failures (server unreachable, non-`problem+json`,
- * auth, timeout, unparseable) never become diagnostics: they surface a
- * {@link BackendError} so the consumer notifies, clears stale diagnostics, and
- * does NOT fall back to the CLI.
+ * Transport / no-verdict failures (server unreachable, non-`problem+json`, auth,
+ * a request-shape 422, timeout, unparseable) never become diagnostics: they
+ * surface a {@link BackendError} so the consumer notifies, clears stale
+ * diagnostics, and does NOT fall back to the CLI.
  */
 export class ApiValidationBackend implements ValidationBackend {
     readonly kind = 'api' as const;
@@ -77,7 +80,7 @@ export class ApiValidationBackend implements ValidationBackend {
         const names = request.files.map(f => f.name);
         const contents = request.files.map(f => f.content);
 
-        let report: PipelexValidationReport;
+        let report: PipelexValidationResult;
         try {
             report = await this.runWithAbort(
                 client.validate(contents, true, names),
@@ -86,10 +89,26 @@ export class ApiValidationBackend implements ValidationBackend {
                 baseUrl,
             );
         } catch (err: unknown) {
-            return this.handleError(err, options, baseUrl);
+            this.handleError(err, baseUrl);
         }
 
-        const graph = options.withGraph ? (report.graph_spec ?? null) : undefined;
+        // 200-diagnostic: the verdict is in the body, not the status. An invalid
+        // bundle is a produced verdict (`is_valid: false`), not a transport error.
+        // (The extension tsconfig is `strict:false`, where boolean-literal
+        // discriminants don't narrow — read `is_valid` and cast the arm explicitly.)
+        if (report.is_valid === false) {
+            const invalid = report as PipelexInvalidReport;
+            const validation: ValidationOutcome = {
+                ok: false,
+                errors: invalid.validation_errors as ValidationErrorItem[],
+            };
+            return options.withGraph ? { validation, graph: null } : { validation };
+        }
+
+        // Valid arm. Pending signatures (when `--allow-signatures` swept any) are an
+        // `is_runnable: false` fact on the success path — never a fabricated error.
+        const valid = report as PipelexValidationReport;
+        const graph = options.withGraph ? (valid.graph_spec ?? null) : undefined;
         return { validation: { ok: true, errors: [] }, graph };
     }
 
@@ -129,22 +148,19 @@ export class ApiValidationBackend implements ValidationBackend {
         });
     }
 
-    private handleError(err: unknown, options: AnalyzeOptions, baseUrl: string): BundleAnalysis {
+    private handleError(err: unknown, baseUrl: string): never {
         // Cancellation and our own timeout/decline pass straight through.
         if (err instanceof AnalyzeAbortError || err instanceof BackendError) {
             throw err;
         }
 
         if (err instanceof ApiResponseError) {
-            const validationOutcome = this.asValidationOutcome(err);
-            if (validationOutcome) {
-                return options.withGraph
-                    ? { validation: validationOutcome, graph: null }
-                    : { validation: validationOutcome };
-            }
-            // A non-validation API response. The server WAS reached — this is not
-            // "unreachable". An auth rejection (401/403) gets its own kind + one-click
-            // remedies; everything else (bad request, 5xx) is a generic api-error.
+            // `/validate` is 200-diagnostic: a content verdict (valid OR invalid)
+            // never throws — it returned in `analyze`. So an `ApiResponseError` here
+            // is always a *no-verdict* condition. The server WAS reached — this is
+            // not "unreachable". An auth rejection (401/403) gets its own kind +
+            // one-click remedies; everything else (a request-shape 422, a bad
+            // request, a 5xx) is a generic api-error.
             const logMessage = `Pipelex API ${err.status} at ${baseUrl}: ${err.serverMessage ?? err.statusText}`;
             if (err.status === 401 || err.status === 403) {
                 throw new BackendError({
@@ -177,31 +193,6 @@ export class ApiValidationBackend implements ValidationBackend {
             logMessage: `Pipelex API unexpected response from ${baseUrl}: ${message}`,
             userMessage: unreachableMessage(baseUrl),
         });
-    }
-
-    /**
-     * Interpret an `ApiResponseError` as a bundle-validation verdict, or return
-     * `undefined` when it is NOT a validation failure (so the caller surfaces it
-     * as a transport/non-validation error).
-     */
-    private asValidationOutcome(err: ApiResponseError): ValidationOutcome | undefined {
-        if (err.validationErrors && err.validationErrors.length > 0) {
-            return { ok: false, errors: err.validationErrors as ValidationErrorItem[] };
-        }
-        // A 422 ValidateBundleError with no per-error list (whole-bundle dry-run /
-        // signature failure) rides the human-readable detail — surface it as one
-        // diagnostic on the primary file rather than dropping it.
-        if (err.status === 422 && err.errorType === 'ValidateBundleError') {
-            return {
-                ok: false,
-                errors: [{
-                    category: 'blueprint_validation',
-                    message: err.serverMessage ?? err.message,
-                    error_type: err.errorType,
-                }],
-            };
-        }
-        return undefined;
     }
 }
 

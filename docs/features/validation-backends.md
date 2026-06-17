@@ -59,9 +59,9 @@ A backend failure is distinct from "the bundle is invalid":
 - **API** — any failure to produce a verdict shows an actionable notification, clears any stale diagnostics, and does **not** silently fall back to the CLI. The wording distinguishes three cases by what actually happened:
     - **Unreachable** — the extension never got an answer (network error, timeout, or an unparseable/non-`problem+json` body): "Pipelex API unreachable at …".
     - **Authentication required** (HTTP 401/403) — the server answered but rejected the request for auth. This is its own case with one-click remedies: a **Set API Key** button (runs `Pipelex: Set Hosted API Key`) and, against the hosted endpoint, a **Get an API Key** button that opens [app.pipelex.com](https://app.pipelex.com/). The method-pane message spells out all three paths with clickable links: get a key at app.pipelex.com, self-host the open-source [pipelex-api](https://github.com/Pipelex/pipelex-api) (`docker run -p 8081:8081 pipelex/pipelex-api`) and point `pipelex.api.baseUrl` at it, or switch `pipelex.backend` to `cli` to validate locally without a key. (Against a self-hosted server the platform/self-host options are omitted — you configure auth on the server you run.)
-    - **API error** (other 4xx / 5xx) — the server answered with a non-validation error: "Pipelex API error at … (HTTP 5xx) …". Not "unreachable", since the server was reached.
+    - **API error** (other 4xx / 5xx, including a request-shape 422) — the server answered with a non-validation error: "Pipelex API error at … (HTTP 5xx) …". Not "unreachable", since the server was reached.
 
-    Only a real validation failure (HTTP 422 with structured errors) becomes diagnostics.
+    `/validate` is a **200-diagnostic** endpoint: a produced verdict — valid *or invalid* — rides a 200 whose body is discriminated on `is_valid`, and only that invalid verdict (`is_valid: false`, with its structured `validation_errors[]`) becomes diagnostics. A non-2xx never means "your bundle is bad" — it means no verdict could be produced (a malformed request, auth, a server fault), which is why it surfaces as a backend error rather than a diagnostic.
 
 In every failure case stale diagnostics are cleared, so the Problems panel never shows a wrong-but-leftover verdict.
 

@@ -81,11 +81,25 @@ describe('CliValidationBackend', () => {
         expect(analysis.validation.errors[0].message).toBe('bad pipe');
     });
 
-    it('synthesizes one diagnostic for an input-domain failure with no structured list', async () => {
-        cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'PipelexInterpreterError', error_domain: 'input', message: 'Missing required fields', validation_errors: [] }) };
+    it('consumes a dry_run residual item directly — no fabricated category', async () => {
+        // The runtime's structured-info invariant is total, so a dry-run failure rides
+        // a real `dry_run` item (no source). The backend passes it through verbatim;
+        // the old `blueprint_validation` synthesis for empty lists is gone.
+        cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'ValidateBundleError', message: 'invalid', validation_errors: [{ category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...' }] }) };
         const analysis = await analyze();
         expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toEqual([{ category: 'blueprint_validation', message: 'Missing required fields', error_type: 'PipelexInterpreterError' }]);
+        expect(analysis.validation.errors).toEqual([{ category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...' }]);
+    });
+
+    it('treats an exit-1 with an empty validation_errors[] as infra, not a fabricated diagnostic', async () => {
+        // With the structured-info invariant total, the real CLI never emits an empty
+        // list for a content verdict. If it somehow does, surface it as infra rather
+        // than synthesizing a stand-in `blueprint_validation` item.
+        cliState.version = [0, 34, 0];
+        cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'PipelexInterpreterError', error_domain: 'input', message: 'Missing required fields', validation_errors: [] }) };
+        const err = await analyze().catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('infra');
     });
 
     it('surfaces a config-domain failure (no list) as an infra BackendError', async () => {

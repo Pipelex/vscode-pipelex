@@ -100,23 +100,30 @@ describe('ApiValidationBackend', () => {
         apiState.lastConstructorOptions = null;
     });
 
-    it('returns ok + graph on a valid bundle, and sends mthds_names', async () => {
-        apiState.validate = async () => ({ success: true, graph_spec: { nodes: [], edges: [] } });
+    it('returns ok + graph on a valid bundle, and sends mthds_sources', async () => {
+        apiState.validate = async () => ({ is_valid: true, graph_spec: { nodes: [], edges: [] } });
         const analysis = await analyze(makeBackend(), true);
         expect(analysis.validation.ok).toBe(true);
         expect(analysis.graph).toEqual({ nodes: [], edges: [] });
-        // contents + allowSignatures=true + parallel names
+        // contents + allowSignatures=true + parallel sources (file names)
         expect(apiState.lastValidateArgs).toEqual([['domain="d"'], true, ['a.mthds']]);
     });
 
     it('passes the resolved token to the client constructor (SecretStorage precedence)', async () => {
-        apiState.validate = async () => ({ success: true });
+        apiState.validate = async () => ({ is_valid: true });
         await analyze(makeBackend());
         expect(apiState.lastConstructorOptions).toEqual({ baseUrl: 'http://localhost:8081', apiToken: 'secret-token' });
     });
 
-    it('maps a 422 with validationErrors to a not-ok outcome', async () => {
-        apiState.validate = async () => { throw new ApiResponseError(422, 'ValidateBundleError', 'invalid', [{ category: 'pipe_validation', message: 'bad', source: 'a.mthds' }]); };
+    it('maps a 200 invalid verdict (is_valid:false) to a not-ok outcome with the structured errors', async () => {
+        // 200-diagnostic: an invalid bundle is a produced verdict in the body, not a throw.
+        apiState.validate = async () => ({
+            is_valid: false,
+            validation_errors: [{ category: 'pipe_validation', message: 'bad', source: 'a.mthds' }],
+            pending_signatures: [],
+            is_runnable: false,
+            message: 'MTHDS validation found errors',
+        });
         const analysis = await analyze(makeBackend(), true);
         expect(analysis.validation.ok).toBe(false);
         expect(analysis.validation.errors).toHaveLength(1);
@@ -124,11 +131,31 @@ describe('ApiValidationBackend', () => {
         expect(analysis.graph).toBeNull();
     });
 
-    it('synthesizes a single diagnostic for a 422 ValidateBundleError with no per-error list', async () => {
-        apiState.validate = async () => { throw new ApiResponseError(422, 'ValidateBundleError', 'whole bundle failed dry-run', undefined); };
+    it('consumes a dry_run residual item directly — no fabricated category', async () => {
+        // The runtime's structured-info invariant is total: a dry-run failure rides
+        // a `dry_run` item (no source). The backend passes it through verbatim — the
+        // old `blueprint_validation` synthesis is gone.
+        apiState.validate = async () => ({
+            is_valid: false,
+            validation_errors: [{ category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...' }],
+            pending_signatures: [],
+            is_runnable: false,
+            message: 'MTHDS validation found errors',
+        });
         const analysis = await analyze(makeBackend());
         expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toEqual([{ category: 'blueprint_validation', message: 'whole bundle failed dry-run', error_type: 'ValidateBundleError' }]);
+        expect(analysis.validation.errors).toEqual([
+            { category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...' },
+        ]);
+    });
+
+    it('maps a request-shape 422 (no verdict) to an api-error BackendError', async () => {
+        // `/validate` never 422s a content verdict now — a 422 is a request-shape
+        // problem (e.g. mthds_sources length mismatch), surfaced as api-error.
+        apiState.validate = async () => { throw new ApiResponseError(422, 'ValidationError', 'mthds_sources length must match mthds_contents', undefined); };
+        const err = await analyze(makeBackend()).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
     });
 
     it('maps a self-hosted 401 to an auth BackendError with a single Set-API-Key action', async () => {
@@ -196,7 +223,7 @@ describe('ApiValidationBackend', () => {
     });
 
     it('declines a non-localhost send when the user does not confirm', async () => {
-        apiState.validate = async () => ({ success: true });
+        apiState.validate = async () => ({ is_valid: true });
         const backend = makeBackend({ baseUrl: 'https://api.pipelex.com', confirmRemote: async () => false });
         const err = await analyze(backend).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
@@ -206,7 +233,7 @@ describe('ApiValidationBackend', () => {
     });
 
     it('proceeds with a remote send when the user confirms', async () => {
-        apiState.validate = async () => ({ success: true });
+        apiState.validate = async () => ({ is_valid: true });
         const backend = makeBackend({ baseUrl: 'https://api.pipelex.com', confirmRemote: async () => true });
         const analysis = await analyze(backend);
         expect(analysis.validation.ok).toBe(true);
@@ -214,7 +241,7 @@ describe('ApiValidationBackend', () => {
     });
 
     it('maps a non-host-only base URL to an actionable api-error BackendError, before prompting or sending', async () => {
-        apiState.validate = async () => ({ success: true });
+        apiState.validate = async () => ({ is_valid: true });
         const confirmRemote = vi.fn(async () => true);
         // A pasted `/v1` path — the client constructor rejects it; this used to escape
         // handleError as a silent throw (validator: no toast; panel: generic error).

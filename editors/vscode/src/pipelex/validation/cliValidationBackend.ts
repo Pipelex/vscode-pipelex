@@ -123,9 +123,16 @@ export class CliValidationBackend implements ValidationBackend {
      * Parse the exit-1 stderr JSON into a validation outcome.
      * Returns `undefined` when it is an infrastructural error (not a bundle problem),
      * so the caller can surface it as a {@link BackendError} instead.
+     *
+     * The runtime's structured-info invariant is total: every invalid-bundle verdict
+     * carries a non-empty `validation_errors[]` (a parse-level failure yields one
+     * source-less `blueprint_validation` residual; a dry-run failure a `dry_run` item).
+     * So we consume that list directly — no per-category synthesis here. An exit-1
+     * envelope with an empty list is therefore NOT a bundle verdict but an infra
+     * error, surfaced as a {@link BackendError} by the caller.
      */
     private parseFailure(json: string): { ok: false; errors: ValidationErrorItem[] } | undefined {
-        let failure: ValidationFailure & { error_domain?: string };
+        let failure: ValidationFailure;
         try {
             failure = JSON.parse(json);
         } catch {
@@ -135,21 +142,6 @@ export class CliValidationBackend implements ValidationBackend {
         const errors = failure.validation_errors;
         if (Array.isArray(errors) && errors.length > 0) {
             return { ok: false, errors };
-        }
-
-        // A bundle validation failure with no structured list (e.g. a top-level
-        // interpreter error). Surface the message as a single diagnostic on the
-        // primary file rather than dropping it silently. Infra errors
-        // (config/runtime domain) fall through to a BackendError.
-        if (failure.error_domain === 'input' && failure.message) {
-            return {
-                ok: false,
-                errors: [{
-                    category: 'blueprint_validation',
-                    message: failure.message,
-                    error_type: failure.error_type,
-                }],
-            };
         }
 
         return undefined;
