@@ -87,12 +87,14 @@ function resolveOwner(
     if (error.source) {
         const src = error.source;
         const srcBase = path.basename(src);
-        // Tail match requires a path-segment boundary so a source like `oo/a.mthds`
-        // cannot match `/project/foo/a.mthds` (or a similarly-named sibling).
+        const isBareName = src === srcBase;
+        // A bare filename matches by basename; a path-qualified source (e.g. `oo/a.mthds`)
+        // must match exactly or on a path-segment boundary, so it can't misroute onto a
+        // similarly-named sibling like `/project/foo/a.mthds` via either branch.
         const match = files.find(f =>
             f.name === src ||
             f.uri.fsPath === src ||
-            path.basename(f.uri.fsPath) === srcBase ||
+            (isBareName && path.basename(f.uri.fsPath) === srcBase) ||
             f.uri.fsPath.endsWith(path.sep + src)
         );
         if (match) {
