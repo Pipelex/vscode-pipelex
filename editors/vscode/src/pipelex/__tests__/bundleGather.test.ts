@@ -37,10 +37,13 @@ describe('gatherBundleFiles', () => {
         };
     });
 
-    it('gathers .mthds/.plx files, primary first, siblings sorted, excludes other extensions', async () => {
+    it('gathers .mthds files, primary first, siblings sorted, excludes other extensions', async () => {
         const files = await gatherBundleFiles(primary);
-        expect(files.map(f => f.name)).toEqual(['main.mthds', 'alpha.mthds', 'legacy.plx', 'zeta.mthds']);
+        expect(files.map(f => f.name)).toEqual(['main.mthds', 'alpha.mthds', 'zeta.mthds']);
         expect(files.find(f => f.name === 'notes.txt')).toBeUndefined();
+        // `.plx` is no longer a recognized bundle extension — it is excluded like any
+        // other non-.mthds file.
+        expect(files.find(f => f.name === 'legacy.plx')).toBeUndefined();
     });
 
     it('reads each file content and keeps the primary URI for the primary file', async () => {
@@ -54,7 +57,7 @@ describe('gatherBundleFiles', () => {
     it('skips a sibling that vanished between readdir and read', async () => {
         delete fsState.contents['zeta.mthds'];
         const files = await gatherBundleFiles(primary);
-        expect(files.map(f => f.name)).toEqual(['main.mthds', 'alpha.mthds', 'legacy.plx']);
+        expect(files.map(f => f.name)).toEqual(['main.mthds', 'alpha.mthds']);
     });
 
     it('falls back to just the primary when the directory is unreadable', async () => {
