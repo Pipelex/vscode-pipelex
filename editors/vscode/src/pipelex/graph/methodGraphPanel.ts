@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { cancelAllInflight } from '../validation/processUtils';
 import { gatherBundleFiles } from '../validation/bundleGather';
+import { resolveErrorLocations } from '../validation/crossFileDiagnostics';
 import { AnalyzeAbortError, BackendError } from '../validation/backend';
 import type { BackendErrorAction, BundleAnalysis, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
 import { CliValidationBackend } from '../validation/cliValidationBackend';
@@ -41,6 +42,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     private webviewReady = false;
     private pendingData: any = null;
     private fileWatcherDebounce: ReturnType<typeof setTimeout> | undefined;
+    /**
+     * Resolved jump targets for the rows of the current validation-error view,
+     * indexed positionally. The webview navigates by index only (never by path),
+     * so it can never request an arbitrary file — see {@link navigateToError}.
+     */
+    private errorTargets: { uri: vscode.Uri; range: vscode.Range }[] = [];
 
     constructor(
         output: vscode.OutputChannel,
@@ -287,7 +294,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             // discard this result so it doesn't overwrite the new file's graph.
             if (this.currentUri?.toString() !== uri.toString()) return;
 
-            this.applyAnalysis(uri, analysis);
+            await this.applyAnalysis(uri, analysis);
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
@@ -310,8 +317,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * Render a backend analysis: the graph when present, the validation errors
      * when the bundle is invalid, otherwise a "no graph" notice. Public so the
      * on-save validator can hand it the analysis from its single backend call.
+     *
+     * Async because the error branch resolves each error to its owning file +
+     * range (a few sibling-file reads) so the rendered list can be clickable;
+     * the common graph / no-graph branches stay synchronous.
      */
-    applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): void {
+    async applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): Promise<void> {
         if (!this.panel) return;
         if (this.currentUri?.toString() !== uri.toString()) return;
 
@@ -326,11 +337,45 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
         const validation = analysis.validation;
         if (!validation.ok && validation.errors.length > 0) {
-            this.setHtml(errorListHtml('Validation Errors', validation.errors.map(toErrorListEntry)));
+            await this.renderValidationErrors(uri, validation.errors);
             return;
         }
 
         this.setHtml(messageHtml('No Graph Available', 'The bundle did not produce a method graph.'));
+    }
+
+    /**
+     * Render the structured validation errors as a clickable list. Each error is
+     * resolved to its owning file + range (reusing the diagnostics resolver, so the
+     * panel and the Problems panel can never disagree) and stashed in
+     * {@link errorTargets} for index-based navigation.
+     */
+    private async renderValidationErrors(uri: vscode.Uri, errors: ValidationErrorItem[]): Promise<void> {
+        // The CLI path resolves siblings itself, so `refresh()` does not gather them;
+        // the clickable list needs their contents to place an error on its owning file.
+        const files = await gatherBundleFiles(uri);
+        // Re-check staleness: the gather above is async, so the user may have switched
+        // files (or closed the panel) while sibling contents were read from disk.
+        if (!this.panel) return;
+        if (this.currentUri?.toString() !== uri.toString()) return;
+
+        const primaryDocument = vscode.workspace.textDocuments.find(
+            d => d.uri.toString() === uri.toString(),
+        );
+        const locations = resolveErrorLocations({ errors, files, primaryUri: uri, primaryDocument });
+
+        this.errorTargets = locations.map(loc => ({ uri: loc.uri, range: loc.range }));
+
+        const entries: ErrorListEntry[] = locations.map((loc, index) => ({
+            index,
+            message: loc.error.message,
+            context: errorContext(loc.error),
+            // Name the owning file only when it differs from the saved one, so a
+            // single-file bundle (or an error on the file you saved) stays clean.
+            file: loc.uri.toString() !== uri.toString() ? basename(loc.uri.fsPath) : undefined,
+        }));
+
+        this.setHtml(errorListHtml(entries));
     }
 
     /**
@@ -589,6 +634,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             this.navigateToPipe(message.pipeCode);
             return;
         }
+        if (message.type === 'navigateToError' && typeof message.index === 'number' && this.currentUri) {
+            // Graphspec-JSON never yields validation errors, so there is nothing to jump to.
+            if (this.sourceKind === 'graphspec-json') return;
+            void this.navigateToError(message.index);
+            return;
+        }
         if (message.type === 'openExternally' && typeof message.url === 'string') {
             // Webviews can't `window.open` or render <embed type="application/pdf">,
             // so the StuffViewer routes both through here. Hand off to the OS via
@@ -641,6 +692,34 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
         } catch (err: any) {
             this.output.appendLine(`navigateToPipe error: ${err.message ?? err}`);
+        }
+    }
+
+    /**
+     * Open the owning file of error row `index` at its line, beside the panel.
+     * The target (which may be a sibling file) comes from {@link errorTargets} —
+     * the webview supplies only an index, never a path. Out-of-range indices are a
+     * safe no-op, mirroring {@link navigateToPipe}'s error handling.
+     */
+    private async navigateToError(index: number) {
+        const target = this.errorTargets[index];
+        if (!target) return;
+
+        try {
+            const document = await vscode.workspace.openTextDocument(target.uri);
+
+            const panelCol = this.panel?.viewColumn;
+            const targetCol = panelCol && panelCol > 1 ? panelCol - 1 : vscode.ViewColumn.One;
+
+            const editor = await vscode.window.showTextDocument(document, {
+                viewColumn: targetCol,
+                preserveFocus: false,
+            });
+
+            editor.selection = new vscode.Selection(target.range.start, target.range.end);
+            editor.revealRange(target.range, vscode.TextEditorRevealType.InCenter);
+        } catch (err: any) {
+            this.output.appendLine(`navigateToError error: ${err.message ?? err}`);
         }
     }
 
@@ -769,22 +848,48 @@ button:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-of
 </style></head><body><div class="msg"><h2>${title}</h2><p>${body}</p>${actionsBlock}</div></body></html>`;
 }
 
-/** Shape a structured validation error into the panel's error-list entry. */
-function toErrorListEntry(error: ValidationErrorItem): { message: string; context?: string } {
-    const context = error.pipe_code
+/** One row in the clickable validation-error list. `index` keys into {@link MethodGraphPanel.errorTargets}. */
+interface ErrorListEntry {
+    index: number;
+    message: string;
+    /** `pipe.<code>` / `concept.<code>`, when the error names one. */
+    context?: string;
+    /** Owning-file basename, set only when the error lives in a sibling (not the saved file). */
+    file?: string;
+}
+
+/** The `pipe.<code>` / `concept.<code>` chip for an error, or undefined when it names neither. */
+function errorContext(error: ValidationErrorItem): string | undefined {
+    return error.pipe_code
         ? `pipe.${error.pipe_code}`
         : error.concept_code
             ? `concept.${error.concept_code}`
             : undefined;
-    return { message: error.message, context };
 }
 
-function errorListHtml(title: string, errors: { message: string; context?: string }[]): string {
-    const items = errors.map(e => {
-        const ctx = e.context
-            ? `<span class="ctx">${escapeHtml(e.context)}</span> `
-            : '';
-        return `<li>${ctx}${escapeHtml(e.message)}</li>`;
+/** Last path segment of a file path, cross-platform (handles `/` and `\`). */
+function basename(fsPath: string): string {
+    return fsPath.replace(/^.*[\\/]/, '');
+}
+
+/**
+ * Render the validation errors as a clickable list. Each row posts
+ * `{ type: 'navigateToError', index }` (never a path) so the extension can open
+ * the owning file at the error's line. The single inline `<script>` carries
+ * {@link RETRY_NONCE_SENTINEL}: `setHtml()` swaps that token for the real nonce
+ * and adds `script-src` only because our own script is present — escaped page
+ * content can never acquire a runnable nonce.
+ */
+function errorListHtml(entries: ErrorListEntry[]): string {
+    const count = entries.length;
+    const heading = `${count} ${count === 1 ? 'Validation Error' : 'Validation Errors'}`;
+    const items = entries.map(e => {
+        const ctx = e.context ? `<span class="ctx">${escapeHtml(e.context)}</span>` : '';
+        const file = e.file ? `<span class="file">${escapeHtml(e.file)}</span>` : '';
+        const meta = (ctx || file) ? `<div class="meta">${ctx}${file}</div>` : '';
+        // `data-error-index` is our own integer, not page content; the message is escaped.
+        return `<li class="error-row" role="button" tabindex="0" data-error-index="${e.index}">`
+            + `${meta}<div class="message">${escapeHtml(e.message)}</div></li>`;
     }).join('\n');
     return `<!DOCTYPE html>
 <html>
@@ -794,14 +899,48 @@ body { display: flex; align-items: flex-start; justify-content: center; min-heig
        font-family: var(--vscode-font-family, sans-serif); color: var(--vscode-foreground, #ccc);
        background: var(--vscode-editor-background, #1e1e1e); box-sizing: border-box; }
 .msg { max-width: 600px; width: 100%; }
-h2 { margin-bottom: 0.5em; }
+h2 { margin-bottom: 0.25em; }
+.hint { margin: 0 0 1.25em; color: var(--vscode-descriptionForeground, #999); }
 ul { list-style: none; padding: 0; margin: 0; }
-li { padding: 6px 10px; margin-bottom: 4px; border-left: 3px solid var(--vscode-errorForeground, #f44); border-radius: 2px;
-     background: var(--vscode-textCodeBlock-background, #2d2d2d); }
-.ctx { font-weight: 600; color: var(--vscode-symbolIcon-fieldForeground, #75beff); margin-right: 6px; }
+li.error-row { padding: 6px 10px; margin-bottom: 4px; border-left: 3px solid var(--vscode-errorForeground, #f44);
+     border-radius: 2px; background: var(--vscode-textCodeBlock-background, #2d2d2d); cursor: pointer; }
+li.error-row:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); }
+li.error-row:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 1px; }
+.meta { margin-bottom: 2px; }
+.ctx { font-weight: 600; color: var(--vscode-symbolIcon-fieldForeground, #75beff); margin-right: 8px; }
 .ctx::after { content: ":"; }
-</style></head><body><div class="msg"><h2>${escapeHtml(title)}</h2><ul>
+.file { font-size: 0.85em; color: var(--vscode-descriptionForeground, #999); }
+.message { white-space: pre-wrap; }
+.actions { margin-top: 1.25em; }
+button { font-family: inherit; font-size: 13px; padding: 4px 14px; cursor: pointer;
+         color: var(--vscode-button-foreground, #fff); background: var(--vscode-button-background, #0e639c);
+         border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; }
+button:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
+button:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 2px; }
+</style></head><body><div class="msg"><h2>${escapeHtml(heading)}</h2>
+<p class="hint">Fix and save to regenerate the graph.</p>
+<ul>
 ${items}
-</ul></div></body></html>`;
+</ul>
+<p class="actions"><button id="pipelex-retry" type="button">Retry</button></p>
+<script nonce="${RETRY_NONCE_SENTINEL}">
+(function () {
+  var vscode = acquireVsCodeApi();
+  var retry = document.getElementById('pipelex-retry');
+  if (retry) { retry.addEventListener('click', function () { vscode.postMessage({ type: 'retry' }); }); }
+  var rows = document.querySelectorAll('.error-row');
+  for (var i = 0; i < rows.length; i++) {
+    (function (row) {
+      var idx = parseInt(row.getAttribute('data-error-index'), 10);
+      function go() { vscode.postMessage({ type: 'navigateToError', index: idx }); }
+      row.addEventListener('click', go);
+      row.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+      });
+    })(rows[i]);
+  }
+}());
+</script>
+</div></body></html>`;
 }
 

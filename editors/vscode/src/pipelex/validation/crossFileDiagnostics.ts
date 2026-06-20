@@ -10,8 +10,20 @@ export interface FileDiagnostics {
     diagnostics: vscode.Diagnostic[];
 }
 
+/** A validation error placed on its owning file at a best-effort source range. */
+export interface ErrorLocation {
+    error: ValidationErrorItem;
+    /** The owning file's on-disk URI (a sibling, or the primary as the fallback). */
+    uri: vscode.Uri;
+    /** Best-effort range within the owning file. */
+    range: vscode.Range;
+}
+
 /**
- * Map a bundle's validation errors onto per-file diagnostics.
+ * Resolve each bundle validation error to its owning file + best-effort range,
+ * preserving input order. This is the single source of truth for owner + range:
+ * both the per-file diagnostics ({@link buildBundleDiagnostics}) and the method
+ * graph panel's clickable error list build on it, so they can never drift.
  *
  * A directory-wide validation can surface an error that belongs to a sibling
  * file. Each error is placed on its OWNING file, resolved in priority order:
@@ -27,14 +39,13 @@ export interface FileDiagnostics {
  * single-file path; the open primary document is used when available (exact
  * ranges), siblings are located against their on-disk text.
  */
-export function buildBundleDiagnostics(args: {
+export function resolveErrorLocations(args: {
     errors: ValidationErrorItem[];
     files: BundleFile[];
     primaryUri: vscode.Uri;
-    diagnosticSource: string;
     primaryDocument?: vscode.TextDocument;
-}): FileDiagnostics[] {
-    const { errors, files, primaryUri, diagnosticSource, primaryDocument } = args;
+}): ErrorLocation[] {
+    const { errors, files, primaryUri, primaryDocument } = args;
 
     const linesCache = new Map<string, string[]>();
     const getLines = (file: BundleFile): string[] => {
@@ -49,18 +60,7 @@ export function buildBundleDiagnostics(args: {
 
     const primaryFile = files.find(f => f.uri.toString() === primaryUri.toString());
 
-    const byUri = new Map<string, FileDiagnostics>();
-    const collect = (uri: vscode.Uri): vscode.Diagnostic[] => {
-        const key = uri.toString();
-        let entry = byUri.get(key);
-        if (!entry) {
-            entry = { uri, diagnostics: [] };
-            byUri.set(key, entry);
-        }
-        return entry.diagnostics;
-    };
-
-    for (const error of errors) {
+    return errors.map(error => {
         const owner = resolveOwner(error, files, getLines) ?? primaryFile;
         const ownerUri = owner?.uri ?? primaryUri;
 
@@ -73,7 +73,34 @@ export function buildBundleDiagnostics(args: {
             range = new vscode.Range(0, 0, 0, 0);
         }
 
-        collect(ownerUri).push(makeDiagnostic(error, range, diagnosticSource));
+        return { error, uri: ownerUri, range };
+    });
+}
+
+/**
+ * Map a bundle's validation errors onto per-file diagnostics, grouping the
+ * order-preserving {@link resolveErrorLocations} output by owning file.
+ */
+export function buildBundleDiagnostics(args: {
+    errors: ValidationErrorItem[];
+    files: BundleFile[];
+    primaryUri: vscode.Uri;
+    diagnosticSource: string;
+    primaryDocument?: vscode.TextDocument;
+}): FileDiagnostics[] {
+    const { errors, files, primaryUri, diagnosticSource, primaryDocument } = args;
+
+    const locations = resolveErrorLocations({ errors, files, primaryUri, primaryDocument });
+
+    const byUri = new Map<string, FileDiagnostics>();
+    for (const { error, uri, range } of locations) {
+        const key = uri.toString();
+        let entry = byUri.get(key);
+        if (!entry) {
+            entry = { uri, diagnostics: [] };
+            byUri.set(key, entry);
+        }
+        entry.diagnostics.push(makeDiagnostic(error, range, diagnosticSource));
     }
 
     return [...byUri.values()];

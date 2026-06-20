@@ -28,6 +28,11 @@ const mockState = vi.hoisted(() => {
         executeCommand: vi.fn(),
         cancelAllInflightSpy: vi.fn(),
         configOverrides: {} as Record<string, any>,
+        // Error-list view fixtures: gatherBundleFiles + resolveErrorLocations are mocked
+        // so the panel's render/navigation logic is tested in isolation from the resolver.
+        bundleFiles: [] as any[],
+        errorLocations: [] as any[],
+        openTextDocuments: [] as any[],
         // Event handler captures
         onSaveHandler: null as ((doc: any) => void) | null,
         onEditorChangeHandler: null as ((editor: any) => void) | null,
@@ -57,6 +62,7 @@ vi.mock('vscode', () => ({
     Selection: vi.fn(),
     TextEditorRevealType: { InCenter: 2 },
     workspace: {
+        get textDocuments() { return mockState.openTextDocuments; },
         getConfiguration: () => ({ get: (key: string, def: any) => mockState.configOverrides[key] ?? def }),
         onDidChangeTextDocument: vi.fn((handler: any) => {
             mockState.onDocChangeHandler = handler;
@@ -127,6 +133,14 @@ vi.mock('../validation/sourceLocator', () => ({
     }),
 }));
 
+vi.mock('../validation/bundleGather', () => ({
+    gatherBundleFiles: vi.fn(() => Promise.resolve(mockState.bundleFiles)),
+}));
+
+vi.mock('../validation/crossFileDiagnostics', () => ({
+    resolveErrorLocations: vi.fn(() => mockState.errorLocations),
+}));
+
 // ---------- Import SUT after mocks ----------
 import { MethodGraphPanel } from '../graph/methodGraphPanel';
 import { BackendError } from '../validation/backend';
@@ -170,6 +184,9 @@ describe('MethodGraphPanel', () => {
         mockState.onEditorChangeHandler = null;
         mockState.onDocChangeHandler = null;
         mockState.configOverrides = {};
+        mockState.bundleFiles = [];
+        mockState.errorLocations = [];
+        mockState.openTextDocuments = [];
     });
 
     // --- Bug B: Filename extraction ---
@@ -508,6 +525,178 @@ describe('MethodGraphPanel', () => {
         // The injected payload is escaped (not a live <script>), so it can never execute.
         expect(html).not.toContain('<script>globalThis.pwned');
         expect(html).toContain('&lt;script&gt;globalThis.pwned');
+        panel.dispose();
+    });
+
+    // --- Validation-error list view (clickable, owner-attributed) ---
+
+    // Drive the invalid-bundle branch of applyAnalysis. resolveErrorLocations is mocked,
+    // so each fixture supplies its own resolved owner uri + range.
+    function invalidAnalysis(): any {
+        return {
+            validation: { ok: false, errors: mockState.errorLocations.map((l: any) => l.error) },
+            graph: null,
+        };
+    }
+
+    it('renders the validation errors with a count header, messages, context chips, and Retry', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [
+            { error: { category: 'pipe_validation', message: 'missing concept Foo', pipe_code: 'my_pipe' }, uri, range },
+            { error: { category: 'concept_validation', message: 'unknown concept Bar', concept_code: 'Bar' }, uri, range },
+        ];
+        await panel.applyAnalysis(uri, invalidAnalysis());
+
+        const html = mockState.mockWebview.html;
+        expect(html).toContain('2 Validation Errors');
+        expect(html).toContain('Fix and save to regenerate the graph');
+        expect(html).toContain('missing concept Foo');
+        expect(html).toContain('unknown concept Bar');
+        expect(html).toContain('pipe.my_pipe');
+        expect(html).toContain('concept.Bar');
+        expect(html).toContain('id="pipelex-retry"');
+        expect(html).toMatch(/postMessage\(\s*\{\s*type:\s*'navigateToError'/);
+        expect(html).toContain("script-src 'nonce-");
+        // Both errors are owned by the saved file → no owning-file chip.
+        expect(html).not.toContain('class="file"');
+        panel.dispose();
+    });
+
+    it('uses a singular header for a single validation error', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [
+            { error: { category: 'pipe_validation', message: 'only one' }, uri, range },
+        ];
+        await panel.applyAnalysis(uri, invalidAnalysis());
+
+        expect(mockState.mockWebview.html).toContain('1 Validation Error');
+        expect(mockState.mockWebview.html).not.toContain('1 Validation Errors');
+        panel.dispose();
+    });
+
+    it('shows the owning-file basename for an error that lives in a sibling file', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        const siblingUri = makeUri('/project/methods/concepts.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const range = { start: { line: 3, character: 0 }, end: { line: 3, character: 0 } };
+        mockState.errorLocations = [
+            { error: { category: 'pipe_validation', message: 'helper broke', pipe_code: 'helper' }, uri: siblingUri, range },
+        ];
+        await panel.applyAnalysis(uri, invalidAnalysis());
+
+        const html = mockState.mockWebview.html;
+        expect(html).toContain('class="file"');
+        expect(html).toContain('concepts.mthds');
+        expect(html).toContain('helper broke');
+        panel.dispose();
+    });
+
+    it('navigateToError opens the owning file in the column beside the panel', async () => {
+        const vscode = await import('vscode');
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        const siblingUri = makeUri('/project/methods/concepts.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const range = { start: { line: 3, character: 0 }, end: { line: 3, character: 5 } };
+        mockState.errorLocations = [
+            { error: { category: 'pipe_validation', message: 'helper broke', pipe_code: 'helper' }, uri: siblingUri, range },
+        ];
+        await panel.applyAnalysis(uri, invalidAnalysis());
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'navigateToError', index: 0 });
+        await new Promise(r => setTimeout(r, 20));
+
+        // Opens the SIBLING (the owning file), not the saved primary.
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(siblingUri);
+        // Panel sits in column 2 → file opens beside it in column 1.
+        expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ viewColumn: 1, preserveFocus: false }),
+        );
+        panel.dispose();
+    });
+
+    it('navigateToError with an out-of-range index is a safe no-op', async () => {
+        const vscode = await import('vscode');
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [
+            { error: { category: 'x', message: 'only one' }, uri, range },
+        ];
+        await panel.applyAnalysis(uri, invalidAnalysis());
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'navigateToError', index: 5 });
+        await new Promise(r => setTimeout(r, 10));
+
+        expect(vscode.workspace.openTextDocument).not.toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    it('navigateToError is ignored for graphspec-json source', async () => {
+        const vscode = await import('vscode');
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // A valid target exists, but the panel is showing a run-graph JSON.
+        (panel as any).errorTargets = [{ uri, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } } }];
+        (panel as any).sourceKind = 'graphspec-json';
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'navigateToError', index: 0 });
+        await new Promise(r => setTimeout(r, 10));
+
+        expect(vscode.workspace.openTextDocument).not.toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    it('escapes attacker-influenced error text in the list; only the trusted script is nonced', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const evil = '<script>globalThis.pwned = 1;</script><img src=x onerror=alert(1)>';
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [
+            { error: { category: 'x', message: evil }, uri, range },
+        ];
+        await panel.applyAnalysis(uri, invalidAnalysis());
+
+        const html = mockState.mockWebview.html;
+        // Our own row/Retry script is the ONLY thing nonced; the sentinel is consumed.
+        expect(html).toMatch(/<script nonce="[^"]+">[\s\S]*navigateToError/);
+        expect(html).not.toContain('PIPELEX_RETRY_NONCE');
+        // The payload is escaped, never a live tag, so it can never execute.
+        expect(html).not.toContain('<script>globalThis.pwned');
+        expect(html).toContain('&lt;script&gt;globalThis.pwned');
+        expect(html).not.toContain('<img src=x onerror=');
+        expect(html).toContain('&lt;img src=x onerror=');
         panel.dispose();
     });
 

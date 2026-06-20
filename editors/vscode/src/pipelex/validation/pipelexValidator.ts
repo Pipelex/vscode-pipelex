@@ -115,7 +115,9 @@ export class PipelexValidator implements vscode.Disposable {
             this.lastNotifiedMessage = undefined;
 
             if (withGraph) {
-                this.graphSink?.applyAnalysis(document.uri, analysis);
+                // Fire-and-forget: the panel render (incl. the async error branch)
+                // is independent of publishing diagnostics for this save.
+                void this.graphSink?.applyAnalysis(document.uri, analysis);
             }
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
