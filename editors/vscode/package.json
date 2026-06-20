@@ -36,7 +36,6 @@
   "keywords": [
     "pipelex",
     "mthds",
-    "plx",
     "dsl",
     "toml",
     "syntax",
@@ -115,8 +114,7 @@
         "id": "mthds",
         "aliases": [
           "MTHDS",
-          "Pipelex Language",
-          "PLX"
+          "Pipelex Language"
         ],
         "extensions": [
           ".mthds"
