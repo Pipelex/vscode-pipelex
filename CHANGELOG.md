@@ -23,7 +23,8 @@
 
 ### Removed
  - **Fabricated diagnostics:** Removed the synthesized `blueprint_validation` diagnostics at the backend sites. Exit-1 CLI envelopes with empty error lists are now surfaced as infrastructure errors instead of synthesized stand-ins.
- - **`.plx` file extension:** Dropped the deprecated `.plx` extension entirely — the `mthds` language no longer associates `.plx` files, on-save bundle gathering no longer includes them, and the file watcher and one-time deprecation prompt are gone. Use `.mthds`.
+ - **`.plx` file extension:** Dropped the deprecated `.plx` extension entirely. In the extension, the `mthds` language no longer associates `.plx` files, on-save bundle gathering no longer includes them, and the file watcher and one-time deprecation prompt are gone. Use `.mthds`.
+ - **`.plx` in the CLI and language server:** `plxt` no longer discovers, formats, or lints `.plx` files (the default glob is now `**/*.{toml,mthds}`), and the language server no longer treats `.plx` as MTHDS or emits the `.plx` deprecation diagnostic. (plxt 0.7.0)
 
 ## [0.9.0] - 2026-05-31
 

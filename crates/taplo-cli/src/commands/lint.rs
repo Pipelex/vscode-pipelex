@@ -95,13 +95,6 @@ impl<E: Environment> Taplo<E> {
         let mut result = Ok(());
 
         for file in files {
-            if file.extension().is_some_and(|ext| ext == "plx") {
-                tracing::warn!(
-                    ?file,
-                    "the .plx file extension is deprecated, rename to .mthds"
-                );
-            }
-
             if let Err(error) = self.lint_file(&file, &cwd).await {
                 tracing::error!(%error, path = ?file, "invalid file");
                 result = Err(anyhow!("some files were not valid"));
