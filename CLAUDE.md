@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## Project Overview
-Fork of [tamasfe/taplo](https://github.com/tamasfe/taplo) (TOML toolkit) extended with Pipelex Language (MTHDS) support.
+Fork of [tamasfe/taplo](https://github.com/tamasfe/taplo) (TOML toolkit) extended with MTHDS (the language for AI methods) support.
 Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packages + VitePress docs site.
 
 ## Critical Rule: Preserve Upstream Taplo Behavior
