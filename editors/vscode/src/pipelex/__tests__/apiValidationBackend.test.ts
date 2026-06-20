@@ -149,6 +149,31 @@ describe('ApiValidationBackend', () => {
         ]);
     });
 
+    it('treats is_valid:false with an empty validation_errors as an api-error BackendError (contract violation)', async () => {
+        // The runtime invariant is total: an invalid verdict ALWAYS carries a
+        // non-empty validation_errors[] (mirrors the CLI parseFailure guard). An
+        // empty list during a server regression must NOT publish zero diagnostics —
+        // it is a no-verdict backend error so stale diagnostics are cleared, not hidden.
+        apiState.validate = async () => ({
+            is_valid: false,
+            validation_errors: [],
+            is_runnable: false,
+            message: 'MTHDS validation found errors',
+        });
+        const err = await analyze(makeBackend(), true).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        // No empty invalid outcome leaked through.
+        expect(err.logMessage).toMatch(/no validation_errors/);
+    });
+
+    it('treats is_valid:false with a missing validation_errors as an api-error BackendError', async () => {
+        apiState.validate = async () => ({ is_valid: false, is_runnable: false, message: 'x' });
+        const err = await analyze(makeBackend()).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+    });
+
     it('maps a request-shape 422 (no verdict) to an api-error BackendError', async () => {
         // `/validate` never 422s a content verdict now — a 422 is a request-shape
         // problem (e.g. mthds_sources length mismatch), surfaced as api-error.

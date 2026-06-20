@@ -795,7 +795,7 @@
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
-    "mthds": "portal:../../../mthds-js",
+    "mthds": "npm:0.12.0",
     "node-fetch": "^3.3.2",
     "react": "^19",
     "react-dom": "^19",

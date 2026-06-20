@@ -30,6 +30,47 @@ export function parseCleanRelease(raw: string | undefined): Semver | null {
 }
 
 /**
+ * Await `promise` but stop waiting if `signal` aborts or `timeoutMs` elapses,
+ * rejecting in either case. The underlying request is NOT cancelled (it keeps
+ * its own client-side request timeout and self-cleans) — we only stop awaiting
+ * it, mirroring `runWithAbort` in the API backend. With neither bound supplied,
+ * the original promise is returned unchanged.
+ */
+function probeWithLimit<T>(promise: Promise<T>, signal?: AbortSignal, timeoutMs?: number): Promise<T> {
+    if (!signal && timeoutMs == null) {
+        return promise;
+    }
+    return new Promise<T>((resolve, reject) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const cleanup = (): void => {
+            if (timer) {
+                clearTimeout(timer);
+            }
+            signal?.removeEventListener('abort', onAbort);
+        };
+        const onAbort = (): void => {
+            cleanup();
+            reject(new Error('version probe aborted'));
+        };
+        if (signal?.aborted) {
+            reject(new Error('version probe aborted'));
+            return;
+        }
+        if (timeoutMs != null) {
+            timer = setTimeout(() => {
+                cleanup();
+                reject(new Error('version probe timed out'));
+            }, timeoutMs);
+        }
+        signal?.addEventListener('abort', onAbort, { once: true });
+        promise.then(
+            value => { cleanup(); resolve(value); },
+            error => { cleanup(); reject(error); },
+        );
+    });
+}
+
+/**
  * Best-effort, warn-once capability gate for the API backend.
  *
  * On the first analysis against a given base URL, probe `GET /v1/version` and,
@@ -43,16 +84,30 @@ export class ApiVersionGate {
 
     constructor(private readonly output: vscode.OutputChannel) {}
 
-    async ensureCapable(client: MthdsApiClient, baseUrl: string): Promise<void> {
+    /**
+     * `signal` / `timeoutMs` bound the *wait* on the probe (not the underlying
+     * request, which keeps its own client-side request timeout). Without them the
+     * probe could delay a save by the client's full request ceiling, and a
+     * superseded save could not cancel it. Both are optional so non-analysis
+     * callers (tests) can probe without an abort context.
+     */
+    async ensureCapable(
+        client: MthdsApiClient,
+        baseUrl: string,
+        signal?: AbortSignal,
+        timeoutMs?: number,
+    ): Promise<void> {
         if (this.checked.has(baseUrl)) {
             return;
         }
         let implementationVersion: string | undefined;
         try {
-            const info = await client.version();
+            const info = await probeWithLimit(client.version(), signal, timeoutMs);
             implementationVersion = info.implementation_version;
         } catch {
-            // Best-effort: a /version failure is surfaced by the validate() call itself.
+            // Best-effort: a /version failure — or a superseded save (abort) / hung
+            // server (timeout) — leaves the gate unevaluated and uncached. The actual
+            // validate() call races the same signal/timeout and surfaces any real fault.
             return;
         }
         this.checked.add(baseUrl);

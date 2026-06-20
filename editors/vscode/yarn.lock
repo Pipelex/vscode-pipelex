@@ -3437,9 +3437,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mthds@portal:../../../mthds-js::locator=pipelex%40workspace%3A.":
-  version: 0.0.0-use.local
-  resolution: "mthds@portal:../../../mthds-js::locator=pipelex%40workspace%3A."
+"mthds@npm:0.12.0":
+  version: 0.12.0
+  resolution: "mthds@npm:0.12.0"
   dependencies:
     "@clack/prompts": "npm:^1.0.0"
     chalk: "npm:^5.4.1"
@@ -3450,10 +3450,11 @@ __metadata:
     smol-toml: "npm:^1.6.0"
     zod: "npm:^4.3.6"
   bin:
-    mthds: ./dist/cli.js
-    mthds-agent: ./dist/agent-cli.js
+    mthds: dist/cli.js
+    mthds-agent: dist/agent-cli.js
+  checksum: 1c0353ae86e1fca1b57629d46fbb7e2e365b3f8ef2680a5e6644d685525d797d4daa6898aa3c876a060ce73ef2e4833b9fd1025c04d6f4e54c8514146a497414
   languageName: node
-  linkType: soft
+  linkType: hard
 
 "nanoid@npm:^3.3.11":
   version: 3.3.11
@@ -3762,7 +3763,7 @@ __metadata:
     encoding: "npm:^0.1.13"
     esbuild: "npm:^0.20.0"
     fast-glob: "npm:^3.3.2"
-    mthds: "portal:../../../mthds-js"
+    mthds: "npm:0.12.0"
     node-fetch: "npm:^3.3.2"
     react: "npm:^19"
     react-dom: "npm:^19"

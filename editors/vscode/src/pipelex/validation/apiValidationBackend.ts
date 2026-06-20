@@ -71,8 +71,11 @@ export class ApiValidationBackend implements ValidationBackend {
             }
         }
 
-        // Best-effort, warn-once version gate (never blocks).
-        await this.deps.versionGate.ensureCapable(client, baseUrl);
+        // Best-effort, warn-once version gate (never blocks). Bounded by the same
+        // abort signal and per-analysis timeout as validate() below, so a hung
+        // /version cannot delay a save past the configured timeout, and a superseded
+        // save abandons the probe immediately.
+        await this.deps.versionGate.ensureCapable(client, baseUrl, signal, request.timeout);
         if (signal.aborted) {
             throw new AnalyzeAbortError();
         }
@@ -98,9 +101,24 @@ export class ApiValidationBackend implements ValidationBackend {
         // discriminants don't narrow — read `is_valid` and cast the arm explicitly.)
         if (report.is_valid === false) {
             const invalid = report as PipelexInvalidReport;
+            const errors = invalid.validation_errors;
+            // The runtime's structured-info invariant is total: an invalid verdict
+            // ALWAYS carries a non-empty `validation_errors[]` (the CLI path enforces
+            // the same in `parseFailure`). An `is_valid: false` body with an empty or
+            // missing list is a backend/contract violation, NOT an empty invalid
+            // verdict — surface it as a no-verdict BackendError so the consumer clears
+            // stale diagnostics, instead of silently publishing zero diagnostics (which
+            // would read as a falsely-clean bundle and a "No Graph Available" panel).
+            if (!Array.isArray(errors) || errors.length === 0) {
+                throw new BackendError({
+                    kind: 'api-error',
+                    logMessage: `Pipelex API returned is_valid:false with no validation_errors at ${baseUrl}`,
+                    userMessage: apiInvalidContractMessage(baseUrl),
+                });
+            }
             const validation: ValidationOutcome = {
                 ok: false,
-                errors: invalid.validation_errors as ValidationErrorItem[],
+                errors: errors as ValidationErrorItem[],
             };
             return options.withGraph ? { validation, graph: null } : { validation };
         }
@@ -250,6 +268,17 @@ function unreachableMessage(baseUrl: string): string {
 /** Non-auth API response (bad request, 5xx). Auth (401/403) is handled by {@link authMessage}. */
 function apiResponseMessage(err: ApiResponseError, baseUrl: string): string {
     return `Pipelex API error at ${baseUrl} (HTTP ${err.status}): ${err.serverMessage ?? err.statusText}.`;
+}
+
+/**
+ * Guidance for an `is_valid:false` body that omitted the required
+ * `validation_errors[]`. The server WAS reached and returned a 200, but the
+ * verdict is unusable — a backend/protocol breakdown, surfaced as an api-error.
+ */
+function apiInvalidContractMessage(baseUrl: string): string {
+    return `Pipelex API at ${baseUrl} reported the bundle invalid but returned no error details — ` +
+        `the server response is malformed. Retry; if it persists, the pipelex-api server may be out of ` +
+        `date, or switch \`pipelex.backend\` to \`cli\`.`;
 }
 
 /**

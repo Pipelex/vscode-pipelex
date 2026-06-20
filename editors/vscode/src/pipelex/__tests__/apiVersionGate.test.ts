@@ -94,4 +94,49 @@ describe('ApiVersionGate.ensureCapable', () => {
         await gate.ensureCapable(failing, 'http://localhost:8081');
         expect(failing.version).toHaveBeenCalledTimes(2);
     });
+
+    it('still warns (below floor) when given a signal + timeout — the probe resolves first', async () => {
+        const gate = new ApiVersionGate({ appendLine: vi.fn() } as any);
+        const controller = new AbortController();
+        await gate.ensureCapable(clientReturning('0.3.0'), 'http://localhost:8081', controller.signal, 30000);
+        expect(showWarning).toHaveBeenCalledTimes(1);
+    });
+
+    it('abandons the probe when the signal is already aborted (does not await a hung version())', async () => {
+        const gate = new ApiVersionGate({ appendLine: vi.fn() } as any);
+        const hanging = { version: vi.fn(() => new Promise<never>(() => { /* never resolves */ })) } as any;
+        const controller = new AbortController();
+        controller.abort();
+        await expect(
+            gate.ensureCapable(hanging, 'http://localhost:8081', controller.signal, 30000)
+        ).resolves.toBeUndefined();
+        expect(showWarning).not.toHaveBeenCalled();
+        // best-effort: not cached → a later (resolving) probe still runs
+        const ok = clientReturning('0.4.0');
+        await gate.ensureCapable(ok, 'http://localhost:8081');
+        expect(ok.version).toHaveBeenCalledTimes(1);
+    });
+
+    it('abandons the probe when the signal aborts mid-flight', async () => {
+        const gate = new ApiVersionGate({ appendLine: vi.fn() } as any);
+        const hanging = { version: vi.fn(() => new Promise<never>(() => { /* never resolves */ })) } as any;
+        const controller = new AbortController();
+        const pending = gate.ensureCapable(hanging, 'http://localhost:8081', controller.signal, 30000);
+        controller.abort();
+        await expect(pending).resolves.toBeUndefined();
+    });
+
+    it('bounds the probe by timeoutMs — a hung /version does not block past the timeout', async () => {
+        vi.useFakeTimers();
+        try {
+            const gate = new ApiVersionGate({ appendLine: vi.fn() } as any);
+            const hanging = { version: vi.fn(() => new Promise<never>(() => { /* never resolves */ })) } as any;
+            const pending = gate.ensureCapable(hanging, 'http://localhost:8081', undefined, 5000);
+            await vi.advanceTimersByTimeAsync(5000);
+            await expect(pending).resolves.toBeUndefined();
+            expect(showWarning).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });
