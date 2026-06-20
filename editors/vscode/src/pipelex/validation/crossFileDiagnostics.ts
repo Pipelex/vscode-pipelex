@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import type { BundleFile } from './backend';
 import type { ValidationErrorItem } from './types';
 import { locateError, locateErrorInLines, findTableHeaderInLines } from './sourceLocator';
@@ -112,18 +111,27 @@ function resolveOwner(
     getLines: (file: BundleFile) => string[],
 ): BundleFile | undefined {
     if (error.source) {
-        const src = error.source;
-        const srcBase = path.basename(src);
+        // The backend can report a POSIX-style relative source (e.g. `subdir/a.mthds`)
+        // even on Windows, where `fsPath` uses `\`. Normalize both sides to forward
+        // slashes before matching, so a path-qualified source is not misrouted by a
+        // separator mismatch (`\` vs `/`) in the basename or segment-boundary checks.
+        const src = error.source.replace(/\\/g, '/');
+        const srcBase = src.substring(src.lastIndexOf('/') + 1);
         const isBareName = src === srcBase;
-        // A bare filename matches by basename; a path-qualified source (e.g. `oo/a.mthds`)
+        // A bare filename matches by basename; a path-qualified source (e.g. `foo/a.mthds`)
         // must match exactly or on a path-segment boundary, so it can't misroute onto a
-        // similarly-named sibling like `/project/foo/a.mthds` via either branch.
-        const match = files.find(f =>
-            f.name === src ||
-            f.uri.fsPath === src ||
-            (isBareName && path.basename(f.uri.fsPath) === srcBase) ||
-            f.uri.fsPath.endsWith(path.sep + src)
-        );
+        // similarly-named sibling like `/project/bar/a.mthds` via either branch.
+        const match = files.find(f => {
+            const fsPath = f.uri.fsPath.replace(/\\/g, '/');
+            const fsBase = fsPath.substring(fsPath.lastIndexOf('/') + 1);
+            const name = f.name.replace(/\\/g, '/');
+            return (
+                name === src ||
+                fsPath === src ||
+                (isBareName && fsBase === srcBase) ||
+                fsPath.endsWith('/' + src)
+            );
+        });
         if (match) {
             return match;
         }

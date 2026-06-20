@@ -159,6 +159,27 @@ describe('resolveErrorLocations — owner + range, order-preserving', () => {
         expect(loc.range.start.line).toBe(3);
     });
 
+    it('routes a POSIX-relative `source` onto a backslash (Windows) fsPath', () => {
+        // The backend can report a POSIX-style relative source (`subdir/concepts.mthds`)
+        // even on Windows, where fsPath uses `\`. The sibling's `name` is the bare
+        // basename, so only the segment-boundary suffix check can match it — and only
+        // after both sides are normalized to `/`. Pre-fix this misrouted to the primary.
+        const winFile = (fsPath: string, name: string, content: string): BundleFile =>
+            ({ uri: { fsPath, scheme: 'file', toString: () => `file://${fsPath}` } as any, name, content });
+        const winPrimary = winFile('C:\\project\\methods\\main.mthds', 'main.mthds', 'domain = "d"\n');
+        const winSibling = winFile(
+            'C:\\project\\methods\\subdir\\concepts.mthds',
+            'concepts.mthds',
+            'domain = "d"\n[concept.Foo]\ndescription = "a foo"\n',
+        );
+        const [loc] = resolveErrorLocations({
+            errors: [{ category: 'concept_validation', message: 'bad Foo', source: 'subdir/concepts.mthds' }],
+            files: [winPrimary, winSibling],
+            primaryUri: winPrimary.uri as any,
+        });
+        expect(loc.uri.toString()).toBe(winSibling.uri.toString());
+    });
+
     it('ranges a primary-owned error from the OPEN document, not the on-disk text', () => {
         // [pipe.main_pipe] is at line index 1 of the primary. The open document
         // returns a sentinel range end (999) the on-disk path would never produce,

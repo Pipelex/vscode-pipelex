@@ -353,7 +353,20 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     private async renderValidationErrors(uri: vscode.Uri, errors: ValidationErrorItem[]): Promise<void> {
         // The CLI path resolves siblings itself, so `refresh()` does not gather them;
         // the clickable list needs their contents to place an error on its owning file.
-        const files = await gatherBundleFiles(uri);
+        // A gather failure (transient read error, deleted primary file) must NOT reject:
+        // the validator calls applyAnalysis fire-and-forget, so an unhandled rejection
+        // would leave the previous graph stale instead of showing the verdict. Fall back
+        // to no siblings — resolveErrorLocations then places every error on the primary
+        // file (non-clickable to siblings) rather than throwing.
+        let files: Awaited<ReturnType<typeof gatherBundleFiles>>;
+        try {
+            files = await gatherBundleFiles(uri);
+        } catch (err) {
+            this.output.appendLine(
+                `pipelex graph: could not gather bundle files for the error view: ${String(err)}`,
+            );
+            files = [];
+        }
         // Re-check staleness: the gather above is async, so the user may have switched
         // files (or closed the panel) while sibling contents were read from disk.
         if (!this.panel) return;

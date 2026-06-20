@@ -567,6 +567,36 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it('still renders the error list when gathering bundle files fails (no unhandled rejection)', async () => {
+        const bundleGather = await import('../validation/bundleGather');
+        vi.mocked(bundleGather.gatherBundleFiles).mockRejectedValueOnce(new Error('disk gone'));
+
+        const output = mockOutput();
+        const panel = new MethodGraphPanel(output, makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [
+            { error: { category: 'pipe_validation', message: 'still shown despite gather failure' }, uri, range },
+        ];
+
+        // The validator calls applyAnalysis fire-and-forget, so a gather failure must
+        // resolve (not reject) — otherwise the rejection is unhandled and the panel
+        // keeps a stale graph instead of the verdict.
+        await expect(panel.applyAnalysis(uri, invalidAnalysis())).resolves.toBeUndefined();
+
+        const html = mockState.mockWebview.html;
+        expect(html).toContain('1 Validation Error');
+        expect(html).toContain('still shown despite gather failure');
+        // The failure was logged, not thrown.
+        expect(output.appendLine).toHaveBeenCalledWith(
+            expect.stringContaining('could not gather bundle files'),
+        );
+        panel.dispose();
+    });
+
     it('uses a singular header for a single validation error', async () => {
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/methods/main.mthds');

@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockState = vi.hoisted(() => ({
     subscriptions: [] as any[],
     globalState: new Map<string, any>(),
+    config: {} as Record<string, any>,
     showWarningMessage: vi.fn(),
     registerCommand: vi.fn((_cmd: string, _handler: any) => ({ dispose: vi.fn() })),
     registerDocumentSemanticTokensProvider: vi.fn(() => ({ dispose: vi.fn() })),
@@ -19,9 +20,9 @@ vi.mock('vscode', () => ({
     SemanticTokensLegend: class { constructor() {} },
     SemanticTokensBuilder: class { constructor() {} },
     workspace: {
-        getConfiguration: () => ({
-            get: (_key: string, def: any) => def,
-        }),
+        getConfiguration: vi.fn(() => ({
+            get: (key: string, def: any) => (key in mockState.config ? mockState.config[key] : def),
+        })),
         onDidOpenTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
         onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
     },
@@ -103,6 +104,7 @@ describe('registerPipelexFeatures', () => {
         vi.clearAllMocks();
         mockState.subscriptions = [];
         mockState.globalState.clear();
+        mockState.config = {};
         mockState.validatorConstructed = false;
         mockState.graphPanelConstructed = false;
         mockState.pipeTestProviderConstructed = false;
@@ -145,5 +147,16 @@ describe('registerPipelexFeatures', () => {
         await registerPipelexFeatures(context);
 
         expect(mockState.pipeTestProviderConstructed).toBe(true);
+    });
+
+    it('registers the validator even when validation is disabled at activation', async () => {
+        // The graph panel reads `validation.enabled` live and suppresses its own
+        // refresh when it is on, so a validator must always exist to drive analysis —
+        // even if the setting was off at activation and is enabled later without a reload.
+        mockState.config['validation.enabled'] = false;
+        const context = makeContext();
+        await registerPipelexFeatures(context);
+
+        expect(mockState.validatorConstructed).toBe(true);
     });
 });
