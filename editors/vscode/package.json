@@ -212,6 +212,14 @@
         "command": "pipelex.runBundle",
         "title": "Pipelex: Run Bundle",
         "icon": "$(play)"
+      },
+      {
+        "command": "pipelex.setApiKey",
+        "title": "Pipelex: Set Hosted API Key"
+      },
+      {
+        "command": "pipelex.clearApiKey",
+        "title": "Pipelex: Clear Hosted API Key"
       }
     ],
     "semanticTokenTypes": [
@@ -537,8 +545,28 @@
           "scope": "resource",
           "default": true
         },
+        "pipelex.backend": {
+          "description": "Which backend validates MTHDS bundles and renders method graphs. `cli` spawns the local `pipelex-agent` CLI (zero-config default). `api` calls a Pipelex API server over HTTP — set `pipelex.api.baseUrl` and, for a hosted endpoint, store a key via the `Pipelex: Set Hosted API Key` command.",
+          "type": "string",
+          "enum": [
+            "cli",
+            "api"
+          ],
+          "enumDescriptions": [
+            "Spawn the local pipelex-agent CLI (default, zero-config).",
+            "Call a Pipelex API server (self-hosted or hosted) via HTTP."
+          ],
+          "scope": "resource",
+          "default": "cli"
+        },
+        "pipelex.api.baseUrl": {
+          "description": "Base URL of the Pipelex API server used when `pipelex.backend` is `api`. Host only, no version path. Defaults to the hosted Pipelex API (`https://api.pipelex.com`) — store a key via `Pipelex: Set Hosted API Key`. For a locally self-hosted pipelex-api, set this to e.g. `http://localhost:8081`.",
+          "type": "string",
+          "scope": "resource",
+          "default": "https://api.pipelex.com"
+        },
         "pipelex.validation.enabled": {
-          "description": "Run pipelex-agent validation on save for MTHDS files.",
+          "description": "Run validation on save for MTHDS files.",
           "type": "boolean",
           "scope": "resource",
           "default": true
@@ -767,6 +795,7 @@
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
+    "mthds": "npm:0.12.0",
     "node-fetch": "^3.3.2",
     "react": "^19",
     "react-dom": "^19",

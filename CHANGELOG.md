@@ -1,5 +1,27 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Added
+- Selectable analysis backend via `pipelex.backend` (`cli` default — zero-config preserved; `api` opt-in). The `api` backend validates bundles and renders method graphs by calling a Pipelex API server (`pipelex.api.baseUrl`, default the hosted `https://api.pipelex.com`; point it at e.g. `http://localhost:8081` for a self-hosted runner) over HTTP via the `mthds` client, with full structured-diagnostics parity. See [Validation backends](docs/features/validation-backends.md).
+- Commands `Pipelex: Set Hosted API Key` / `Pipelex: Clear Hosted API Key` store a hosted Pipelex API key in VS Code SecretStorage (never in plaintext settings); the `api` backend resolves the token as SecretStorage → `MTHDS_API_KEY` env.
+- Cross-file diagnostics: a bundle-validation error is now placed on its declaring file (resolved from the error's `source`), not only on the saved file, for directory-wide bundles on both backends.
+- One-time confirmation before the `api` backend sends bundle contents to a non-localhost host (the whole directory's `.mthds` contents are sent on each save).
+- The method graph view now shows a **Retry** button on its error states (CLI not found / too old, API unreachable, API error, API key required, send declined, unexpected error) that re-runs the analysis for the open file, so a transient failure recovers without reopening the panel.
+- A Pipelex API auth rejection (HTTP 401/403) is now reported as its own "API key required" state — separate from "unreachable" and generic API errors — with one-click remedies on both the notification and the method graph view: **Set API Key** (runs `Pipelex: Set Hosted API Key`) and, against the hosted endpoint, **Get an API Key** (opens `app.pipelex.com`). The method-pane message has clickable links and spells out all three paths: get a key at app.pipelex.com, self-host the open-source `pipelex-api` (`docker run -p 8081:8081 pipelex/pipelex-api`), or switch `pipelex.backend` to `cli`.
+
+### Changed
+- The `api` backend reads the 200-diagnostic `/validate` body directly. `POST /v1/validate` now returns a discriminated verdict (`is_valid: true|false`) on a 200 — an invalid bundle is a produced verdict, not an HTTP 422 throw — so `ApiValidationBackend` pattern-matches `is_valid` off `MthdsApiClient.validate()`'s union instead of catching a 422. A non-2xx is now always a *no-verdict* condition (a request-shape 422, auth, transport, 5xx) surfaced as a `BackendError`. It also sends the renamed `mthds_sources` (was `mthds_names`) parallel-source array.
+- Both backends consume the runtime's structured `validation_errors[]` directly — the fabricated `blueprint_validation` synthesis at the two backend sites is **removed** (closes follow-up #10). The runtime's structured-info invariant is now total, so every invalid verdict already carries a non-empty list: a parse-level failure rides one source-less `blueprint_validation` residual and a dry-run failure a graph-level `dry_run` item (placed on the primary file via the existing source-less fallback). An exit-1 CLI envelope with an empty list is surfaced as an `infra` error rather than a synthesized stand-in.
+- On-save validation and the method graph pass `--allow-signatures` to `pipelex-agent validate bundle`, so work-in-progress bundles containing `PipeSignature` stubs validate and render instead of failing with `SignaturesNotAllowedError`
+- Minimum supported `pipelex-agent` raised to 0.34.0 — required for the structured `validation_errors[]` fields (`source` / `field_name`) that power cross-file diagnostics and parity with the API backend. This is a compatibility-floor break: an older `pipelex-agent` is reported as too old (the extension's behavior is otherwise unchanged).
+- Validation diagnostics now use the source label `pipelex` (was `pipelex-agent`), reflecting that either backend can produce them.
+
+### Fixed
+- The `pipelex-agent` version floor is now enforced before trusting the CLI's output, not only on a spawn failure. A CLI in the `[0.31.0, 0.34.0)` range still validates and emits a structured error list (without the `source` / `field_name` fields), so the previous lazy check let it through silently and degraded cross-file diagnostics; an under-floor CLI is now reported as too old up front on both the validation and graph paths.
+- An open method-graph panel no longer keeps showing a stale graph when an on-save analysis fails or is skipped: a backend/transport failure now renders the error in the panel, and a save skipped because another extension reported errors shows a short notice. Previously, with validation enabled, only the success path updated the panel.
+- A save that is skipped because another extension already reported errors now cancels any in-flight analysis for that file first, so a slow prior run can no longer resolve afterward and re-publish diagnostics the skip just cleared.
+
 ## [0.9.0] - 2026-05-31
 
 ### Changed

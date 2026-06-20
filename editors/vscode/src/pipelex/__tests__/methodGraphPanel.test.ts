@@ -129,6 +129,7 @@ vi.mock('../validation/sourceLocator', () => ({
 
 // ---------- Import SUT after mocks ----------
 import { MethodGraphPanel } from '../graph/methodGraphPanel';
+import { BackendError } from '../validation/backend';
 
 // Helper to create a mock output channel
 function mockOutput() {
@@ -281,6 +282,34 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it('refresh() passes --library-dir with the bundle directory', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const args = vi.mocked(processUtils.spawnCli).mock.calls[0][1] as string[];
+        const idx = args.indexOf('--library-dir');
+        expect(idx).toBeGreaterThan(-1);
+        expect(args[idx + 1]).toBe('/project/methods');
+        panel.dispose();
+    });
+
+    it('refresh() passes --allow-signatures so stub pipes still render', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const args = vi.mocked(processUtils.spawnCli).mock.calls[0][1] as string[];
+        expect(args).toContain('--allow-signatures');
+        panel.dispose();
+    });
+
     // --- Regression: staleness after spawnCli (previous Bug 1) ---
 
     it('refresh() discards spawnCli result when file switched during spawn', async () => {
@@ -353,6 +382,132 @@ describe('MethodGraphPanel', () => {
         expect(mockState.showWarningMessage).toHaveBeenCalledWith(
             expect.stringContaining('pipelex-agent')
         );
+        panel.dispose();
+    });
+
+    // --- Retry button on the error view ---
+
+    it('renders a Retry button on the error view and re-runs the analysis when clicked', async () => {
+        const processUtils = await import('../validation/processUtils');
+        mockState.resolveCliResult = null; // → CLI Not Found error view
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // The error view carries a Retry button wired to post { type: 'retry' }.
+        expect(mockState.mockWebview.html).toContain('CLI Not Found');
+        expect(mockState.mockWebview.html).toContain('id="pipelex-retry"');
+        expect(mockState.mockWebview.html).toMatch(/postMessage\(\s*\{\s*type:\s*'retry'/);
+        expect(mockState.mockWebview.html).toContain("script-src 'nonce-");
+        // resolveCli returned null, so the analysis never reached spawnCli.
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
+
+        // CLI becomes available; clicking Retry re-runs and now reaches spawnCli.
+        mockState.resolveCliResult = { command: 'pipelex-agent', args: [] };
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'retry' });
+        await vi.waitFor(() => {
+            expect(processUtils.spawnCli).toHaveBeenCalled();
+        });
+
+        panel.dispose();
+    });
+
+    it('does not render a Retry button on a successful graph render', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // Success path swaps in the graph webview HTML (no error message / Retry button).
+        expect(mockState.mockWebview.html).not.toContain('id="pipelex-retry"');
+        panel.dispose();
+    });
+
+    it('renders a non-auth api-error (e.g. HTTP 503) under "Pipelex API Error", not "Unreachable"', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        panel.applyBackendError(uri, new BackendError({
+            kind: 'api-error',
+            logMessage: 'Pipelex API 503 at https://api.pipelex.com: service unavailable',
+            userMessage: 'Pipelex API error at https://api.pipelex.com (HTTP 503): service unavailable.',
+        }));
+
+        const html = mockState.mockWebview.html;
+        expect(html).toContain('Pipelex API Error');
+        expect(html).not.toContain('Pipelex API Unreachable');
+        expect(html).toContain('HTTP 503');
+        panel.dispose();
+    });
+
+    it('renders an auth error under "Pipelex API Key Required" with buttons + clickable inline links', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        panel.applyBackendError(uri, new BackendError({
+            kind: 'auth',
+            logMessage: 'Pipelex API 401 at https://api.pipelex.com: unauthorized',
+            userMessage: 'plain text fallback (should not be used when detailHtml is present)',
+            detailHtml: 'The hosted Pipelex API needs an API key.</p><p>Get it at ' +
+                '<a class="pipelex-link" href="https://app.pipelex.com/">app.pipelex.com</a>, or self-host the ' +
+                '<a class="pipelex-link" href="https://github.com/Pipelex/pipelex-api">pipelex-api</a> — ' +
+                '<code>docker run -p 8081:8081 pipelex/pipelex-api</code>.',
+            actions: [
+                { label: 'Set API Key', command: 'pipelex.setApiKey' },
+                { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
+            ],
+        }));
+
+        const html = mockState.mockWebview.html;
+        expect(html).toContain('Pipelex API Key Required');
+        expect(html).not.toContain('Pipelex API Unreachable');
+        // Both remedy buttons plus Retry are rendered.
+        expect(html).toContain('Set API Key');
+        expect(html).toContain('Get an API Key');
+        expect(html).toContain('Retry');
+        // Buttons post the safe, whitelisted message shapes (command dispatch + http open).
+        expect(html).toContain('"type":"runCommand","command":"pipelex.setApiKey"');
+        expect(html).toContain('"type":"openExternally","url":"https://app.pipelex.com/"');
+        // detailHtml is rendered as real HTML (not escaped), with clickable links + the Docker command.
+        expect(html).toContain('<a class="pipelex-link" href="https://app.pipelex.com/"');
+        expect(html).toContain('<a class="pipelex-link" href="https://github.com/Pipelex/pipelex-api"');
+        expect(html).toContain('docker run -p 8081:8081 pipelex/pipelex-api');
+        // The script wires inline-link clicks to open externally.
+        expect(html).toContain("querySelectorAll('a.pipelex-link')");
+        expect(html).not.toContain('plain text fallback');
+        panel.dispose();
+    });
+
+    it('never blesses attacker-influenced error text with a nonce (only the trusted Retry script gets one)', async () => {
+        // A backend failure carrying server-influenced text (here via the CLI's stderr;
+        // the same body path serves the API "unreachable" message, whose text a malicious
+        // baseUrl controls). Even WITH the Retry script's script-src active, a <script>
+        // smuggled into the body must stay inert.
+        const processUtils = await import('../validation/processUtils');
+        vi.mocked(processUtils.spawnCli).mockRejectedValueOnce({
+            exitCode: 1,
+            stderr: '<script>globalThis.pwned = 1;</script>',
+        });
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/file.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const html = mockState.mockWebview.html;
+        // Our own Retry script is the ONLY thing that got a nonce, and the sentinel is consumed.
+        expect(html).toMatch(/<script nonce="[^"]+">[\s\S]*postMessage/);
+        expect(html).not.toContain('PIPELEX_RETRY_NONCE');
+        // The injected payload is escaped (not a live <script>), so it can never execute.
+        expect(html).not.toContain('<script>globalThis.pwned');
+        expect(html).toContain('&lt;script&gt;globalThis.pwned');
         panel.dispose();
     });
 
