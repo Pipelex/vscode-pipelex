@@ -26,6 +26,15 @@ export class PipelexValidator implements vscode.Disposable {
     private readonly factory: BackendFactory;
     /** Per-directory record of URIs currently holding diagnostics, so a re-run clears its own stale set. */
     private readonly ownedByDir = new Map<string, vscode.Uri[]>();
+    /**
+     * Per-directory monotonic generation. Each save stamps its run with the directory's
+     * next generation; a diagnostics write is dropped when a newer save for the same
+     * directory has since started. In-flight analyses are cancelled per-URI, so a
+     * concurrent save of a SIBLING in the same directory is not cancelled — without this
+     * gate, that sibling's run, if it resolves last, would overwrite this save's fresher
+     * per-directory diagnostics set with stale content it read earlier.
+     */
+    private readonly dirGeneration = new Map<string, number>();
     private graphSink: GraphAnalysisSink | undefined;
     private notFoundWarningShown = false;
     private lastNotifiedMessage: string | undefined;
@@ -75,13 +84,21 @@ export class PipelexValidator implements vscode.Disposable {
         const uriKey = document.uri.toString();
         cancelInflightByKey(this.inflight, uriKey);
 
+        // Stamp this save with the directory's next generation. Diagnostics are written
+        // per-directory, but in-flight runs are cancelled per-URI, so a sibling saved in
+        // the same directory is NOT cancelled; gating each directory write on the latest
+        // generation stops an older sibling run from clobbering this save's fresher set.
+        const dir = path.dirname(document.uri.fsPath);
+        const myGen = (this.dirGeneration.get(dir) ?? 0) + 1;
+        this.dirGeneration.set(dir, myGen);
+
         // Skip if the file has existing Error-severity diagnostics from other sources (e.g. LSP syntax errors)
         const existingDiags = vscode.languages.getDiagnostics(document.uri);
         const hasOtherErrors = existingDiags.some(
             d => d.severity === vscode.DiagnosticSeverity.Error && d.source !== DIAGNOSTIC_SOURCE
         );
         if (hasOtherErrors) {
-            this.clearDir(path.dirname(document.uri.fsPath));
+            this.clearDir(dir);
             // Keep an open graph panel in sync: it no longer self-refreshes on save
             // when validation is enabled, so tell it this save was skipped rather
             // than let it keep showing a stale graph.
@@ -95,7 +112,6 @@ export class PipelexValidator implements vscode.Disposable {
         const controller = new AbortController();
         this.inflight.set(uriKey, controller);
 
-        const dir = path.dirname(document.uri.fsPath);
         const timeout = config.get<number>('validation.timeout', 30000);
         const direction = config.get<string>('graph.direction', 'top_down');
         const withGraph = this.graphSink?.isShowingMthds(document.uri) ?? false;
@@ -111,8 +127,14 @@ export class PipelexValidator implements vscode.Disposable {
             );
             if (controller.signal.aborted) return;
 
-            this.applyValidation(document, files, analysis);
-            this.lastNotifiedMessage = undefined;
+            // Drop the diagnostics write if a newer save for this directory has started
+            // (a sibling save is not cancelled by our per-URI abort). The graph is
+            // per-file and guarded separately by the panel's own currentUri check, so it
+            // still updates for the file the user is viewing.
+            if (this.dirGeneration.get(dir) === myGen) {
+                this.applyValidation(document, files, analysis);
+                this.lastNotifiedMessage = undefined;
+            }
 
             if (withGraph) {
                 // Fire-and-forget: the panel render (incl. the async error branch)
@@ -121,7 +143,11 @@ export class PipelexValidator implements vscode.Disposable {
             }
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
-            this.handleBackendError(err, dir);
+            // Same generation gate as the success path: a stale sibling run must not clear
+            // the directory's diagnostics out from under a newer save that already wrote them.
+            if (this.dirGeneration.get(dir) === myGen) {
+                this.handleBackendError(err, dir);
+            }
             // Keep an open graph panel in sync — with validation enabled it does not
             // self-refresh on save, so without this it would keep showing the last
             // good graph after a transport/backend failure. No-ops if not showing.

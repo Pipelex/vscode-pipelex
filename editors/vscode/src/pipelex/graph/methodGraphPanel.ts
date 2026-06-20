@@ -799,6 +799,11 @@ function toPanelAction(action: BackendErrorAction): PanelAction {
     return { label: action.label, message: { type: 'openExternally', url: action.externalUrl } };
 }
 
+/**
+ * Render a simple message view. `title` is plain text and is escaped here. `body`
+ * is trusted HTML by contract — callers MUST pass either a static string, their own
+ * `escapeHtml(...)` output, or pre-escaped HTML (e.g. `BackendError.detailHtml`).
+ */
 function messageHtml(title: string, body: string, options?: { retry?: boolean; actions?: PanelAction[] }): string {
     // Buttons post back to the extension (see handleWebviewMessage); the single
     // inline <script> runs under the nonce that setHtml() injects for simple HTML.
@@ -858,7 +863,7 @@ button { font-family: inherit; font-size: 13px; padding: 4px 14px; cursor: point
          border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; }
 button:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
 button:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 2px; }
-</style></head><body><div class="msg"><h2>${title}</h2><p>${body}</p>${actionsBlock}</div></body></html>`;
+</style></head><body><div class="msg"><h2>${escapeHtml(title)}</h2><p>${body}</p>${actionsBlock}</div></body></html>`;
 }
 
 /** One row in the clickable validation-error list. `index` keys into {@link MethodGraphPanel.errorTargets}. */

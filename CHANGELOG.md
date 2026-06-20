@@ -20,6 +20,7 @@
 ### Fixed
  - **Stale graph prevention:** An open method-graph panel no longer shows a stale graph when on-save analysis fails or is skipped; backend/transport failures render the error directly in the panel.
  - **Race condition on skipped saves:** A skipped save (e.g., when another extension reports syntax errors) now cancels any in-flight analysis for that file, preventing a slow prior run from re-publishing stale diagnostics.
+ - **Concurrent sibling-save race:** Saving two `.mthds` files in the same directory in quick succession no longer lets a slower earlier run overwrite the newer save's diagnostics. Diagnostics are written per directory but analyses are cancelled per file, so each save is now stamped with a per-directory generation and a stale run's write is dropped.
 
 ### Removed
  - **Fabricated diagnostics:** Removed the synthesized `blueprint_validation` diagnostics at the backend sites. Exit-1 CLI envelopes with empty error lists are now surfaced as infrastructure errors instead of synthesized stand-ins.
