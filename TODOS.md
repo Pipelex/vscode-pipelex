@@ -106,9 +106,9 @@ This flag finds the two genuine latent null-safety bugs in production code (`ser
 
 Depends on `strictNullChecks` (TS refuses it otherwise — that's why it follows Phase 2). It surfaces **no** errors in our code today, so this is effectively free — but it must be **re-measured after Phase 2 lands**, because class-field inference can shift.
 
-- [ ] Add `"strictPropertyInitialization": true,` to `tsconfig.typecheck.json` `compilerOptions`.
-- [ ] `cd editors/vscode && yarn typecheck` → exit 0. If any uninitialized class-property errors appear (none expected as of 2026-06-21), fix by either a definite-assignment annotation (`field!: T`) or a constructor/initializer — prefer a real initializer over `!` where the value is genuinely always set.
-- [ ] Commit: `feat(typecheck): enable strictPropertyInitialization`. *(May be folded into the Phase 2 commit if it stays clean — your call.)*
+- [x] Add `"strictPropertyInitialization": true,` to `tsconfig.typecheck.json` `compilerOptions`.
+- [x] `cd editors/vscode && yarn typecheck` → exit 0. If any uninitialized class-property errors appear (none expected as of 2026-06-21), fix by either a definite-assignment annotation (`field!: T`) or a constructor/initializer — prefer a real initializer over `!` where the value is genuinely always set. *(clean — no errors after Phase 2)*
+- [x] Commit: `feat(typecheck): enable strictPropertyInitialization`. *(landed as its own commit — Phase 2 was already committed.)*
 
 ---
 

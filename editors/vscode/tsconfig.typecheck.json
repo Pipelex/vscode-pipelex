@@ -21,7 +21,8 @@
     "noImplicitThis": true,
     "useUnknownInCatchVariables": true,
     "alwaysStrict": true,
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "vitest.config.mts"]
