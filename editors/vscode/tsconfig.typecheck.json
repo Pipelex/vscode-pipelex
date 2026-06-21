@@ -1,0 +1,20 @@
+{
+  // Standalone type-check gate for the extension. Additive — it does NOT feed the
+  // esbuild build (rollup/esbuild strip types per-file and never type-check). It
+  // extends the base build tsconfig and overrides only what `tsc --noEmit` needs to
+  // model the real runtime envs (extension host = node, webview = DOM, server-worker
+  // = `self as any`). Run via `yarn typecheck`; wired into `make check` + CI.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // DOM (+ DOM.Iterable) covers window/document/Worker/MessageEvent and the
+    // `self as any` cast in server-worker.ts. WebWorker is intentionally omitted —
+    // it duplicate-conflicts with DOM and is not needed.
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    // Follow @pipelex/mthds-ui's subpath `exports` (e.g. .../graph/react), like
+    // esbuild does natively. Requires module: esnext (inherited) + TypeScript >=5.
+    "moduleResolution": "bundler"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "vitest.config.mts"]
+}

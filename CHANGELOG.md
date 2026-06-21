@@ -1,5 +1,10 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Added
+ - **Type-check gate for the VS Code extension:** Added a standalone `tsc --noEmit` type-check (`editors/vscode/tsconfig.typecheck.json` + `yarn typecheck`) wired into `make check` and CI. The extension's TypeScript pipeline is esbuild-based and never type-checked the source — the host↔webview protocol and the cross-repo GraphSpec contract had zero static checking. The gate models the real runtime environments (node host, DOM webview, web worker) and resolves `@pipelex/mthds-ui`'s subpath exports, while leaving the esbuild build config untouched. Fixed the latent type errors it surfaced: removed a dead `handleInitializeResult` override (no longer an override point in `vscode-languageclient` 9 — UTF-16 negotiation stays in `fillInitializeParams`), added the required `envVars` to the browser worker's `Environment`, and realigned the API-validation tests to the current `mthds` exception constructor signatures.
+
 ## [0.10.0] - 2026-06-21
 
 ### Added

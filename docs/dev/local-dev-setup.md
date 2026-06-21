@@ -37,8 +37,8 @@ Run `make help` to see all targets. Here are the key ones:
 | `make vsix` | Package the extension into `editors/vscode/pipelex.vsix` |
 | `make ext-install` | Build, package, and install the `.vsix` into your IDE |
 | `make ext-uninstall` | Remove the extension from your IDE |
-| `make test` | Run all tests (Rust + extension) |
-| `make check` | Quick compilation checks (CLI + WASM) |
+| `make test` | Run all tests (Rust + extension) and type-check the extension |
+| `make check` | Full quality gate: format + lint + all tests (incl. extension type-check) + compilation checks (CLI + WASM) |
 | `make clean` | Remove all build artifacts |
 
 ## Step-by-Step Guide
@@ -99,6 +99,18 @@ For faster iteration without packaging a `.vsix` each time, use the VS Code Exte
 4. A new IDE window opens with the extension loaded from source
 
 Changes to TypeScript require `cd editors/vscode && yarn build` then relaunch. Changes to Rust/WASM require rebuilding the LSP bundle first: `cd js/lsp && yarn build`.
+
+### Type-checking the extension
+
+The extension's build pipeline is entirely esbuild-based (rollup + `rollup-plugin-esbuild` for the node/browser bundles, a direct `esbuild.buildSync` for the webview, vitest for tests). esbuild strips types per file and never type-checks, so neither `make ext` nor `yarn test` catches a type error — the host↔webview message protocol and the cross-repo GraphSpec contract are exactly the surface that benefits from static checking.
+
+`yarn typecheck` (from `editors/vscode`) closes that gap with a standalone `tsc --noEmit`:
+
+```bash
+cd editors/vscode && yarn typecheck
+```
+
+It runs against `tsconfig.typecheck.json`, a separate config that extends the esbuild build `tsconfig.json` and overrides only what standalone `tsc` needs — `DOM`/`DOM.Iterable` libs (for `window`/`document`/`Worker`/`self`) and `moduleResolution: bundler` (to follow `@pipelex/mthds-ui`'s subpath `exports`, like esbuild does natively). The base build config is left untouched. The gate runs as part of `make test` / `make check` and in CI, so a type error can't merge. It inherits the base `strict: false`, so coverage is currently shallow; ratcheting `strict` on is a worthwhile follow-up.
 
 ## Uninstalling
 

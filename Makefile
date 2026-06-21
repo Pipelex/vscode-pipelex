@@ -109,7 +109,7 @@ test: ## Run all tests (Rust + VS Code extension)
 	cargo test -p pipelex-cli
 	cargo test -p taplo
 	cargo test -p taplo-lsp
-	cd $(EXT_DIR) && yarn test
+	cd $(EXT_DIR) && { yarn typecheck; tc=$$?; yarn test; vt=$$?; [ $$tc -eq 0 ] && [ $$vt -eq 0 ]; }
 
 check-no-local-deps: ## Fail if mthds-ui is not the npm spec
 	@grep -qE '"@pipelex/mthds-ui":[[:space:]]*"npm:' $(EXT_DIR)/package.json || \
