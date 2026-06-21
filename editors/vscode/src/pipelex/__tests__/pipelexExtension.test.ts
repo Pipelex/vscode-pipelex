@@ -28,15 +28,21 @@ vi.mock('vscode', () => ({
     },
     window: {
         showWarningMessage: mockState.showWarningMessage,
+        showInformationMessage: vi.fn(),
         activeTextEditor: undefined,
+        visibleTextEditors: [],
+        activeColorTheme: { kind: 2 },
         createOutputChannel: vi.fn(() => ({ appendLine: vi.fn(), dispose: vi.fn() })),
         registerWebviewPanelSerializer: vi.fn(() => ({ dispose: vi.fn() })),
         onDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeActiveColorTheme: vi.fn(() => ({ dispose: vi.fn() })),
     },
     commands: {
         registerCommand: mockState.registerCommand,
         executeCommand: vi.fn(),
     },
+    ColorThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },
+    ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
     languages: {
         registerDocumentSemanticTokensProvider: mockState.registerDocumentSemanticTokensProvider,
     },

@@ -4,8 +4,15 @@ import * as path from 'path';
 import * as os from 'os';
 import { parse as parseToml } from 'smol-toml';
 
-/** Binary color theme understood by the mthds-ui GraphViewer. */
+/** Resolved binary color theme understood by the mthds-ui GraphViewer. */
 export type GraphTheme = 'dark' | 'light';
+
+/**
+ * Theme *mode* sent to the renderer. `'system'` follows the active VS Code
+ * color theme (via the injected {@link GraphRenderConfig.systemTheme});
+ * `'dark'`/`'light'` pin a fixed appearance.
+ */
+export type GraphThemeMode = 'dark' | 'light' | 'system';
 
 export interface GraphRenderConfig {
     edgeType: string;
@@ -13,10 +20,18 @@ export interface GraphRenderConfig {
     ranksep: number;
     initialZoom: number | undefined;
     panToTop: boolean;
-    theme: GraphTheme;
+    /** Theme mode. `'system'` (the default) tracks the editor via {@link systemTheme}. */
+    theme: GraphThemeMode;
+    /**
+     * The active editor's resolved binary theme. Injected into the renderer's
+     * `'system'` mode so it flips deterministically — the webview's own
+     * `prefers-color-scheme` is unreliable — and re-sent on every editor theme
+     * switch (see methodGraphPanel.onColorThemeChanged).
+     */
+    systemTheme: GraphTheme;
 }
 
-const DEFAULTS: Omit<GraphRenderConfig, 'theme'> = {
+const DEFAULTS: Omit<GraphRenderConfig, 'theme' | 'systemTheme'> = {
     edgeType: 'bezier',
     nodesep: 50,
     ranksep: 30,
@@ -74,19 +89,22 @@ async function readPipelexToml(): Promise<Partial<GraphRenderConfig>> {
 
 /**
  * Resolve the graph render config from (lowest→highest priority):
- *   active editor theme → ~/.pipelex/pipelex.toml → VS Code settings.
+ *   default `system` mode → ~/.pipelex/pipelex.toml → VS Code settings.
  *
- * The theme follows the editor by default. A `pipelex.toml` `style.theme`, or
- * the `pipelex.graph.theme` setting when pinned to `dark`/`light` (i.e. not
- * `auto`), overrides that. The renderer derives its full palette from this
- * theme — the host must NOT send a `paletteColors` override, or it would shadow
- * the renderer's light/dark palette (see methodGraphPanel.sendGraphspecToWebview).
+ * The theme mode defaults to `'system'`, which follows the active editor via
+ * the injected `systemTheme`. A `pipelex.toml` `style.theme`, or the
+ * `pipelex.graph.theme` setting when pinned to `dark`/`light` (i.e. not
+ * `auto`), pins it instead. The renderer derives its full palette from the
+ * resolved theme — the host must NOT send a `paletteColors` override, or it
+ * would shadow the renderer's light/dark palette (see
+ * methodGraphPanel.sendGraphspecToWebview).
  */
 export async function resolveGraphConfig(): Promise<GraphRenderConfig> {
     const fromToml = await readPipelexToml();
     const merged: GraphRenderConfig = {
         ...DEFAULTS,
-        theme: activeEditorGraphTheme(),
+        theme: 'system',
+        systemTheme: activeEditorGraphTheme(),
         ...fromToml,
     };
 
@@ -95,9 +113,14 @@ export async function resolveGraphConfig(): Promise<GraphRenderConfig> {
     const edgeType = cfg.get<string>('graph.edgeType');
     if (edgeType) merged.edgeType = edgeType;
 
-    // `auto` (the default) keeps the toml/editor-derived theme.
+    // `pipelex.graph.theme`: `auto` follows the editor (`system` mode);
+    // `dark`/`light` pin it. Unset leaves the toml/default mode.
     const theme = cfg.get<string>('graph.theme');
-    if (isGraphTheme(theme)) merged.theme = theme;
+    if (theme === 'auto') {
+        merged.theme = 'system';
+    } else if (isGraphTheme(theme)) {
+        merged.theme = theme;
+    }
 
     return merged;
 }

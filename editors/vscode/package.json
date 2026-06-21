@@ -217,6 +217,14 @@
       {
         "command": "pipelex.clearApiKey",
         "title": "Pipelex: Clear Hosted API Key"
+      },
+      {
+        "command": "pipelex.applyLightSyntaxColors",
+        "title": "Pipelex: Apply Light Theme Colors for MTHDS"
+      },
+      {
+        "command": "pipelex.removeLightSyntaxColors",
+        "title": "Pipelex: Remove Light Theme Colors for MTHDS"
       }
     ],
     "semanticTokenTypes": [
@@ -791,7 +799,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "npm:0.8.0",
+    "@pipelex/mthds-ui": "npm:latest",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",

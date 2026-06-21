@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import type { GraphSpec, GraphConfig } from '@pipelex/mthds-ui';
+import type { GraphSpec, GraphConfig, GraphTheme } from '@pipelex/mthds-ui';
 import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
 
 // VS Code webview API
@@ -24,6 +24,11 @@ let currentGraphspec: GraphSpec | null = null;
 let currentConfig: GraphConfig = {};
 let currentUri: string | null = null;
 let renderApp: (() => void) | null = null;
+
+// The host-injected environment theme for GraphViewer's `system` mode. The
+// webview's own `prefers-color-scheme` is unreliable, so the host detects the
+// VS Code theme and re-sends this on every editor theme switch (setSystemTheme).
+let currentSystemTheme: GraphTheme | undefined;
 
 // Held so we can preserve the viewport across same-file refreshes.
 let reactFlowInstance: any = null;
@@ -50,6 +55,14 @@ function onOpenExternally(url: string, filename?: string) {
 
 function handleMessage(event: { data: any }) {
     const message = event.data;
+    if (message.type === 'setSystemTheme') {
+        // Editor theme switched. Update only the injected environment theme and
+        // re-render — GraphViewer re-resolves `system` while keeping the graph,
+        // viewport, and any manual theme pin intact.
+        currentSystemTheme = message.systemTheme;
+        if (renderApp) renderApp();
+        return;
+    }
     if (message.type === 'setData') {
         // Persist the source file URI so VS Code can restore after reload
         if (message.uri) {
@@ -75,11 +88,15 @@ function handleMessage(event: { data: any }) {
 
         currentGraphspec = message.graphspec || null;
         currentConfig = message.config || {};
+        if (message.config?.systemTheme) {
+            currentSystemTheme = message.config.systemTheme;
+        }
 
         // Theme drives the renderer's palette: GraphViewer applies the full
         // light/dark palette (getPaletteForTheme) as inline styles on its own
-        // container, so the host passes only `config.theme` and never a
-        // `paletteColors` override (which would shadow that palette).
+        // container, so the host passes only `config.theme` (the mode) plus the
+        // injected `systemTheme`, never a `paletteColors` override (which would
+        // shadow that palette).
 
         if (renderApp) renderApp();
 
@@ -119,6 +136,10 @@ function App() {
         key: currentUri ?? 'graphviewer',
         graphspec: currentGraphspec,
         config: currentConfig,
+        // Host-injected environment theme for `system` mode (the webview's own
+        // `prefers-color-scheme` is unreliable). Reactive: a setSystemTheme
+        // re-render flips the `system`-mode palette without remounting.
+        systemTheme: currentSystemTheme,
         onNavigateToPipe,
         onReactFlowInit,
         canEmbedPdf: false,

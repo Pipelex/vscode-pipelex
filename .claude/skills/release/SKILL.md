@@ -101,6 +101,26 @@ The result should look like:
 ## [previous version] - ...
 ```
 
+## Step 5b: Regenerate generated docs
+
+`editors/vscode/CHANGELOG.md` is a **generated** file (it carries a "do not edit directly" banner). It is composed from the root `CHANGELOG.md` plus the upstream Taplo changelog by `scripts/compose-docs.sh`. Nothing in CI runs that script — it only runs via `make docs` — so the generated changelog goes stale unless regenerated here. Now that the root `CHANGELOG.md` is finalized, regenerate it.
+
+**Guard first — the script needs a local `upstream` mirror branch.** `compose-docs.sh` reads the Taplo docs from a branch named `upstream` (`git show upstream:...`). A normal checkout often only has the remote-tracking `origin/upstream`, not a local `upstream` branch. **If the local branch is missing the script silently deletes `docs/upstream/*` and replaces the upstream sections of `README.md`, `CONTRIBUTING.md`, and `editors/vscode/CHANGELOG.md` with a "_(No upstream file present)_" placeholder** — a destructive no-op-looking change. So ensure the mirror exists and is current first:
+
+```bash
+git fetch origin upstream
+git branch -f upstream origin/upstream
+make docs
+```
+
+Then review the result (`git status`, `git diff`). Expected:
+- `editors/vscode/CHANGELOG.md` — now leads with the new `## [X.Y.Z]` section (this is the point of the step).
+- `README.md`, `CONTRIBUTING.md`, `docs/upstream/*` — change **only** if the upstream mirror actually moved; otherwise they stay no-ops.
+
+**Stop and investigate** if any upstream section collapses to "_(No upstream file present)_" — that means the `upstream` ref still wasn't found, and the fetch/branch step above must be fixed before continuing. Do not commit a gutted README/CONTRIBUTING/changelog.
+
+Stage the regenerated files so they ship with the release.
+
 ## Step 6: Validate
 
 Run checks for affected targets:
@@ -118,4 +138,5 @@ Report any failures before proceeding.
 Show the user:
 - All files modified and their old -> new versions
 - The updated changelog section
+- The regenerated docs from Step 5b (`editors/vscode/CHANGELOG.md`, plus any `README.md` / `CONTRIBUTING.md` / `docs/upstream/*` refreshed by `make docs`)
 - Remind them: pushing to `main` triggers CI auto-tagging and release publishing

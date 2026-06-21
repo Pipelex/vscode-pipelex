@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
 import { getOutput } from '../util';
 import { registerApiKeyCommands } from './validation/apiKey';
+import { registerLightSyntaxColors } from './syntax/lightColors';
 
 /**
  * Register all Pipelex-specific features for MTHDS support
@@ -13,6 +14,10 @@ export async function registerPipelexFeatures(context: vscode.ExtensionContext) 
     // Hosted API key commands (SecretStorage). Available in any host — SecretStorage
     // does not depend on child_process, unlike the validator/graph features below.
     registerApiKeyCommands(context);
+
+    // Light-theme MTHDS syntax colors (consent-gated settings write). Host-agnostic:
+    // settings writes work everywhere, no child_process needed.
+    registerLightSyntaxColors(context);
 
     if (semanticTokensEnabled) {
         const provider = new PipelexSemanticTokensProvider();

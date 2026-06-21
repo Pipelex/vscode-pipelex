@@ -10,7 +10,7 @@ import { CliValidationBackend } from '../validation/cliValidationBackend';
 import { SET_API_KEY_COMMAND } from '../validation/apiKey';
 import { findTableHeader } from '../validation/sourceLocator';
 import type { ValidationErrorItem } from '../validation/types';
-import { resolveGraphConfig } from './graphConfig';
+import { resolveGraphConfig, activeEditorGraphTheme } from './graphConfig';
 import { parseGraphspecFile } from './graphspecDetector';
 import { escapeHtml } from '../htmlEscape';
 
@@ -127,6 +127,27 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 }
             })
         );
+
+        this.disposables.push(
+            vscode.window.onDidChangeActiveColorTheme(() => this.onColorThemeChanged())
+        );
+    }
+
+    /**
+     * The VS Code color theme switched. A graph in `'system'` mode (the
+     * default — it follows the editor) must repaint to match; its own
+     * `prefers-color-scheme` is unreliable in the webview, so the host injects
+     * the resolved theme. Only the resolved `systemTheme` changes here (the
+     * mode is unchanged), so re-send just that — cheap, and it leaves the
+     * graphspec/viewport untouched. A manual in-graph theme pin is preserved
+     * because the renderer ignores `systemTheme` unless its mode is `'system'`.
+     */
+    private onColorThemeChanged(): void {
+        if (!this.panel || !this.webviewReady) return;
+        this.panel.webview.postMessage({
+            type: 'setSystemTheme',
+            systemTheme: activeEditorGraphTheme(),
+        });
     }
 
     show(uri: vscode.Uri) {
@@ -565,7 +586,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 // Do NOT send `paletteColors` here — GraphViewer merges it *over*
                 // the theme palette, which would pin node/edge colors to one theme
                 // and break the in-graph light/dark toggle.
+                //
+                // `theme` is the *mode* (`system`/`dark`/`light`). `system` (the
+                // default) follows the editor via the injected `systemTheme`, which
+                // onColorThemeChanged re-sends on every editor theme switch.
                 theme: graphConfig.theme,
+                systemTheme: graphConfig.systemTheme,
             },
         };
 

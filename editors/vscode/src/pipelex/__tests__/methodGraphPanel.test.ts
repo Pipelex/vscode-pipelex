@@ -39,6 +39,7 @@ const mockState = vi.hoisted(() => {
         onSaveHandler: null as ((doc: any) => void) | null,
         onEditorChangeHandler: null as ((editor: any) => void) | null,
         onDocChangeHandler: null as ((event: any) => void) | null,
+        onColorThemeChangeHandler: null as ((theme: any) => void) | null,
     };
 });
 
@@ -98,6 +99,10 @@ vi.mock('vscode', () => ({
         })),
         onDidChangeActiveTextEditor: vi.fn((handler: any) => {
             mockState.onEditorChangeHandler = handler;
+            return { dispose: vi.fn() };
+        }),
+        onDidChangeActiveColorTheme: vi.fn((handler: any) => {
+            mockState.onColorThemeChangeHandler = handler;
             return { dispose: vi.fn() };
         }),
     },
@@ -188,6 +193,7 @@ describe('MethodGraphPanel', () => {
         mockState.onSaveHandler = null;
         mockState.onEditorChangeHandler = null;
         mockState.onDocChangeHandler = null;
+        mockState.onColorThemeChangeHandler = null;
         mockState.configOverrides = {};
         mockState.bundleFiles = [];
         mockState.errorLocations = [];
@@ -256,7 +262,10 @@ describe('MethodGraphPanel', () => {
         const setData = mockState.mockWebview.postMessage.mock.calls
             .map(c => c[0])
             .find((m: any) => m?.type === 'setData');
-        expect(setData.config.theme).toBe('dark'); // follows the (mocked dark) editor
+        // Default mode is `system`, following the (mocked dark) editor via the
+        // injected `systemTheme`.
+        expect(setData.config.theme).toBe('system');
+        expect(setData.config.systemTheme).toBe('dark');
         expect(setData.config).not.toHaveProperty('paletteColors');
         panel.dispose();
     });
@@ -279,7 +288,54 @@ describe('MethodGraphPanel', () => {
         const setData = mockState.mockWebview.postMessage.mock.calls
             .map(c => c[0])
             .find((m: any) => m?.type === 'setData');
-        expect(setData.config.theme).toBe('light');
+        // `system` mode resolves to the (mocked light) editor via `systemTheme`.
+        expect(setData.config.theme).toBe('system');
+        expect(setData.config.systemTheme).toBe('light');
+        panel.dispose();
+    });
+
+    it('re-sends the resolved systemTheme when the editor color theme switches', async () => {
+        const graphspec = { nodes: [], edges: [] };
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ graphspec, pipe_code: 'main' }),
+            stderr: '',
+        };
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+
+        // Complete the handshake so the panel is ready to receive live updates.
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+
+        // The constructor registered a color-theme listener.
+        expect(mockState.onColorThemeChangeHandler).not.toBeNull();
+
+        // Editor switches dark → light; the host re-sends only the resolved
+        // systemTheme so the renderer's `system` mode flips live.
+        mockState.mockWebview.postMessage.mockClear();
+        mockState.activeColorThemeKind = 1; // ColorThemeKind.Light
+        mockState.onColorThemeChangeHandler!({ kind: 1 });
+
+        expect(mockState.mockWebview.postMessage).toHaveBeenCalledWith({
+            type: 'setSystemTheme',
+            systemTheme: 'light',
+        });
+        panel.dispose();
+    });
+
+    it('does not post a theme update when no graph is showing yet (not ready)', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+
+        // No webviewReady handshake → the webview can't receive a live update.
+        mockState.mockWebview.postMessage.mockClear();
+        mockState.activeColorThemeKind = 1;
+        mockState.onColorThemeChangeHandler!({ kind: 1 });
+
+        expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
         panel.dispose();
     });
 
