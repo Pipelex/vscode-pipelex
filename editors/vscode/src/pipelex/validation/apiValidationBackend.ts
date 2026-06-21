@@ -101,6 +101,20 @@ export class ApiValidationBackend implements ValidationBackend {
             this.handleError(err, baseUrl);
         }
 
+        // A 200 must carry a JSON object with `is_valid`. The `mthds` client
+        // JSON.parses the body without shape-validating it, so a `null`/primitive
+        // body slips through as `report` — and reading `report.is_valid` below would
+        // throw a TypeError that escapes `handleError` to the generic error path.
+        // Treat a non-object body as a malformed (no-verdict) response, mirroring the
+        // missing-`validation_errors` contract violation handled further down.
+        if (report === null || typeof report !== 'object') {
+            throw new BackendError({
+                kind: 'api-error',
+                logMessage: `Pipelex API returned a non-object /validate body at ${baseUrl}`,
+                userMessage: apiMalformedBodyMessage(baseUrl),
+            });
+        }
+
         // 200-diagnostic: the verdict is in the body, not the status. An invalid
         // bundle is a produced verdict (`is_valid: false`), not a transport error.
         // (The extension tsconfig is `strict:false`, where boolean-literal
@@ -285,6 +299,18 @@ function apiInvalidContractMessage(baseUrl: string): string {
     return `Pipelex API at ${baseUrl} reported the bundle invalid but returned no error details — ` +
         `the server response is malformed. Retry; if it persists, the pipelex-api server may be out of ` +
         `date, or switch \`pipelex.backend\` to \`cli\`.`;
+}
+
+/**
+ * Guidance for a 200 `/validate` body that is not a JSON object (e.g. literal
+ * `null` or a primitive). The server was reached and returned 200, but the body
+ * is not a verdict at all — a backend/protocol breakdown, surfaced as an api-error
+ * like the missing-`validation_errors` case above.
+ */
+function apiMalformedBodyMessage(baseUrl: string): string {
+    return `Pipelex API at ${baseUrl} returned a malformed validation response (not a JSON verdict) — ` +
+        `retry; if it persists, the pipelex-api server may be out of date, or switch ` +
+        `\`pipelex.backend\` to \`cli\`.`;
 }
 
 /**

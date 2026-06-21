@@ -283,7 +283,7 @@ async function maybePrompt(context: vscode.ExtensionContext): Promise<void> {
 }
 
 /** If colors were applied under an older palette version, refresh them in place. */
-async function refreshIfStale(context: vscode.ExtensionContext): Promise<void> {
+export async function refreshIfStale(context: vscode.ExtensionContext): Promise<void> {
     if (context.globalState.get<string>(CONSENT_KEY) !== 'applied') {
         return;
     }

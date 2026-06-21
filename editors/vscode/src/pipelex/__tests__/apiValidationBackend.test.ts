@@ -174,6 +174,18 @@ describe('ApiValidationBackend', () => {
         expect(err.kind).toBe('api-error');
     });
 
+    it('treats a non-object 200 body (literal null) as an api-error BackendError, not a TypeError', async () => {
+        // The mthds client JSON.parses without shape-validating, so a 200 with body
+        // `null` resolves `report` to null. Reading `report.is_valid` would throw a
+        // TypeError that escapes to the generic error path — guard it as a malformed
+        // (no-verdict) response instead.
+        apiState.validate = async () => null;
+        const err = await analyze(makeBackend()).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        expect(err.logMessage).toMatch(/non-object/);
+    });
+
     it('maps a request-shape 422 (no verdict) to an api-error BackendError', async () => {
         // `/validate` never 422s a content verdict now — a 422 is a request-shape
         // problem (e.g. mthds_sources length mismatch), surfaced as api-error.

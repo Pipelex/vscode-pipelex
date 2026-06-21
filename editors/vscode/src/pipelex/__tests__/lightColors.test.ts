@@ -19,7 +19,7 @@ vi.mock('vscode', () => ({
 
 vi.mock('../../util', () => ({ getOutput: () => ({ appendLine: vi.fn() }) }));
 
-import { applyLightColors, removeLightColors } from '../syntax/lightColors';
+import { applyLightColors, removeLightColors, refreshIfStale } from '../syntax/lightColors';
 
 function makeContext() {
     const gs = new Map<string, any>();
@@ -122,6 +122,48 @@ describe('lightColors apply/remove', () => {
 
         // Only our stamped rules are stripped; the user's same-scope rule remains.
         expect(state.stored['[*Light*]'].textMateRules).toEqual([userRule]);
+    });
+
+    it('refreshIfStale rewrites the block and advances appliedVersion when applied under an older palette', async () => {
+        const { context, gs } = makeContext();
+        // Simulate a prior apply under an older palette version.
+        gs.set('pipelex.syntaxColors.lightConsent', 'applied');
+        gs.set('pipelex.syntaxColors.appliedVersion', 1);
+        state.stored = undefined;
+
+        await refreshIfStale(context);
+
+        // The managed block was re-applied in place.
+        expect(hasScope(managedRules(), 'entity.name.tag.pipe.mthds')).toBe(true);
+        // appliedVersion advanced off the stale value to the current palette version.
+        const advanced = gs.get('pipelex.syntaxColors.appliedVersion');
+        expect(typeof advanced).toBe('number');
+        expect(advanced).not.toBe(1);
+    });
+
+    it('refreshIfStale leaves settings untouched when consent was never given', async () => {
+        const { context, gs } = makeContext();
+        // No consent recorded (and a stale version that would otherwise trigger a refresh).
+        gs.set('pipelex.syntaxColors.appliedVersion', 1);
+        state.stored = undefined;
+
+        await refreshIfStale(context);
+
+        // A declined/never-applied user must not get their settings written.
+        expect(state.stored).toBeUndefined();
+        expect(gs.get('pipelex.syntaxColors.appliedVersion')).toBe(1);
+    });
+
+    it('refreshIfStale is a no-op when already on the current palette version', async () => {
+        const { context } = makeContext();
+        // applyLightColors stamps the current version; a refresh must then not rewrite.
+        await applyLightColors(context);
+        state.stored = { marker: true } as any;
+
+        await refreshIfStale(context);
+
+        // Untouched — the version gate short-circuits before re-applying.
+        expect(state.stored).toEqual({ marker: true });
     });
 
     it('keeps a user-authored nameless rule on a managed scope across a palette refresh', async () => {
