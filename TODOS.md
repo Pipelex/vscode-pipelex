@@ -77,7 +77,7 @@ These five flags surface **no** errors in our code. Land them together.
 
 This flag finds the two genuine latent null-safety bugs in production code (`server.ts`) plus one test-only mock typing. Fix all three, then enable.
 
-- [ ] **`src/server.ts:21`** — filter out undefined env values so the entries match `[string, string][]`:
+- [x] **`src/server.ts:21`** — filter out undefined env values so the entries match `[string, string][]`:
   ```ts
   envVars: () =>
     Object.entries(process.env).filter(
@@ -85,20 +85,20 @@ This flag finds the two genuine latent null-safety bugs in production code (`ser
     ),
   ```
   *(Why real: `process.env` is `Record<string, string | undefined>`; an unset var would otherwise flow through as `undefined`.)*
-- [ ] **`src/server.ts:81`** — `process.send` only exists when the process was forked with an IPC channel, so it is typed `| undefined`. Use an optional call (behavior-preserving — this worker is always forked with IPC, so it never actually no-ops):
+- [x] **`src/server.ts:81`** — `process.send` only exists when the process was forked with an IPC channel, so it is typed `| undefined`. Use an optional call (behavior-preserving — this worker is always forked with IPC, so it never actually no-ops):
   ```ts
   onMessage(message) {
     process.send?.(message);
   },
   ```
-- [ ] **`src/pipelex/__tests__/validation.test.ts:239`** — the `which.sync` overload TS resolves here returns `string`; the mock returns `null` to simulate "not found". Cast in the test (mirrors the real `{ nothrow: true }` runtime which can return `null`):
+- [x] **`src/pipelex/__tests__/validation.test.ts:239`** — the `which.sync` overload TS resolves here returns `string`; the mock returns `null` to simulate "not found". Cast in the test (mirrors the real `{ nothrow: true }` runtime which can return `null`):
   ```ts
   vi.mocked(which.sync).mockReturnValue(null as unknown as string);
   ```
-- [ ] Add `"strictNullChecks": true,` to `tsconfig.typecheck.json` `compilerOptions`.
-- [ ] `cd editors/vscode && yarn typecheck` → exit 0. Re-run and fix any **residual** SNC errors not in the list above (treat exit 0 as the bar, not "fixed the three").
-- [ ] `cd editors/vscode && yarn test` → still green (confirms the `server.ts` and test edits didn't change behavior).
-- [ ] Commit: `fix(typecheck): satisfy strictNullChecks (guard env entries + process.send)`.
+- [x] Add `"strictNullChecks": true,` to `tsconfig.typecheck.json` `compilerOptions`.
+- [x] `cd editors/vscode && yarn typecheck` → exit 0. Re-run and fix any **residual** SNC errors not in the list above (treat exit 0 as the bar, not "fixed the three"). *(measured: exactly the three documented errors, no residuals)*
+- [x] `cd editors/vscode && yarn test` → still green (confirms the `server.ts` and test edits didn't change behavior). *(all tests pass)*
+- [x] Commit: `fix(typecheck): satisfy strictNullChecks (guard env entries + process.send)`.
 
 ---
 

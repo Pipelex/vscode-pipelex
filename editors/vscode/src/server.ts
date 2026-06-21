@@ -18,7 +18,10 @@ process.on("message", async (d: RpcMessage) => {
       {
         cwd: () => process.cwd(),
         envVar: name => process.env[name],
-        envVars: () => Object.entries(process.env),
+        envVars: () =>
+          Object.entries(process.env).filter(
+            (entry): entry is [string, string] => entry[1] !== undefined,
+          ),
         findConfigFile: from => {
           const projectNames = [".pipelex/plxt.toml", "plxt.toml"];
           const taploNames = [".taplo.toml", "taplo.toml"];
@@ -78,7 +81,7 @@ process.on("message", async (d: RpcMessage) => {
       },
       {
         onMessage(message) {
-          process.send(message);
+          process.send?.(message);
         },
       }
     );
