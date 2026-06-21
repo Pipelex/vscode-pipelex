@@ -67,7 +67,10 @@ vi.mock('vscode', () => ({
     ColorThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },
     workspace: {
         get textDocuments() { return mockState.openTextDocuments; },
-        getConfiguration: () => ({ get: (key: string, def: any) => mockState.configOverrides[key] ?? def }),
+        getConfiguration: () => ({
+            get: (key: string, def: any) => mockState.configOverrides[key] ?? def,
+            inspect: (key: string) => ({ globalValue: mockState.configOverrides[key] }),
+        }),
         onDidChangeTextDocument: vi.fn((handler: any) => {
             mockState.onDocChangeHandler = handler;
             return { dispose: vi.fn() };

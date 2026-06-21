@@ -99,4 +99,48 @@ describe('lightColors apply/remove', () => {
         expect(rules).toEqual([{ scope: 'keyword', settings: { foreground: '#123123' } }]);
         expect(hasScope(rules, 'entity.name.tag.pipe.mthds')).toBe(false);
     });
+
+    it('preserves a user rule that targets a managed scope (no sentinel name) on apply', async () => {
+        const userRule = { scope: 'entity.name.tag.pipe.mthds', settings: { foreground: '#ababab' } };
+        state.stored = { '[*Light*]': { textMateRules: [userRule] } };
+        const { context } = makeContext();
+        await applyLightColors(context);
+
+        const rules = managedRules();
+        // The user's own customization survives untouched (no sentinel name).
+        expect(rules).toContainEqual(userRule);
+        // Our managed rule for the same scope is also present, stamped with the sentinel.
+        expect(rules.some(r => r.scope === 'entity.name.tag.pipe.mthds' && r.name === 'pipelex.mthds.light')).toBe(true);
+    });
+
+    it('does not delete a user rule on a managed scope when removing', async () => {
+        const userRule = { scope: 'entity.name.tag.pipe.mthds', settings: { foreground: '#ababab' } };
+        state.stored = { '[*Light*]': { textMateRules: [userRule] } };
+        const { context } = makeContext();
+        await applyLightColors(context);
+        await removeLightColors();
+
+        // Only our stamped rules are stripped; the user's same-scope rule remains.
+        expect(state.stored['[*Light*]'].textMateRules).toEqual([userRule]);
+    });
+
+    it('migrates legacy nameless managed rules without duplicating', async () => {
+        // A block written by a pre-name palette version: managed scopes, no sentinel.
+        state.stored = {
+            '[*Light*]': {
+                textMateRules: [
+                    { scope: 'entity.name.tag.pipe.mthds', settings: { foreground: '#D32F2F', fontStyle: 'bold' } },
+                    { scope: 'entity.name.type.concept.mthds', settings: { foreground: '#0F766E', fontStyle: 'bold' } },
+                ],
+            },
+        };
+        const { context } = makeContext();
+        await applyLightColors(context, { migrateLegacy: true });
+
+        const rules = managedRules();
+        // Every rule now carries the sentinel — no nameless legacy leftovers.
+        expect(rules.every(r => r.name === 'pipelex.mthds.light')).toBe(true);
+        // The migrated scope is present exactly once, not duplicated.
+        expect(rules.filter(r => r.scope === 'entity.name.tag.pipe.mthds').length).toBe(1);
+    });
 });

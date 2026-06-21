@@ -22,7 +22,7 @@ import { getOutput } from '../../util';
  */
 
 /** Bump when LIGHT_RULES changes so an already-applied block refreshes on update. */
-const PALETTE_VERSION = 2;
+const PALETTE_VERSION = 3;
 
 /** globalState key: `'applied' | 'declined'`; absent = not yet decided. */
 const CONSENT_KEY = 'pipelex.syntaxColors.lightConsent';
@@ -38,7 +38,16 @@ const TOKEN_COLORS_KEY = 'tokenColorCustomizations';
 /** VS Code wildcard theme-name key matching every theme whose label contains "Light". */
 const LIGHT_THEME_KEY = '[*Light*]';
 
+/**
+ * Sentinel stamped on the `name` of every rule we write, so apply/remove can
+ * identify *exactly* the rules this extension authored — never one the user
+ * wrote that merely happens to target the same MTHDS scope. `name` is a valid
+ * key in VS Code's `textMateRules` schema.
+ */
+const MANAGED_RULE_NAME = 'pipelex.mthds.light';
+
 interface TextMateRule {
+    name?: string;
     scope: string | string[];
     settings: { foreground?: string; fontStyle?: string };
 }
@@ -153,17 +162,35 @@ const LIGHT_RULES: readonly TextMateRule[] = [
     },
 ];
 
-/** Every individual scope string our rules manage — used to identify our rules on merge/remove. */
+/** The rules we actually write, each stamped with {@link MANAGED_RULE_NAME}. */
+const MANAGED_LIGHT_RULES: readonly TextMateRule[] = LIGHT_RULES.map(rule => ({ name: MANAGED_RULE_NAME, ...rule }));
+
+/** Every individual scope string our rules manage — used only for the one-time legacy migration. */
 const MANAGED_SCOPES: ReadonlySet<string> = new Set(
     LIGHT_RULES.flatMap(rule => (Array.isArray(rule.scope) ? rule.scope : [rule.scope]))
 );
 
 /**
- * A rule counts as "ours" when every scope it carries is one we manage. This lets
- * apply/remove replace our rules without disturbing any rule the user authored —
- * even one that happens to touch a `.mthds` scope alongside others.
+ * A rule counts as "ours" only when it carries our sentinel {@link MANAGED_RULE_NAME}.
+ * Identifying rules by an explicit stamp — rather than by scope membership — means
+ * apply/remove never touch a rule the user authored, even one targeting the exact
+ * same `.mthds` scope as one of ours.
  */
 function isManagedRule(rule: TextMateRule): boolean {
+    return rule.name === MANAGED_RULE_NAME;
+}
+
+/**
+ * A rule written by a pre-name palette version (no sentinel, all scopes managed).
+ * Used ONLY by the gated migration sweep in {@link refreshIfStale} — never on the
+ * new-user apply/remove path — so it can clean up our own legacy blocks without
+ * risking a user-authored rule. Safe there because that sweep only fires when
+ * CONSENT_KEY === 'applied', i.e. we are the ones who wrote the block.
+ */
+function isLegacyManagedRule(rule: TextMateRule): boolean {
+    if (rule.name !== undefined) {
+        return false;
+    }
     const scopes = Array.isArray(rule.scope) ? rule.scope : [rule.scope];
     return scopes.length > 0 && scopes.every(scope => MANAGED_SCOPES.has(scope));
 }
@@ -198,13 +225,22 @@ async function writeGlobalTokenColors(next: TokenColorCustomizations): Promise<v
         .update(TOKEN_COLORS_KEY, value, vscode.ConfigurationTarget.Global);
 }
 
-/** Merge our managed light rules into `[*Light*]`, preserving any rules the user authored. */
-export async function applyLightColors(context: vscode.ExtensionContext): Promise<void> {
+/**
+ * Merge our managed light rules into `[*Light*]`, preserving any rules the user
+ * authored. With `migrateLegacy`, also strips pre-name managed rules — only safe
+ * on the {@link refreshIfStale} path, where the block is known to be ours.
+ */
+export async function applyLightColors(
+    context: vscode.ExtensionContext,
+    opts: { migrateLegacy?: boolean } = {},
+): Promise<void> {
     const next = readGlobalTokenColors();
     const existingLight = (next[LIGHT_THEME_KEY] as ThemeTokenColors | undefined) ?? {};
     const existingRules = Array.isArray(existingLight.textMateRules) ? existingLight.textMateRules : [];
-    const preserved = existingRules.filter(rule => !isManagedRule(rule));
-    next[LIGHT_THEME_KEY] = { ...existingLight, textMateRules: [...preserved, ...LIGHT_RULES] };
+    const preserved = existingRules.filter(
+        rule => !isManagedRule(rule) && !(opts.migrateLegacy === true && isLegacyManagedRule(rule)),
+    );
+    next[LIGHT_THEME_KEY] = { ...existingLight, textMateRules: [...preserved, ...MANAGED_LIGHT_RULES] };
 
     await writeGlobalTokenColors(next);
     await context.globalState.update(CONSENT_KEY, 'applied');
@@ -279,7 +315,9 @@ async function refreshIfStale(context: vscode.ExtensionContext): Promise<void> {
         return;
     }
     try {
-        await applyLightColors(context);
+        // The block here is ours (consent === 'applied'), so it's safe to also
+        // sweep pre-name managed rules left by an older palette version.
+        await applyLightColors(context, { migrateLegacy: true });
     } catch (err) {
         getOutput().appendLine(`Pipelex: light-color refresh failed: ${String((err as Error)?.message ?? err)}`);
     }

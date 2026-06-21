@@ -114,8 +114,11 @@ export async function resolveGraphConfig(): Promise<GraphRenderConfig> {
     if (edgeType) merged.edgeType = edgeType;
 
     // `pipelex.graph.theme`: `auto` follows the editor (`system` mode);
-    // `dark`/`light` pin it. Unset leaves the toml/default mode.
-    const theme = cfg.get<string>('graph.theme');
+    // `dark`/`light` pin it. Inspect rather than `get` so the contributed
+    // `auto` default does NOT clobber a `pipelex.toml` `style.theme` pin —
+    // only an *explicitly set* value (user/workspace/folder) overrides the toml.
+    const themeInspect = cfg.inspect<string>('graph.theme');
+    const theme = themeInspect?.workspaceFolderValue ?? themeInspect?.workspaceValue ?? themeInspect?.globalValue;
     if (theme === 'auto') {
         merged.theme = 'system';
     } else if (isGraphTheme(theme)) {
