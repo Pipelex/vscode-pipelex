@@ -116,14 +116,15 @@ Depends on `strictNullChecks` (TS refuses it otherwise — that's why it follows
 
 After Phase 2, the only remaining implicit-`any` errors are the two missing React type packages used by the webview adapter (`adapter.ts` uses `React.createElement`, **not** JSX, so **no `jsx` tsconfig option is needed**).
 
-- [ ] Install the React types matching the installed runtime (react / react-dom are `19.2.4`):
+- [x] Install the React types matching the installed runtime (react / react-dom are `19.2.4`):
   ```bash
   cd editors/vscode && yarn add -D @types/react@^19 @types/react-dom@^19
   ```
-- [ ] Add `"noImplicitAny": true,` to `tsconfig.typecheck.json` `compilerOptions`.
-- [ ] `cd editors/vscode && yarn typecheck` → exit 0. **Watch-item:** once `@types/react` resolves, `React.createElement(GraphViewer, {…})` in `adapter.ts:157` becomes type-checked against `GraphViewer`'s real props (`@pipelex/mthds-ui`); a prop mismatch could newly surface. If so, fix the prop shape at the call site — do not loosen with `any`. Re-run until exit 0.
-- [ ] `cd editors/vscode && yarn test` → still green.
-- [ ] Commit: `feat(typecheck): enable noImplicitAny (+ @types/react, @types/react-dom)`.
+  *(installed: `@types/react@19.2.17`, `@types/react-dom@19.2.3`)*
+- [x] Add `"noImplicitAny": true,` to `tsconfig.typecheck.json` `compilerOptions`.
+- [x] `cd editors/vscode && yarn typecheck` → exit 0. **Watch-item:** once `@types/react` resolves, `React.createElement(GraphViewer, {…})` in `adapter.ts:157` becomes type-checked against `GraphViewer`'s real props (`@pipelex/mthds-ui`); a prop mismatch could newly surface. If so, fix the prop shape at the call site — do not loosen with `any`. Re-run until exit 0. *(no prop mismatch surfaced; exit 0)*
+- [x] `cd editors/vscode && yarn test` → still green. *(all tests pass)*
+- [x] Commit: `feat(typecheck): enable noImplicitAny (+ @types/react, @types/react-dom)`.
 
 ---
 
