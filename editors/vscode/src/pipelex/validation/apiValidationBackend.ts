@@ -71,11 +71,17 @@ export class ApiValidationBackend implements ValidationBackend {
             }
         }
 
-        // Best-effort, warn-once version gate (never blocks). Bounded by the same
-        // abort signal and per-analysis timeout as validate() below, so a hung
-        // /version cannot delay a save past the configured timeout, and a superseded
-        // save abandons the probe immediately.
-        await this.deps.versionGate.ensureCapable(client, baseUrl, signal, request.timeout);
+        // Best-effort, warn-once version gate (never blocks, never throws). Fire it
+        // CONCURRENTLY with validate() instead of awaiting it first: serialized, a hung
+        // /version would add a full timeout on TOP of validate()'s own, so one save could
+        // take up to 2× `pipelex.validation.timeout`. Running them together caps the wait
+        // at a single timeout. The probe still carries the same signal/timeout (a
+        // superseded save abandons it) and `ensureCapable` swallows every fault internally.
+        void this.deps.versionGate.ensureCapable(client, baseUrl, signal, request.timeout);
+        // Abort BEFORE initiating validate(): the consent modal / token resolution above
+        // were awaited, so the save may have been superseded meanwhile. `client.validate()`
+        // is evaluated eagerly (it initiates the request) before `runWithAbort` wraps it,
+        // so without this guard a stale save would still ship the bundle to the remote.
         if (signal.aborted) {
             throw new AnalyzeAbortError();
         }

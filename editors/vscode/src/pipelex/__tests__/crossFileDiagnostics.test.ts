@@ -26,7 +26,7 @@ vi.mock('vscode', () => {
 });
 
 import * as vscode from 'vscode';
-import { buildBundleDiagnostics } from '../validation/crossFileDiagnostics';
+import { buildBundleDiagnostics, resolveErrorLocations } from '../validation/crossFileDiagnostics';
 import type { BundleFile } from '../validation/backend';
 import type { ValidationErrorItem } from '../validation/types';
 
@@ -104,5 +104,100 @@ describe('buildBundleDiagnostics — owner resolution', () => {
         // [pipe.helper] is on line index 3 of the sibling file.
         const result = build([{ category: 'pipe_validation', message: 'bad', source: 'concepts.mthds', pipe_code: 'helper' }]);
         expect(result[0].diagnostics[0].range.start.line).toBe(3);
+    });
+});
+
+describe('resolveErrorLocations — owner + range, order-preserving', () => {
+    function resolve(errors: ValidationErrorItem[], primaryDocument?: any) {
+        return resolveErrorLocations({
+            errors,
+            files: [PRIMARY, SIBLING],
+            primaryUri: PRIMARY.uri as any,
+            primaryDocument,
+        });
+    }
+
+    it('preserves input order across mixed owners', () => {
+        const result = resolve([
+            { category: 'pipe_validation', message: 'first (primary)', source: 'main.mthds' },
+            { category: 'pipe_validation', message: 'second (sibling)', source: 'concepts.mthds' },
+            { category: 'pipe_validation', message: 'third (primary)', source: 'main.mthds' },
+        ]);
+        expect(result.map(r => r.error.message)).toEqual(['first (primary)', 'second (sibling)', 'third (primary)']);
+        expect(result.map(r => r.uri.toString())).toEqual([
+            PRIMARY.uri.toString(),
+            SIBLING.uri.toString(),
+            PRIMARY.uri.toString(),
+        ]);
+    });
+
+    it('places a `source`-owned error on the named file', () => {
+        const [loc] = resolve([{ category: 'pipe_validation', message: 'x', source: 'concepts.mthds' }]);
+        expect(loc.uri.toString()).toBe(SIBLING.uri.toString());
+    });
+
+    it('places a pipe-code-owned error (no source) on the declaring file', () => {
+        const [loc] = resolve([{ category: 'pipe_factory', message: 'x', pipe_code: 'helper' }]);
+        expect(loc.uri.toString()).toBe(SIBLING.uri.toString());
+    });
+
+    it('places a concept-code-owned error (no source) on the declaring file', () => {
+        const [loc] = resolve([{ category: 'pipe_factory', message: 'x', concept_code: 'Foo' }]);
+        expect(loc.uri.toString()).toBe(SIBLING.uri.toString());
+    });
+
+    it('falls back to the primary file when nothing resolves, at range line 0', () => {
+        const [loc] = resolve([{ category: 'blueprint_validation', message: 'mystery' }]);
+        expect(loc.uri.toString()).toBe(PRIMARY.uri.toString());
+        expect(loc.range.start.line).toBe(0);
+    });
+
+    it('ranges a sibling-owned error from its on-disk lines (no open document)', () => {
+        // [pipe.helper] is at line index 3 of the sibling.
+        const [loc] = resolve([{ category: 'pipe_validation', message: 'x', source: 'concepts.mthds', pipe_code: 'helper' }]);
+        expect(loc.uri.toString()).toBe(SIBLING.uri.toString());
+        expect(loc.range.start.line).toBe(3);
+    });
+
+    it('routes a POSIX-relative `source` onto a backslash (Windows) fsPath', () => {
+        // The backend can report a POSIX-style relative source (`subdir/concepts.mthds`)
+        // even on Windows, where fsPath uses `\`. The sibling's `name` is the bare
+        // basename, so only the segment-boundary suffix check can match it — and only
+        // after both sides are normalized to `/`. Pre-fix this misrouted to the primary.
+        const winFile = (fsPath: string, name: string, content: string): BundleFile =>
+            ({ uri: { fsPath, scheme: 'file', toString: () => `file://${fsPath}` } as any, name, content });
+        const winPrimary = winFile('C:\\project\\methods\\main.mthds', 'main.mthds', 'domain = "d"\n');
+        const winSibling = winFile(
+            'C:\\project\\methods\\subdir\\concepts.mthds',
+            'concepts.mthds',
+            'domain = "d"\n[concept.Foo]\ndescription = "a foo"\n',
+        );
+        const [loc] = resolveErrorLocations({
+            errors: [{ category: 'concept_validation', message: 'bad Foo', source: 'subdir/concepts.mthds' }],
+            files: [winPrimary, winSibling],
+            primaryUri: winPrimary.uri as any,
+        });
+        expect(loc.uri.toString()).toBe(winSibling.uri.toString());
+    });
+
+    it('ranges a primary-owned error from the OPEN document, not the on-disk text', () => {
+        // [pipe.main_pipe] is at line index 1 of the primary. The open document
+        // returns a sentinel range end (999) the on-disk path would never produce,
+        // proving locateError(document) — not locateErrorInLines — supplied the range.
+        const lines = (PRIMARY.content as string).split('\n');
+        const primaryDocument = {
+            lineCount: lines.length,
+            lineAt: (i: number) => ({
+                text: lines[i] ?? '',
+                range: new (vscode as any).Range(i, 0, i, 999),
+            }),
+        };
+        const [loc] = resolve(
+            [{ category: 'pipe_validation', message: 'x', pipe_code: 'main_pipe' }],
+            primaryDocument,
+        );
+        expect(loc.uri.toString()).toBe(PRIMARY.uri.toString());
+        expect(loc.range.start.line).toBe(1);
+        expect(loc.range.end.character).toBe(999);
     });
 });

@@ -3,8 +3,6 @@
     "activityBar.background": "#0a1a14",
     "activityBar.foreground": "#00e676",
     "activityBar.inactiveForeground": "#00a85480",
-    "editor.background": "#0d1f18",
-    "editor.foreground": "#e2e8f0",
     "sideBar.background": "#0a1a14",
     "sideBar.foreground": "#94a3b8",
     "titleBar.activeBackground": "#006633",

@@ -1,6 +1,6 @@
 [package]
 name         = "pipelex-lsp"
-description  = "Pipelex Language Server (wraps taplo-lsp with MTHDS support)"
+description  = "Pipelex Language Server for MTHDS"
 version      = "0.1.0"
 rust-version = { workspace = true }
 authors      = { workspace = true }

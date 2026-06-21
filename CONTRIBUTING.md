@@ -5,15 +5,15 @@
 
 Please read the upstream Taplo guidelines below. Here are the key differences for this fork:
 
-## PLX-specific contributions
-- **PLX grammar/schemas**: Located in `editors/vscode/src/pipelex/` - PRs welcome
-- **Language features**: Semantic tokens, syntax highlighting for PLX constructs
-- **VS Code integration**: PLX-specific commands and configuration
+## MTHDS-specific contributions
+- **MTHDS grammar/schemas**: Located in `editors/vscode/src/pipelex/` - PRs welcome
+- **Language features**: Semantic tokens, syntax highlighting for MTHDS constructs
+- **VS Code integration**: MTHDS-specific commands and configuration
 
 ## Contribution workflow
 1. **For Taplo core/editor behavior**: Consider contributing to [upstream Taplo](https://github.com/tamasfe/taplo) first
-2. **For PLX-specific features**: Contribute directly to this repository
-3. **For bugs**: Check if it's Taplo-related (upstream) or PLX-specific (here)
+2. **For MTHDS-specific features**: Contribute directly to this repository
+3. **For bugs**: Check if it's Taplo-related (upstream) or MTHDS-specific (here)
 
 ## Development setup
 ```bash

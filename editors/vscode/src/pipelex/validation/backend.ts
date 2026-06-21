@@ -80,7 +80,12 @@ export interface ValidationBackend {
  */
 export interface GraphAnalysisSink {
     isShowingMthds(uri: vscode.Uri): boolean;
-    applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): void;
+    /**
+     * Render the analysis. May resolve asynchronously (the invalid-bundle branch
+     * reads sibling files to build a clickable, owner-attributed error list);
+     * callers that only need the diagnostics published can fire-and-forget it.
+     */
+    applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): void | Promise<void>;
     /**
      * The on-save analysis threw (backend / transport error). The panel renders
      * the failure instead of keeping the previous (now stale) graph. A no-op when

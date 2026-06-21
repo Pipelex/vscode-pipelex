@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -36,7 +36,6 @@
   "keywords": [
     "pipelex",
     "mthds",
-    "plx",
     "dsl",
     "toml",
     "syntax",
@@ -115,12 +114,10 @@
         "id": "mthds",
         "aliases": [
           "MTHDS",
-          "Pipelex Language",
-          "PLX"
+          "MTHDS Language"
         ],
         "extensions": [
-          ".mthds",
-          ".plx"
+          ".mthds"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -220,6 +217,14 @@
       {
         "command": "pipelex.clearApiKey",
         "title": "Pipelex: Clear Hosted API Key"
+      },
+      {
+        "command": "pipelex.applyLightSyntaxColors",
+        "title": "Pipelex: Apply Light Theme Colors for MTHDS"
+      },
+      {
+        "command": "pipelex.removeLightSyntaxColors",
+        "title": "Pipelex: Remove Light Theme Colors for MTHDS"
       }
     ],
     "semanticTokenTypes": [
@@ -604,18 +609,21 @@
           "scope": "resource",
           "description": "Edge curve type for the graph renderer. Overrides pipelex.toml."
         },
-        "pipelex.graph.palette": {
+        "pipelex.graph.theme": {
           "type": "string",
           "enum": [
-            "dracula",
-            "yellow_blue"
+            "auto",
+            "dark",
+            "light"
           ],
           "enumDescriptions": [
-            "Vibrant dark palette with salmon pipes, teal data, lemon edges",
-            "Classic blue pipes and amber data"
+            "Match the active VS Code color theme (default)",
+            "Always render the graph with the dark palette",
+            "Always render the graph with the light palette"
           ],
           "scope": "resource",
-          "description": "Color palette for the graph renderer. Overrides pipelex.toml."
+          "default": "auto",
+          "description": "Color theme for the method graph renderer. 'auto' follows the editor's color theme. Overrides pipelex.toml."
         },
         "pipelex.graph.direction": {
           "description": "Layout direction for the method graph.",
@@ -791,7 +799,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "npm:0.6.5",
+    "@pipelex/mthds-ui": "npm:0.9.0",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",

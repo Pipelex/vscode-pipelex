@@ -3,8 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { BundleFile } from './backend';
 
-/** Extensions the CLI treats as bundle files. `.plx` is the deprecated alias. */
-const MTHDS_GLOB = /\.(mthds|plx)$/i;
+/** The extension the CLI treats as a bundle file. */
+const MTHDS_GLOB = /\.mthds$/i;
 
 /**
  * Gather every `.mthds` file in the saved file's directory, mirroring the CLI's
