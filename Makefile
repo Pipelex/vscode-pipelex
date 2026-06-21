@@ -23,7 +23,7 @@ PYTHON_VERSION    ?= 3.13
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s update-schema up
-.PHONY: build cli pipelex-tools pipelex-lib env lock ext ext-deps lsp-types ext-install ext-uninstall vsix clean test check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
+.PHONY: build cli pipelex-tools pipelex-lib pipelex-lib-smoke env lock ext ext-deps lsp-types ext-install ext-uninstall vsix clean test check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
 .PHONY: use-local use-npm ul un
 
 help: ## Show this help
@@ -54,6 +54,9 @@ pipelex-tools: env ## Build and install the pipelex-tools CLI wheel (native plxt
 
 pipelex-lib: env ## Build and install the pipelex-tools-lib Python library (import pipelex_tools, dev)
 	@. "$(VIRTUAL_ENV)/bin/activate" && cd crates/pipelex-py && maturin develop --release
+
+pipelex-lib-smoke: pipelex-lib ## Build the library wheel (dev) and run the Python import smoke test
+	@. "$(VIRTUAL_ENV)/bin/activate" && cd crates/pipelex-py && python -m unittest discover -s tests -p 'test_*.py'
 
 lock: ## Update Cargo.lock after version bumps
 	cargo update --workspace
@@ -106,6 +109,9 @@ fmt-check: ## Check Rust and TOML/MTHDS formatting
 
 lint: ## Run Clippy on the workspace
 	cargo clippy --workspace --all-targets -- -D warnings
+	# The PyO3 glue in pipelex-py is `#[cfg(feature = "python")]`-gated, so the
+	# workspace clippy above (feature off) never sees it. Lint it feature-on too.
+	cargo clippy -p pipelex-py --features python --all-targets -- -D warnings
 
 plxt-lint: ## Lint TOML/MTHDS files with plxt
 	cargo run --bin plxt -- lint
@@ -128,6 +134,9 @@ setup-hooks: ## Configure git to use .githooks/ for hooks
 check: check-no-local-deps fmt-check lint test ## Full quality gate (format + lint + test + compilation)
 	cargo check -p pipelex-cli --locked
 	cargo check -p pipelex-py --locked
+	# Compile the PyO3 bindings too — `src/python.rs` is feature-gated and is
+	# otherwise only ever built at `maturin develop` time, outside the gate.
+	cargo check -p pipelex-py --features python --locked
 	cargo check -p pipelex-wasm --target wasm32-unknown-unknown --locked
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
