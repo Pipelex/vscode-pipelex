@@ -74,7 +74,8 @@ jobs:
         # The workspace clippy above builds pipelex-py with the `python` feature
         # OFF, so the PyO3 glue in src/python.rs is gated out and never linted.
         # Compile it feature-on here so the bindings face the same -D warnings gate.
-        run: cargo clippy -p pipelex-py --features python --all-targets -- -D warnings
+        # `--locked` mirrors `make check`, pinning the pyo3/pythonize subgraph.
+        run: cargo clippy -p pipelex-py --features python --locked --all-targets -- -D warnings
 
   test:
     name: Test on Rust stable
@@ -86,9 +87,11 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Test Rust crates
         # Mirror the `make test` crate set so CI and the local gate stay at parity.
-        # pipelex-py is tested feature-off here (its PyO3 glue is exercised
-        # end-to-end by the test-python-bindings job); the import smoke test there
-        # covers the feature-on path.
+        # pipelex-py is compiled feature-off here (it has no Rust tests yet, and
+        # mod python is gated out); its PyO3 glue is exercised end-to-end by the
+        # test-python-bindings job's import smoke test. NOTE: a future Rust test
+        # under #[cfg(feature = "python")] would NOT run here — add --features
+        # python (and a libpython) if/when such a test is introduced.
         run: cargo test -p taplo -p taplo-lsp -p pipelex-common -p pipelex-cli -p pipelex-py
       - name: Check formatting regression
         run: cargo run --bin plxt -- fmt --check
@@ -129,20 +132,28 @@ jobs:
       - name: Install latest Rust toolchain
         run: rustup update --no-self-update
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Install Python
+        # Pin the interpreter (matches the Makefile's PYTHON_VERSION) so this
+        # e2e guard doesn't break when ubuntu-latest bumps its default python3
+        # outside the wheel's requires-python range.
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
       - name: Build the wheel, install it, and run the import smoke test
         # End-to-end against the shipped artifact: build the actual
         # `pipelex-tools-lib` wheel with maturin (which turns on the `python`
         # feature via [tool.maturin] features), install it, and import the
         # `pipelex_tools` module. This is the only check that catches a
         # `[lib] name` / `#[pymodule]` / `PyInit_` symbol mismatch — a desync
-        # builds a valid wheel but fails at import. python3 is preinstalled on
-        # the runner; maturin comes from pip, so no new GitHub Action is added.
+        # builds a valid wheel but fails at import.
+        #   --release: import-test the same profile that ships to PyPI.
+        #   --locked:  build against the committed Cargo.lock, like `make check`.
         working-directory: crates/pipelex-py
         run: |
-          python3 -m venv .venv
+          python -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip maturin
-          maturin build --out dist
+          maturin build --release --locked --out dist
           pip install --no-index --find-links dist pipelex-tools-lib
           python -m unittest discover -s tests -p 'test_*.py'
 
