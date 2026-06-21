@@ -66,5 +66,13 @@ optional  = true
 name = "plxt"
 path = "bin/plxt.rs"
 
+[dev-dependencies]
+# Parity tests (tests/parity.rs) compare the in-process `pipelex_tools` library
+# against the shipped `plxt` binary. They live here — not in `pipelex-py` —
+# because only the bin-owning crate gets `CARGO_BIN_EXE_plxt`. The `python`
+# feature stays OFF, so this dev-dep is pure Rust (no PyO3) and never reaches the
+# `plxt` binary (dev-dependencies are compiled only for test/bench targets).
+pipelex-py = { path = "../pipelex-py" }
+
 [lints]
 workspace = true

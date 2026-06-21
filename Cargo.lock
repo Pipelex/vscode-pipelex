@@ -1591,6 +1591,7 @@ dependencies = [
  "clap_complete",
  "lsp-async-stub",
  "pipelex-common",
+ "pipelex-py",
  "reqwest",
  "taplo-cli",
  "taplo-common",

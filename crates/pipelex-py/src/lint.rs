@@ -105,8 +105,16 @@ pub fn lint_mthds_impl(content: &str) -> Result<Vec<Diagnostic>, anyhow::Error> 
                 .map(|r| Range::from_text_range(content, r));
             let message = err.display_message();
             let location = err.instance_location();
+            // Mirror the CLI's `print_schema_errors_compact` dedup key exactly: it
+            // fabricates `(1, 1)` for a rangeless error (`None => (1, 1)`) *before*
+            // keying, so a rangeless error and a genuine `1:1` error sharing a
+            // message + instance location collapse to one on both surfaces. Keying
+            // on `None` here would keep them as two and spuriously fail parity.
             let dedup_key = (
-                range.as_ref().map(|r| (r.start_line, r.start_col)),
+                range
+                    .as_ref()
+                    .map(|r| (r.start_line, r.start_col))
+                    .unwrap_or((1, 1)),
                 message.clone(),
                 location.clone(),
             );

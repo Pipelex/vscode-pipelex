@@ -7,6 +7,7 @@ on:
     tags:
       - plxt-cli/v*
       - pipelex-vscode-ext/v*
+      - pipelex-tools-lib/v*
     paths-ignore:
       - "site/**/*"
       - schemas/**/*
@@ -33,6 +34,7 @@ jobs:
 
           CLI_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-cli/Cargo.toml)
           EXT_VERSION=$(jq -r '.version' editors/vscode/package.json)
+          LIB_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-py/Cargo.toml)
 
           CREATED=0
 
@@ -45,6 +47,12 @@ jobs:
           if [ -n "$EXT_VERSION" ] && ! git rev-parse "pipelex-vscode-ext/v${EXT_VERSION}" >/dev/null 2>&1; then
             git tag "pipelex-vscode-ext/v${EXT_VERSION}"
             echo "Created tag pipelex-vscode-ext/v${EXT_VERSION}"
+            CREATED=1
+          fi
+
+          if [ -n "$LIB_VERSION" ] && ! git rev-parse "pipelex-tools-lib/v${LIB_VERSION}" >/dev/null 2>&1; then
+            git tag "pipelex-tools-lib/v${LIB_VERSION}"
+            echo "Created tag pipelex-tools-lib/v${LIB_VERSION}"
             CREATED=1
           fi
 

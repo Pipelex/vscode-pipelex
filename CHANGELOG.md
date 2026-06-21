@@ -1,5 +1,10 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Added
+ - **Python library bindings — `pipelex-tools-lib`:** A new importable `pipelex_tools` module exposes MTHDS lint and format as in-process functions — `format_mthds(content, *, options=None)` and `lint_mthds(content, *, source=None)` — so a Python host (e.g. the `pipelex-api` server) can validate and format `.mthds` content without shelling out to the `plxt` binary. It is a thin PyO3 wrapper over the same `taplo`/`taplo-common` engine the CLI uses, with the canonical MTHDS formatting defaults baked in and Rust parity tests pinning its output to `plxt fmt`/`plxt lint` so the two can't drift. Both functions return structured `{kind, severity, message, location, range}` diagnostics and never raise on malformed `.mthds` content. `lint_mthds` validates against the embedded official MTHDS schema only (`pipelex://mthds.schema.json`), fully offline — no network, no config discovery, no external schema. It ships as a **separate** PyPI package (`pip install pipelex-tools-lib`, import `pipelex_tools`) from the `pipelex-tools` CLI, because maturin cannot pack a native binary and a pyo3 extension module into one wheel; the CLI wheel (the native `plxt`) is unchanged. The PyO3 glue is behind a `python` cargo feature, so plain `cargo build`/`cargo test` and the MSRV jobs stay PyO3-free. New docs: `docs/dev/pipelex-tools-python-bindings.md`. (pipelex-tools-lib 0.1.0)
+
 ## [0.10.0] - 2026-06-21
 
 ### Added
