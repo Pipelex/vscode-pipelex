@@ -75,14 +75,15 @@ export class PipelexValidator implements vscode.Disposable {
         if (document.languageId !== 'mthds') return;
         if (document.uri.scheme !== 'file') return;
 
-        const config = vscode.workspace.getConfiguration('pipelex', document.uri);
-        if (!config.get<boolean>('validation.enabled', true)) return;
-
         // A new save supersedes any in-flight analysis for this file. Cancel it
-        // BEFORE the early-return guards below — otherwise a stale run could resolve
-        // afterwards and re-publish diagnostics we are about to clear.
+        // BEFORE the early-return guards below (incl. the validation.enabled gate) —
+        // otherwise disabling validation mid-flight, or any later guard, would leave a
+        // stale run to resolve and re-publish diagnostics we should have superseded.
         const uriKey = document.uri.toString();
         cancelInflightByKey(this.inflight, uriKey);
+
+        const config = vscode.workspace.getConfiguration('pipelex', document.uri);
+        if (!config.get<boolean>('validation.enabled', true)) return;
 
         // Stamp this save with the directory's next generation. Diagnostics are written
         // per-directory, but in-flight runs are cancelled per-URI, so a sibling saved in

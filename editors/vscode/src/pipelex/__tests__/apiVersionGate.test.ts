@@ -86,6 +86,19 @@ describe('ApiVersionGate.ensureCapable', () => {
         expect(client.version).toHaveBeenCalledTimes(1);
     });
 
+    it('probes once and warns once when two saves race the same base URL', async () => {
+        const gate = new ApiVersionGate({ appendLine: vi.fn() } as any);
+        const client = clientReturning('0.3.0');
+        // Fire both before either probe resolves: without an in-flight guard both
+        // pass the `checked` test, both probe, and both show the warning.
+        await Promise.all([
+            gate.ensureCapable(client, 'http://localhost:8081'),
+            gate.ensureCapable(client, 'http://localhost:8081'),
+        ]);
+        expect(client.version).toHaveBeenCalledTimes(1);
+        expect(showWarning).toHaveBeenCalledTimes(1);
+    });
+
     it('does not throw or cache when /version fails (best-effort)', async () => {
         const gate = new ApiVersionGate({ appendLine: vi.fn() } as any);
         const failing = { version: vi.fn(async () => { throw new Error('down'); }) } as any;

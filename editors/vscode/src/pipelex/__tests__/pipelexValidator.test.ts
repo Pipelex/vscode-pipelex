@@ -115,6 +115,40 @@ describe('PipelexValidator — per-directory generation gate', () => {
         validator.dispose();
     });
 
+    it('a save while validation is disabled cancels an in-flight analysis so its stale result is dropped', async () => {
+        const deferred = makeDeferred<any>();
+        let capturedSignal: AbortSignal | undefined;
+        const backend = {
+            kind: 'cli',
+            analyze: (_req: any, _opts: any, signal: AbortSignal) => {
+                capturedSignal = signal;
+                return deferred.promise;
+            },
+        };
+        const factory = { getBackend: () => backend } as any;
+        const validator = new PipelexValidator({ appendLine: vi.fn() } as any, factory);
+        const onSave = mockState.onSaveHandler!;
+
+        // 1. Validation enabled: first save starts an in-flight analysis.
+        const p1 = onSave(mkDoc('/proj/x.mthds'));
+        await flush();
+        expect(capturedSignal?.aborted).toBe(false);
+
+        // 2. User disables validation, then saves the same file again. That save
+        //    must cancel the in-flight run BEFORE returning on the disabled guard.
+        mockState.configEnabled = false;
+        await onSave(mkDoc('/proj/x.mthds'));
+        expect(capturedSignal?.aborted).toBe(true);
+
+        // 3. When the now-superseded analysis resolves, it publishes nothing.
+        deferred.resolve({ validation: { ok: false, errors: [{ category: 'x', message: 'stale' }] } });
+        await p1;
+        expect(mockState.diagStore.has('file:///proj/x.mthds')).toBe(false);
+        expect(mockState.setCalls).not.toContain('file:///proj/x.mthds');
+
+        validator.dispose();
+    });
+
     it('publishes diagnostics on a normal single save', async () => {
         const deferred = makeDeferred<any>();
         const backend = { kind: 'cli', analyze: () => deferred.promise };

@@ -81,6 +81,12 @@ function probeWithLimit<T>(promise: Promise<T>, signal?: AbortSignal, timeoutMs?
  */
 export class ApiVersionGate {
     private readonly checked = new Set<string>();
+    /**
+     * Base URLs with a probe currently in flight. `ensureCapable` is started
+     * fire-and-forget per analysis, so without this guard two quick saves against
+     * the same URL would both pass the `checked` test, both probe, and both warn.
+     */
+    private readonly inFlight = new Set<string>();
 
     constructor(private readonly output: vscode.OutputChannel) {}
 
@@ -97,36 +103,43 @@ export class ApiVersionGate {
         signal?: AbortSignal,
         timeoutMs?: number,
     ): Promise<void> {
-        if (this.checked.has(baseUrl)) {
+        if (this.checked.has(baseUrl) || this.inFlight.has(baseUrl)) {
             return;
         }
-        let implementationVersion: string | undefined;
+        this.inFlight.add(baseUrl);
         try {
-            const info = await probeWithLimit(client.version(), signal, timeoutMs);
-            implementationVersion = info.implementation_version;
-        } catch {
-            // Best-effort: a /version failure — or a superseded save (abort) / hung
-            // server (timeout) — leaves the gate unevaluated and uncached. The actual
-            // validate() call races the same signal/timeout and surfaces any real fault.
-            return;
-        }
-        this.checked.add(baseUrl);
+            let implementationVersion: string | undefined;
+            try {
+                const info = await probeWithLimit(client.version(), signal, timeoutMs);
+                implementationVersion = info.implementation_version;
+            } catch {
+                // Best-effort: a /version failure — or a superseded save (abort) / hung
+                // server (timeout) — leaves the gate unevaluated and uncached (in-flight is
+                // cleared in `finally`, so a later save re-probes). The actual validate()
+                // call races the same signal/timeout and surfaces any real fault.
+                return;
+            }
+            this.checked.add(baseUrl);
 
-        const parsed = parseCleanRelease(implementationVersion);
-        if (parsed && compareSemver(parsed, MIN_API_IMPLEMENTATION_VERSION) < 0) {
-            this.output.appendLine(
-                `pipelex-api at ${baseUrl} reports implementation_version ${implementationVersion}, ` +
-                `older than the required ${formatSemver(MIN_API_IMPLEMENTATION_VERSION)}.`
-            );
-            vscode.window.showWarningMessage(
-                tooOldMessage({ baseUrl, implementationVersion })
-            );
+            const parsed = parseCleanRelease(implementationVersion);
+            if (parsed && compareSemver(parsed, MIN_API_IMPLEMENTATION_VERSION) < 0) {
+                this.output.appendLine(
+                    `pipelex-api at ${baseUrl} reports implementation_version ${implementationVersion}, ` +
+                    `older than the required ${formatSemver(MIN_API_IMPLEMENTATION_VERSION)}.`
+                );
+                vscode.window.showWarningMessage(
+                    tooOldMessage({ baseUrl, implementationVersion })
+                );
+            }
+        } finally {
+            this.inFlight.delete(baseUrl);
         }
     }
 
     /** Test/diagnostic helper — forget which base URLs were probed. */
     reset(): void {
         this.checked.clear();
+        this.inFlight.clear();
     }
 }
 
