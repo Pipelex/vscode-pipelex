@@ -650,6 +650,51 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
     }
 
+    /**
+     * Persist the in-graph theme toggle into the `pipelex.graph.theme` setting so
+     * the choice survives panel reloads and VS Code restarts (restored via
+     * resolveGraphConfig). The renderer's mode (`dark`/`light`/`system`) maps onto
+     * the setting's enum (`dark`/`light`/`auto`).
+     *
+     * Reads and writes through the SAME unscoped accessor `resolveGraphConfig`
+     * uses (graphConfig.ts) — `getConfiguration('pipelex')` with no resource — and
+     * targets Workspace (when a workspace value already exists, so the toggle
+     * "sticks") or otherwise Global. It deliberately never targets WorkspaceFolder:
+     * the unscoped reader cannot see a folder-scoped value, so a folder write would
+     * be persisted but never read back. The no-op guard compares against the
+     * *effective* value including the contributed `auto` default, so toggling to
+     * `system` while nothing is explicitly set does NOT pin an explicit `auto` that
+     * would then clobber a `pipelex.toml` `style.theme` pin. No panel re-render is
+     * triggered (there is no config-change listener for the graph), so the live
+     * viewport is untouched; the value takes effect on the next analysis or open.
+     */
+    private async persistThemeMode(mode: string): Promise<void> {
+        const value = mode === 'dark' || mode === 'light' ? mode : mode === 'system' ? 'auto' : undefined;
+        if (!value) {
+            this.output.appendLine(`pipelex graph: ignoring unknown theme mode "${mode}"`);
+            return;
+        }
+
+        try {
+            const cfg = vscode.workspace.getConfiguration('pipelex');
+            const inspect = cfg.inspect<string>('graph.theme');
+            const target = inspect?.workspaceValue !== undefined
+                ? vscode.ConfigurationTarget.Workspace
+                : vscode.ConfigurationTarget.Global;
+
+            // Effective value the reader resolves: explicit scopes, then the
+            // contributed default. Skipping the write when it matches avoids churn
+            // and — when the effective value is already `auto` by default — keeps a
+            // `system` toggle from pinning an explicit `auto` over a toml pin.
+            const current = inspect?.workspaceValue ?? inspect?.globalValue ?? inspect?.defaultValue;
+            if (current === value) return;
+
+            await cfg.update('graph.theme', value, target);
+        } catch (err: any) {
+            this.output.appendLine(`pipelex graph: failed to persist theme mode: ${err?.message ?? err}`);
+        }
+    }
+
     private handleWebviewMessage(message: any) {
         if (message.type === 'webviewReady') {
             this.webviewReady = true;
@@ -661,6 +706,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
         if (message.type === 'retry') {
             this.retry();
+            return;
+        }
+        if (message.type === 'themeModeChanged' && typeof message.mode === 'string') {
+            void this.persistThemeMode(message.mode);
             return;
         }
         if (message.type === 'runCommand' && typeof message.command === 'string') {

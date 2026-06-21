@@ -28,6 +28,11 @@ const mockState = vi.hoisted(() => {
         executeCommand: vi.fn(),
         cancelAllInflightSpy: vi.fn(),
         configOverrides: {} as Record<string, any>,
+        // Per-key `inspect()` results (scope values). Falls back to globalValue
+        // from configOverrides when a key isn't listed here.
+        configInspect: {} as Record<string, any>,
+        // Captured `config.update(key, value, target)` calls for assertions.
+        configUpdates: [] as { key: string; value: any; target: any }[],
         // Active VS Code color theme kind (vscode.ColorThemeKind.Dark = 2 by default).
         activeColorThemeKind: 2 as number,
         // Error-list view fixtures: gatherBundleFiles + resolveErrorLocations are mocked
@@ -65,11 +70,16 @@ vi.mock('vscode', () => ({
     Selection: vi.fn(),
     TextEditorRevealType: { InCenter: 2 },
     ColorThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },
+    ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
     workspace: {
         get textDocuments() { return mockState.openTextDocuments; },
         getConfiguration: () => ({
             get: (key: string, def: any) => mockState.configOverrides[key] ?? def,
-            inspect: (key: string) => ({ globalValue: mockState.configOverrides[key] }),
+            inspect: (key: string) => mockState.configInspect[key] ?? { globalValue: mockState.configOverrides[key] },
+            update: (key: string, value: any, target: any) => {
+                mockState.configUpdates.push({ key, value, target });
+                return Promise.resolve();
+            },
         }),
         onDidChangeTextDocument: vi.fn((handler: any) => {
             mockState.onDocChangeHandler = handler;
@@ -198,6 +208,8 @@ describe('MethodGraphPanel', () => {
         mockState.onDocChangeHandler = null;
         mockState.onColorThemeChangeHandler = null;
         mockState.configOverrides = {};
+        mockState.configInspect = {};
+        mockState.configUpdates = [];
         mockState.bundleFiles = [];
         mockState.errorLocations = [];
         mockState.openTextDocuments = [];
@@ -339,6 +351,108 @@ describe('MethodGraphPanel', () => {
         mockState.onColorThemeChangeHandler!({ kind: 1 });
 
         expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    // --- themeModeChanged persistence ---
+
+    // The in-graph theme toggle reports its new mode; the host persists it into
+    // `pipelex.graph.theme` so it survives reloads / restarts.
+    async function showGraphAndGetHandler() {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        return { panel, messageHandler };
+    }
+
+    it('persists a dark/light toggle to pipelex.graph.theme (Global) verbatim', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+
+        messageHandler({ type: 'themeModeChanged', mode: 'light' });
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(mockState.configUpdates).toContainEqual({ key: 'graph.theme', value: 'light', target: 1 });
+        panel.dispose();
+    });
+
+    it('maps the renderer "system" mode onto the setting\'s "auto" value', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+        // Pretend the setting is currently pinned to light so the write is observable.
+        mockState.configInspect['graph.theme'] = { globalValue: 'light' };
+
+        messageHandler({ type: 'themeModeChanged', mode: 'system' });
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(mockState.configUpdates).toContainEqual({ key: 'graph.theme', value: 'auto', target: 1 });
+        panel.dispose();
+    });
+
+    it('writes at the scope where the setting is already defined so the toggle sticks', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+        mockState.configInspect['graph.theme'] = { workspaceValue: 'dark' };
+
+        messageHandler({ type: 'themeModeChanged', mode: 'light' });
+        await new Promise(r => setTimeout(r, 0));
+
+        // ConfigurationTarget.Workspace === 2
+        expect(mockState.configUpdates).toContainEqual({ key: 'graph.theme', value: 'light', target: 2 });
+        panel.dispose();
+    });
+
+    it('never targets WorkspaceFolder — the unscoped reader cannot see it', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+        // Even if a folder-scoped value exists, the writer must match the
+        // resource-blind resolveGraphConfig: target Global, not WorkspaceFolder
+        // (which would be written but never read back).
+        mockState.configInspect['graph.theme'] = { workspaceFolderValue: 'dark' };
+
+        messageHandler({ type: 'themeModeChanged', mode: 'light' });
+        await new Promise(r => setTimeout(r, 0));
+
+        // ConfigurationTarget.Global === 1 (never 3 / WorkspaceFolder).
+        expect(mockState.configUpdates).toContainEqual({ key: 'graph.theme', value: 'light', target: 1 });
+        panel.dispose();
+    });
+
+    it('does not pin an explicit "auto" over the contributed default (toml-pin safe)', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+        // Nothing explicitly set; the effective value is the contributed default.
+        // Toggling to system (→ auto) must NOT write, or it would override a
+        // pipelex.toml style.theme pin (which resolveGraphConfig only yields to an
+        // *explicitly* set graph.theme).
+        mockState.configInspect['graph.theme'] = { defaultValue: 'auto' };
+
+        messageHandler({ type: 'themeModeChanged', mode: 'system' });
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(mockState.configUpdates).toHaveLength(0);
+        panel.dispose();
+    });
+
+    it('does not write when the new mode already matches the persisted value', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+        mockState.configInspect['graph.theme'] = { globalValue: 'dark' };
+
+        messageHandler({ type: 'themeModeChanged', mode: 'dark' });
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(mockState.configUpdates).toHaveLength(0);
+        panel.dispose();
+    });
+
+    it('ignores an unknown theme mode without writing', async () => {
+        const output = mockOutput();
+        const panel = new MethodGraphPanel(output, makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+
+        messageHandler({ type: 'themeModeChanged', mode: 'sepia' });
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(mockState.configUpdates).toHaveLength(0);
+        expect(output.appendLine).toHaveBeenCalledWith(expect.stringContaining('unknown theme mode "sepia"'));
         panel.dispose();
     });
 

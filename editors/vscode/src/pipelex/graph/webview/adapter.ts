@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import type { GraphSpec, GraphConfig, GraphTheme } from '@pipelex/mthds-ui';
+import type { GraphSpec, GraphConfig, GraphTheme, GraphThemeMode } from '@pipelex/mthds-ui';
 import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
 
 // VS Code webview API
@@ -30,6 +30,13 @@ let renderApp: (() => void) | null = null;
 // VS Code theme and re-sends this on every editor theme switch (setSystemTheme).
 let currentSystemTheme: GraphTheme | undefined;
 
+// The theme *mode* last reported to the host for persistence. Seeded from each
+// setData's `config.theme` so a mere environment flip (which keeps the mode at
+// `system` while the resolved theme changes) is NOT mistaken for a user toggle.
+// Only a genuine mode change — the user cycling the in-graph theme button —
+// gets forwarded so the host can persist it (see onThemeChange).
+let lastReportedMode: GraphThemeMode | undefined;
+
 // Held so we can preserve the viewport across same-file refreshes.
 let reactFlowInstance: any = null;
 
@@ -41,6 +48,17 @@ function onNavigateToPipe(pipeCode: string) {
 
 function onReactFlowInit(instance: any) {
     reactFlowInstance = instance;
+}
+
+// The user cycled the in-graph theme toggle (dark → light → system). Forward
+// the new *mode* so the host can persist it to `pipelex.graph.theme` and restore
+// it on the next open / VS Code restart. Deduped against the last reported mode
+// so an environment-driven `system` re-resolve (same mode, different resolved
+// theme) is not persisted as if the user had picked it.
+function onThemeChange(mode: GraphThemeMode) {
+    if (mode === lastReportedMode) return;
+    lastReportedMode = mode;
+    vscode.postMessage({ type: 'themeModeChanged', mode });
 }
 
 // VS Code webviews run in Electron, which ships without Chromium's PDFium
@@ -91,6 +109,10 @@ function handleMessage(event: { data: any }) {
         if (message.config?.systemTheme) {
             currentSystemTheme = message.config.systemTheme;
         }
+        // Seed the persist baseline from the host-resolved mode so the first
+        // genuine toggle (not the initial mount or a systemTheme flip) is what
+        // gets forwarded for persistence.
+        lastReportedMode = currentConfig.theme;
 
         // Theme drives the renderer's palette: GraphViewer applies the full
         // light/dark palette (getPaletteForTheme) as inline styles on its own
@@ -140,6 +162,9 @@ function App() {
         // `prefers-color-scheme` is unreliable). Reactive: a setSystemTheme
         // re-render flips the `system`-mode palette without remounting.
         systemTheme: currentSystemTheme,
+        // Persist the in-graph theme toggle to `pipelex.graph.theme` so it
+        // survives panel reloads and VS Code restarts.
+        onThemeChange,
         onNavigateToPipe,
         onReactFlowInit,
         canEmbedPdf: false,
