@@ -9,8 +9,12 @@
 //!
 //! The PyO3 glue lives in [`python`] and is gated behind the `python` cargo
 //! feature so that plain `cargo build` / `cargo test` stay PyO3-free. The pure
-//! lint/format logic (added in later phases) is *not* gated, so it compiles and
-//! unit-tests without a Python interpreter.
+//! lint/format logic ([`format`], [`lint`], [`diagnostic`]) is *not* gated, so
+//! it compiles and unit-tests without a Python interpreter.
+
+pub mod diagnostic;
+pub mod format;
+pub mod lint;
 
 #[cfg(feature = "python")]
 mod python;
