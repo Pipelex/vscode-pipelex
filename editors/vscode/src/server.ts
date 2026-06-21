@@ -81,7 +81,16 @@ process.on("message", async (d: RpcMessage) => {
       },
       {
         onMessage(message) {
-          process.send?.(message);
+          // The worker is always forked with an IPC channel (TransportKind.ipc),
+          // so process.send is defined. Guard explicitly so a broken invariant
+          // fails loudly with a diagnosable error rather than silently dropping
+          // every LSP response (which would look like a hung language server).
+          if (!process.send) {
+            throw new Error(
+              "server worker has no IPC channel; cannot send LSP message",
+            );
+          }
+          process.send(message);
         },
       }
     );
