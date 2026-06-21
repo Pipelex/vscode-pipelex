@@ -4,6 +4,7 @@
   "description": "A JavaScript wrapper for the Pipelex TOML/MTHDS language server.",
   "scripts": {
     "build": "yarn rollup --silent -c rollup.config.mjs",
+    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly --skipLibCheck",
     "prepublish": "RELEASE=true yarn build",
     "clean": "rm -rf dist"
   },

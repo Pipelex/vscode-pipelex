@@ -99,6 +99,14 @@ jobs:
         run: |
           corepack enable
           cd editors/vscode && yarn install --immutable
+      - name: Build @pipelex/lsp type declarations
+        # The extension typecheck resolves the portal dep @pipelex/lsp via its
+        # dist/index.d.ts, which is gitignored and not part of the checkout. Emit
+        # just the declarations (no WASM/Rust build needed) so `yarn typecheck`
+        # can resolve the module.
+        run: |
+          corepack enable
+          cd js && yarn install --immutable && yarn workspace @pipelex/lsp run build:types
       - name: Typecheck VS Code extension
         run: cd editors/vscode && yarn typecheck
       - name: Test VS Code extension

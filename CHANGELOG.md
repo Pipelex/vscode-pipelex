@@ -33,6 +33,7 @@
  - **Dead `handleInitializeResult` override:** Removed from both language clients — it's no longer an override point in `vscode-languageclient` 9 (it called a `super` method that no longer exists, so it never ran). UTF-16 position negotiation stays in `fillInitializeParams`.
  - **Missing browser worker `envVars`:** The browser server worker's `Environment` was missing the required `envVars` member; added it.
  - **API-validation test mocks realigned:** Updated the `mthds` exception mocks to the current message-first `ApiResponseError`/`ApiUnreachableError` constructor signatures, so the test call sites type-check against the real classes.
+ - **Type-check gate green in CI:** `yarn typecheck` resolves the portal dependency `@pipelex/lsp` through its `dist/index.d.ts`, which is gitignored and absent on a fresh checkout — so CI failed with `Cannot find module '@pipelex/lsp'` (and the cascade of implicit-`any` errors that followed). CI and `make test` now emit just the declarations first via a new `@pipelex/lsp` `build:types` script (`tsc --emitDeclarationOnly`, no WASM/Rust build required) before type-checking the extension.
 
 ### Removed
  - **`pipelex.graph.palette` setting:** Dropped the `dracula`/`yellow_blue` palette override. It duplicated and overrode the renderer's own light/dark palette (which is what broke light mode); theming is now driven by `pipelex.graph.theme` and the in-graph toggle.
