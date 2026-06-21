@@ -124,23 +124,19 @@ describe('lightColors apply/remove', () => {
         expect(state.stored['[*Light*]'].textMateRules).toEqual([userRule]);
     });
 
-    it('migrates legacy nameless managed rules without duplicating', async () => {
-        // A block written by a pre-name palette version: managed scopes, no sentinel.
-        state.stored = {
-            '[*Light*]': {
-                textMateRules: [
-                    { scope: 'entity.name.tag.pipe.mthds', settings: { foreground: '#D32F2F', fontStyle: 'bold' } },
-                    { scope: 'entity.name.type.concept.mthds', settings: { foreground: '#0F766E', fontStyle: 'bold' } },
-                ],
-            },
-        };
+    it('keeps a user-authored nameless rule on a managed scope across a palette refresh', async () => {
+        // Regression for the over-aggressive legacy migration: a refresh re-applies
+        // the palette via plain applyLightColors and must NOT delete a user's own
+        // nameless rule just because it targets a managed MTHDS scope.
+        const userRule = { scope: 'entity.name.tag.pipe.mthds', settings: { foreground: '#ababab', fontStyle: 'italic' } };
+        state.stored = { '[*Light*]': { textMateRules: [userRule] } };
         const { context } = makeContext();
-        await applyLightColors(context, { migrateLegacy: true });
+        await applyLightColors(context);
 
         const rules = managedRules();
-        // Every rule now carries the sentinel — no nameless legacy leftovers.
-        expect(rules.every(r => r.name === 'pipelex.mthds.light')).toBe(true);
-        // The migrated scope is present exactly once, not duplicated.
-        expect(rules.filter(r => r.scope === 'entity.name.tag.pipe.mthds').length).toBe(1);
+        // The user's customization survives verbatim.
+        expect(rules).toContainEqual(userRule);
+        // Our managed rule for the same scope is present, stamped with the sentinel.
+        expect(rules.some(r => r.scope === 'entity.name.tag.pipe.mthds' && r.name === 'pipelex.mthds.light')).toBe(true);
     });
 });
