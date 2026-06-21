@@ -60,7 +60,7 @@ Everything below must be green by the end. Three of these are fixed in Phase 2, 
 
 These five flags surface **no** errors in our code. Land them together.
 
-- [ ] In `tsconfig.typecheck.json` `compilerOptions`, add:
+- [x] In `tsconfig.typecheck.json` `compilerOptions`, add:
   ```jsonc
   "strictFunctionTypes": true,
   "strictBindCallApply": true,
@@ -68,8 +68,8 @@ These five flags surface **no** errors in our code. Land them together.
   "useUnknownInCatchVariables": true,
   "alwaysStrict": true,
   ```
-- [ ] `cd editors/vscode && yarn typecheck` → exit 0.
-- [ ] Commit: `feat(typecheck): enable zero-cost strict flags for editors/vscode`.
+- [x] `cd editors/vscode && yarn typecheck` → exit 0.
+- [x] Commit: `feat(typecheck): enable zero-cost strict flags for editors/vscode`. *(landed: `1dd37d7`)*
 
 ---
 

@@ -13,7 +13,14 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     // Follow @pipelex/mthds-ui's subpath `exports` (e.g. .../graph/react), like
     // esbuild does natively. Requires module: esnext (inherited) + TypeScript >=5.
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    // Ratcheting toward full `strict` one flag at a time (see TODOS.md). These five
+    // members of the strict family surface no errors in our code.
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "vitest.config.mts"]
