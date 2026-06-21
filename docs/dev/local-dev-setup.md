@@ -110,7 +110,7 @@ The extension's build pipeline is entirely esbuild-based (rollup + `rollup-plugi
 cd editors/vscode && yarn typecheck
 ```
 
-It runs against `tsconfig.typecheck.json`, a separate config that extends the esbuild build `tsconfig.json` and overrides only what standalone `tsc` needs — `DOM`/`DOM.Iterable` libs (for `window`/`document`/`Worker`/`self`) and `moduleResolution: bundler` (to follow `@pipelex/mthds-ui`'s subpath `exports`, like esbuild does natively). The base build config is left untouched. The gate runs as part of `make test` / `make check` and in CI, so a type error can't merge. It inherits the base `strict: false`, so coverage is currently shallow; ratcheting `strict` on is a worthwhile follow-up.
+It runs against `tsconfig.typecheck.json`, a separate config that extends the esbuild build `tsconfig.json` and overrides only what standalone `tsc` needs — `DOM`/`DOM.Iterable` libs (for `window`/`document`/`Worker`/`self`) and `moduleResolution: bundler` (to follow `@pipelex/mthds-ui`'s subpath `exports`, like esbuild does natively). The base build config is left untouched. The gate runs as part of `make test` / `make check` and in CI, so a type error can't merge. It runs in full `strict` mode, set only in `tsconfig.typecheck.json` — the base build `tsconfig.json` stays at `strict: false` per the fork rule, since the esbuild build strips types per file and never type-checks, so strictness belongs solely in the gate.
 
 ## Uninstalling
 
