@@ -15,22 +15,31 @@ vi.mock('vscode', () => ({
 
 // ---------- mthds mock (classes defined inside the hoisted factory) ----------
 vi.mock('mthds', () => {
+    // Mirror the real `mthds` constructor signatures (message-first) so the
+    // call sites below type-check against the imported real classes, while the
+    // backend still reads `.status`/`.serverMessage`/`.statusText`/`.code`.
     class ApiResponseError extends Error {
         constructor(
+            message: string,
+            public apiUrl: string,
             public status: number,
+            public statusText: string,
+            public responseBody: string,
             public errorType: string | undefined,
             public serverMessage: string | undefined,
             public validationErrors: any[] | undefined,
-            public apiUrl = 'http://localhost:8081',
-            public statusText = 'Unprocessable Entity',
         ) {
-            super(serverMessage ?? 'api error');
+            super(message);
             this.name = 'ApiResponseError';
         }
     }
     class ApiUnreachableError extends Error {
-        constructor(public apiUrl: string, public code: string | undefined) {
-            super('unreachable');
+        constructor(
+            message: string,
+            public apiUrl: string,
+            public code: string | undefined,
+        ) {
+            super(message);
             this.name = 'ApiUnreachableError';
         }
     }
@@ -189,14 +198,14 @@ describe('ApiValidationBackend', () => {
     it('maps a request-shape 422 (no verdict) to an api-error BackendError', async () => {
         // `/validate` never 422s a content verdict now — a 422 is a request-shape
         // problem (e.g. mthds_sources length mismatch), surfaced as api-error.
-        apiState.validate = async () => { throw new ApiResponseError(422, 'ValidationError', 'mthds_sources length must match mthds_contents', undefined); };
+        apiState.validate = async () => { throw new ApiResponseError('mthds_sources length must match mthds_contents', 'http://localhost:8081', 422, 'Unprocessable Entity', '', 'ValidationError', 'mthds_sources length must match mthds_contents', undefined); };
         const err = await analyze(makeBackend()).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('api-error');
     });
 
     it('maps a self-hosted 401 to an auth BackendError with a single Set-API-Key action', async () => {
-        apiState.validate = async () => { throw new ApiResponseError(401, 'AuthError', 'unauthorized', undefined); };
+        apiState.validate = async () => { throw new ApiResponseError('unauthorized', 'http://localhost:8081', 401, 'Unauthorized', '', 'AuthError', 'unauthorized', undefined); };
         const err = await analyze(makeBackend()).catch(e => e); // default baseUrl is localhost (self-hosted)
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('auth');
@@ -210,7 +219,7 @@ describe('ApiValidationBackend', () => {
     });
 
     it('maps a hosted 401/403 to an auth BackendError with Set + Get-a-key actions and clickable rich detail', async () => {
-        apiState.validate = async () => { throw new ApiResponseError(403, 'AuthError', 'forbidden', undefined); };
+        apiState.validate = async () => { throw new ApiResponseError('forbidden', 'https://api.pipelex.com', 403, 'Forbidden', '', 'AuthError', 'forbidden', undefined); };
         const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('auth');
@@ -229,14 +238,14 @@ describe('ApiValidationBackend', () => {
     });
 
     it('maps a 5xx to an api-error BackendError (server reached, errored)', async () => {
-        apiState.validate = async () => { throw new ApiResponseError(503, undefined, 'service unavailable', undefined, 'https://api.pipelex.com', 'Service Unavailable'); };
+        apiState.validate = async () => { throw new ApiResponseError('service unavailable', 'https://api.pipelex.com', 503, 'Service Unavailable', '', undefined, 'service unavailable', undefined); };
         const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('api-error');
     });
 
     it('maps ApiUnreachableError to a transport BackendError', async () => {
-        apiState.validate = async () => { throw new ApiUnreachableError('http://localhost:8081', 'ECONNREFUSED'); };
+        apiState.validate = async () => { throw new ApiUnreachableError('connection refused', 'http://localhost:8081', 'ECONNREFUSED'); };
         const err = await analyze(makeBackend()).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('unreachable');
@@ -244,7 +253,7 @@ describe('ApiValidationBackend', () => {
     });
 
     it('uses a network-flavored unreachable message for the hosted API (not "is pipelex-api running")', async () => {
-        apiState.validate = async () => { throw new ApiUnreachableError('https://api.pipelex.com', 'ENOTFOUND'); };
+        apiState.validate = async () => { throw new ApiUnreachableError('host not found', 'https://api.pipelex.com', 'ENOTFOUND'); };
         const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('unreachable');

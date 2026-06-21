@@ -38,8 +38,8 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - `make vsix` - Package the extension into a `.vsix` file (runs `ext` first)
 - `make ext-install` - Build, package, and install the `.vsix` into Cursor or VS Code
 - `make ext-uninstall` - Uninstall the extension from the IDE
-- `make test` - Run all tests (Rust crates + VS Code extension vitest)
-- `make check` - **Full quality gate**: fmt check, plxt fmt check, clippy (`-D warnings`), all crate tests, vitest, and WASM check. Always run after code changes.
+- `make test` - Run all tests (Rust crates + VS Code extension vitest) and type-check the extension (`yarn typecheck`)
+- `make check` - **Full quality gate**: fmt check, plxt fmt check, clippy (`-D warnings`), all crate tests, vitest, extension `tsc` type-check, and WASM check. Always run after code changes.
 - `make clean` - Remove all build artifacts (cargo, JS dist, VSIX)
 - `make sync-grammar` - Copy MTHDS TextMate grammar to the website repo
 

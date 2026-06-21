@@ -29,17 +29,6 @@ class PipelexNodeLanguageClient extends node.LanguageClient {
     // VS Code uses UTF-16 positions internally
     params.capabilities.general.positionEncodings = ["utf-16"];
   }
-
-  protected handleInitializeResult(result: any): void {
-    // Ensure capabilities exist and have positionEncoding
-    if (!result.capabilities) {
-      result.capabilities = {};
-    }
-    if (!result.capabilities.positionEncoding) {
-      result.capabilities.positionEncoding = 'utf-16';
-    }
-    super.handleInitializeResult(result);
-  }
 }
 
 class PipelexBrowserLanguageClient extends browser.LanguageClient {
@@ -49,17 +38,6 @@ class PipelexBrowserLanguageClient extends browser.LanguageClient {
     params.capabilities ??= {};
     params.capabilities.general ??= {};
     params.capabilities.general.positionEncodings = ["utf-16"];
-  }
-
-  protected handleInitializeResult(result: any): void {
-    // Ensure capabilities exist and have positionEncoding
-    if (!result.capabilities) {
-      result.capabilities = {};
-    }
-    if (!result.capabilities.positionEncoding) {
-      result.capabilities.positionEncoding = 'utf-16';
-    }
-    super.handleInitializeResult(result);
   }
 }
 

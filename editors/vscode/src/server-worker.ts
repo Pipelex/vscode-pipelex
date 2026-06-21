@@ -18,6 +18,7 @@ reader.listen(async message => {
       {
         cwd: () => "/",
         envVar: () => "",
+        envVars: () => [],
         findConfigFile: () => undefined,
         glob: () => [],
         isAbsolute: () => true,

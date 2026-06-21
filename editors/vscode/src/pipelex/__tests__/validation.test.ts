@@ -236,7 +236,7 @@ import { resolveCli } from '../validation/cliResolver';
 describe('cliResolver', () => {
     beforeEach(() => {
         vi.mocked(fs.existsSync).mockReturnValue(false);
-        vi.mocked(which.sync).mockReturnValue(null);
+        vi.mocked(which.sync).mockReturnValue(null as unknown as string);
         mockWorkspace.workspaceFolders = undefined;
         mockWorkspace.getConfiguration = () => ({ get: () => null });
     });

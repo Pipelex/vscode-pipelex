@@ -95,10 +95,14 @@ jobs:
             echo "::error::package.json contains file: dependencies — run 'make ul' before pushing"
             exit 1
           fi
-      - name: Test VS Code extension
+      - name: Install VS Code extension deps
         run: |
           corepack enable
-          cd editors/vscode && yarn install --immutable && yarn test
+          cd editors/vscode && yarn install --immutable
+      - name: Typecheck VS Code extension
+        run: cd editors/vscode && yarn typecheck
+      - name: Test VS Code extension
+        run: cd editors/vscode && yarn test
 
   check_wasm32:
     name: Check on WASM

@@ -794,6 +794,7 @@
     "build:browser-server": "rollup -c rollup.config.browser-server.mjs",
     "build:node": "rollup -c rollup.config.mjs",
     "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -817,6 +818,8 @@
     "@rollup/plugin-replace": "^5.0.5",
     "@types/deep-equal": "^1.0.4",
     "@types/node": "^20.11.9",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "@types/vscode": "^1.90.0",
     "@types/which": "^3.0.3",
     "@vscode/test-web": "^0.0.51",
