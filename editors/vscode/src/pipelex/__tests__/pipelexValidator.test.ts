@@ -21,6 +21,9 @@ vi.mock('vscode', () => {
     };
     return {
         DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
+        // Round-trips an inflight key (a `uri.toString()`) back to its fsPath, matching
+        // mkDoc's `file://<fsPath>` form, so cancelInflightInDir can resolve each key's dir.
+        Uri: { parse: (s: string) => ({ fsPath: s.replace(/^file:\/\//, '') }) },
         languages: {
             createDiagnosticCollection: vi.fn(() => collection),
             getDiagnostics: vi.fn(() => []),
@@ -145,6 +148,44 @@ describe('PipelexValidator — per-directory generation gate', () => {
         await p1;
         expect(mockState.diagStore.has('file:///proj/x.mthds')).toBe(false);
         expect(mockState.setCalls).not.toContain('file:///proj/x.mthds');
+
+        validator.dispose();
+    });
+
+    it('a sibling save while validation is disabled cancels an in-flight analysis in the same directory', async () => {
+        const deferredA = makeDeferred<any>();
+        let signalA: AbortSignal | undefined;
+        const backend = {
+            kind: 'cli',
+            analyze: (req: any, _opts: any, signal: AbortSignal) => {
+                if (req.primaryUri.fsPath.endsWith('a.mthds')) {
+                    signalA = signal;
+                    return deferredA.promise;
+                }
+                return makeDeferred<any>().promise; // sibling B never resolves; irrelevant here
+            },
+        };
+        const factory = { getBackend: () => backend } as any;
+        const validator = new PipelexValidator({ appendLine: vi.fn() } as any, factory);
+        const onSave = mockState.onSaveHandler!;
+
+        // 1. Validation enabled: A starts an in-flight analysis in /proj.
+        const pA = onSave(mkDoc('/proj/a.mthds'));
+        await flush();
+        expect(signalA?.aborted).toBe(false);
+
+        // 2. User disables validation, then saves a SIBLING (B) in the same directory.
+        //    The per-URI cancel only supersedes B; B's disabled-guard return must also
+        //    cancel A's in-flight run so it can't publish after validation is off.
+        mockState.configEnabled = false;
+        await onSave(mkDoc('/proj/b.mthds'));
+        expect(signalA?.aborted).toBe(true);
+
+        // 3. A resolves after validation was disabled — it must publish nothing.
+        deferredA.resolve({ validation: { ok: false, errors: [{ category: 'x', message: 'A-stale' }] } });
+        await pA;
+        expect(mockState.diagStore.has('file:///proj/a.mthds')).toBe(false);
+        expect(mockState.setCalls).not.toContain('file:///proj/a.mthds');
 
         validator.dispose();
     });

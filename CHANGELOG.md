@@ -26,6 +26,7 @@
  - **Stale graph prevention:** An open method-graph panel no longer shows a stale graph when on-save analysis fails or is skipped; backend/transport failures render the error directly in the panel.
  - **Race condition on skipped saves:** A skipped save (e.g., when another extension reports syntax errors) now cancels any in-flight analysis for that file, preventing a slow prior run from re-publishing stale diagnostics.
  - **Concurrent sibling-save race:** Saving two `.mthds` files in the same directory in quick succession no longer lets a slower earlier run overwrite the newer save's diagnostics. Diagnostics are written per directory but analyses are cancelled per file, so each save is now stamped with a per-directory generation and a stale run's write is dropped.
+ - **Disabling validation mid-flight:** Turning off `pipelex.validation.enabled` while an analysis is running now cancels in-flight runs for that directory, so a slower earlier sibling run can't publish diagnostics after validation is off.
 
 ### Removed
  - **`pipelex.graph.palette` setting:** Dropped the `dracula`/`yellow_blue` palette override. It duplicated and overrode the renderer's own light/dark palette (which is what broke light mode); theming is now driven by `pipelex.graph.theme` and the in-graph toggle.

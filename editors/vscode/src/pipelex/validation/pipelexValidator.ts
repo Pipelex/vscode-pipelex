@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { cancelInflightByKey } from './processUtils';
+import { cancelInflightByKey, cancelInflightInDir } from './processUtils';
 import { gatherBundleFiles } from './bundleGather';
 import { buildBundleDiagnostics } from './crossFileDiagnostics';
 import { AnalyzeAbortError, BackendError } from './backend';
@@ -83,7 +83,19 @@ export class PipelexValidator implements vscode.Disposable {
         cancelInflightByKey(this.inflight, uriKey);
 
         const config = vscode.workspace.getConfiguration('pipelex', document.uri);
-        if (!config.get<boolean>('validation.enabled', true)) return;
+        if (!config.get<boolean>('validation.enabled', true)) {
+            // Validation was turned off — possibly while a sibling in this directory is
+            // still analysing. The per-URI cancel above only superseded THIS file's run;
+            // an in-flight sibling (not cancelled, generation unchanged) would otherwise
+            // resolve and publish directory diagnostics after validation is disabled.
+            // Cancel every in-flight run for this directory so none can publish once off.
+            cancelInflightInDir(
+                this.inflight,
+                path.dirname(document.uri.fsPath),
+                key => path.dirname(vscode.Uri.parse(key).fsPath),
+            );
+            return;
+        }
 
         // Stamp this save with the directory's next generation. Diagnostics are written
         // per-directory, but in-flight runs are cancelled per-URI, so a sibling saved in
