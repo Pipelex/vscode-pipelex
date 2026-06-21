@@ -49,3 +49,24 @@ export function cancelAllInflight(inflight: Map<string, AbortController>) {
     }
     inflight.clear();
 }
+
+/**
+ * Cancel every inflight request whose URI lives in `dir`. Used when validation is
+ * turned off mid-flight: the per-URI cancel only supersedes the saved file, so a
+ * sibling analysing in the same directory (not cancelled, generation unchanged)
+ * could still pass its generation gate and publish directory diagnostics after
+ * validation is disabled. `dirOfKey` maps an inflight key (a `Uri.toString()`) to
+ * its parent directory; injected so this stays free of a `vscode` dependency.
+ */
+export function cancelInflightInDir(
+    inflight: Map<string, AbortController>,
+    dir: string,
+    dirOfKey: (key: string) => string,
+) {
+    for (const [key, controller] of inflight) {
+        if (dirOfKey(key) === dir) {
+            controller.abort();
+            inflight.delete(key);
+        }
+    }
+}

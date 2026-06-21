@@ -53,8 +53,7 @@ pub(crate) async fn hover<E: Environment>(
 
     // MTHDS semantic hover: if the cursor is on a reference field (pipe, output,
     // refines, inputs value), resolve it and show rich hover content.
-    let is_mthds_file =
-        document_uri.as_str().ends_with(".mthds") || document_uri.as_str().ends_with(".plx");
+    let is_mthds_file = document_uri.as_str().ends_with(".mthds");
     if is_mthds_file {
         let hover_range = || {
             find_string_position_info(&query)

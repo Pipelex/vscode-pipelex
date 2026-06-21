@@ -23,7 +23,7 @@ PYTHON_VERSION    ?= 3.13
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s update-schema up
-.PHONY: build cli pipelex-tools env lock ext ext-deps ext-install ext-uninstall vsix clean test check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
+.PHONY: build cli pipelex-tools env lock ext ext-deps lsp-types ext-install ext-uninstall vsix clean test check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
 .PHONY: use-local use-npm ul un
 
 help: ## Show this help
@@ -57,6 +57,9 @@ lock: ## Update Cargo.lock after version bumps
 
 ext-deps: ## Build the @pipelex/lsp WASM bundle (prerequisite for ext)
 	cd $(JS_LSP_DIR) && yarn install && yarn build
+
+lsp-types: ## Emit @pipelex/lsp type declarations only (fast, no WASM) for the typecheck gate
+	cd $(JS_LSP_DIR) && yarn install && yarn build:types
 
 ext: ext-deps ## Build the VS Code extension
 	cd $(EXT_DIR) && yarn install && yarn build
@@ -104,12 +107,12 @@ lint: ## Run Clippy on the workspace
 plxt-lint: ## Lint TOML/MTHDS files with plxt
 	cargo run --bin plxt -- lint
 
-test: ## Run all tests (Rust + VS Code extension)
+test: lsp-types ## Run all tests (Rust + VS Code extension)
 	cargo test -p pipelex-common
 	cargo test -p pipelex-cli
 	cargo test -p taplo
 	cargo test -p taplo-lsp
-	cd $(EXT_DIR) && yarn test
+	cd $(EXT_DIR) && { yarn typecheck; tc=$$?; yarn test; vt=$$?; [ $$tc -eq 0 ] && [ $$vt -eq 0 ]; }
 
 check-no-local-deps: ## Fail if mthds-ui is not the npm spec
 	@grep -qE '"@pipelex/mthds-ui":[[:space:]]*"npm:' $(EXT_DIR)/package.json || \

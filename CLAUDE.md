@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## Project Overview
-Fork of [tamasfe/taplo](https://github.com/tamasfe/taplo) (TOML toolkit) extended with Pipelex Language (MTHDS) support.
+Fork of [tamasfe/taplo](https://github.com/tamasfe/taplo) (TOML toolkit) extended with MTHDS (the language for AI methods) support.
 Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packages + VitePress docs site.
 
 ## Critical Rule: Preserve Upstream Taplo Behavior
@@ -38,8 +38,8 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - `make vsix` - Package the extension into a `.vsix` file (runs `ext` first)
 - `make ext-install` - Build, package, and install the `.vsix` into Cursor or VS Code
 - `make ext-uninstall` - Uninstall the extension from the IDE
-- `make test` - Run all tests (Rust crates + VS Code extension vitest)
-- `make check` - **Full quality gate**: fmt check, plxt fmt check, clippy (`-D warnings`), all crate tests, vitest, and WASM check. Always run after code changes.
+- `make test` - Run all tests (Rust crates + VS Code extension vitest) and type-check the extension (`yarn typecheck`)
+- `make check` - **Full quality gate**: fmt check, plxt fmt check, clippy (`-D warnings`), all crate tests, vitest, extension `tsc` type-check, and WASM check. Always run after code changes.
 - `make clean` - Remove all build artifacts (cargo, JS dist, VSIX)
 - `make sync-grammar` - Copy MTHDS TextMate grammar to the website repo
 
@@ -83,10 +83,18 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 The extension includes a webview panel that renders method/pipe graphs using ReactFlow. The extension receives a **GraphSpec** (JSON with nodes and edges) from `pipelex-agent validate --view` and renders the graph itself using ReactFlow in the webview. This gives full control over layout, styling, and interactivity.
 
 ### Extension-side code
-- `editors/vscode/src/pipelex/graph/methodGraphPanel.ts` — webview panel manager
+- `editors/vscode/src/pipelex/graph/methodGraphPanel.ts` — webview panel manager (extension host); builds the `setData` config payload
+- `editors/vscode/src/pipelex/graph/graphConfig.ts` — resolves render config (edge type, layout, theme) from `~/.pipelex/pipelex.toml` + VS Code settings
+- `editors/vscode/src/pipelex/graph/webview/adapter.ts` — webview entry; mounts `@pipelex/mthds-ui`'s `GraphViewer` (the actual ReactFlow renderer) and bridges VS Code messages. Bundled to `graph.js`.
 - `editors/vscode/src/pipelex/graph/webview/graph.html` — webview HTML template
-- `editors/vscode/src/pipelex/graph/webview/graph.js` — ReactFlow rendering logic
-- `editors/vscode/src/pipelex/graph/webview/graph.css` — graph styles
+- `editors/vscode/src/pipelex/graph/webview/graph.css` — host-side webview chrome / VS Code theme detection (the graph's node/edge colors come from the renderer, not here)
+
+### Theming (light/dark)
+The `GraphViewer` from `@pipelex/mthds-ui` **owns the palette**: it applies the full light or dark token set (`getPaletteForTheme(theme)`) as inline styles on its full-bleed `.react-flow-container`, and the in-graph toolbar's theme button toggles it. The host therefore drives the theme through GraphViewer's theme props and **must never send `config.paletteColors`**: GraphViewer merges that *over* the theme palette (`{ ...themePalette, ...overrides }`), which pins node/edge colors to one theme and silently breaks the light/dark toggle.
+
+`config.theme` is the theme *mode* (`'system' | 'dark' | 'light'`), not a resolved color. It defaults to `'system'` (follow the active VS Code color theme); `pipelex.graph.theme` (`auto`/`dark`/`light`) pins it. Because the webview's own `prefers-color-scheme` is unreliable, the host also injects the resolved binary theme via GraphViewer's `systemTheme` prop (carried on the `setData` `config` and extracted in `adapter.ts`). When the user switches VS Code between a light and dark theme, `methodGraphPanel.onColorThemeChanged` (wired to `vscode.window.onDidChangeActiveColorTheme`) posts a lightweight `{ type: 'setSystemTheme', systemTheme }` message; the adapter re-renders with the new `systemTheme` prop so a `'system'`-mode graph repaints live without re-running analysis or resetting the viewport. A manual in-graph theme pin survives the switch because GraphViewer ignores `systemTheme` unless its mode is `'system'`.
+
+**Persisting the in-graph toggle.** The in-graph theme button is itself a control over `pipelex.graph.theme` — there is one source of truth, not a second hidden store. GraphViewer reports every mode change through its `onThemeChange(mode, resolvedTheme)` callback; `adapter.ts` forwards only a genuine *mode* change (deduped against the host-seeded `config.theme`, so an environment-driven `'system'` re-resolve is not mistaken for a user pick) as a `{ type: 'themeModeChanged', mode }` message. `methodGraphPanel.persistThemeMode` maps the renderer mode onto the setting enum (`'system'`→`auto`, else verbatim) and writes it via `config.update`. **The writer must mirror the reader's scope.** `resolveGraphConfig` reads `pipelex.graph.theme` through `getConfiguration('pipelex')` with **no resource**, so its `workspaceFolderValue` term is dead — it effectively reads `workspaceValue ?? globalValue`. `persistThemeMode` therefore also uses the unscoped accessor and targets `Workspace` (when a workspace value already exists, so the toggle "sticks") or otherwise `Global` — **never `WorkspaceFolder`**, which the unscoped reader cannot see, so a folder-scoped write would persist but never be read back. The no-op guard compares against the *effective* value **including the contributed `auto` default** (`workspaceValue ?? globalValue ?? defaultValue`): toggling to `'system'` while nothing is explicitly set is a no-op, so it does not pin an explicit `auto` that would clobber a `pipelex.toml` `style.theme`. A *non-default* toggle (dark/light, or system over an existing explicit value) does write an explicit `pipelex.graph.theme`, which then overrides any toml `style.theme` — intended, since it's a deliberate user action. There is **no** config-change listener for the graph, so persisting never re-renders or resets the live viewport; the value is picked up by `resolveGraphConfig` on the next open / restart.
 
 ### Key cross-repo dependency
 When modifying graph rendering, always consult `../pipelex/pipelex/graph/graphspec.py` to understand the GraphSpec data model (node types, edge types, metadata) that the extension must consume. Changes to graphspec.py in pipelex directly affect the JSON the extension receives.

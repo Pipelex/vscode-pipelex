@@ -1,0 +1,170 @@
+import * as path from 'path';
+import { resolveCli } from './cliResolver';
+import { spawnCli } from './processUtils';
+import { extractJson } from './cliOutput';
+import { getAgentCliVersion, compareSemver, formatSemver, MIN_AGENT_VERSION } from './agentCliVersion';
+import { AnalyzeAbortError, BackendError } from './backend';
+import type { AnalyzeOptions, BundleAnalysis, BundleRequest, ValidationBackend } from './backend';
+import type { ValidationErrorItem, ValidationFailure } from './types';
+
+/**
+ * CLI backend — spawns `pipelex-agent validate bundle`.
+ *
+ * A single spawn per `analyze()` serves both channels via the exit code (Part B
+ * of the upstream plan was deferred — the one `--view` spawn already returns
+ * graph-on-success or errors-on-failure):
+ *
+ * - `withGraph:false` → `validate bundle … --allow-signatures --format json`.
+ *   exit 0 → valid; exit 1 → parse `validation_errors` from stderr JSON.
+ * - `withGraph:true`  → adds `--view --direction <dir>`. exit 0 → parse the
+ *   `graphspec` from stdout JSON; exit 1 → errors + `graph:null`.
+ *
+ * `--format json` makes both streams machine-readable (the agent CLI otherwise
+ * defaults error output to markdown).
+ */
+export class CliValidationBackend implements ValidationBackend {
+    readonly kind = 'cli' as const;
+
+    async analyze(request: BundleRequest, options: AnalyzeOptions, signal: AbortSignal): Promise<BundleAnalysis> {
+        const resolved = resolveCli(request.primaryUri);
+        if (!resolved) {
+            throw new BackendError({
+                kind: 'not-found',
+                logMessage: 'could not resolve pipelex-agent',
+                userMessage:
+                    'Pipelex validation: could not find pipelex-agent. ' +
+                    'Install it or set pipelex.validation.agentCliPath in settings.',
+            });
+        }
+
+        // Enforce the version floor BEFORE trusting the CLI's output. The structured
+        // `source` / `field_name` fields cross-file diagnostics rely on only exist from
+        // MIN_AGENT_VERSION; a CLI in [0.31.0, 0.34.0) still exits 0 / emits a structured
+        // error list, just without those fields. Checking only on a spawn failure (the
+        // earlier behavior) let such a CLI through silently, degrading cross-file mapping
+        // with no "too old" warning. The version probe is cached per command, so only the
+        // first analysis of a session pays for it.
+        await this.throwIfTooOld(resolved, request, signal);
+
+        const primaryPath = request.primaryUri.fsPath;
+        const dir = path.dirname(primaryPath);
+        const args = [
+            ...resolved.args,
+            'validate', 'bundle', primaryPath,
+            '--library-dir', dir,
+            '--allow-signatures',
+        ];
+        if (options.withGraph) {
+            args.push('--view');
+            if (options.direction) {
+                args.push('--direction', options.direction);
+            }
+        }
+        args.push('--format', 'json');
+
+        try {
+            const { stdout } = await spawnCli(resolved.command, args, request.timeout, signal, request.cwd);
+            // exit 0 → valid bundle.
+            if (options.withGraph) {
+                const graph = this.parseGraphspec(stdout);
+                return { validation: { ok: true, errors: [] }, graph };
+            }
+            return { validation: { ok: true, errors: [] } };
+        } catch (err: any) {
+            if (signal.aborted) {
+                throw new AnalyzeAbortError();
+            }
+            return this.handleSpawnError(err, options);
+        }
+    }
+
+    private parseGraphspec(stdout: string): unknown {
+        const json = extractJson(stdout);
+        if (!json) {
+            return null;
+        }
+        try {
+            const result = JSON.parse(json);
+            return result?.graphspec ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Map a non-zero CLI exit to a validation outcome or a {@link BackendError}.
+     * The version floor is enforced up front in {@link analyze}, so a too-old CLI
+     * (including one that argparse-errors on an unknown flag) never reaches here.
+     */
+    private handleSpawnError(err: any, options: AnalyzeOptions): BundleAnalysis {
+        if (err.exitCode === 1 && typeof err.stderr === 'string') {
+            const json = extractJson(err.stderr);
+            if (json) {
+                const outcome = this.parseFailure(json);
+                if (outcome) {
+                    return options.withGraph ? { validation: outcome, graph: null } : { validation: outcome };
+                }
+            }
+            // exit 1 but the stderr is not a parseable validation failure.
+            throw new BackendError({
+                kind: 'infra',
+                logMessage: `pipelex-agent: ${err.stderr.slice(0, 500)}`,
+            });
+        }
+
+        // Non-exit-1 failure (spawn error, timeout, …).
+        throw new BackendError({
+            kind: 'infra',
+            logMessage: `pipelex-agent error: ${err.message ?? err}`,
+        });
+    }
+
+    /**
+     * Parse the exit-1 stderr JSON into a validation outcome.
+     * Returns `undefined` when it is an infrastructural error (not a bundle problem),
+     * so the caller can surface it as a {@link BackendError} instead.
+     *
+     * The runtime's structured-info invariant is total: every invalid-bundle verdict
+     * carries a non-empty `validation_errors[]` (a parse-level failure yields one
+     * source-less `blueprint_validation` residual; a dry-run failure a `dry_run` item).
+     * So we consume that list directly — no per-category synthesis here. An exit-1
+     * envelope with an empty list is therefore NOT a bundle verdict but an infra
+     * error, surfaced as a {@link BackendError} by the caller.
+     */
+    private parseFailure(json: string): { ok: false; errors: ValidationErrorItem[] } | undefined {
+        let failure: ValidationFailure;
+        try {
+            failure = JSON.parse(json);
+        } catch {
+            return undefined;
+        }
+
+        const errors = failure.validation_errors;
+        if (Array.isArray(errors) && errors.length > 0) {
+            return { ok: false, errors };
+        }
+
+        return undefined;
+    }
+
+    private async throwIfTooOld(
+        resolved: { command: string; args: string[] },
+        request: BundleRequest,
+        signal: AbortSignal,
+    ): Promise<void> {
+        const installed = await getAgentCliVersion(resolved.command, resolved.args, request.cwd);
+        if (signal.aborted) {
+            throw new AnalyzeAbortError();
+        }
+        if (installed && compareSemver(installed, MIN_AGENT_VERSION) < 0) {
+            throw new BackendError({
+                kind: 'too-old',
+                installedVersion: formatSemver(installed),
+                minVersion: formatSemver(MIN_AGENT_VERSION),
+                logMessage:
+                    `pipelex-agent ${formatSemver(installed)} is too old ` +
+                    `(needs ≥ ${formatSemver(MIN_AGENT_VERSION)}).`,
+            });
+        }
+    }
+}

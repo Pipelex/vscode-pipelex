@@ -1,13 +1,13 @@
 # Pipelex MTHDS Support
 
-This fork of the Even Better TOML extension adds support for MTHDS (Pipelex Language) files alongside the existing TOML support.
+This fork of the Even Better TOML extension adds support for MTHDS (the language for AI methods) files alongside the existing TOML support.
 
 ## Features Added
 
 ### MTHDS Language Support
 - **File Extension**: `.mthds` files are recognized and highlighted
 - **Language ID**: `mthds`
-- **Aliases**: "MTHDS", "Pipelex Language", "PLX"
+- **Aliases**: "MTHDS", "MTHDS Language"
 
 ### MTHDS-Specific Syntax Highlighting
 The extension provides enhanced syntax highlighting for MTHDS-specific constructs:

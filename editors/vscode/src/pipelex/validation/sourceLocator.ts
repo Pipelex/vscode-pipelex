@@ -2,41 +2,68 @@ import * as vscode from 'vscode';
 import type { ValidationErrorItem } from './types';
 
 /**
- * Map a validation error to the best-effort source range in the document.
+ * Map a validation error to the best-effort source range in a document.
  *
  * Strategy:
  * 1. Determine a target code: use pipe_code, concept_code, or extract from message
  * 2. Search for the matching `[pipe.<code>]` or `[concept.<code>]` table header
  * 3. If field_path is present, search for `<field> =` within that table section
  * 4. Fallback to line 0
+ *
+ * The matching core operates on an array of line strings (`findErrorLine`) so the
+ * same placement logic serves an open `TextDocument` (the saved file) and a
+ * sibling file that is only read from disk (cross-file diagnostics, never opened).
  */
 export function locateError(error: ValidationErrorItem, document: vscode.TextDocument): vscode.Range {
+    const lines = documentLines(document);
+    const line = findErrorLine(error, lines);
+    const safeLine = Math.min(line, document.lineCount - 1);
+    return document.lineAt(safeLine).range;
+}
+
+/** Same placement logic against raw text — for files that are not open as documents. */
+export function locateErrorInLines(error: ValidationErrorItem, lines: string[]): vscode.Range {
+    const line = findErrorLine(error, lines);
+    return fullLineRange(lines, line);
+}
+
+/** Split document text into line strings (cheaper than repeated `lineAt`). */
+function documentLines(document: vscode.TextDocument): string[] {
+    const out: string[] = [];
+    for (let i = 0; i < document.lineCount; i++) {
+        out.push(document.lineAt(i).text);
+    }
+    return out;
+}
+
+/** The matching core: returns the 0-based target line for an error, or 0 as fallback. */
+export function findErrorLine(error: ValidationErrorItem, lines: string[]): number {
     const pipeCode = error.pipe_code ?? extractCodeFromMessage(error.message, 'pipe');
     const conceptCode = error.concept_code ?? extractCodeFromMessage(error.message, 'concept');
 
     let headerLine = -1;
 
     if (pipeCode) {
-        headerLine = findTableHeader(document, 'pipe', pipeCode);
+        headerLine = findTableHeaderInLines(lines, 'pipe', pipeCode);
     }
     if (headerLine === -1 && conceptCode) {
-        headerLine = findTableHeader(document, 'concept', conceptCode);
+        headerLine = findTableHeaderInLines(lines, 'concept', conceptCode);
     }
 
     if (headerLine !== -1 && error.field_path) {
         const fieldKey = error.field_path.split('.').pop()!;
-        const fieldLine = findFieldInSection(document, headerLine, fieldKey);
+        const fieldLine = findFieldInSection(lines, headerLine, fieldKey);
         if (fieldLine !== -1) {
-            return fullLineRange(document, fieldLine);
+            return fieldLine;
         }
-        return fullLineRange(document, headerLine);
+        return headerLine;
     }
 
     if (headerLine !== -1) {
-        return fullLineRange(document, headerLine);
+        return headerLine;
     }
 
-    return fullLineRange(document, 0);
+    return 0;
 }
 
 /**
@@ -51,10 +78,16 @@ function extractCodeFromMessage(message: string, kind: 'pipe' | 'concept'): stri
     return match ? match[1] : null;
 }
 
+/** Find a `[<kind>.<code>]` table header in a document. */
 export function findTableHeader(document: vscode.TextDocument, kind: string, code: string): number {
+    return findTableHeaderInLines(documentLines(document), kind, code);
+}
+
+/** Find a `[<kind>.<code>]` table header in raw lines. */
+export function findTableHeaderInLines(lines: string[], kind: string, code: string): number {
     const pattern = new RegExp(`^\\s*\\[${kind}\\.${escapeRegex(code)}\\]`);
-    for (let i = 0; i < document.lineCount; i++) {
-        if (pattern.test(document.lineAt(i).text)) {
+    for (let i = 0; i < lines.length; i++) {
+        if (pattern.test(lines[i])) {
             return i;
         }
     }
@@ -65,10 +98,10 @@ export function findTableHeader(document: vscode.TextDocument, kind: string, cod
  * Search for `<fieldKey> =` within the table section starting at headerLine.
  * A section ends at the next table header or end of document.
  */
-function findFieldInSection(document: vscode.TextDocument, headerLine: number, fieldKey: string): number {
+function findFieldInSection(lines: string[], headerLine: number, fieldKey: string): number {
     const fieldPattern = new RegExp(`^\\s*${escapeRegex(fieldKey)}\\s*=`);
-    for (let i = headerLine + 1; i < document.lineCount; i++) {
-        const text = document.lineAt(i).text;
+    for (let i = headerLine + 1; i < lines.length; i++) {
+        const text = lines[i];
         // Stop at the next table header
         if (/^\s*\[/.test(text)) {
             break;
@@ -80,9 +113,12 @@ function findFieldInSection(document: vscode.TextDocument, headerLine: number, f
     return -1;
 }
 
-function fullLineRange(document: vscode.TextDocument, line: number): vscode.Range {
-    const safeLine = Math.min(line, document.lineCount - 1);
-    return document.lineAt(safeLine).range;
+function fullLineRange(lines: string[], line: number): vscode.Range {
+    if (lines.length === 0) {
+        return new vscode.Range(0, 0, 0, 0);
+    }
+    const safeLine = Math.min(Math.max(line, 0), lines.length - 1);
+    return new vscode.Range(safeLine, 0, safeLine, lines[safeLine].length);
 }
 
 function escapeRegex(s: string): string {

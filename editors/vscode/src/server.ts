@@ -18,7 +18,10 @@ process.on("message", async (d: RpcMessage) => {
       {
         cwd: () => process.cwd(),
         envVar: name => process.env[name],
-        envVars: () => Object.entries(process.env),
+        envVars: () =>
+          Object.entries(process.env).filter(
+            (entry): entry is [string, string] => entry[1] !== undefined,
+          ),
         findConfigFile: from => {
           const projectNames = [".pipelex/plxt.toml", "plxt.toml"];
           const taploNames = [".taplo.toml", "taplo.toml"];
@@ -78,6 +81,15 @@ process.on("message", async (d: RpcMessage) => {
       },
       {
         onMessage(message) {
+          // The worker is always forked with an IPC channel (TransportKind.ipc),
+          // so process.send is defined. Guard explicitly so a broken invariant
+          // fails loudly with a diagnosable error rather than silently dropping
+          // every LSP response (which would look like a hung language server).
+          if (!process.send) {
+            throw new Error(
+              "server worker has no IPC channel; cannot send LSP message",
+            );
+          }
           process.send(message);
         },
       }

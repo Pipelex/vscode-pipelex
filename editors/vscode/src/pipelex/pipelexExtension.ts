@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
 import { getOutput } from '../util';
+import { registerApiKeyCommands } from './validation/apiKey';
+import { registerLightSyntaxColors } from './syntax/lightColors';
 
 /**
  * Register all Pipelex-specific features for MTHDS support
@@ -8,6 +10,14 @@ import { getOutput } from '../util';
 export async function registerPipelexFeatures(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('pipelex');
     const semanticTokensEnabled = config.get<boolean>('mthds.semanticTokens', true);
+
+    // Hosted API key commands (SecretStorage). Available in any host — SecretStorage
+    // does not depend on child_process, unlike the validator/graph features below.
+    registerApiKeyCommands(context);
+
+    // Light-theme MTHDS syntax colors (consent-gated settings write). Host-agnostic:
+    // settings writes work everywhere, no child_process needed.
+    registerLightSyntaxColors(context);
 
     if (semanticTokensEnabled) {
         const provider = new PipelexSemanticTokensProvider();
@@ -22,31 +32,12 @@ export async function registerPipelexFeatures(context: vscode.ExtensionContext) 
 
     // Validator and graph panel require child_process (Node host only)
     try {
-        await registerNodeFeatures(context, config);
+        await registerNodeFeatures(context);
     } catch (err: any) {
         const output = getOutput();
         output.appendLine(`Pipelex: failed to register Node features: ${err.message ?? err}`);
         vscode.window.showWarningMessage(
             'Pipelex: some features could not be loaded. Check the output panel for details.'
-        );
-    }
-
-    const PLX_DISMISSED_KEY = 'pipelex.plxDeprecationDismissed';
-    if (!context.globalState.get<boolean>(PLX_DISMISSED_KEY)) {
-        context.subscriptions.push(
-            vscode.workspace.onDidOpenTextDocument(doc => {
-                if (doc.uri.fsPath.endsWith('.plx') &&
-                    !context.globalState.get<boolean>(PLX_DISMISSED_KEY)) {
-                    vscode.window.showWarningMessage(
-                        'The .plx file extension is deprecated. Please rename your files to .mthds.',
-                        "Don't Show Again"
-                    ).then(choice => {
-                        if (choice === "Don't Show Again") {
-                            context.globalState.update(PLX_DISMISSED_KEY, true);
-                        }
-                    });
-                }
-            })
         );
     }
 }
@@ -57,7 +48,6 @@ export async function registerPipelexFeatures(context: vscode.ExtensionContext) 
  */
 async function registerNodeFeatures(
     context: vscode.ExtensionContext,
-    config: vscode.WorkspaceConfiguration,
 ) {
     // In browser environments, child_process is unavailable
     try {
@@ -66,13 +56,19 @@ async function registerNodeFeatures(
         return;
     }
 
-    // Pipelex-agent validation on save
-    const validationEnabled = config.get<boolean>('validation.enabled', true);
-    if (validationEnabled) {
-        const { PipelexValidator } = await import('./validation/pipelexValidator');
-        const validator = new PipelexValidator(getOutput());
-        context.subscriptions.push(validator);
-    }
+    // The backend factory selects CLI vs API per `pipelex.backend`; it is shared by
+    // the validator and the graph panel so version-gate / remote-consent state is one copy.
+    const { BackendFactory } = await import('./validation/backendFactory');
+    const factory = new BackendFactory(context, getOutput());
+
+    // Bundle validation on save. Registered unconditionally: PipelexValidator.onSave
+    // re-reads `pipelex.validation.enabled` per-document and no-ops when it is off, so
+    // the validator can be enabled live without a reload. Gating creation on the
+    // activation-time setting left the graph panel — which reads the setting live and
+    // suppresses its own refresh when validation is on — with no validator to drive.
+    const { PipelexValidator } = await import('./validation/pipelexValidator');
+    const validator = new PipelexValidator(getOutput(), factory);
+    context.subscriptions.push(validator);
 
     const { runInTerminal } = await import('./terminalRunner');
 
@@ -101,8 +97,12 @@ async function registerNodeFeatures(
     // Method graph webview panel
     const { MethodGraphPanel } = await import('./graph/methodGraphPanel');
     const { isGraphspecJson } = await import('./graph/graphspecDetector');
-    const graphPanel = new MethodGraphPanel(getOutput(), context.extensionUri);
+    const graphPanel = new MethodGraphPanel(getOutput(), context.extensionUri, uri => factory.getBackend(uri));
     context.subscriptions.push(graphPanel);
+
+    // On save, the validator drives ONE analyze call and hands the graph to the panel
+    // (no second backend round-trip when the panel is open).
+    validator.setGraphSink(graphPanel);
 
     // Context key: set pipelex.isGraphspecJson when the active editor is a valid GraphSpec JSON
     context.subscriptions.push(

@@ -6,14 +6,24 @@ import { execFile } from 'child_process';
  * for the lifetime of the extension host.
  *
  * Used to give actionable error messages when an installed `pipelex-agent`
- * predates a feature the extension relies on (e.g. `--format json`, which
- * landed in 0.29.0).
+ * predates a feature the extension relies on (e.g. the structured
+ * `validation_errors[]` fields, which landed in 0.34.0).
  */
 
 export type Semver = readonly [number, number, number];
 
-/** First `pipelex-agent` version that accepts `validate bundle --format json`. */
-export const MIN_FORMAT_JSON_VERSION: Semver = [0, 29, 0];
+/**
+ * Minimum `pipelex-agent` version the extension relies on. Features that set
+ * this floor:
+ * - `validate bundle --format json` (landed in 0.29.0)
+ * - `validate bundle --allow-signatures` (landed in 0.31.0)
+ * - structured `validation_errors[]` carrying `source` / `field_name` (landed in
+ *   0.34.0) — needed for cross-file diagnostics and parity with the API backend.
+ *
+ * This is a compatibility-floor break: an older `pipelex-agent` is reported as
+ * too old (the extension's behavior is otherwise unchanged).
+ */
+export const MIN_AGENT_VERSION: Semver = [0, 34, 0];
 
 const cache = new Map<string, Promise<Semver | null>>();
 

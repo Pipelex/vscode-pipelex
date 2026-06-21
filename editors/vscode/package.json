@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -36,7 +36,6 @@
   "keywords": [
     "pipelex",
     "mthds",
-    "plx",
     "dsl",
     "toml",
     "syntax",
@@ -115,12 +114,10 @@
         "id": "mthds",
         "aliases": [
           "MTHDS",
-          "Pipelex Language",
-          "PLX"
+          "MTHDS Language"
         ],
         "extensions": [
-          ".mthds",
-          ".plx"
+          ".mthds"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -212,6 +209,22 @@
         "command": "pipelex.runBundle",
         "title": "Pipelex: Run Bundle",
         "icon": "$(play)"
+      },
+      {
+        "command": "pipelex.setApiKey",
+        "title": "Pipelex: Set Hosted API Key"
+      },
+      {
+        "command": "pipelex.clearApiKey",
+        "title": "Pipelex: Clear Hosted API Key"
+      },
+      {
+        "command": "pipelex.applyLightSyntaxColors",
+        "title": "Pipelex: Apply Light Theme Colors for MTHDS"
+      },
+      {
+        "command": "pipelex.removeLightSyntaxColors",
+        "title": "Pipelex: Remove Light Theme Colors for MTHDS"
       }
     ],
     "semanticTokenTypes": [
@@ -537,8 +550,28 @@
           "scope": "resource",
           "default": true
         },
+        "pipelex.backend": {
+          "description": "Which backend validates MTHDS bundles and renders method graphs. `cli` spawns the local `pipelex-agent` CLI (zero-config default). `api` calls a Pipelex API server over HTTP — set `pipelex.api.baseUrl` and, for a hosted endpoint, store a key via the `Pipelex: Set Hosted API Key` command.",
+          "type": "string",
+          "enum": [
+            "cli",
+            "api"
+          ],
+          "enumDescriptions": [
+            "Spawn the local pipelex-agent CLI (default, zero-config).",
+            "Call a Pipelex API server (self-hosted or hosted) via HTTP."
+          ],
+          "scope": "resource",
+          "default": "cli"
+        },
+        "pipelex.api.baseUrl": {
+          "description": "Base URL of the Pipelex API server used when `pipelex.backend` is `api`. Host only, no version path. Defaults to the hosted Pipelex API (`https://api.pipelex.com`) — store a key via `Pipelex: Set Hosted API Key`. For a locally self-hosted pipelex-api, set this to e.g. `http://localhost:8081`.",
+          "type": "string",
+          "scope": "resource",
+          "default": "https://api.pipelex.com"
+        },
         "pipelex.validation.enabled": {
-          "description": "Run pipelex-agent validation on save for MTHDS files.",
+          "description": "Run validation on save for MTHDS files.",
           "type": "boolean",
           "scope": "resource",
           "default": true
@@ -576,18 +609,21 @@
           "scope": "resource",
           "description": "Edge curve type for the graph renderer. Overrides pipelex.toml."
         },
-        "pipelex.graph.palette": {
+        "pipelex.graph.theme": {
           "type": "string",
           "enum": [
-            "dracula",
-            "yellow_blue"
+            "auto",
+            "dark",
+            "light"
           ],
           "enumDescriptions": [
-            "Vibrant dark palette with salmon pipes, teal data, lemon edges",
-            "Classic blue pipes and amber data"
+            "Match the active VS Code color theme (default)",
+            "Always render the graph with the dark palette",
+            "Always render the graph with the light palette"
           ],
           "scope": "resource",
-          "description": "Color palette for the graph renderer. Overrides pipelex.toml."
+          "default": "auto",
+          "description": "Color theme for the method graph renderer. 'auto' follows the editor's color theme. Overrides pipelex.toml."
         },
         "pipelex.graph.direction": {
           "description": "Layout direction for the method graph.",
@@ -758,15 +794,17 @@
     "build:browser-server": "rollup -c rollup.config.browser-server.mjs",
     "build:node": "rollup -c rollup.config.mjs",
     "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "npm:0.6.5",
+    "@pipelex/mthds-ui": "npm:0.9.0",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
+    "mthds": "npm:0.12.0",
     "node-fetch": "^3.3.2",
     "react": "^19",
     "react-dom": "^19",
@@ -780,6 +818,8 @@
     "@rollup/plugin-replace": "^5.0.5",
     "@types/deep-equal": "^1.0.4",
     "@types/node": "^20.11.9",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "@types/vscode": "^1.90.0",
     "@types/which": "^3.0.3",
     "@vscode/test-web": "^0.0.51",
