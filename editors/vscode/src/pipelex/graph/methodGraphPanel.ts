@@ -10,7 +10,7 @@ import { CliValidationBackend } from '../validation/cliValidationBackend';
 import { SET_API_KEY_COMMAND } from '../validation/apiKey';
 import { findTableHeader } from '../validation/sourceLocator';
 import type { ValidationErrorItem } from '../validation/types';
-import { resolveGraphConfig, getPaletteColors } from './graphConfig';
+import { resolveGraphConfig } from './graphConfig';
 import { parseGraphspecFile } from './graphspecDetector';
 import { escapeHtml } from '../htmlEscape';
 
@@ -561,7 +561,11 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 edgeType: graphConfig.edgeType,
                 initialZoom: graphConfig.initialZoom,
                 panToTop: graphConfig.panToTop,
-                paletteColors: getPaletteColors(graphConfig.palette),
+                // The renderer derives its full light/dark palette from `theme`.
+                // Do NOT send `paletteColors` here — GraphViewer merges it *over*
+                // the theme palette, which would pin node/edge colors to one theme
+                // and break the in-graph light/dark toggle.
+                theme: graphConfig.theme,
             },
         };
 

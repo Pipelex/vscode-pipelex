@@ -4,49 +4,43 @@ import * as path from 'path';
 import * as os from 'os';
 import { parse as parseToml } from 'smol-toml';
 
+/** Binary color theme understood by the mthds-ui GraphViewer. */
+export type GraphTheme = 'dark' | 'light';
+
 export interface GraphRenderConfig {
     edgeType: string;
     nodesep: number;
     ranksep: number;
     initialZoom: number | undefined;
     panToTop: boolean;
-    theme: string;
-    palette: string;
+    theme: GraphTheme;
 }
 
-const DEFAULTS: GraphRenderConfig = {
+const DEFAULTS: Omit<GraphRenderConfig, 'theme'> = {
     edgeType: 'bezier',
     nodesep: 50,
     ranksep: 30,
     initialZoom: undefined,
     panToTop: true,
-    theme: 'dark',
-    palette: 'dracula',
 };
 
-const PALETTE_COLORS: Record<string, Record<string, string>> = {
-    dracula: {
-        '--color-pipe': '#ff6b6b',
-        '--color-pipe-bg': 'rgba(224,108,117,0.18)',
-        '--color-pipe-text': '#ffffff',
-        '--color-stuff': '#4ECDC4',
-        '--color-stuff-bg': 'rgba(78,205,196,0.12)',
-        '--color-stuff-border': '#9ddcfd',
-        '--color-stuff-text': '#98FB98',
-        '--color-stuff-text-dim': '#9ddcfd',
-        '--color-edge': '#FFFACD',
-        '--color-batch-item': '#bd93f9',
-        '--color-batch-aggregate': '#50fa7b',
-        '--color-parallel-combine': '#d6a4ff',
-        '--color-success': '#50FA7B',
-        '--color-success-bg': 'rgba(80,250,123,0.15)',
-        '--color-error': '#FF5555',
-        '--color-error-bg': 'rgba(255,85,85,0.15)',
-        '--color-accent': '#8BE9FD',
-        '--color-warning': '#FFB86C',
-    },
-    // yellow_blue uses CSS defaults — no overrides needed
-};
+function isGraphTheme(value: unknown): value is GraphTheme {
+    return value === 'dark' || value === 'light';
+}
+
+/**
+ * Map VS Code's active color theme to the graph's binary light/dark theme so
+ * the graph opens matching the editor. Guards against `ColorThemeKind` being
+ * absent (e.g. under unit-test mocks), defaulting to dark.
+ */
+export function activeEditorGraphTheme(): GraphTheme {
+    const Kind = vscode.ColorThemeKind;
+    const kind = vscode.window.activeColorTheme?.kind;
+    if (Kind && (kind === Kind.Light || kind === Kind.HighContrastLight)) {
+        return 'light';
+    }
+    return 'dark';
+}
 
 async function readPipelexToml(): Promise<Partial<GraphRenderConfig>> {
     const tomlPath = path.join(os.homedir(), '.pipelex', 'pipelex.toml');
@@ -68,8 +62,7 @@ async function readPipelexToml(): Promise<Partial<GraphRenderConfig>> {
         if (typeof rf.ranksep === 'number') result.ranksep = rf.ranksep;
         if (typeof rf.initial_zoom === 'number') result.initialZoom = rf.initial_zoom;
         if (typeof rf.pan_to_top === 'boolean') result.panToTop = rf.pan_to_top;
-        if (typeof rf.style?.theme === 'string') result.theme = rf.style.theme;
-        if (typeof rf.style?.palette === 'string') result.palette = rf.style.palette;
+        if (isGraphTheme(rf.style?.theme)) result.theme = rf.style.theme;
         return result;
     } catch {
         vscode.window.showWarningMessage(
@@ -79,21 +72,32 @@ async function readPipelexToml(): Promise<Partial<GraphRenderConfig>> {
     }
 }
 
+/**
+ * Resolve the graph render config from (lowest→highest priority):
+ *   active editor theme → ~/.pipelex/pipelex.toml → VS Code settings.
+ *
+ * The theme follows the editor by default. A `pipelex.toml` `style.theme`, or
+ * the `pipelex.graph.theme` setting when pinned to `dark`/`light` (i.e. not
+ * `auto`), overrides that. The renderer derives its full palette from this
+ * theme — the host must NOT send a `paletteColors` override, or it would shadow
+ * the renderer's light/dark palette (see methodGraphPanel.sendGraphspecToWebview).
+ */
 export async function resolveGraphConfig(): Promise<GraphRenderConfig> {
     const fromToml = await readPipelexToml();
-    const merged: GraphRenderConfig = { ...DEFAULTS, ...fromToml };
+    const merged: GraphRenderConfig = {
+        ...DEFAULTS,
+        theme: activeEditorGraphTheme(),
+        ...fromToml,
+    };
 
     // VS Code settings override (only when explicitly set)
     const cfg = vscode.workspace.getConfiguration('pipelex');
     const edgeType = cfg.get<string>('graph.edgeType');
-    const palette = cfg.get<string>('graph.palette');
-
     if (edgeType) merged.edgeType = edgeType;
-    if (palette) merged.palette = palette;
+
+    // `auto` (the default) keeps the toml/editor-derived theme.
+    const theme = cfg.get<string>('graph.theme');
+    if (isGraphTheme(theme)) merged.theme = theme;
 
     return merged;
-}
-
-export function getPaletteColors(palette: string): Record<string, string> {
-    return PALETTE_COLORS[palette] || {};
 }

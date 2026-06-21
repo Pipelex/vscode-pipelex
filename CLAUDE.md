@@ -83,10 +83,14 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 The extension includes a webview panel that renders method/pipe graphs using ReactFlow. The extension receives a **GraphSpec** (JSON with nodes and edges) from `pipelex-agent validate --view` and renders the graph itself using ReactFlow in the webview. This gives full control over layout, styling, and interactivity.
 
 ### Extension-side code
-- `editors/vscode/src/pipelex/graph/methodGraphPanel.ts` — webview panel manager
+- `editors/vscode/src/pipelex/graph/methodGraphPanel.ts` — webview panel manager (extension host); builds the `setData` config payload
+- `editors/vscode/src/pipelex/graph/graphConfig.ts` — resolves render config (edge type, layout, theme) from `~/.pipelex/pipelex.toml` + VS Code settings
+- `editors/vscode/src/pipelex/graph/webview/adapter.ts` — webview entry; mounts `@pipelex/mthds-ui`'s `GraphViewer` (the actual ReactFlow renderer) and bridges VS Code messages. Bundled to `graph.js`.
 - `editors/vscode/src/pipelex/graph/webview/graph.html` — webview HTML template
-- `editors/vscode/src/pipelex/graph/webview/graph.js` — ReactFlow rendering logic
-- `editors/vscode/src/pipelex/graph/webview/graph.css` — graph styles
+- `editors/vscode/src/pipelex/graph/webview/graph.css` — host-side webview chrome / VS Code theme detection (the graph's node/edge colors come from the renderer, not here)
+
+### Theming (light/dark)
+The `GraphViewer` from `@pipelex/mthds-ui` **owns the palette**: it applies the full light or dark token set (`getPaletteForTheme(theme)`) as inline styles on its full-bleed `.react-flow-container`, and the in-graph toolbar's theme button toggles it. The host therefore drives the theme through one field only — `config.theme` (`'dark' | 'light'`) — and **must never send `config.paletteColors`**: GraphViewer merges that *over* the theme palette (`{ ...themePalette, ...overrides }`), which pins node/edge colors to one theme and silently breaks the light/dark toggle. `config.theme` defaults to following the active VS Code color theme; `pipelex.graph.theme` (`auto`/`dark`/`light`) pins it.
 
 ### Key cross-repo dependency
 When modifying graph rendering, always consult `../pipelex/pipelex/graph/graphspec.py` to understand the GraphSpec data model (node types, edge types, metadata) that the extension must consume. Changes to graphspec.py in pipelex directly affect the JSON the extension receives.

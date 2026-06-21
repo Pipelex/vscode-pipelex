@@ -76,12 +76,10 @@ function handleMessage(event: { data: any }) {
         currentGraphspec = message.graphspec || null;
         currentConfig = message.config || {};
 
-        // Apply palette colors as CSS custom properties on <body>
-        if (currentConfig.paletteColors) {
-            for (const [cssVar, value] of Object.entries(currentConfig.paletteColors)) {
-                document.body.style.setProperty(cssVar, value);
-            }
-        }
+        // Theme drives the renderer's palette: GraphViewer applies the full
+        // light/dark palette (getPaletteForTheme) as inline styles on its own
+        // container, so the host passes only `config.theme` and never a
+        // `paletteColors` override (which would shadow that palette).
 
         if (renderApp) renderApp();
 

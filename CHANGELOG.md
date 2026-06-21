@@ -15,14 +15,17 @@
  - **Direct structured error consumption:** Both backends now consume the runtime's structured `validation_errors[]` directly. The `api` backend reads the 200-response `/validate` body and treats invalid bundles as a produced verdict (`is_valid: false`) rather than catching an HTTP 422, and dry-run failures now ride a graph-level `dry_run` item.
  - **Diagnostic source label** changed from `pipelex-agent` to `pipelex`, reflecting that errors can originate from either backend.
  - **Tolerate signature stubs:** On-save validation and the method graph now pass `--allow-signatures` to `pipelex-agent validate bundle`, allowing WIP bundles with `PipeSignature` stubs to validate and render.
+ - **Method graph theme follows the editor:** The graph now opens in the palette matching the active VS Code color theme by default. The new `pipelex.graph.theme` setting (`auto`/`dark`/`light`) pins it, and the in-graph theme button still toggles live.
  - **Dependencies:** Bumped `@pipelex/mthds-ui` to `0.8.0` and added `mthds` `0.12.0`.
 
 ### Fixed
+ - **Method graph light mode:** Toggling the in-graph theme button to Light now applies the full light palette to nodes and edges. The extension previously forced a fixed dark palette over the renderer's theme, so node/edge colors stayed dark in light mode while only the background switched.
  - **Stale graph prevention:** An open method-graph panel no longer shows a stale graph when on-save analysis fails or is skipped; backend/transport failures render the error directly in the panel.
  - **Race condition on skipped saves:** A skipped save (e.g., when another extension reports syntax errors) now cancels any in-flight analysis for that file, preventing a slow prior run from re-publishing stale diagnostics.
  - **Concurrent sibling-save race:** Saving two `.mthds` files in the same directory in quick succession no longer lets a slower earlier run overwrite the newer save's diagnostics. Diagnostics are written per directory but analyses are cancelled per file, so each save is now stamped with a per-directory generation and a stale run's write is dropped.
 
 ### Removed
+ - **`pipelex.graph.palette` setting:** Dropped the `dracula`/`yellow_blue` palette override. It duplicated and overrode the renderer's own light/dark palette (which is what broke light mode); theming is now driven by `pipelex.graph.theme` and the in-graph toggle.
  - **Fabricated diagnostics:** Removed the synthesized `blueprint_validation` diagnostics at the backend sites. Exit-1 CLI envelopes with empty error lists are now surfaced as infrastructure errors instead of synthesized stand-ins.
  - **`.plx` file extension:** Dropped the deprecated `.plx` extension entirely. In the extension, the `mthds` language no longer associates `.plx` files, on-save bundle gathering no longer includes them, and the file watcher and one-time deprecation prompt are gone. Use `.mthds`.
  - **`.plx` in the CLI and language server:** `plxt` no longer discovers, formats, or lints `.plx` files (the default glob is now `**/*.{toml,mthds}`), and the language server no longer treats `.plx` as MTHDS or emits the `.plx` deprecation diagnostic. (plxt 0.7.0)

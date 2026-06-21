@@ -601,18 +601,21 @@
           "scope": "resource",
           "description": "Edge curve type for the graph renderer. Overrides pipelex.toml."
         },
-        "pipelex.graph.palette": {
+        "pipelex.graph.theme": {
           "type": "string",
           "enum": [
-            "dracula",
-            "yellow_blue"
+            "auto",
+            "dark",
+            "light"
           ],
           "enumDescriptions": [
-            "Vibrant dark palette with salmon pipes, teal data, lemon edges",
-            "Classic blue pipes and amber data"
+            "Match the active VS Code color theme (default)",
+            "Always render the graph with the dark palette",
+            "Always render the graph with the light palette"
           ],
           "scope": "resource",
-          "description": "Color palette for the graph renderer. Overrides pipelex.toml."
+          "default": "auto",
+          "description": "Color theme for the method graph renderer. 'auto' follows the editor's color theme. Overrides pipelex.toml."
         },
         "pipelex.graph.direction": {
           "description": "Layout direction for the method graph.",

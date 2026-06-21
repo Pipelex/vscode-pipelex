@@ -28,6 +28,8 @@ const mockState = vi.hoisted(() => {
         executeCommand: vi.fn(),
         cancelAllInflightSpy: vi.fn(),
         configOverrides: {} as Record<string, any>,
+        // Active VS Code color theme kind (vscode.ColorThemeKind.Dark = 2 by default).
+        activeColorThemeKind: 2 as number,
         // Error-list view fixtures: gatherBundleFiles + resolveErrorLocations are mocked
         // so the panel's render/navigation logic is tested in isolation from the resolver.
         bundleFiles: [] as any[],
@@ -61,6 +63,7 @@ vi.mock('vscode', () => ({
     },
     Selection: vi.fn(),
     TextEditorRevealType: { InCenter: 2 },
+    ColorThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },
     workspace: {
         get textDocuments() { return mockState.openTextDocuments; },
         getConfiguration: () => ({ get: (key: string, def: any) => mockState.configOverrides[key] ?? def }),
@@ -82,6 +85,8 @@ vi.mock('vscode', () => ({
         })),
     },
     window: {
+        // Default to a dark editor theme; tests can override via mockState.activeColorThemeKind.
+        get activeColorTheme() { return { kind: mockState.activeColorThemeKind ?? 2 }; },
         createWebviewPanel: vi.fn((_id: string, title: string) => {
             mockState.mockPanel.title = title;
             return mockState.mockPanel;
@@ -187,6 +192,7 @@ describe('MethodGraphPanel', () => {
         mockState.bundleFiles = [];
         mockState.errorLocations = [];
         mockState.openTextDocuments = [];
+        mockState.activeColorThemeKind = 2; // ColorThemeKind.Dark
     });
 
     // --- Bug B: Filename extraction ---
@@ -245,6 +251,35 @@ describe('MethodGraphPanel', () => {
                 config: expect.objectContaining({ direction: 'TB' }),
             })
         );
+        // The renderer owns the palette via `theme`; the host must never send a
+        // `paletteColors` override (it would shadow the light/dark palette).
+        const setData = mockState.mockWebview.postMessage.mock.calls
+            .map(c => c[0])
+            .find((m: any) => m?.type === 'setData');
+        expect(setData.config.theme).toBe('dark'); // follows the (mocked dark) editor
+        expect(setData.config).not.toHaveProperty('paletteColors');
+        panel.dispose();
+    });
+
+    it('graph theme follows the active editor color theme (light)', async () => {
+        mockState.activeColorThemeKind = 1; // ColorThemeKind.Light
+        const graphspec = { nodes: [], edges: [] };
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ graphspec, pipe_code: 'main' }),
+            stderr: '',
+        };
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+
+        const setData = mockState.mockWebview.postMessage.mock.calls
+            .map(c => c[0])
+            .find((m: any) => m?.type === 'setData');
+        expect(setData.config.theme).toBe('light');
         panel.dispose();
     });
 
