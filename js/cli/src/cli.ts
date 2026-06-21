@@ -14,7 +14,10 @@ import { convertEnv, Environment, prepareEnv } from "@taplo/core";
   const env: Environment = {
     cwd: () => process.cwd(),
     envVar: name => process.env[name],
-    envVars: () => Object.entries(process.env),
+    envVars: () =>
+      Object.entries(process.env).filter(
+        (entry): entry is [string, string] => entry[1] !== undefined,
+      ),
     findConfigFile: from => {
       try {
         fs.accessSync(path.join(from, ".taplo.toml"));
