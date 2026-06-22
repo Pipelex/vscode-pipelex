@@ -142,7 +142,7 @@ jobs:
         uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1.50.0
         with:
           target: ${{ matrix.arch }}
-          args: --release --out dist
+          args: --release --locked --out dist
           sccache: "true"
           manylinux: auto
       - name: Upload wheels
@@ -230,7 +230,7 @@ jobs:
         uses: PyO3/maturin-action@b1bd829e37fef14c63f19162034228a2f3dc1021 # v1.50.0
         with:
           target: ${{ matrix.arch }}
-          args: --release --out dist
+          args: --release --locked --out dist
           sccache: "true"
           manylinux: auto
           working-directory: crates/pipelex-py

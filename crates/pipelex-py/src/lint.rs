@@ -19,6 +19,19 @@
 //! schema (settled decision #3). Because validation hits only the in-memory
 //! builtin (no external `$ref`s, no env IO, no `spawn`), a current-thread tokio
 //! runtime `block_on` is sufficient.
+//!
+//! **Precondition — not for use inside a Tokio runtime.** The schema stage
+//! builds its *own* current-thread runtime and `block_on`s it, so calling this
+//! helper from a thread that is already driving a Tokio runtime panics
+//! ("Cannot start a runtime from within a runtime"). This is sound for the only
+//! caller — the PyO3 wrapper (`python.rs`), invoked via `Python::allow_threads`
+//! from plain Python/OS threads (e.g. a FastAPI threadpool) that have no
+//! ambient runtime. We can't simply offload the `block_on` to a worker thread:
+//! `Schemas::validate_root` borrows the `dom::Node` across its `.await` for
+//! error-position mapping, and the DOM is `!Send` (rowan's `Rc`-based syntax
+//! tree), so it cannot cross a thread boundary. A future Rust caller that needs
+//! this from within a runtime must re-parse and validate on its own dedicated
+//! thread.
 
 use std::collections::HashSet;
 
