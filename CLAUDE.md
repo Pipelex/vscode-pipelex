@@ -38,8 +38,10 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - `make vsix` - Package the extension into a `.vsix` file (runs `ext` first)
 - `make ext-install` - Build, package, and install the `.vsix` into Cursor or VS Code
 - `make ext-uninstall` - Uninstall the extension from the IDE
-- `make test` - Run all tests (Rust crates + VS Code extension vitest) and type-check the extension (`yarn typecheck`)
-- `make check` - **Full quality gate**: fmt check, plxt fmt check, clippy (`-D warnings`), all crate tests, vitest, extension `tsc` type-check, and WASM check. Always run after code changes.
+- `make test` - Run all fast tests (every Rust crate that has tests + VS Code extension vitest) and type-check the extension (`yarn typecheck`). It aggregates the per-package `test-*` targets below.
+- `make test-<package>` - Run one package's tests in isolation. One target per package that has a test suite: `test-taplo`, `test-taplo-common`, `test-taplo-lsp`, `test-lsp-async-stub`, `test-pipelex-common`, `test-pipelex-cli`, `test-pipelex-py` (Rust side), `test-ext` (extension tsc + vitest), and `test-pipelex-lib` (builds the Python wheel via maturin, then runs the `pipelex_tools` smoke test).
+- `make test-all` - `make test` **plus** `test-pipelex-lib`. The Python smoke test is kept out of plain `make test` because it needs `uv` + a `maturin` release build; `test-all` is the run-absolutely-everything target. (`make pipelex-lib-smoke` remains as an alias for `test-pipelex-lib`.)
+- `make check` - **Full quality gate**: fmt check, plxt fmt check, clippy (`-D warnings`), all crate tests (via `make test`), vitest, extension `tsc` type-check, and WASM check. Always run after code changes.
 - `make clean` - Remove all build artifacts (cargo, JS dist, VSIX)
 - `make sync-grammar` - Copy MTHDS TextMate grammar to the website repo
 
@@ -105,7 +107,12 @@ When modifying graph rendering, always consult `../pipelex/pipelex/graph/graphsp
 - `node_modules/` and `target/` - Build artifacts
 
 ## CI/CD
-- GitHub Actions: `ci.yaml` (fmt check, cargo test, WASM check, MSRV tests)
+- **Branching:** feature branches PR into `dev`; `dev` (via `release/*`) feeds `main`. Both `dev` and `main` are protected.
+- **PR quality gate (required, Makefile-driven so CI = local gate):**
+  - `check.yml` → runs `make check` (fmt + clippy + crate/extension tests + locked compile checks, incl. both WASM crates)
+  - `test-all.yml` → runs `make test-all` (every fast suite + the Python library smoke test)
+  - Both trigger on PRs into `main`+`dev` and are **required status checks** on both branches (branch protection: PR required, force-push/delete blocked, conversation resolution required, `enforce_admins` off). The workflows' `branches:` filter must track the protected-branch set. See `docs/dev/ci-and-branch-protection.md`.
+- `ci.yaml` — what the make gates don't cover: release auto-tagging (push to `main`), the e2e `pipelex-tools-py` wheel build/install, `toml-test` conformance, and MSRV (1.74) builds. Triggers on push/PR to `main` **only** (gates the `dev`→`main` boundary, not every feature PR). Not required checks.
 - Releases: `releases.yaml` — PyPI, VS Code Marketplace, Open VSX
 - Auto-tagging via inline shell in `ci.yaml`
 - **Enterprise allowlist:** Pipelex Enterprise restricts third-party actions. Only 4 are allowed (`Swatinem/rust-cache`, `PyO3/maturin-action`, `pypa/gh-action-pypi-publish`, `peaceiris/actions-gh-pages`) — all SHA-pinned in workflows. See `docs/dev/release-publishing.md` for details and allowlist management.

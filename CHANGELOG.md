@@ -1,5 +1,13 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Added
+ - **Python library bindings — `pipelex-tools-py`:** A new importable `pipelex_tools` module exposes MTHDS lint and format as in-process functions — `format_mthds(content, *, options=None)` and `lint_mthds(content, *, source=None)` — so a Python host (e.g. the `pipelex-api` server) can validate and format `.mthds` content without shelling out to the `plxt` binary. It is a thin PyO3 wrapper over the same `taplo`/`taplo-common` engine the CLI uses, with the canonical MTHDS formatting defaults baked in and Rust parity tests pinning its output to `plxt fmt`/`plxt lint` so the two can't drift. Both functions return structured `{kind, severity, message, location, range}` diagnostics and never raise on malformed `.mthds` content. `lint_mthds` validates against the embedded official MTHDS schema only (`pipelex://mthds.schema.json`), fully offline — no network, no config discovery, no external schema. It ships as a **separate** PyPI package (`pip install pipelex-tools-py`, import `pipelex_tools`) from the `pipelex-tools` CLI, because maturin cannot pack a native binary and a pyo3 extension module into one wheel; the CLI wheel (the native `plxt`) is unchanged. The PyO3 glue is behind a `python` cargo feature, so plain `cargo build`/`cargo test` and the MSRV jobs stay PyO3-free. The wheel ships PEP 561 type stubs (`pipelex_tools.pyi` + `py.typed`, packaged by maturin into the `pipelex_tools` package) so downstream consumers get full static typing and editor autocomplete on `format_mthds`/`lint_mthds`. New docs: `docs/dev/pipelex-tools-python-bindings.md`. (pipelex-tools-py 0.1.0)
+
+### Changed
+ - **Per-package test targets; `make test` runs them all:** The monolithic `make test` recipe is split into one `test-<package>` target per package that has a test suite — `test-taplo`, `test-taplo-common`, `test-taplo-lsp`, `test-lsp-async-stub`, `test-pipelex-common`, `test-pipelex-cli`, `test-pipelex-py`, `test-ext`, and `test-pipelex-lib` — so any single package can be tested in isolation. `make test` now aggregates the fast native + extension targets, which **closes two gaps**: the `taplo-common` and `lsp-async-stub` crates have test suites but were never run by `make test` (or CI) and now are. The Python library smoke test (which needs `uv` + a `maturin` build) stays out of plain `make test` and lives behind the new `make test-all` (= `make test` + `test-pipelex-lib`); `make pipelex-lib-smoke` remains as an alias for `test-pipelex-lib`. The CI `test` job's crate set was updated in lockstep to keep the documented CI-vs-local parity.
+
 ## [0.10.0] - 2026-06-21
 
 ### Added

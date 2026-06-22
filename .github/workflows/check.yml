@@ -1,0 +1,64 @@
+name: Check
+
+# The PR quality gate. Runs the same `make check` developers run locally —
+# fmt-check + clippy + the full crate/extension test suite + the locked
+# compile checks (CLI, PyO3 bindings, both WASM crates). Keeping CI on the
+# Makefile target (instead of hand-mirrored steps) is what keeps the local
+# gate and CI at parity: `make check` is the single source of truth.
+
+on:
+  pull_request:
+    # Must match the protected branches (dev + main). If you protect another
+    # branch, add it here too, or PRs into it will hang on a check that never runs.
+    branches:
+      - main
+      - dev
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: make check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install latest Rust toolchain
+        run: |
+          rustup update --no-self-update
+          rustup component add rustfmt clippy
+          rustup target add wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+
+      - name: Install Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+
+      - name: Guard against local file dependencies
+        # A `file:`/portal dep leaks in when someone runs `make use-local` (ul)
+        # and forgets to switch back. `make check` already guards the mthds-ui
+        # spec via check-no-local-deps; this catches any other file: dep too.
+        run: |
+          if grep -q '"file:' editors/vscode/package.json; then
+            echo "::error::package.json contains file: dependencies — run 'make un' before pushing"
+            exit 1
+          fi
+
+      - name: Install VS Code extension deps
+        # `make check` -> test -> test-ext type-checks and runs vitest inside
+        # editors/vscode but does NOT install its node_modules (devs already
+        # have them from `make ext`). Install them here so the gate runs cold.
+        run: |
+          corepack enable
+          cd editors/vscode && yarn install --immutable
+
+      - name: Run make check
+        run: make check
+
+      - name: Check that the git index is clean
+        # Catch any tracked file the format/build steps may have rewritten.
+        run: git diff-index --quiet HEAD --

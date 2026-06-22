@@ -24,15 +24,18 @@ COMMON_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-common/Car
 LSP_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-lsp/Cargo.toml 2>/dev/null || echo "unknown")
 WASM_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-wasm/Cargo.toml 2>/dev/null || echo "unknown")
 JS_LSP_VERSION=$(jq -r '.version' js/lsp/package.json 2>/dev/null || echo "unknown")
+LIB_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-py/Cargo.toml 2>/dev/null || echo "unknown")
 
 # --- Find latest tags ---
 EXT_TAG=$(git tag -l 'pipelex-vscode-ext/v*' --sort=-version:refname | head -1)
 CLI_TAG=$(git tag -l 'plxt-cli/v*' --sort=-version:refname | head -1)
+LIB_TAG=$(git tag -l 'pipelex-tools-py/v*' --sort=-version:refname | head -1)
 
 # Fall back to first commit if no tags exist
 FALLBACK_REF=$(git rev-list --max-parents=0 HEAD | head -1)
 EXT_BASE="${BASE_REF:-${EXT_TAG:-$FALLBACK_REF}}"
 CLI_BASE="${BASE_REF:-${CLI_TAG:-$FALLBACK_REF}}"
+LIB_BASE="${BASE_REF:-${LIB_TAG:-$FALLBACK_REF}}"
 
 # --- Categorize changed files ---
 categorize() {
@@ -40,6 +43,7 @@ categorize() {
   case "$file" in
     editors/vscode/*|js/*) echo "extension" ;;
     crates/pipelex-cli/*|crates/taplo-cli/*) echo "cli" ;;
+    crates/pipelex-py/*) echo "lib" ;;
     crates/pipelex-common/*|crates/pipelex-lsp/*|crates/pipelex-wasm/*|crates/taplo-lsp/*|crates/taplo-common/*|crates/taplo/*|crates/taplo-wasm/*|crates/lsp-async-stub/*) echo "common" ;;
     .github/*|docs/*|site/*|scripts/*) echo "ci_docs" ;;
     test-data/*) echo "test_data" ;;
@@ -72,6 +76,13 @@ CLI_CIDOCS_FILES=$(count_category "$CLI_BASE" "ci_docs")
 CLI_TEST_FILES=$(count_category "$CLI_BASE" "test_data")
 CLI_OTHER_FILES=$(count_category "$CLI_BASE" "other")
 
+# The library wheel (crates/pipelex-py) is built on the shared taplo/taplo-common
+# engine, so a `common` change affects it just like it affects the CLI.
+LIB_LIB_FILES=$(count_category "$LIB_BASE" "lib")
+LIB_COMMON_FILES=$(count_category "$LIB_BASE" "common")
+LIB_CIDOCS_FILES=$(count_category "$LIB_BASE" "ci_docs")
+LIB_OTHER_FILES=$(count_category "$LIB_BASE" "other")
+
 # --- Determine affected components ---
 # Use the most recent tag as the unified base for file listing
 if [[ -n "$BASE_REF" ]]; then
@@ -93,12 +104,14 @@ fi
 
 EXT_AFFECTED="false"
 CLI_AFFECTED="false"
+LIB_AFFECTED="false"
 COMMON_AFFECTED="false"
 CI_DOCS_ONLY="true"
 
 (( EXT_EXT_FILES + EXT_COMMON_FILES > 0 )) && EXT_AFFECTED="true" && CI_DOCS_ONLY="false"
 (( CLI_CLI_FILES + CLI_COMMON_FILES > 0 )) && CLI_AFFECTED="true" && CI_DOCS_ONLY="false"
-(( EXT_COMMON_FILES + CLI_COMMON_FILES > 0 )) && COMMON_AFFECTED="true"
+(( LIB_LIB_FILES + LIB_COMMON_FILES > 0 )) && LIB_AFFECTED="true" && CI_DOCS_ONLY="false"
+(( EXT_COMMON_FILES + CLI_COMMON_FILES + LIB_COMMON_FILES > 0 )) && COMMON_AFFECTED="true"
 (( EXT_OTHER_FILES + CLI_OTHER_FILES + EXT_TEST_FILES + CLI_TEST_FILES > 0 )) && CI_DOCS_ONLY="false"
 
 # --- Check changelog status ---
@@ -133,6 +146,7 @@ DATE: $(date +%Y-%m-%d)
 --- CURRENT VERSIONS ---
 extension: $EXT_VERSION
 cli: $CLI_VERSION
+pipelex-tools-py: $LIB_VERSION
 pipelex-common: $COMMON_VERSION
 pipelex-lsp: $LSP_VERSION
 pipelex-wasm: $WASM_VERSION
@@ -141,6 +155,7 @@ pipelex-lsp-js: $JS_LSP_VERSION
 --- LATEST TAGS ---
 extension: ${EXT_TAG:-<none>}
 cli: ${CLI_TAG:-<none>}
+pipelex-tools-py: ${LIB_TAG:-<none>}
 
 --- CHANGES SINCE LAST EXTENSION RELEASE (${EXT_BASE}) ---
 extension_files: $EXT_EXT_FILES
@@ -158,9 +173,16 @@ ci_docs_files: $CLI_CIDOCS_FILES
 test_data_files: $CLI_TEST_FILES
 other_files: $CLI_OTHER_FILES
 
+--- CHANGES SINCE LAST LIBRARY RELEASE (${LIB_BASE}) ---
+lib_files: $LIB_LIB_FILES
+common_files: $LIB_COMMON_FILES
+ci_docs_files: $LIB_CIDOCS_FILES
+other_files: $LIB_OTHER_FILES
+
 --- AFFECTED COMPONENTS ---
 extension: $EXT_AFFECTED
 cli: $CLI_AFFECTED
+lib: $LIB_AFFECTED
 common: $COMMON_AFFECTED
 ci_docs_only: $CI_DOCS_ONLY
 
