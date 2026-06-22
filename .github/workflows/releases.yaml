@@ -45,6 +45,7 @@ jobs:
     outputs:
       plxt-cli: ${{ steps.plxt-cli.outputs.version || '' }}
       vscode-ext: ${{ steps.vscode-ext.outputs.version || '' }}
+      pipelex-tools-py: ${{ steps.pipelex-tools-py.outputs.version || '' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Retrieve plxt-cli release version
@@ -55,6 +56,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/pipelex-vscode-ext/v')
         run: echo "version=$(echo ${GITHUB_REF#refs/tags/pipelex-vscode-ext/v})" >> $GITHUB_OUTPUT
         id: vscode-ext
+      - name: Retrieve pipelex-tools-py release version
+        if: startsWith(github.ref, 'refs/tags/pipelex-tools-py/v')
+        run: echo "version=$(echo ${GITHUB_REF#refs/tags/pipelex-tools-py/v})" >> $GITHUB_OUTPUT
+        id: pipelex-tools-py
 
   publish_vscode_extension:
     name: Publish VSCode Extension
