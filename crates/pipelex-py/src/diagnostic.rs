@@ -10,6 +10,8 @@
 use serde::Serialize;
 use taplo::rowan::TextRange;
 
+// ⚠️ PUBLIC PYTHON SURFACE — these variants are serialized lowercase into each
+// diagnostic's `kind`; mirror any change in `pipelex_tools.pyi` (`Diagnostic.kind`).
 /// Which validation stage produced a diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -22,6 +24,8 @@ pub enum DiagnosticKind {
     Schema,
 }
 
+// ⚠️ PUBLIC PYTHON SURFACE — serialized into each diagnostic's `range`; mirror
+// any field change in `pipelex_tools.pyi` (`Range`).
 /// A source range, as both raw byte offsets and 1-based codespan-style
 /// line/column coordinates. Coordinates match the `plxt` CLI exactly (the
 /// offset→line/col mapping is replicated from the CLI; see
@@ -55,6 +59,8 @@ impl Range {
     }
 }
 
+// ⚠️ PUBLIC PYTHON SURFACE — serialized into the Python diagnostic dicts via
+// `pythonize`; mirror any field change in `pipelex_tools.pyi` (`Diagnostic`).
 /// A single lint/format diagnostic.
 ///
 /// Field names are kept neutral — the `pipelex-api` repo owns the wire contract

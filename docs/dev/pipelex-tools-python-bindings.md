@@ -84,6 +84,21 @@ Diagnostic = {
 
 The line/column coordinates match the `plxt` CLI exactly. The `pipelex-api` repo owns the wire contract and `model_validate`s these.
 
+## Type stubs (PEP 561)
+
+`pipelex-tools-py` ships **inline type information**, so a downstream consumer (e.g. the strict-typed `pipelex-api`) gets full static typing and editor autocomplete on the two functions. Without it, `pipelex_tools` is a compiled extension that type checkers see as opaque (everything is `Any`, or mypy reports *"missing library stubs"*) — a `.pyi` is the only way to type a native module.
+
+The stub is hand-written at `crates/pipelex-py/pipelex_tools.pyi` (alongside a `py.typed` marker). When maturin finds it, it builds the wheel as a PEP 561 **package** — `pipelex_tools/{__init__.py, __init__.pyi, py.typed, *.abi3.so}` — placing the marker inside the package where PEP 561 wants it. The import surface is unchanged: `import pipelex_tools` / `pipelex_tools.format_mthds(...)` work exactly as before, because maturin's generated `__init__.py` re-exports from the compiled submodule. (Verified: a built wheel resolves `format_mthds(...)` to `FormatResult` under mypy, and the smoke suite passes against the installed package.)
+
+**The stub is a hand-maintained mirror — nothing enforces it against the Rust at compile time.** If you change the exported surface, update the stub in the same commit. The Rust definitions that feed it carry `⚠️ PUBLIC PYTHON SURFACE` markers (grep for them) pointing back to the stub:
+
+| Stub symbol | Rust source |
+| --- | --- |
+| `format_mthds` / `lint_mthds` signatures | `src/python.rs` |
+| `Diagnostic`, `Range`, `kind` values | `src/diagnostic.rs` |
+| `FormatResult` (the `format_mthds` return) | `src/format.rs` (`FormatOutcome`) |
+| `LintResult` (the `lint_mthds` return) | `src/python.rs` (`LintOutput`) |
+
 ## Testing
 
 The surface is covered at three levels:

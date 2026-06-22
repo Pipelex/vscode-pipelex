@@ -15,6 +15,9 @@ use taplo_common::config::Config;
 
 use crate::diagnostic::{Diagnostic, Range};
 
+// ⚠️ PUBLIC PYTHON SURFACE — serialized into the `format_mthds` dict via `pythonize`.
+// Mirror any field change in the hand-maintained stub `pipelex_tools.pyi` (`FormatResult`);
+// nothing enforces the match at compile time.
 /// Result of [`format_mthds_impl`] — the native analog of the binding's
 /// `{ "formatted", "changed", "diagnostics" }` dict.
 #[derive(Debug, Clone, Serialize)]

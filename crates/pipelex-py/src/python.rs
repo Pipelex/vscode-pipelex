@@ -15,6 +15,8 @@ use crate::diagnostic::Diagnostic;
 use crate::format::format_mthds_impl;
 use crate::lint::lint_mthds_impl;
 
+// ⚠️ PUBLIC PYTHON SURFACE — serialized into the `lint_mthds` dict; mirror any
+// change in `pipelex_tools.pyi` (`LintResult`).
 /// The `lint_mthds` return shape: `{ "diagnostics": [Diagnostic] }`.
 #[derive(Serialize)]
 struct LintOutput {
@@ -59,6 +61,9 @@ fn to_py<T: Serialize>(py: Python<'_>, value: &T) -> PyResult<PyObject> {
         .map_err(|err| PyValueError::new_err(err.to_string()))
 }
 
+// ⚠️ PUBLIC PYTHON SURFACE — keep this signature and its return shape in sync
+// with the hand-maintained stub `pipelex_tools.pyi` (`format_mthds`); the stub is
+// not compiler-checked against this function.
 /// `format_mthds(content, *, options=None) -> dict`
 ///
 /// Returns `{ "formatted", "changed", "diagnostics" }`. On a syntax error the
@@ -79,6 +84,9 @@ fn format_mthds(
     to_py(py, &outcome)
 }
 
+// ⚠️ PUBLIC PYTHON SURFACE — keep this signature and its return shape in sync
+// with the hand-maintained stub `pipelex_tools.pyi` (`lint_mthds`); the stub is
+// not compiler-checked against this function.
 /// `lint_mthds(content, *, source=None) -> dict`
 ///
 /// Returns `{ "diagnostics": [Diagnostic] }` (empty == clean). Validation is
