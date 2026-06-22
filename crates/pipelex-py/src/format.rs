@@ -73,6 +73,16 @@ pub fn format_mthds_impl(
     content: &str,
     options: &[(String, String)],
 ) -> Result<FormatOutcome, anyhow::Error> {
+    // Validate/apply caller options first so a bad option value is rejected
+    // consistently, regardless of whether `content` parses (settled contract:
+    // `ValueError` is raised only — and always — for malformed options).
+    let mut format_opts = mthds_format_options();
+    format_opts.update_from_str(
+        options
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str())),
+    )?;
+
     let syntax = parser::parse(content);
 
     if !syntax.errors.is_empty() {
@@ -97,13 +107,6 @@ pub fn format_mthds_impl(
             diagnostics,
         });
     }
-
-    let mut format_opts = mthds_format_options();
-    format_opts.update_from_str(
-        options
-            .iter()
-            .map(|(key, value)| (key.as_str(), value.as_str())),
-    )?;
 
     // `Config::default().format_scopes("")` yields the correct (empty) scopes
     // with no filesystem touch — the same call the wasm crate makes. There are
@@ -223,5 +226,16 @@ mod tests {
         let result =
             format_mthds_impl("a = 1\n", &[("column_width".to_owned(), "wide".to_owned())]);
         assert!(result.is_err(), "a bad option value should error");
+    }
+
+    #[test]
+    fn malformed_option_value_errors_even_with_syntax_error() {
+        // Option validation must not depend on whether the content parses:
+        // a bad option value is rejected before the syntax short-circuit.
+        let result = format_mthds_impl("key = ", &[("column_width".to_owned(), "wide".to_owned())]);
+        assert!(
+            result.is_err(),
+            "bad option value must error regardless of syntax errors"
+        );
     }
 }
