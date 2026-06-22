@@ -168,7 +168,9 @@ check: check-no-local-deps fmt-check lint test ## Full quality gate (format + li
 	cargo check -p pipelex-py --locked
 	# The feature-on PyO3 path is already compiled (and lock-checked) by the
 	# `cargo clippy -p pipelex-py --features python --locked` step in `lint`.
-	cargo check -p pipelex-wasm --target wasm32-unknown-unknown --locked
+	# Check both WASM crates so `make check` is the full WASM compile gate
+	# (taplo-wasm is upstream, pipelex-wasm is ours).
+	cargo check -p taplo-wasm -p pipelex-wasm --target wasm32-unknown-unknown --locked
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
 

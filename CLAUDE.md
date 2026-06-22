@@ -107,7 +107,12 @@ When modifying graph rendering, always consult `../pipelex/pipelex/graph/graphsp
 - `node_modules/` and `target/` - Build artifacts
 
 ## CI/CD
-- GitHub Actions: `ci.yaml` (fmt check, cargo test, WASM check, MSRV tests)
+- **Branching:** feature branches PR into `dev`; `dev` (via `release/*`) feeds `main`. Both `dev` and `main` are protected.
+- **PR quality gate (required, Makefile-driven so CI = local gate):**
+  - `check.yml` → runs `make check` (fmt + clippy + crate/extension tests + locked compile checks, incl. both WASM crates)
+  - `test-all.yml` → runs `make test-all` (every fast suite + the Python library smoke test)
+  - Both trigger on PRs into `main`+`dev` and are **required status checks** on both branches (branch protection: PR required, force-push/delete blocked, conversation resolution required, `enforce_admins` off). The workflows' `branches:` filter must track the protected-branch set. See `docs/dev/ci-and-branch-protection.md`.
+- `ci.yaml` — what the make gates don't cover: release auto-tagging (push to `main`), the e2e `pipelex-tools-py` wheel build/install, `toml-test` conformance, and MSRV (1.74) builds. Triggers on push/PR to `main` **only** (gates the `dev`→`main` boundary, not every feature PR). Not required checks.
 - Releases: `releases.yaml` — PyPI, VS Code Marketplace, Open VSX
 - Auto-tagging via inline shell in `ci.yaml`
 - **Enterprise allowlist:** Pipelex Enterprise restricts third-party actions. Only 4 are allowed (`Swatinem/rust-cache`, `PyO3/maturin-action`, `pypa/gh-action-pypi-publish`, `peaceiris/actions-gh-pages`) — all SHA-pinned in workflows. See `docs/dev/release-publishing.md` for details and allowlist management.

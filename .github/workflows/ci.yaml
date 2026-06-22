@@ -1,5 +1,13 @@
 name: Continuous integration
 
+# The PR quality gate proper lives in two Makefile-driven workflows so CI and
+# the local gate stay at parity:
+#   - check.yml     -> `make check`     (fmt + clippy + crate/ext tests + locked compile, incl. both WASM crates)
+#   - test-all.yml  -> `make test-all`  (every fast suite + the Python library smoke test)
+# This file holds what those targets do NOT cover: release auto-tagging, the
+# end-to-end pipelex_tools wheel build/install, toml-test conformance, and the
+# MSRV (1.74) builds.
+
 on:
   push:
     branches:
@@ -62,76 +70,6 @@ jobs:
             echo "No new version tags to create"
           fi
 
-  fmt-lint:
-    name: Check formatting and lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
-        run: |
-          rustup update --no-self-update
-          rustup component add rustfmt clippy
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      - name: Check Rust formatting
-        run: cargo fmt --check
-      - name: Check TOML formatting
-        run: cargo run --bin plxt -- fmt --check --diff
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Run Clippy on the pipelex-py PyO3 bindings (feature on)
-        # The workspace clippy above builds pipelex-py with the `python` feature
-        # OFF, so the PyO3 glue in src/python.rs is gated out and never linted.
-        # Compile it feature-on here so the bindings face the same -D warnings gate.
-        # `--locked` mirrors `make check`, pinning the pyo3/pythonize subgraph.
-        run: cargo clippy -p pipelex-py --features python --locked --all-targets -- -D warnings
-
-  test:
-    name: Test on Rust stable
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
-        run: rustup update --no-self-update
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      - name: Test Rust crates
-        # Mirror the `make test` crate set so CI and the local gate stay at parity.
-        # pipelex-py is compiled feature-off here, so `mod python` is gated out and
-        # only its pure-Rust wrapping logic is tested; the PyO3 glue is exercised
-        # end-to-end by the test-python-bindings job's import smoke test. NOTE: a
-        # future Rust test under #[cfg(feature = "python")] would NOT run here —
-        # add --features python (and a libpython) if/when such a test is introduced.
-        run: cargo test -p taplo -p taplo-common -p taplo-lsp -p lsp-async-stub -p pipelex-common -p pipelex-cli -p pipelex-py
-      - name: Check formatting regression
-        run: cargo run --bin plxt -- fmt --check
-      - name: Check if git index is clean
-        run: git diff-index --quiet HEAD --
-      - name: Install Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 20
-      - name: Guard against local file dependencies
-        run: |
-          if grep -q '"file:' editors/vscode/package.json; then
-            echo "::error::package.json contains file: dependencies — run 'make ul' before pushing"
-            exit 1
-          fi
-      - name: Install VS Code extension deps
-        run: |
-          corepack enable
-          cd editors/vscode && yarn install --immutable
-      - name: Build @pipelex/lsp type declarations
-        # The extension typecheck resolves the portal dep @pipelex/lsp via its
-        # dist/index.d.ts, which is gitignored and not part of the checkout. Emit
-        # just the declarations (no WASM/Rust build needed) so `yarn typecheck`
-        # can resolve the module.
-        run: |
-          corepack enable
-          cd js && yarn install --immutable && yarn workspace @pipelex/lsp run build:types
-      - name: Typecheck VS Code extension
-        run: cd editors/vscode && yarn typecheck
-      - name: Test VS Code extension
-        run: cd editors/vscode && yarn test
-
   test-python-bindings:
     name: Test Python bindings (pipelex-tools-py)
     runs-on: ubuntu-latest
@@ -151,9 +89,11 @@ jobs:
         # End-to-end against the shipped artifact: build the actual
         # `pipelex-tools-py` wheel with maturin (which turns on the `python`
         # feature via [tool.maturin] features), install it, and import the
-        # `pipelex_tools` module. This is the only check that catches a
-        # `[lib] name` / `#[pymodule]` / `PyInit_` symbol mismatch — a desync
-        # builds a valid wheel but fails at import.
+        # `pipelex_tools` module. This complements test-all.yml, whose
+        # `make test-all` smoke uses `maturin develop` (dev mode) — only this
+        # build-and-install path catches a `[lib] name` / `#[pymodule]` /
+        # `PyInit_` symbol mismatch, which produces a valid wheel that fails
+        # at import.
         #   --release: import-test the same profile that ships to PyPI.
         #   --locked:  build against the committed Cargo.lock, like `make check`.
         working-directory: crates/pipelex-py
@@ -164,19 +104,6 @@ jobs:
           maturin build --release --locked --out dist
           pip install --no-index --find-links dist pipelex-tools-py
           python -m unittest discover -s tests -p 'test_*.py'
-
-  check_wasm32:
-    name: Check on WASM
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
-        run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      - name: Check WASM crates (locked)
-        run: cargo check -p taplo-wasm -p pipelex-wasm --target wasm32-unknown-unknown --locked
 
   toml_test:
     name: Run toml-test
