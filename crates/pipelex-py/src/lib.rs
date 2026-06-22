@@ -2,7 +2,7 @@
 //!
 //! This crate is **library-only**: it produces the `pipelex_tools` Python
 //! extension module (MTHDS lint & format as importable functions), shipped as
-//! the `pipelex-tools-lib` wheel via maturin's `pyo3` bindings. The native
+//! the `pipelex-tools-py` wheel via maturin's `pyo3` bindings. The native
 //! `plxt` CLI is a separate concern — it stays in `pipelex-cli` and ships as the
 //! `pipelex-tools` wheel via maturin's `bin` bindings (maturin cannot package a
 //! native binary and a pyo3 cdylib in the same wheel).

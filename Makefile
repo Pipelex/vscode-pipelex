@@ -52,7 +52,7 @@ env: ## Create Python virtual env (if missing)
 pipelex-tools: env ## Build and install the pipelex-tools CLI wheel (native plxt binary, dev)
 	@. "$(VIRTUAL_ENV)/bin/activate" && maturin develop --release
 
-pipelex-lib: env ## Build and install the pipelex-tools-lib Python library (import pipelex_tools, dev)
+pipelex-lib: env ## Build and install the pipelex-tools-py Python library (import pipelex_tools, dev)
 	@. "$(VIRTUAL_ENV)/bin/activate" && cd crates/pipelex-py && maturin develop --release
 
 pipelex-lib-smoke: pipelex-lib ## Build the library wheel (dev) and run the Python import smoke test

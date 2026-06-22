@@ -1,5 +1,5 @@
 [project]
-name = "pipelex-tools-lib"
+name = "pipelex-tools-py"
 description = "Pipelex Tools as a Python library — MTHDS lint & format, importable as `pipelex_tools`"
 authors = [
   { name = "Evotis S.A.S.", email = "oss@pipelex.com" },

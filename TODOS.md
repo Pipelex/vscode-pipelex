@@ -1,6 +1,6 @@
 # TODO — Python bindings for Pipelex Tools (lint & format as a library)
 
-Status: **Phases 1–4 complete (Checkpoint 3 reached — all repo-side implementation done; the only remaining action is the deliberate `pipelex-tools-lib/v0.1.0` tag push that publishes to PyPI, plus the separate downstream `pipelex-api` PR).** Both `format_mthds` and `lint_mthds` are implemented and tested at all three levels: Rust **unit** (`cargo test -p pipelex-py`), Rust **parity** (`crates/pipelex-cli/tests/parity.rs` — binding vs `plxt fmt -`/`plxt lint -` on the corpus), and Python **e2e** from the built wheel (`make pipelex-lib-smoke` locally + the `pypi_test_pipelex_lib` matrix job in CI). Release wiring (new `pipelex-tools-lib/v*` tag in `ci.yaml` auto-tag + `releases.yaml` build/test/publish jobs), docs (`docs/dev/pipelex-tools-python-bindings.md` + `release-publishing.md` update), and the CHANGELOG entry are all in. **The full `make check` gate is green** (fmt + plxt fmt + clippy both feature sets + all Rust tests + extension typecheck/vitest + wasm + locked checks). This is the detailed implementation plan. It supersedes and refines the cold-start design in [`wip/pipelex-tools-python-bindings.md`](wip/pipelex-tools-python-bindings.md) — read that for the "why"; read this for the "how".
+Status: **Phases 1–4 complete (Checkpoint 3 reached — all repo-side implementation done; the only remaining action is the deliberate `pipelex-tools-py/v0.1.0` tag push that publishes to PyPI, plus the separate downstream `pipelex-api` PR).** Both `format_mthds` and `lint_mthds` are implemented and tested at all three levels: Rust **unit** (`cargo test -p pipelex-py`), Rust **parity** (`crates/pipelex-cli/tests/parity.rs` — binding vs `plxt fmt -`/`plxt lint -` on the corpus), and Python **e2e** from the built wheel (`make pipelex-lib-smoke` locally + the `pypi_test_pipelex_lib` matrix job in CI). Release wiring (new `pipelex-tools-py/v*` tag in `ci.yaml` auto-tag + `releases.yaml` build/test/publish jobs), docs (`docs/dev/pipelex-tools-python-bindings.md` + `release-publishing.md` update), and the CHANGELOG entry are all in. **The full `make check` gate is green** (fmt + plxt fmt + clippy both feature sets + all Rust tests + extension typecheck/vitest + wasm + locked checks). This is the detailed implementation plan. It supersedes and refines the cold-start design in [`wip/pipelex-tools-python-bindings.md`](wip/pipelex-tools-python-bindings.md) — read that for the "why"; read this for the "how".
 
 Goal: add a Python-importable surface (PyO3) — `format_mthds` / `lint_mthds` — so a Python host (the `pipelex-api` FastAPI server) can call lint and format **in-process** instead of shelling out to the `plxt` binary.
 
@@ -37,13 +37,13 @@ maturin cannot put a native binary and a pyo3 extension module in the same wheel
 | Package | Wheel kind | Built from | Ships | Status |
 | --- | --- | --- | --- | --- |
 | **`pipelex-tools`** (existing) | native bin (`py3-none-<platform>`) | `crates/pipelex-cli` via **root** `pyproject.toml` (`bindings = "bin"`) | the real native `plxt` executable, in `…​.data/scripts/plxt` | **unchanged** |
-| **`pipelex-tools-lib`** (new) | abi3 cdylib (`cp38-abi3-<platform>`) | `crates/pipelex-py` via `crates/pipelex-py/pyproject.toml` (`bindings = "pyo3"`) | `import pipelex_tools` → `format_mthds` / `lint_mthds` | new |
+| **`pipelex-tools-py`** (new) | abi3 cdylib (`cp38-abi3-<platform>`) | `crates/pipelex-py` via `crates/pipelex-py/pyproject.toml` (`bindings = "pyo3"`) | `import pipelex_tools` → `format_mthds` / `lint_mthds` | new |
 
 - `pip install pipelex-tools` → a **true native** `plxt` (zero Python startup, exactly as today).
-- `pip install pipelex-tools-lib` → `import pipelex_tools` (the library `pipelex-api` consumes).
+- `pip install pipelex-tools-py` → `import pipelex_tools` (the library `pipelex-api` consumes).
 - They coexist in one env (script in `bin/` vs module in site-packages — no file overlap).
 
-**Library package name `pipelex-tools-lib` is provisional** — nothing is published yet, so it's a cheap rename (one `[project] name` + the downstream pin). The Python **import** name is fixed at `pipelex_tools` (the cdylib `[lib] name`).
+**Library package name is `pipelex-tools-py`** (decided 2026-06-22 — renamed from the provisional `pipelex-tools-lib` before any publish). It pairs with the existing `pipelex-tools` CLI package and is the name `pipelex-api` will pin. The Python **import** name is fixed at `pipelex_tools` (the cdylib `[lib] name`); the crate stays `pipelex-py`. Only the PyPI **distribution** name changed.
 
 **Why this leaves the CLI pristine.** Because the CLI ships from `pipelex-cli` exactly as before, **none** of the abandoned single-wheel surgery is needed: no bin move, no `cli_main()` extraction, no `_run_cli` shim, no relocating `pipelex-cli`'s integration tests. `crates/pipelex-cli` is untouched (still owns `[[bin]] plxt` + `tests/{schema_path,quiet_flag}.rs`, version `0.7.0`), and the root `pyproject.toml` / `ci.yaml` auto_tag / `Makefile cli:` target are all unchanged.
 
@@ -60,12 +60,12 @@ The pure format/lint logic is **not** gated (plain Rust returning `#[derive(Seri
 
 ## Crate layout
 
-New **library-only** crate `crates/pipelex-py/` (Python import name `pipelex_tools`, published as `pipelex-tools-lib`). This is the as-built Phase-1 skeleton; Phase 2/3 add `diagnostic.rs` / `format.rs` / `lint.rs` and a `tests/` dir.
+New **library-only** crate `crates/pipelex-py/` (Python import name `pipelex_tools`, published as `pipelex-tools-py`). This is the as-built Phase-1 skeleton; Phase 2/3 add `diagnostic.rs` / `format.rs` / `lint.rs` and a `tests/` dir.
 
 ```
 crates/pipelex-py/
   Cargo.toml          # library-only: cdylib + rlib, no [[bin]]
-  pyproject.toml      # the pipelex-tools-lib package (bindings = "pyo3")
+  pyproject.toml      # the pipelex-tools-py package (bindings = "pyo3")
   src/
     lib.rs            # #[cfg(feature="python")] mod python;  (+ pub mod diagnostic/format/lint in Phase 2/3)
     python.rs         # #[cfg(feature="python")] #[pyfunction] wrappers + #[pymodule]
@@ -204,11 +204,11 @@ manifest-path = "crates/pipelex-cli/Cargo.toml"
 include       = ["LICENSE"]
 ```
 
-**`crates/pipelex-py/pyproject.toml` — the library package `pipelex-tools-lib` (NEW):**
+**`crates/pipelex-py/pyproject.toml` — the library package `pipelex-tools-py` (NEW):**
 
 ```toml
 [project]
-name = "pipelex-tools-lib"
+name = "pipelex-tools-py"
 requires-python = ">=3.8,<3.15"   # matches abi3-py38 → one wheel per os × arch
 dynamic = ["version"]             # maturin reads the version from crates/pipelex-py/Cargo.toml
 
@@ -219,8 +219,8 @@ features      = ["python"]        # turn PyO3 on only for the wheel build
 ```
 
 - Build the library: `cd crates/pipelex-py && maturin build` (or `maturin develop` for dev — `make pipelex-lib`). Build the CLI: `maturin build` from the repo root (`make pipelex-tools`). Both land in `target/wheels/`.
-- ✅ **Phase-1 gate — RESOLVED.** Proven end-to-end: the root build yields `pipelex_tools-0.7.0-py3-none-<plat>.whl` carrying the **native** `plxt` binary in `…​.data/scripts/plxt`; the library build yields `pipelex_tools_lib-0.1.0-cp38-abi3-<plat>.whl` from which `import pipelex_tools` works after `pip install`. `cargo build`/`test` stay PyO3-free. **One wheel carrying both was abandoned (maturin can't) — see the architecture note at the top.**
-- ✅ **DONE (Phase 4): per-target binary build for the library on Windows.** abi3 linking differs on Windows; the library wheel is now exercised on the full CI matrix (incl. Windows) via the `pypi_test_pipelex_lib` job's import smoke test — `pip install pipelex-tools-lib` + `python -m unittest discover` against the shipped wheel, not just locally on macOS.
+- ✅ **Phase-1 gate — RESOLVED.** Proven end-to-end: the root build yields `pipelex_tools-0.7.0-py3-none-<plat>.whl` carrying the **native** `plxt` binary in `…​.data/scripts/plxt`; the library build yields `pipelex_tools_py-0.1.0-cp38-abi3-<plat>.whl` from which `import pipelex_tools` works after `pip install`. `cargo build`/`test` stay PyO3-free. **One wheel carrying both was abandoned (maturin can't) — see the architecture note at the top.**
+- ✅ **DONE (Phase 4): per-target binary build for the library on Windows.** abi3 linking differs on Windows; the library wheel is now exercised on the full CI matrix (incl. Windows) via the `pypi_test_pipelex_lib` job's import smoke test — `pip install pipelex-tools-py` + `python -m unittest discover` against the shipped wheel, not just locally on macOS.
 
 ---
 
@@ -228,16 +228,16 @@ features      = ["python"]        # turn PyO3 on only for the wheel build
 
 The CLI release path is **untouched**. The library gets a **parallel, independent** release path under a new tag. Independent versions: the CLI keeps its own version in `crates/pipelex-cli/Cargo.toml` (and the `plxt-cli/v*` tag); the library version lives in `crates/pipelex-py/Cargo.toml` (maturin reads it via `dynamic = ["version"]`).
 
-- **New tag scheme `pipelex-tools-lib/v*`** for the library. Add it to `on.push.tags` in both `ci.yaml` and `releases.yaml`. In `ci.yaml`'s `auto_tag`, add a step that reads the version from `crates/pipelex-py/Cargo.toml` and creates `pipelex-tools-lib/v${LIB_VERSION}` (mirroring the existing `plxt-cli` step — do **not** touch the existing one). In `releases.yaml`'s `get_version`, add a `pipelex-tools-lib` output.
+- **New tag scheme `pipelex-tools-py/v*`** for the library. Add it to `on.push.tags` in both `ci.yaml` and `releases.yaml`. In `ci.yaml`'s `auto_tag`, add a step that reads the version from `crates/pipelex-py/Cargo.toml` and creates `pipelex-tools-py/v${LIB_VERSION}` (mirroring the existing `plxt-cli` step — do **not** touch the existing one). In `releases.yaml`'s `get_version`, add a `pipelex-tools-py` output.
 - **New release jobs in `releases.yaml`** mirroring `pypi_build_plxt` / `pypi_test_plxt` / `pypi_publish_plxt`, but for the library:
-  - build job: same `os × arch` matrix, but tell `PyO3/maturin-action` to use the library project via `working-directory: crates/pipelex-py` (so it picks up `crates/pipelex-py/pyproject.toml` → `bindings = "pyo3"`). Gate on the `pipelex-tools-lib/v*` tag.
-  - test job: `pip install pipelex-tools-lib --no-index --find-links wheels/`, then the import smoke test (below) on **every** matrix OS (incl. Windows — abi3 linking differs there).
-  - publish job: `pypa/gh-action-pypi-publish`, gated on the `pipelex-tools-lib/v*` push.
+  - build job: same `os × arch` matrix, but tell `PyO3/maturin-action` to use the library project via `working-directory: crates/pipelex-py` (so it picks up `crates/pipelex-py/pyproject.toml` → `bindings = "pyo3"`). Gate on the `pipelex-tools-py/v*` tag.
+  - test job: `pip install pipelex-tools-py --no-index --find-links wheels/`, then the import smoke test (below) on **every** matrix OS (incl. Windows — abi3 linking differs there).
+  - publish job: `pypa/gh-action-pypi-publish`, gated on the `pipelex-tools-py/v*` push.
 - **Library import smoke test** (the e2e gate in CI — replaces the old "extend `pypi_test_plxt`" idea, since the library is now a separate wheel): `python -c "import pipelex_tools; assert pipelex_tools.format_mthds('a=1')['formatted']; assert 'diagnostics' in pipelex_tools.lint_mthds('a=1')"`. Keep `pypi_test_plxt`'s `plxt help` exactly as-is for the CLI.
 - **Makefile (done in Phase 1):** `cli:` / `pipelex-tools:` unchanged (CLI); added `pipelex-lib:` (`cd crates/pipelex-py && maturin develop --release`); `test:` runs `cargo test -p pipelex-py`; `check:` runs `cargo check -p pipelex-py --locked`. `build:` builds CLI + library + ext.
-- **Docs (per the repo doc rule):** add `docs/dev/pipelex-tools-python-bindings.md` — the two functions, the `Diagnostic` shape, the embedded-schema-only guarantee, `import pipelex_tools` usage, and the **two-package split** (why `pip install pipelex-tools-lib` for the library vs `pipelex-tools` for the CLI). Update in the same change as the code.
-- **CHANGELOG.md:** add an entry under the current release section (no empty `## [Unreleased]` left behind). Tag `pipelex-tools-lib/v0.1.0` once green.
-- **Downstream (separate repo/PR):** in `pipelex-api`, add the pin to **`pipelex-tools-lib>=0.1.0`** (not `pipelex-tools`) and add `/v1/lint` + `/v1/format` (modeled on `api/routes/pipelex/validate.py` — diagnostic 200-with-discriminator, opt-in `rendered_markdown`, RFC 7807 only for no-verdict). Not part of this repo's work.
+- **Docs (per the repo doc rule):** add `docs/dev/pipelex-tools-python-bindings.md` — the two functions, the `Diagnostic` shape, the embedded-schema-only guarantee, `import pipelex_tools` usage, and the **two-package split** (why `pip install pipelex-tools-py` for the library vs `pipelex-tools` for the CLI). Update in the same change as the code.
+- **CHANGELOG.md:** add an entry under the current release section (no empty `## [Unreleased]` left behind). Tag `pipelex-tools-py/v0.1.0` once green.
+- **Downstream (separate repo/PR):** in `pipelex-api`, add the pin to **`pipelex-tools-py>=0.1.0`** (not `pipelex-tools`) and add `/v1/lint` + `/v1/format` (modeled on `api/routes/pipelex/validate.py` — diagnostic 200-with-discriminator, opt-in `rendered_markdown`, RFC 7807 only for no-verdict). Not part of this repo's work.
 
 ---
 
@@ -251,7 +251,7 @@ Stand up `crates/pipelex-py` as a **library-only** crate (cdylib + rlib) with on
 - `cargo test -p pipelex-cli -p pipelex-py` → green (CLI's `quiet_flag` + `schema_path` integration tests still pass in place).
 - `cargo clippy --workspace --all-targets` (default) **and** `cargo clippy -p pipelex-py --features python` → no warnings; `cargo fmt --check` + `plxt fmt --check` clean; `cargo check -p pipelex-py --locked` clean.
 - Root `maturin build` → `pipelex_tools-0.7.0-py3-none-<plat>.whl` carrying the **native** `plxt` in `…​.data/scripts/plxt`.
-- `crates/pipelex-py` `maturin build` → `pipelex_tools_lib-0.1.0-cp38-abi3-<plat>.whl`; in a clean venv, `pip install` + `import pipelex_tools` + `ping()` works, and the wheel ships **no** `plxt` (correct).
+- `crates/pipelex-py` `maturin build` → `pipelex_tools_py-0.1.0-cp38-abi3-<plat>.whl`; in a clean venv, `pip install` + `import pipelex_tools` + `ping()` works, and the wheel ships **no** `plxt` (correct).
 
 > **Checkpoint 1 (met):** the **two-wheel** packaging is proven — native `plxt` CLI wheel (unchanged) + importable `pipelex_tools` library wheel. Plain `cargo build`/`test` and the MSRV jobs remain Python-free; the CLI `os × arch` matrix is unchanged. (The single-wheel-carries-both idea was found infeasible with maturin and replaced by the two-package architecture — see the top of this doc.)
 
@@ -277,21 +277,21 @@ Pure, sync. `diagnostic.rs` (structs + `offset_to_line_col`) and `format.rs` (`f
 
 ### Phase 4 — parity + integration/e2e tests + CI + release (DONE ✅)
 - **Rust integration `tests/parity.rs`:** asserts binding output matches `plxt fmt -` / `plxt lint -` (compact) on the `test-data/mthds` corpus. Parity-test home → **`crates/pipelex-cli/tests/parity.rs`** (resolved): `pipelex-py` is added as a **dev-dependency** of `pipelex-cli` (pure Rust, `python` feature off — no PyO3 in the bin), so the test has `env!("CARGO_BIN_EXE_plxt")` *and* can call the library impls directly. The parity tests cover format-vs-CLI over every fixture + an inline canonicalization case; lint-vs-CLI over every fixture + inline syntax/semantic cases. The CLI compact diagnostics are parsed back to `(line, col, kind, msg+location)` and compared as a sorted multiset, pinning the shared dedup semantics.
-- **Python e2e tests in CI:** the import smoke test as a **new** `pypi_test_pipelex_lib` matrix job (windows/ubuntu/macos) — checkout (for `test_smoke.py`) + `pip install pipelex-tools-lib --no-index --find-links wheels/` + `python -m unittest discover -s crates/pipelex-py/tests`. `pypi_test_plxt` (`plxt help`) left untouched.
-- **Release wiring:** added the `pipelex-tools-lib/v*` tag to `ci.yaml` `on.push.tags` + a `LIB_VERSION` auto-tag step (reads `crates/pipelex-py/Cargo.toml`), and to `releases.yaml` `on.push.tags` + a `get_version` output + the `pypi_build_pipelex_lib` / `pypi_test_pipelex_lib` / `pypi_publish_pipelex_lib` jobs (maturin-action `working-directory: crates/pipelex-py`, artifacts under `crates/pipelex-py/dist`). The plxt CLI release path is byte-for-byte untouched.
-- **Docs + CHANGELOG:** added `docs/dev/pipelex-tools-python-bindings.md`, updated `docs/dev/release-publishing.md` (artifact table + the two-package note + the `pipelex-tools-lib` PyPI trusted-publisher setup), and a `## [Unreleased]` CHANGELOG entry tagged `(pipelex-tools-lib 0.1.0)`. `make check` is green.
+- **Python e2e tests in CI:** the import smoke test as a **new** `pypi_test_pipelex_lib` matrix job (windows/ubuntu/macos) — checkout (for `test_smoke.py`) + `pip install pipelex-tools-py --no-index --find-links wheels/` + `python -m unittest discover -s crates/pipelex-py/tests`. `pypi_test_plxt` (`plxt help`) left untouched.
+- **Release wiring:** added the `pipelex-tools-py/v*` tag to `ci.yaml` `on.push.tags` + a `LIB_VERSION` auto-tag step (reads `crates/pipelex-py/Cargo.toml`), and to `releases.yaml` `on.push.tags` + a `get_version` output + the `pypi_build_pipelex_lib` / `pypi_test_pipelex_lib` / `pypi_publish_pipelex_lib` jobs (maturin-action `working-directory: crates/pipelex-py`, artifacts under `crates/pipelex-py/dist`). The plxt CLI release path is byte-for-byte untouched.
+- **Docs + CHANGELOG:** added `docs/dev/pipelex-tools-python-bindings.md`, updated `docs/dev/release-publishing.md` (artifact table + the two-package note + the `pipelex-tools-py` PyPI trusted-publisher setup), and a `## [Unreleased]` CHANGELOG entry tagged `(pipelex-tools-py 0.1.0)`. `make check` is green.
 
 **As-built notes (one important parity finding):**
 - **Lint parity must point the CLI at the builtin URL, not the schema *file*.** Driving the CLI with `--schema-path crates/taplo-common/schemas/mthds_schema.json` (a `file://` URL) makes it **disagree** with the binding on `oneOf`-heavy MTHDS pipes: the file's internal `$ref`s resolve under a different base URI, so the validator collapses the per-branch errors into a single `'pipe' does not match any of the allowed schemas`. The binding (and the extension/hook in production) validate against the embedded builtin `pipelex://mthds.schema.json` (`MTHDS_SCHEMA_URL`), so the parity probe uses `plxt lint --schema pipelex://mthds.schema.json -`. With that, the two match error-for-error (the granular schema errors on `prompt-templates.mthds`, etc.). Documented in the `parity.rs` module doc and `docs/dev/pipelex-tools-python-bindings.md`.
 - **Rangeless errors:** the CLI compact printer fabricates `1:1` for semantic/schema errors with no `TextRange`; the binding emits `range: null`. The parity comparison maps binding `None → (1,1)` to reconcile (a deliberate, documented divergence).
 
-> **Checkpoint 3 (reached ✅ — repo side):** the library surface is implemented, tested at all three levels, CI/release-wired, and documented; `make check` is green. **Remaining deliberate actions (not auto-performed):** (1) push the `pipelex-tools-lib/v0.1.0` tag — or bump `crates/pipelex-py/Cargo.toml` on `main` and let `ci.yaml` auto-tag — to make `releases.yaml` build/test/**publish** the wheel to PyPI (first publish also needs the `pipelex-tools-lib` PyPI trusted-publisher set up per `release-publishing.md`); (2) confirm the provisional package name `pipelex-tools-lib` before that first publish (it's the name `pipelex-api` will pin). Then hand off to `pipelex-api` (separate session/repo): add the `pipelex-tools-lib` pin, add `/v1/lint` + `/v1/format`.
+> **Checkpoint 3 (reached ✅ — repo side):** the library surface is implemented, tested at all three levels, CI/release-wired, and documented; `make check` is green. **Remaining deliberate actions (not auto-performed):** (1) push the `pipelex-tools-py/v0.1.0` tag — or bump `crates/pipelex-py/Cargo.toml` on `main` and let `ci.yaml` auto-tag — to make `releases.yaml` build/test/**publish** the wheel to PyPI (first publish also needs the `pipelex-tools-py` PyPI trusted-publisher set up per `release-publishing.md`). The package name is now **decided** as `pipelex-tools-py` (renamed from the provisional `pipelex-tools-lib` on 2026-06-22). Then hand off to `pipelex-api` (separate session/repo): add the `pipelex-tools-py` pin, add `/v1/lint` + `/v1/format`.
 
 ---
 
 ## Open decisions to settle while building
 
-- **Library package name.** `pipelex-tools-lib` is provisional (nothing published yet). Confirm before Phase-4 tag/publish — it's the name `pipelex-api` will pin. The import name `pipelex_tools` is fixed.
+- ~~**Library package name.**~~ → **Resolved: `pipelex-tools-py`** (decided 2026-06-22, renamed from the provisional `pipelex-tools-lib` before any publish). It's the name `pipelex-api` will pin. The import name `pipelex_tools` is fixed.
 - **Runtime reuse.** Building a current-thread runtime per `lint_mthds` call is simple and correct (validation is fast and fully in-memory). If profiling later shows it matters, cache a runtime in a `thread_local!` or `OnceLock`. Start simple.
 - ~~**Parity-test home** (Phase 4): `crates/pipelex-cli/tests/` (has `CARGO_BIN_EXE_plxt`) vs a self-built `plxt` resolver.~~ → **Resolved: `crates/pipelex-cli/tests/parity.rs`** with `pipelex-py` as a dev-dependency (see Phase 4 as-built).
 - **Final `Diagnostic` field names** — coordinate with the `pipelex-api` wire models so the route can `model_validate` with minimal remapping; the API repo owns the contract.
@@ -299,9 +299,9 @@ Pure, sync. `diagnostic.rs` (structs + `offset_to_line_col`) and `format.rs` (`f
 
 _Resolved during Phase 1:_ single-wheel-carries-both → **infeasible with maturin, replaced by two packages**. `maturin develop` honors `[tool.maturin] features` → confirmed (no explicit `--features python` needed). `pipelex-cli` version → **stays independent at `0.7.0`** (CLI untouched), library versioned separately.
 
-_Resolved during Phases 2–3:_ **Runtime reuse** → per-call current-thread runtime kept (simple + correct; profiling can revisit). **`end_line`/`end_col` for rangeless errors** → semantic/schema errors with no `TextRange` emit `range: null` (mirrors wasm `Option<Range>`); `location` likewise emits `null` when absent — shape stays stable. **Diagnostic field names** (provisional, to confirm with `pipelex-api` in Phase 4): `kind`, `severity`, `message`, `location`, `range{start_offset,end_offset,start_line,start_col,end_line,end_col}`. **Caller `options` value typing** → Python `bool` mapped to lowercase, others via `str()`; bad values raise `ValueError`. Still open for Phase 4: **library package name** (`pipelex-tools-lib` provisional) and **parity-test home** (`CARGO_BIN_EXE_plxt` caveat).
+_Resolved during Phases 2–3:_ **Runtime reuse** → per-call current-thread runtime kept (simple + correct; profiling can revisit). **`end_line`/`end_col` for rangeless errors** → semantic/schema errors with no `TextRange` emit `range: null` (mirrors wasm `Option<Range>`); `location` likewise emits `null` when absent — shape stays stable. **Diagnostic field names** (provisional, to confirm with `pipelex-api` in Phase 4): `kind`, `severity`, `message`, `location`, `range{start_offset,end_offset,start_line,start_col,end_line,end_col}`. **Caller `options` value typing** → Python `bool` mapped to lowercase, others via `str()`; bad values raise `ValueError`. Still open for Phase 4: **library package name** (was provisional; later decided as `pipelex-tools-py`) and **parity-test home** (`CARGO_BIN_EXE_plxt` caveat).
 
-_Resolved during Phase 4:_ **Parity-test home** → `crates/pipelex-cli/tests/parity.rs` (`pipelex-py` dev-dep, pure Rust). **Lint parity vehicle** → drive the CLI with `--schema pipelex://mthds.schema.json` (the builtin URL), **not** `--schema-path <file>` — the file path changes `$ref` base-URI resolution and collapses `oneOf` branch errors, diverging from the binding. **Library package name** → still provisional `pipelex-tools-lib`; confirm before the first PyPI publish (it's the name `pipelex-api` pins).
+_Resolved during Phase 4:_ **Parity-test home** → `crates/pipelex-cli/tests/parity.rs` (`pipelex-py` dev-dep, pure Rust). **Lint parity vehicle** → drive the CLI with `--schema pipelex://mthds.schema.json` (the builtin URL), **not** `--schema-path <file>` — the file path changes `$ref` base-URI resolution and collapses `oneOf` branch errors, diverging from the binding. **Library package name** → **decided 2026-06-22 as `pipelex-tools-py`** (renamed from the provisional `pipelex-tools-lib` before any publish; it's the name `pipelex-api` pins).
 
 _Resolved post-review (code-review #1, #2):_ **`lint_mthds` never-raises on bad content** → the schema stage's `validate_root` can return `Err` (notably when the validator produced errors that couldn't be mapped to document positions); that path now surfaces a single location-less `kind:"schema"` diagnostic instead of propagating as `ValueError`, so `lint_mthds` upholds the same never-raise-on-bad-content contract as `format_mthds` (decision #2). **Diagnostic dedup for CLI parity** → syntax diagnostics are deduped by range (mirrors the CLI's `print_parse_errors_compact` `unique_by(range)`) and schema diagnostics by (coords + message + instance location) (mirrors `print_schema_errors_compact`'s `seen_messages`); semantic diagnostics are **not** deduped, matching the CLI. The Phase 4 parity tests must assert these dedup semantics, not raw 1:1 error counts.
 
@@ -313,7 +313,7 @@ The new library surface must be covered at **three levels** — this is a hard r
 
 1. **Unit (Rust, no Python) — `cargo test -p pipelex-py`.** The pure `format_mthds_impl` / `lint_mthds_impl` return `#[derive(Serialize)]` structs, so they're testable without a Python interpreter. Cover **every reachable diagnostic path**: format known-good / syntax-error (no-raise, decision #2) / baked-default / caller-override / line-col mapping; lint clean / syntax / semantic / schema (with `location`) / offline. Fixtures: `test-data/mthds/*.mthds`, `test-data/mthds/lint/{valid,invalid_schema}.mthds`.
 2. **Integration (Rust, `tests/`) — parity.** Binding output must match the `plxt` CLI (`plxt fmt -` / `plxt lint -`) on a shared corpus, so the in-process library and the shipped binary can't drift. (Mind the `CARGO_BIN_EXE_plxt` caveat — see Phase 4.)
-3. **End-to-end (Python, from the built wheel) — in CI on every OS.** `pip install pipelex-tools-lib` (the actual wheel, incl. Windows abi3), then `import pipelex_tools` and exercise `format_mthds` / `lint_mthds` on known-good and known-bad `.mthds` — asserting on the structured `diagnostics` (`kind`, `range`, `location`), not just truthiness. This is the gate that catches packaging/ABI regressions a `cargo test` cannot.
+3. **End-to-end (Python, from the built wheel) — in CI on every OS.** `pip install pipelex-tools-py` (the actual wheel, incl. Windows abi3), then `import pipelex_tools` and exercise `format_mthds` / `lint_mthds` on known-good and known-bad `.mthds` — asserting on the structured `diagnostics` (`kind`, `range`, `location`), not just truthiness. This is the gate that catches packaging/ABI regressions a `cargo test` cannot.
 
 No diagnostic path ships unverified; no `kind` is added without a test that reaches it.
 
@@ -321,12 +321,12 @@ No diagnostic path ships unverified; no `kind` is added without a test that reac
 
 ## Acceptance criteria (definition of done for this repo's half)
 
-- `pip install pipelex-tools` gives a working **native** `plxt` command (unchanged); `pip install pipelex-tools-lib` gives `import pipelex_tools` exposing `format_mthds` and `lint_mthds`.
+- `pip install pipelex-tools` gives a working **native** `plxt` command (unchanged); `pip install pipelex-tools-py` gives `import pipelex_tools` exposing `format_mthds` and `lint_mthds`.
 - `lint_mthds` validates `.mthds` against the embedded schema only, fully offline; no code path fetches an external schema.
 - `format_mthds` returns `{formatted, changed, diagnostics}`, never raising on syntax errors (decision #2), with output matching `plxt fmt -` on the corpus.
 - `cargo build` and `cargo test` (and the MSRV jobs) remain PyO3-free; `make check` is green.
 - **All three test levels pass** (unit + parity integration + Python e2e-from-wheel) — see [Testing strategy](#testing-strategy); every diagnostic path is covered.
-- Library version set, CHANGELOG updated, `docs/` updated, tag `pipelex-tools-lib/v0.1.0` pushed → `releases.yaml` builds/tests/publishes the library wheel. CLI release path untouched.
+- Library version set, CHANGELOG updated, `docs/` updated, tag `pipelex-tools-py/v0.1.0` pushed → `releases.yaml` builds/tests/publishes the library wheel. CLI release path untouched.
 
 ---
 
@@ -347,7 +347,7 @@ No diagnostic path ships unverified; no `kind` is added without a test that reac
 | CLI package maturin config (UNCHANGED) | root `pyproject.toml` `[tool.maturin]` (`bindings = "bin"`) |
 | Library package maturin config | `crates/pipelex-py/pyproject.toml` (`bindings = "pyo3"`) — built in Phase 1 |
 | CLI release path (UNCHANGED) | `.github/workflows/releases.yaml` (`pypi_build_plxt` / `pypi_test_plxt` / `pypi_publish_plxt`); `ci.yaml` `auto_tag` `plxt-cli/v*` |
-| Library release jobs to ADD (Phase 4) | `releases.yaml` (mirror the plxt jobs with `working-directory: crates/pipelex-py`); new tag `pipelex-tools-lib/v*` in `ci.yaml` + `releases.yaml` |
+| Library release jobs to ADD (Phase 4) | `releases.yaml` (mirror the plxt jobs with `working-directory: crates/pipelex-py`); new tag `pipelex-tools-py/v*` in `ci.yaml` + `releases.yaml` |
 | `.mthds` test fixtures | clean: `test-data/mthds/lint/valid.mthds`; schema-invalid: `test-data/mthds/lint/invalid_schema.mthds`; format corpus: `test-data/mthds/*.mthds` |
 | Docs to add (Phase 4) | `docs/dev/pipelex-tools-python-bindings.md` (new) |
 | Library crate (created, Phase 1) | `crates/pipelex-py/` (library-only: `Cargo.toml`, `pyproject.toml`, `src/{lib,python}.rs`) |

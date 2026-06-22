@@ -2,7 +2,7 @@
 
 `pipelex_tools` is an importable Python library that exposes MTHDS **lint** and **format** as in-process functions, so a Python host (e.g. the `pipelex-api` FastAPI server) can validate and format `.mthds` content without shelling out to the `plxt` binary. It is a thin PyO3 wrapper around the same `taplo`/`taplo-common` engine the `plxt` CLI uses, so the library and the binary cannot drift (enforced by parity tests — see [Testing](#testing)).
 
-The bindings live in the `crates/pipelex-py` crate (Python module name `pipelex_tools`, published as the `pipelex-tools-lib` wheel).
+The bindings live in the `crates/pipelex-py` crate (Python module name `pipelex_tools`, published as the `pipelex-tools-py` wheel).
 
 ## Two packages, one repo
 
@@ -11,9 +11,9 @@ maturin cannot pack a native binary and a pyo3 extension module into the same wh
 | Install | Wheel kind | Gives you | Built from |
 | --- | --- | --- | --- |
 | `pip install pipelex-tools` | native bin | the real `plxt` executable (zero Python startup) | `crates/pipelex-cli` via the **root** `pyproject.toml` (`bindings = "bin"`) |
-| `pip install pipelex-tools-lib` | abi3 cdylib | `import pipelex_tools` → `format_mthds` / `lint_mthds` | `crates/pipelex-py` via `crates/pipelex-py/pyproject.toml` (`bindings = "pyo3"`) |
+| `pip install pipelex-tools-py` | abi3 cdylib | `import pipelex_tools` → `format_mthds` / `lint_mthds` | `crates/pipelex-py` via `crates/pipelex-py/pyproject.toml` (`bindings = "pyo3"`) |
 
-They coexist in one environment with no file overlap (a script in `bin/` vs a module in `site-packages`). The Python **import** name is `pipelex_tools` either way; only the PyPI **distribution** name differs. The `pipelex-api` server depends on `pipelex-tools-lib`.
+They coexist in one environment with no file overlap (a script in `bin/` vs a module in `site-packages`). The Python **import** name is `pipelex_tools` either way; only the PyPI **distribution** name differs. The `pipelex-api` server depends on `pipelex-tools-py`.
 
 The PyO3 glue is behind a `python` cargo feature, so plain `cargo build` / `cargo test` and the MSRV jobs stay PyO3-free; maturin turns the feature on for the wheel build (`[tool.maturin] features = ["python"]`).
 
@@ -90,9 +90,9 @@ The surface is covered at three levels:
 
 1. **Rust unit** (`cargo test -p pipelex-py`) — the pure `format_mthds_impl` / `lint_mthds_impl` (which return `#[derive(Serialize)]` structs) tested without a Python interpreter: every reachable diagnostic path (format known-good / syntax-error / baked-default / caller-override / line-col mapping; lint clean / syntax / semantic / schema-with-location / offline).
 2. **Rust parity** (`crates/pipelex-cli/tests/parity.rs`) — the in-process library output must match the shipped `plxt` binary (`plxt fmt -` / `plxt lint -`) on the `test-data/mthds` corpus, so the two can't drift. It lives in `pipelex-cli` (not `pipelex-py`) because only the bin-owning crate gets `CARGO_BIN_EXE_plxt`; `pipelex-py` is a pure-Rust dev-dependency there.
-3. **Python e2e from the built wheel** (`crates/pipelex-py/tests/test_smoke.py`) — `pip install pipelex-tools-lib`, then exercise the *shipped* module asserting on the structured `diagnostics`. Run locally via `make pipelex-lib-smoke`, and in CI on every release OS (incl. Windows, where abi3 linking differs) by the `pypi_test_pipelex_lib` job.
+3. **Python e2e from the built wheel** (`crates/pipelex-py/tests/test_smoke.py`) — `pip install pipelex-tools-py`, then exercise the *shipped* module asserting on the structured `diagnostics`. Run locally via `make pipelex-lib-smoke`, and in CI on every release OS (incl. Windows, where abi3 linking differs) by the `pypi_test_pipelex_lib` job.
 
 ## Build & release
 
 - Dev build: `make pipelex-lib` (`cd crates/pipelex-py && maturin develop --release`), or `make pipelex-lib-smoke` to also run the Python smoke test.
-- Release: bump `version` in `crates/pipelex-py/Cargo.toml`; on push to `main`, `ci.yaml`'s auto-tag step creates `pipelex-tools-lib/v{version}`, which triggers the build/test/publish jobs in `releases.yaml`. The CLI release path (`plxt-cli/v*`) is entirely independent. See [`release-publishing.md`](release-publishing.md).
+- Release: bump `version` in `crates/pipelex-py/Cargo.toml`; on push to `main`, `ci.yaml`'s auto-tag step creates `pipelex-tools-py/v{version}`, which triggers the build/test/publish jobs in `releases.yaml`. The CLI release path (`plxt-cli/v*`) is entirely independent. See [`release-publishing.md`](release-publishing.md).

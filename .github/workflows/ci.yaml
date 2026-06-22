@@ -7,7 +7,7 @@ on:
     tags:
       - plxt-cli/v*
       - pipelex-vscode-ext/v*
-      - pipelex-tools-lib/v*
+      - pipelex-tools-py/v*
     paths-ignore:
       - "site/**/*"
       - schemas/**/*
@@ -50,9 +50,9 @@ jobs:
             CREATED=1
           fi
 
-          if [ -n "$LIB_VERSION" ] && ! git rev-parse "pipelex-tools-lib/v${LIB_VERSION}" >/dev/null 2>&1; then
-            git tag "pipelex-tools-lib/v${LIB_VERSION}"
-            echo "Created tag pipelex-tools-lib/v${LIB_VERSION}"
+          if [ -n "$LIB_VERSION" ] && ! git rev-parse "pipelex-tools-py/v${LIB_VERSION}" >/dev/null 2>&1; then
+            git tag "pipelex-tools-py/v${LIB_VERSION}"
+            echo "Created tag pipelex-tools-py/v${LIB_VERSION}"
             CREATED=1
           fi
 
@@ -133,7 +133,7 @@ jobs:
         run: cd editors/vscode && yarn test
 
   test-python-bindings:
-    name: Test Python bindings (pipelex-tools-lib)
+    name: Test Python bindings (pipelex-tools-py)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -149,7 +149,7 @@ jobs:
           python-version: "3.13"
       - name: Build the wheel, install it, and run the import smoke test
         # End-to-end against the shipped artifact: build the actual
-        # `pipelex-tools-lib` wheel with maturin (which turns on the `python`
+        # `pipelex-tools-py` wheel with maturin (which turns on the `python`
         # feature via [tool.maturin] features), install it, and import the
         # `pipelex_tools` module. This is the only check that catches a
         # `[lib] name` / `#[pymodule]` / `PyInit_` symbol mismatch — a desync
@@ -162,7 +162,7 @@ jobs:
           . .venv/bin/activate
           pip install --upgrade pip maturin
           maturin build --release --locked --out dist
-          pip install --no-index --find-links dist pipelex-tools-lib
+          pip install --no-index --find-links dist pipelex-tools-py
           python -m unittest discover -s tests -p 'test_*.py'
 
   check_wasm32:

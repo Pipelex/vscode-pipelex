@@ -5,12 +5,12 @@ Automated publishing for Pipelex-specific artifacts via `.github/workflows/relea
 | Artifact | Registry | Tag pattern | Trigger |
 |----------|----------|-------------|---------|
 | `pipelex-tools` CLI (`plxt`) | PyPI | `plxt-cli/v{version}` | Version bump in `crates/pipelex-cli/Cargo.toml` |
-| `pipelex-tools-lib` library (`import pipelex_tools`) | PyPI | `pipelex-tools-lib/v{version}` | Version bump in `crates/pipelex-py/Cargo.toml` |
+| `pipelex-tools-py` library (`import pipelex_tools`) | PyPI | `pipelex-tools-py/v{version}` | Version bump in `crates/pipelex-py/Cargo.toml` |
 | Pipelex VS Code extension | VS Code Marketplace + Open VSX | `pipelex-vscode-ext/v{version}` | Version bump in `editors/vscode/package.json` |
 
 Inline shell in `ci.yaml` reads version fields on each push to `main` and creates the corresponding tag if it doesn't already exist (requires `WORKFLOW_PAT` secret).
 
-The CLI (`pipelex-tools`) and the library (`pipelex-tools-lib`) are **two separate PyPI packages** built from this one repo — maturin cannot pack a native binary and a pyo3 extension module into the same wheel. The CLI ships the real `plxt` executable (`bindings = "bin"`, root `pyproject.toml`); the library ships the importable `pipelex_tools` module (`bindings = "pyo3"`, `crates/pipelex-py/pyproject.toml`). Their release paths are fully independent — separate tags, versions, and build/test/publish jobs. See [`pipelex-tools-python-bindings.md`](pipelex-tools-python-bindings.md) for the library surface.
+The CLI (`pipelex-tools`) and the library (`pipelex-tools-py`) are **two separate PyPI packages** built from this one repo — maturin cannot pack a native binary and a pyo3 extension module into the same wheel. The CLI ships the real `plxt` executable (`bindings = "bin"`, root `pyproject.toml`); the library ships the importable `pipelex_tools` module (`bindings = "pyo3"`, `crates/pipelex-py/pyproject.toml`). Their release paths are fully independent — separate tags, versions, and build/test/publish jobs. See [`pipelex-tools-python-bindings.md`](pipelex-tools-python-bindings.md) for the library surface.
 
 ---
 
@@ -32,7 +32,7 @@ OIDC trusted publishing lets GitHub Actions publish to PyPI without storing an A
 3. If `pipelex-tools` **already exists** on PyPI:
    - Go to **Project → Settings → Publishing → Add Trusted Publisher**
    - Same values as above
-4. Repeat steps 2–3 for the **`pipelex-tools-lib`** project (the importable library). It is a distinct PyPI project published from the same repo and `releases.yaml` workflow — set PyPI project name `pipelex-tools-lib`, everything else identical.
+4. Repeat steps 2–3 for the **`pipelex-tools-py`** project (the importable library). It is a distinct PyPI project published from the same repo and `releases.yaml` workflow — set PyPI project name `pipelex-tools-py`, everything else identical.
 
 ### VS Code Marketplace
 
