@@ -23,7 +23,8 @@ PYTHON_VERSION    ?= 3.13
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s update-schema up
-.PHONY: build cli pipelex-tools pipelex-lib pipelex-lib-smoke env lock ext ext-deps lsp-types ext-install ext-uninstall vsix clean test check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
+.PHONY: build cli pipelex-tools pipelex-lib pipelex-lib-smoke env lock ext ext-deps lsp-types ext-install ext-uninstall vsix clean check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
+.PHONY: test test-all test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-ext test-pipelex-lib
 .PHONY: use-local use-npm ul un
 
 help: ## Show this help
@@ -54,9 +55,6 @@ pipelex-tools: env ## Build and install the pipelex-tools CLI wheel (native plxt
 
 pipelex-lib: env ## Build and install the pipelex-tools-py Python library (import pipelex_tools, dev)
 	@. "$(VIRTUAL_ENV)/bin/activate" && cd crates/pipelex-py && maturin develop --release
-
-pipelex-lib-smoke: pipelex-lib ## Build the library wheel (dev) and run the Python import smoke test
-	@. "$(VIRTUAL_ENV)/bin/activate" && cd crates/pipelex-py && python -m unittest discover -s tests -p 'test_*.py'
 
 lock: ## Update Cargo.lock after version bumps
 	cargo update --workspace
@@ -117,13 +115,46 @@ lint: ## Run Clippy on the workspace
 plxt-lint: ## Lint TOML/MTHDS files with plxt
 	cargo run --bin plxt -- lint
 
-test: lsp-types ## Run all tests (Rust + VS Code extension)
-	cargo test -p pipelex-common
-	cargo test -p pipelex-cli
-	cargo test -p pipelex-py
+# One target per package that has a test suite. `make test` runs the fast
+# native + extension suites; `make test-all` additionally builds the Python
+# library wheel and runs its smoke test (needs uv + maturin).
+
+test: test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-ext ## Run all fast tests (Rust crates + VS Code extension)
+
+test-all: test test-pipelex-lib ## Run every test suite, incl. the Python library smoke test (builds the wheel)
+
+# Rust crates — upstream taplo
+test-taplo: ## Test the taplo core crate
 	cargo test -p taplo
+
+test-taplo-common: ## Test the taplo-common crate
+	cargo test -p taplo-common
+
+test-taplo-lsp: ## Test the taplo-lsp crate
 	cargo test -p taplo-lsp
+
+test-lsp-async-stub: ## Test the lsp-async-stub crate
+	cargo test -p lsp-async-stub
+
+# Rust crates — Pipelex
+test-pipelex-common: ## Test the pipelex-common crate
+	cargo test -p pipelex-common
+
+test-pipelex-cli: ## Test the pipelex-cli (plxt) crate
+	cargo test -p pipelex-cli
+
+test-pipelex-py: ## Test the pipelex-py crate (Rust side, python feature off)
+	cargo test -p pipelex-py
+
+# VS Code extension
+test-ext: lsp-types ## Type-check (tsc) and test (vitest) the VS Code extension
 	cd $(EXT_DIR) && { yarn typecheck; tc=$$?; yarn test; vt=$$?; [ $$tc -eq 0 ] && [ $$vt -eq 0 ]; }
+
+# Python library
+test-pipelex-lib: pipelex-lib ## Build the library wheel (dev) and run its Python smoke test
+	@. "$(VIRTUAL_ENV)/bin/activate" && cd crates/pipelex-py && python -m unittest discover -s tests -p 'test_*.py'
+
+pipelex-lib-smoke: test-pipelex-lib ## Alias for test-pipelex-lib (build wheel + Python smoke test)
 
 check-no-local-deps: ## Fail if mthds-ui is not the npm spec
 	@grep -qE '"@pipelex/mthds-ui":[[:space:]]*"npm:' $(EXT_DIR)/package.json || \

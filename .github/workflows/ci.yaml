@@ -95,12 +95,12 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Test Rust crates
         # Mirror the `make test` crate set so CI and the local gate stay at parity.
-        # pipelex-py is compiled feature-off here (it has no Rust tests yet, and
-        # mod python is gated out); its PyO3 glue is exercised end-to-end by the
-        # test-python-bindings job's import smoke test. NOTE: a future Rust test
-        # under #[cfg(feature = "python")] would NOT run here — add --features
-        # python (and a libpython) if/when such a test is introduced.
-        run: cargo test -p taplo -p taplo-lsp -p pipelex-common -p pipelex-cli -p pipelex-py
+        # pipelex-py is compiled feature-off here, so `mod python` is gated out and
+        # only its pure-Rust wrapping logic is tested; the PyO3 glue is exercised
+        # end-to-end by the test-python-bindings job's import smoke test. NOTE: a
+        # future Rust test under #[cfg(feature = "python")] would NOT run here —
+        # add --features python (and a libpython) if/when such a test is introduced.
+        run: cargo test -p taplo -p taplo-common -p taplo-lsp -p lsp-async-stub -p pipelex-common -p pipelex-cli -p pipelex-py
       - name: Check formatting regression
         run: cargo run --bin plxt -- fmt --check
       - name: Check if git index is clean

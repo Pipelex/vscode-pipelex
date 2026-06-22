@@ -38,8 +38,10 @@ Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packag
 - `make vsix` - Package the extension into a `.vsix` file (runs `ext` first)
 - `make ext-install` - Build, package, and install the `.vsix` into Cursor or VS Code
 - `make ext-uninstall` - Uninstall the extension from the IDE
-- `make test` - Run all tests (Rust crates + VS Code extension vitest) and type-check the extension (`yarn typecheck`)
-- `make check` - **Full quality gate**: fmt check, plxt fmt check, clippy (`-D warnings`), all crate tests, vitest, extension `tsc` type-check, and WASM check. Always run after code changes.
+- `make test` - Run all fast tests (every Rust crate that has tests + VS Code extension vitest) and type-check the extension (`yarn typecheck`). It aggregates the per-package `test-*` targets below.
+- `make test-<package>` - Run one package's tests in isolation. One target per package that has a test suite: `test-taplo`, `test-taplo-common`, `test-taplo-lsp`, `test-lsp-async-stub`, `test-pipelex-common`, `test-pipelex-cli`, `test-pipelex-py` (Rust side), `test-ext` (extension tsc + vitest), and `test-pipelex-lib` (builds the Python wheel via maturin, then runs the `pipelex_tools` smoke test).
+- `make test-all` - `make test` **plus** `test-pipelex-lib`. The Python smoke test is kept out of plain `make test` because it needs `uv` + a `maturin` release build; `test-all` is the run-absolutely-everything target. (`make pipelex-lib-smoke` remains as an alias for `test-pipelex-lib`.)
+- `make check` - **Full quality gate**: fmt check, plxt fmt check, clippy (`-D warnings`), all crate tests (via `make test`), vitest, extension `tsc` type-check, and WASM check. Always run after code changes.
 - `make clean` - Remove all build artifacts (cargo, JS dist, VSIX)
 - `make sync-grammar` - Copy MTHDS TextMate grammar to the website repo
 
