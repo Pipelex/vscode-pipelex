@@ -42,6 +42,14 @@ describe('resolveDeclaringFile — source-first tier', () => {
         expect(owner?.uri.toString()).toBe(CONCRETE.uri.toString());
     });
 
+    it('supersedes a signature `source` with a same-domain concrete declaration', () => {
+        const owner = resolveDeclaringFile({
+            kind: 'pipe', code: 'screen', domainCode: 'rec',
+            source: `${DIR}/bundle.mthds`, files, getLines,
+        });
+        expect(owner?.uri.toString()).toBe(CONCRETE.uri.toString());
+    });
+
     it('resolves a bare-basename `source` by basename', () => {
         const owner = resolveDeclaringFile({
             kind: 'pipe', code: 'screen', source: 'screen.mthds', files, getLines,
@@ -76,6 +84,32 @@ describe('resolveDeclaringFile — source-first tier', () => {
 });
 
 describe('resolveDeclaringFile — scan fallback tier (no source)', () => {
+    it('prefers a concrete pipe over a same-code signature when source is absent', () => {
+        const owner = resolveDeclaringFile({
+            kind: 'pipe', code: 'screen', files: [SIGNATURE, CONCRETE, CONCEPTS], getLines,
+        });
+        expect(owner?.uri.toString()).toBe(CONCRETE.uri.toString());
+    });
+
+    it('prefers the concrete pipe within the clicked domain when duplicate names span domains', () => {
+        const alphaConcrete = makeFile(`${DIR}/alpha.mthds`, 'alpha.mthds',
+            'domain = "alpha"\n[pipe.screen]\ntype = "PipeSequence"\n');
+        const betaSignature = makeFile(`${DIR}/beta-signature.mthds`, 'beta-signature.mthds',
+            'domain = "beta"\n[pipe.screen]\ntype = "PipeSignature"\n');
+        const betaConcrete = makeFile(`${DIR}/beta-concrete.mthds`, 'beta-concrete.mthds',
+            'domain = "beta"\n[pipe.screen]\ntype = "PipeLLM"\n');
+
+        const owner = resolveDeclaringFile({
+            kind: 'pipe',
+            code: 'screen',
+            domainCode: 'beta',
+            files: [alphaConcrete, betaSignature, betaConcrete],
+            getLines,
+        });
+
+        expect(owner?.uri.toString()).toBe(betaConcrete.uri.toString());
+    });
+
     it('finds the file declaring `[pipe.<code>]`', () => {
         const owner = resolveDeclaringFile({
             kind: 'pipe', code: 'build', files: [SIGNATURE, CONCRETE, CONCEPTS], getLines,

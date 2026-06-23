@@ -582,6 +582,37 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it('navigateToPipe prefers a concrete sibling over a same-code signature when registry source is absent', async () => {
+        const vscode = await import('vscode');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+        const siblingUri = makeUri('/project/methods/screen.mthds');
+
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [{ pipe_code: 'screen', domain_code: 'rec', kind: 'controller' }],
+            edges: [],
+            pipe_registry: {
+                'rec.screen': { code: 'screen', domain_code: 'rec' },
+            },
+        };
+        mockState.docContents['/project/methods/screen.mthds'] =
+            'domain = "rec"\n[pipe.screen]\ntype = "PipeSequence"\n';
+        mockState.bundleFiles = [
+            { uri: primaryUri, name: 'bundle.mthds', content: 'domain = "rec"\n[pipe.screen]\ntype = "PipeSignature"\n' },
+            { uri: siblingUri, name: 'screen.mthds', content: mockState.docContents['/project/methods/screen.mthds'] },
+        ];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'screen' });
+        await new Promise(r => setTimeout(r, 20));
+
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(siblingUri);
+        panel.dispose();
+    });
+
     it('navigateToPipe reads domain-less registry sources from `.pipe` keys', async () => {
         const vscode = await import('vscode');
         const primaryUri = makeUri('/project/methods/bundle.mthds');

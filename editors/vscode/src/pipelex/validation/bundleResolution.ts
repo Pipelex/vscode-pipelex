@@ -33,6 +33,18 @@ export function resolveDeclaringFile(args: {
     if (source) {
         const match = matchSourceFile(source, files);
         if (match && findTableHeaderInLines(getLines(match), kind, code) !== -1) {
+            if (kind === 'pipe' && pipeDeclarationIsSignature(getLines(match), code)) {
+                const concrete = findDeclaringFileByScan(
+                    kind,
+                    code,
+                    files,
+                    domainCode ?? fileDeclaredDomain(getLines(match)),
+                    getLines,
+                );
+                if (concrete && !pipeDeclarationIsSignature(getLines(concrete), code)) {
+                    return concrete;
+                }
+            }
             return match;
         }
     }
@@ -74,11 +86,11 @@ export function matchSourceFile(source: string, files: BundleFile[]): BundleFile
 }
 
 /**
- * Find the gathered file that declares `[kind.code]`. When the same header
- * appears in more than one file (a signature/concrete split, or a same-named
- * declaration in two domains) and `domainCode` is known, prefer the file whose
- * top-level `domain = "<domainCode>"` matches; otherwise the first match wins
- * (gather order: primary first, then siblings sorted by name).
+ * Find the gathered file that declares `[kind.code]`. When the same pipe header
+ * appears in more than one file, prefer a concrete pipe over a `PipeSignature`
+ * stub so click-to-code lands on the implementation. If `domainCode` is known,
+ * apply that preference within the matching domain. Otherwise the first match
+ * wins (gather order: primary first, then siblings sorted by name).
  */
 export function findDeclaringFileByScan(
     kind: DeclarationKind,
@@ -88,23 +100,53 @@ export function findDeclaringFileByScan(
     getLines: (file: BundleFile) => string[],
 ): BundleFile | undefined {
     const matches = files.filter(f => findTableHeaderInLines(getLines(f), kind, code) !== -1);
-    if (matches.length <= 1 || !domainCode) {
+    if (matches.length <= 1) {
         return matches[0];
     }
-    return matches.find(f => fileDeclaresDomain(getLines(f), domainCode)) ?? matches[0];
+    const domainMatches = domainCode
+        ? matches.filter(f => fileDeclaresDomain(getLines(f), domainCode))
+        : [];
+    const preferredMatches = domainMatches.length > 0 ? domainMatches : matches;
+    if (kind === 'pipe') {
+        return preferredMatches.find(f => !pipeDeclarationIsSignature(getLines(f), code))
+            ?? preferredMatches[0];
+    }
+    return preferredMatches[0];
 }
 
 /** Whether a file's lines declare a top-level `domain = "<domainCode>"`. */
 function fileDeclaresDomain(lines: string[], domainCode: string): boolean {
-    const pattern = new RegExp(`^\\s*domain\\s*=\\s*(["'])${escapeRegex(domainCode)}\\1\\s*(?:#.*)?$`);
+    return fileDeclaredDomain(lines) === domainCode;
+}
+
+function fileDeclaredDomain(lines: string[]): string | undefined {
     for (const line of lines) {
-        if (pattern.test(line)) {
-            return true;
+        const match = /^\s*domain\s*=\s*(["'])(.*?)\1\s*(?:#.*)?$/.exec(line);
+        if (match) {
+            return match[2];
         }
         // A `domain` key is a top-level bundle field; stop at the first table so a
         // later `domain = ` inside a `[concept.X.structure]` field can't false-match.
         if (/^\s*\[/.test(line)) {
             break;
+        }
+    }
+    return undefined;
+}
+
+/** Whether a `[pipe.<code>]` section is a signature-only declaration. */
+function pipeDeclarationIsSignature(lines: string[], code: string): boolean {
+    const headerLine = findTableHeaderInLines(lines, 'pipe', code);
+    if (headerLine === -1) {
+        return false;
+    }
+    for (let i = headerLine + 1; i < lines.length; i++) {
+        const text = lines[i];
+        if (/^\s*\[/.test(text)) {
+            break;
+        }
+        if (/^\s*type\s*=\s*(["'])PipeSignature\1\s*(?:#.*)?$/.test(text)) {
+            return true;
         }
     }
     return false;
