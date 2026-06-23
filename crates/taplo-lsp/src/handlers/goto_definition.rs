@@ -172,7 +172,7 @@ async fn resolve_pipe_definition_across_bundle<E: Environment>(
 
         if let Some((uri, doc)) = open_by_path.remove(&path) {
             if let Some(definition) =
-                pipe_definition_from_document(uri, doc.dom, doc.mapper, pipe_name)
+                pipe_definition_from_document(uri, &doc.dom, doc.mapper, pipe_name)
             {
                 definitions.push(definition);
             }
@@ -191,7 +191,7 @@ async fn resolve_pipe_definition_across_bundle<E: Environment>(
         let parse = parser::parse(&source);
         let dom = parse.into_dom();
         let mapper = Mapper::new_utf16(&source, false);
-        if let Some(definition) = pipe_definition_from_document(uri, dom, mapper, pipe_name) {
+        if let Some(definition) = pipe_definition_from_document(uri, &dom, mapper, pipe_name) {
             definitions.push(definition);
         }
     }
@@ -221,7 +221,7 @@ fn percent_encode_file_path(path: &str) -> String {
     for byte in path.bytes() {
         match byte {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' | b':' => {
-                encoded.push(byte as char)
+                encoded.push(byte as char);
             }
             _ => {
                 write!(&mut encoded, "%{byte:02X}").expect("writing to string cannot fail");
@@ -233,12 +233,12 @@ fn percent_encode_file_path(path: &str) -> String {
 
 fn pipe_definition_from_document(
     uri: Url,
-    dom: Node,
+    dom: &Node,
     mapper: Mapper,
     pipe_name: &str,
 ) -> Option<PipeDefinition> {
-    let domain = document_domain(&dom);
-    let node = pipe_node(&dom, pipe_name)?;
+    let domain = document_domain(dom);
+    let node = pipe_node(dom, pipe_name)?;
     let is_signature = pipe_definition_is_signature(&node);
     Some(PipeDefinition {
         uri,
@@ -316,7 +316,7 @@ mod tests {
         let parse = parser::parse(source);
         let dom = parse.into_dom();
         let mapper = Mapper::new_utf16(source, false);
-        pipe_definition_from_document(Url::parse(uri).unwrap(), dom, mapper, pipe_name).unwrap()
+        pipe_definition_from_document(Url::parse(uri).unwrap(), &dom, mapper, pipe_name).unwrap()
     }
 
     #[test]
