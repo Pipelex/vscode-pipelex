@@ -776,9 +776,6 @@ describe('MethodGraphPanel', () => {
         const primaryUri = makeUri('/project/methods/bundle.mthds');
         const siblingUri = makeUri('/project/methods/helpers.mthds');
         let resolveGather: ((files: any[]) => void) | undefined;
-        vi.mocked(bundleGather.gatherBundleFiles).mockImplementationOnce(() => new Promise(resolve => {
-            resolveGather = resolve;
-        }));
 
         const graphspec = {
             meta: { format: 'mthds' },
@@ -791,6 +788,9 @@ describe('MethodGraphPanel', () => {
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
 
+        vi.mocked(bundleGather.gatherBundleFiles).mockImplementationOnce(() => new Promise(resolve => {
+            resolveGather = resolve;
+        }));
         vi.mocked(vscode.workspace.openTextDocument).mockClear();
         messageHandler({ type: 'navigateToPipe', pipeCode: 'helper', nodeId: 'node-helper', domainCode: 'rec' });
         await vi.waitFor(() => {
@@ -864,6 +864,45 @@ describe('MethodGraphPanel', () => {
         const idx = args.indexOf('--library-dir');
         expect(idx).toBeGreaterThan(-1);
         expect(args[idx + 1]).toBe('/project/methods');
+        panel.dispose();
+    });
+
+    it('refresh() analyzes sibling bundle.mthds when opened file has no main_pipe', async () => {
+        const processUtils = await import('../validation/processUtils');
+        const graphspec = { nodes: [], edges: [] };
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ graphspec, pipe_code: 'main' }),
+            stderr: '',
+        };
+        const helperUri = makeUri('/project/methods/helper.mthds');
+        const bundleUri = makeUri('/project/methods/bundle.mthds');
+        mockState.bundleFiles = [
+            { uri: helperUri, name: 'helper.mthds', content: 'domain = "rec"\n[pipe.helper]\n' },
+            { uri: bundleUri, name: 'bundle.mthds', content: 'domain = "rec"\nmain_pipe = "main"\n[pipe.main]\n' },
+        ];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(helperUri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const args = vi.mocked(processUtils.spawnCli).mock.calls[0][1] as string[];
+        expect(args).toEqual(expect.arrayContaining([
+            'validate',
+            'bundle',
+            '/project/methods/bundle.mthds',
+            '--library-dir',
+            '/project/methods',
+        ]));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+        expect(mockState.mockWebview.postMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: 'setData',
+                uri: helperUri.toString(),
+                graphspec,
+            }),
+        );
         panel.dispose();
     });
 
@@ -1122,13 +1161,13 @@ describe('MethodGraphPanel', () => {
 
     it('still renders the error list when gathering bundle files fails (no unhandled rejection)', async () => {
         const bundleGather = await import('../validation/bundleGather');
-        vi.mocked(bundleGather.gatherBundleFiles).mockRejectedValueOnce(new Error('disk gone'));
 
         const output = mockOutput();
         const panel = new MethodGraphPanel(output, makeExtensionUri());
         const uri = makeUri('/project/methods/main.mthds');
         panel.show(uri);
         await new Promise(r => setTimeout(r, 20));
+        vi.mocked(bundleGather.gatherBundleFiles).mockRejectedValueOnce(new Error('disk gone'));
 
         const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
         mockState.errorLocations = [

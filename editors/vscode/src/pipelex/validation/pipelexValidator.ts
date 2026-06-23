@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { cancelInflightByKey, cancelInflightInDir } from './processUtils';
 import { gatherBundleFiles } from './bundleGather';
+import { resolveGraphPrimaryBundle } from './graphPrimary';
 import { buildBundleDiagnostics } from './crossFileDiagnostics';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { BackendFactory } from './backendFactory';
@@ -132,9 +133,13 @@ export class PipelexValidator implements vscode.Disposable {
 
         try {
             const backend = this.factory.getBackend(document.uri);
-            const files = await gatherBundleFiles(document.uri);
+            const graphPrimary = withGraph
+                ? await resolveGraphPrimaryBundle(document.uri)
+                : undefined;
+            const analysisPrimaryUri = graphPrimary?.primaryUri ?? document.uri;
+            const files = graphPrimary?.files ?? await gatherBundleFiles(document.uri);
             const analysis = await backend.analyze(
-                { primaryUri: document.uri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
+                { primaryUri: analysisPrimaryUri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
                 { withGraph, direction },
                 controller.signal,
             );

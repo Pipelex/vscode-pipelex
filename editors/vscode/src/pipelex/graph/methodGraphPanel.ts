@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import { cancelAllInflight } from '../validation/processUtils';
 import { gatherBundleFiles } from '../validation/bundleGather';
+import { resolveGraphPrimaryBundle } from '../validation/graphPrimary';
 import { resolveErrorLocations } from '../validation/crossFileDiagnostics';
 import { resolveDeclaringFile } from '../validation/bundleResolution';
 import { AnalyzeAbortError, BackendError } from '../validation/backend';
@@ -335,10 +336,11 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
         try {
             const backend = this.getBackend(uri);
+            const graphPrimary = await resolveGraphPrimaryBundle(uri);
             // The CLI reads siblings via `--library-dir` itself; only the API path needs contents.
-            const files = backend.kind === 'api' ? await gatherBundleFiles(uri) : [];
+            const files = backend.kind === 'api' ? graphPrimary.files : [];
             const analysis = await backend.analyze(
-                { primaryUri: uri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
+                { primaryUri: graphPrimary.primaryUri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
                 { withGraph: true, direction },
                 controller.signal,
             );
