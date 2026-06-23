@@ -40,6 +40,9 @@ const mockState = vi.hoisted(() => {
         bundleFiles: [] as any[],
         errorLocations: [] as any[],
         openTextDocuments: [] as any[],
+        // Per-fsPath file contents for the URI-aware openTextDocument mock, so a
+        // resolved sibling opens with real text the faithful findTableHeader can scan.
+        docContents: {} as Record<string, string>,
         // Event handler captures
         onSaveHandler: null as ((doc: any) => void) | null,
         onEditorChangeHandler: null as ((editor: any) => void) | null,
@@ -90,13 +93,30 @@ vi.mock('vscode', () => ({
             return { dispose: vi.fn() };
         }),
         getWorkspaceFolder: () => ({ uri: { fsPath: '/workspace' } }),
-        openTextDocument: vi.fn(() => Promise.resolve({
-            lineCount: 10,
-            lineAt: (i: number) => ({
-                text: i === 3 ? '[pipe.my_pipe]' : '',
-                range: { start: { line: i, character: 0 }, end: { line: i, character: 14 } },
-            }),
-        })),
+        openTextDocument: vi.fn((uriArg: any) => {
+            // URI-aware: when a fixture registers content for this path, build a
+            // document from it (so a resolved sibling opens with its real text);
+            // otherwise fall back to the legacy single-doc shape used by older tests.
+            const fsPath = uriArg?.fsPath ?? uriArg;
+            const content = mockState.docContents[fsPath];
+            if (content != null) {
+                const lines = content.split('\n');
+                return Promise.resolve({
+                    lineCount: lines.length,
+                    lineAt: (i: number) => ({
+                        text: lines[i] ?? '',
+                        range: { start: { line: i, character: 0 }, end: { line: i, character: (lines[i] ?? '').length } },
+                    }),
+                });
+            }
+            return Promise.resolve({
+                lineCount: 10,
+                lineAt: (i: number) => ({
+                    text: i === 3 ? '[pipe.my_pipe]' : '',
+                    range: { start: { line: i, character: 0 }, end: { line: i, character: 14 } },
+                }),
+            });
+        }),
     },
     window: {
         // Default to a dark editor theme; tests can override via mockState.activeColorThemeKind.
@@ -149,12 +169,29 @@ vi.mock('fs', () => ({
     readFileSync: vi.fn(() => mockState.readFileSyncResult),
 }));
 
-vi.mock('../validation/sourceLocator', () => ({
-    findTableHeader: vi.fn((_doc: any, _kind: string, code: string) => {
-        if (code === 'my_pipe') return 3;
-        return -1;
-    }),
-}));
+// Faithful (vscode-free) re-implementations: findTableHeader scans the opened
+// document, findTableHeaderInLines scans raw lines — the latter is what the real
+// resolveDeclaringFile (unmocked here) calls during its scan-fallback tier.
+vi.mock('../validation/sourceLocator', () => {
+    const headerRe = (kind: string, code: string) =>
+        new RegExp(`^\\s*\\[${kind}\\.${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`);
+    return {
+        findTableHeader: vi.fn((doc: any, kind: string, code: string) => {
+            const re = headerRe(kind, code);
+            for (let i = 0; i < doc.lineCount; i++) {
+                if (re.test(doc.lineAt(i).text)) return i;
+            }
+            return -1;
+        }),
+        findTableHeaderInLines: vi.fn((lines: string[], kind: string, code: string) => {
+            const re = headerRe(kind, code);
+            for (let i = 0; i < lines.length; i++) {
+                if (re.test(lines[i])) return i;
+            }
+            return -1;
+        }),
+    };
+});
 
 vi.mock('../validation/bundleGather', () => ({
     gatherBundleFiles: vi.fn(() => Promise.resolve(mockState.bundleFiles)),
@@ -213,6 +250,7 @@ describe('MethodGraphPanel', () => {
         mockState.bundleFiles = [];
         mockState.errorLocations = [];
         mockState.openTextDocuments = [];
+        mockState.docContents = {};
         mockState.activeColorThemeKind = 2; // ColorThemeKind.Dark
     });
 
@@ -488,6 +526,143 @@ describe('MethodGraphPanel', () => {
         // Should have opened the document and shown it
         expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(uri);
         expect(vscode.window.showTextDocument).toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    // --- Cross-file pipe navigation (source-first, scan-as-fallback) ---
+
+    // Drive a graphspec (with a pipe_registry) onto the panel via the normal CLI
+    // path so `currentGraphspec` is retained, then return the message handler.
+    async function showGraphWithSpec(panel: MethodGraphPanel, primaryUri: any, graphspec: any) {
+        mockState.spawnCliResult = { stdout: JSON.stringify({ graphspec, pipe_code: 'x' }), stderr: '' };
+        panel.show(primaryUri);
+        await new Promise(r => setTimeout(r, 50));
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+        return messageHandler;
+    }
+
+    it('navigateToPipe opens the concrete sibling named by registry `source` (cross-file)', async () => {
+        const vscode = await import('vscode');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+        const siblingUri = makeUri('/project/methods/screen.mthds');
+
+        // `screen` is declared in BOTH the primary (signature) and the sibling
+        // (concrete). The registry `source` points at the concrete sibling — the
+        // win a pure scan (which hits the primary signature first) cannot make.
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [{ pipe_code: 'screen', domain_code: 'rec', kind: 'controller' }],
+            edges: [],
+            pipe_registry: {
+                'rec.screen': { code: 'screen', domain_code: 'rec', source: '/project/methods/screen.mthds' },
+            },
+        };
+        mockState.docContents['/project/methods/screen.mthds'] =
+            'domain = "rec"\n[pipe.screen]\ntype = "PipeSequence"\n';
+        mockState.bundleFiles = [
+            { uri: primaryUri, name: 'bundle.mthds', content: 'domain = "rec"\n[pipe.screen]\ntype = "PipeSignature"\n' },
+            { uri: siblingUri, name: 'screen.mthds', content: mockState.docContents['/project/methods/screen.mthds'] },
+        ];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'screen' });
+        await new Promise(r => setTimeout(r, 20));
+
+        // Opened the CONCRETE sibling, not the signature in the primary, and revealed it beside.
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(siblingUri);
+        expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ viewColumn: 1, preserveFocus: false }),
+        );
+        panel.dispose();
+    });
+
+    it('navigateToPipe keeps a primary-declared pipe on the primary file (single-file regression)', async () => {
+        const vscode = await import('vscode');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [{ pipe_code: 'main', domain_code: 'rec', kind: 'controller' }],
+            edges: [],
+            pipe_registry: { 'rec.main': { code: 'main', domain_code: 'rec', source: '/project/methods/bundle.mthds' } },
+        };
+        mockState.docContents['/project/methods/bundle.mthds'] = 'domain = "rec"\n[pipe.main]\ntype = "PipeLLM"\n';
+        mockState.bundleFiles = [
+            { uri: primaryUri, name: 'bundle.mthds', content: mockState.docContents['/project/methods/bundle.mthds'] },
+        ];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'main' });
+        await new Promise(r => setTimeout(r, 20));
+
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(primaryUri);
+        panel.dispose();
+    });
+
+    it('navigateToPipe falls back to the declaration scan when the registry omits `source` (older CLI)', async () => {
+        const vscode = await import('vscode');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+        const siblingUri = makeUri('/project/methods/helpers.mthds');
+
+        // Registry entry WITHOUT a `source` — the feature-detection degradation path.
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [{ pipe_code: 'helper', domain_code: 'rec', kind: 'operator' }],
+            edges: [],
+            pipe_registry: { 'rec.helper': { code: 'helper', domain_code: 'rec' } },
+        };
+        mockState.docContents['/project/methods/helpers.mthds'] = 'domain = "rec"\n[pipe.helper]\ntype = "PipeLLM"\n';
+        mockState.bundleFiles = [
+            { uri: primaryUri, name: 'bundle.mthds', content: 'domain = "rec"\n[pipe.main]\n' },
+            { uri: siblingUri, name: 'helpers.mthds', content: mockState.docContents['/project/methods/helpers.mthds'] },
+        ];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'helper' });
+        await new Promise(r => setTimeout(r, 20));
+
+        // No source → scan locates `[pipe.helper]` in the sibling.
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(siblingUri);
+        panel.dispose();
+    });
+
+    it('navigateToPipe logs and stays put for a synthesized pipe with no declaring file', async () => {
+        const output = mockOutput();
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+
+        // A synthesized controller (e.g. an implicit batch wrapper): no `source` and
+        // no declaring header anywhere — mirrors today's silent-log behavior.
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [{ pipe_code: 'process_batch', domain_code: 'rec', kind: 'controller' }],
+            edges: [],
+            pipe_registry: { 'rec.process_batch': { code: 'process_batch', domain_code: 'rec' } },
+        };
+        mockState.docContents['/project/methods/bundle.mthds'] = 'domain = "rec"\n[pipe.main]\n';
+        mockState.bundleFiles = [
+            { uri: primaryUri, name: 'bundle.mthds', content: mockState.docContents['/project/methods/bundle.mthds'] },
+        ];
+
+        const panel = new MethodGraphPanel(output, makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'process_batch' });
+        await new Promise(r => setTimeout(r, 20));
+
+        expect(output.appendLine).toHaveBeenCalledWith(
+            expect.stringContaining('Could not find [pipe.process_batch]'),
+        );
         panel.dispose();
     });
 

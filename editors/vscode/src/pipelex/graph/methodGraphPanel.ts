@@ -4,8 +4,9 @@ import * as fs from 'fs';
 import { cancelAllInflight } from '../validation/processUtils';
 import { gatherBundleFiles } from '../validation/bundleGather';
 import { resolveErrorLocations } from '../validation/crossFileDiagnostics';
+import { resolveDeclaringFile } from '../validation/bundleResolution';
 import { AnalyzeAbortError, BackendError } from '../validation/backend';
-import type { BackendErrorAction, BundleAnalysis, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
+import type { BackendErrorAction, BundleAnalysis, BundleFile, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
 import { CliValidationBackend } from '../validation/cliValidationBackend';
 import { SET_API_KEY_COMMAND } from '../validation/apiKey';
 import { findTableHeader } from '../validation/sourceLocator';
@@ -26,6 +27,26 @@ const RETRY_NONCE_SENTINEL = 'PIPELEX_RETRY_NONCE';
 
 /** Commands the message-view buttons may dispatch — a closed allowlist, not arbitrary command execution. */
 const WEBVIEW_ALLOWED_COMMANDS = new Set<string>([SET_API_KEY_COMMAND]);
+
+/**
+ * The subset of a GraphSpec the panel reads to map a clicked pipe node back to
+ * its declaring file. Loosely typed on purpose: the registry's `source` field is
+ * an additive, feature-detected enrichment (older CLIs omit it) and is not part
+ * of the published `@pipelex/mthds-ui` GraphSpec types. The panel retains the
+ * full graphspec it forwarded to the webview and reads only these fields.
+ */
+interface GraphspecForNav {
+    nodes?: Array<{ pipe_code?: string; domain_code?: string }>;
+    pipe_registry?: Record<string, { source?: string } | undefined>;
+}
+
+/** A clicked pipe node's resolved identity bits, recovered from the retained graphspec. */
+interface PipeNodeIdentity {
+    /** The node's declaring domain, when the graphspec carries it. */
+    domainCode?: string;
+    /** The declaring file path from `pipe_registry[domain.code].source`, when present. */
+    source?: string;
+}
 
 export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     private static readonly CSP_NONCE_SENTINEL = 'PIPELEX_CSP_NONCE';
@@ -48,6 +69,13 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * so it can never request an arbitrary file — see {@link navigateToError}.
      */
     private errorTargets: { uri: vscode.Uri; range: vscode.Range }[] = [];
+    /**
+     * The graphspec last forwarded to the webview, retained so a `navigateToPipe`
+     * click can recover the clicked node's `domain_code` and registry `source`
+     * (the webview message carries only the bare `pipeCode`). Reset on every send,
+     * cleared on dispose.
+     */
+    private currentGraphspec: unknown;
 
     constructor(
         output: vscode.OutputChannel,
@@ -246,6 +274,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             this.currentUri = undefined;
             this.sourceKind = undefined;
             this.webviewReady = false;
+            this.currentGraphspec = undefined;
         });
         this.panel.webview.onDidReceiveMessage(
             message => this.handleWebviewMessage(message),
@@ -568,6 +597,11 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
         if (this.currentUri?.toString() !== uri.toString()) return;
 
+        // Retain the graphspec so a pipe-node click can recover its declaring
+        // domain + registry `source` (see navigateToPipe). Set alongside the send
+        // so it always matches what the webview is rendering.
+        this.currentGraphspec = graphspec;
+
         const setDataPayload = {
             type: 'setData',
             uri: uri.toString(),
@@ -760,28 +794,73 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
     }
 
+    /**
+     * Recover a clicked pipe node's identity from the retained graphspec. The
+     * webview message carries only the bare `pipeCode`, so the node is matched by
+     * `pipe_code` to recover its `domain_code`, which keys into `pipe_registry`
+     * for the declaration `source` path.
+     *
+     * v1 edge: if the same `pipe_code` appears under two domains as two nodes, a
+     * bare `pipeCode` can't say which was clicked — the first node match wins, and
+     * the scan fallback still finds a correct declaration. The bulletproof upgrade
+     * (wiring mthds-ui's `onNodeSelect(nodeId, nodeData)`) is recorded but not done
+     * here, to keep the webview message contract unchanged.
+     */
+    private lookupPipeNode(pipeCode: string): PipeNodeIdentity {
+        const spec = this.currentGraphspec as GraphspecForNav | undefined;
+        const node = spec?.nodes?.find(n => n.pipe_code === pipeCode);
+        const domainCode = node?.domain_code;
+        const source = domainCode ? spec?.pipe_registry?.[`${domainCode}.${pipeCode}`]?.source : undefined;
+        return { domainCode, source };
+    }
+
+    /**
+     * Reveal the code for a clicked pipe node, across files in the bundle.
+     *
+     * Resolution is source-first, scan-as-fallback (feature-detected, no version
+     * floor): the registry `source` gives an exact declaring file when present
+     * (so a signature/concrete split lands on the concrete implementation in a
+     * sibling), else the gathered siblings are scanned for the `[pipe.<code>]`
+     * declaration. When neither resolves a sibling, it falls back to the primary
+     * file — today's single-file behavior. The owning file is resolved to a URI;
+     * the exact line still comes from scanning the opened document, so the live
+     * (possibly unsaved) buffer of the primary is honored.
+     */
     private async navigateToPipe(pipeCode: string) {
-        if (!this.currentUri) return;
+        const primaryUri = this.currentUri;
+        if (!primaryUri) return;
 
         try {
-            const document = await vscode.workspace.openTextDocument(this.currentUri);
+            const { domainCode, source } = this.lookupPipeNode(pipeCode);
+
+            // The CLI path doesn't gather siblings during refresh (it reads them via
+            // --library-dir), so gather them here to resolve a cross-file declaration.
+            // A gather failure degrades to the primary-only path rather than aborting.
+            let files: BundleFile[];
+            try {
+                files = await gatherBundleFiles(primaryUri);
+            } catch {
+                files = [];
+            }
+
+            const owner = resolveDeclaringFile({
+                kind: 'pipe',
+                code: pipeCode,
+                domainCode,
+                source,
+                files,
+                getLines: f => f.content.split(/\r\n|\r|\n/),
+            });
+            const targetUri = owner?.uri ?? primaryUri;
+
+            const document = await vscode.workspace.openTextDocument(targetUri);
             const headerLine = findTableHeader(document, 'pipe', pipeCode);
             if (headerLine === -1) {
-                this.output.appendLine(`Could not find [pipe.${pipeCode}] in ${this.currentUri.fsPath}`);
+                this.output.appendLine(`Could not find [pipe.${pipeCode}] in ${targetUri.fsPath}`);
                 return;
             }
 
-            const panelCol = this.panel?.viewColumn;
-            const targetCol = panelCol && panelCol > 1 ? panelCol - 1 : vscode.ViewColumn.One;
-
-            const editor = await vscode.window.showTextDocument(document, {
-                viewColumn: targetCol,
-                preserveFocus: false,
-            });
-
-            const range = document.lineAt(headerLine).range;
-            editor.selection = new vscode.Selection(range.start, range.end);
-            editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+            await this.revealRangeBeside(document, document.lineAt(headerLine).range);
         } catch (err: any) {
             this.output.appendLine(`navigateToPipe error: ${err.message ?? err}`);
         }
@@ -799,20 +878,29 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
         try {
             const document = await vscode.workspace.openTextDocument(target.uri);
-
-            const panelCol = this.panel?.viewColumn;
-            const targetCol = panelCol && panelCol > 1 ? panelCol - 1 : vscode.ViewColumn.One;
-
-            const editor = await vscode.window.showTextDocument(document, {
-                viewColumn: targetCol,
-                preserveFocus: false,
-            });
-
-            editor.selection = new vscode.Selection(target.range.start, target.range.end);
-            editor.revealRange(target.range, vscode.TextEditorRevealType.InCenter);
+            await this.revealRangeBeside(document, target.range);
         } catch (err: any) {
             this.output.appendLine(`navigateToError error: ${err.message ?? err}`);
         }
+    }
+
+    /**
+     * Open `document` in the column beside the panel and reveal `range`, centered
+     * and selected. Shared by pipe-node navigation and error-list navigation so
+     * both place the cursor identically. The target column is one left of the
+     * panel (or column 1 when the panel is already leftmost).
+     */
+    private async revealRangeBeside(document: vscode.TextDocument, range: vscode.Range): Promise<void> {
+        const panelCol = this.panel?.viewColumn;
+        const targetCol = panelCol && panelCol > 1 ? panelCol - 1 : vscode.ViewColumn.One;
+
+        const editor = await vscode.window.showTextDocument(document, {
+            viewColumn: targetCol,
+            preserveFocus: false,
+        });
+
+        editor.selection = new vscode.Selection(range.start, range.end);
+        editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
     }
 
     private setHtml(html: string) {
