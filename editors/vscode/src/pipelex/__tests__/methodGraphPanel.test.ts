@@ -176,6 +176,7 @@ vi.mock('../validation/sourceLocator', () => {
     const headerRe = (kind: string, code: string) =>
         new RegExp(`^\\s*\\[${kind}\\.${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`);
     return {
+        escapeRegex: (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
         findTableHeader: vi.fn((doc: any, kind: string, code: string) => {
             const re = headerRe(kind, code);
             for (let i = 0; i < doc.lineCount; i++) {
@@ -581,6 +582,138 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it('navigateToPipe reads domain-less registry sources from `.pipe` keys', async () => {
+        const vscode = await import('vscode');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+        const siblingUri = makeUri('/project/methods/screen.mthds');
+
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [{ id: 'node-screen', pipe_code: 'screen', kind: 'controller' }],
+            edges: [],
+            pipe_registry: {
+                '.screen': { code: 'screen', domain_code: '', source: '/project/methods/screen.mthds' },
+            },
+        };
+        mockState.docContents['/project/methods/screen.mthds'] =
+            '[pipe.screen]\ntype = "PipeSequence"\n';
+        mockState.bundleFiles = [
+            { uri: primaryUri, name: 'bundle.mthds', content: '[pipe.screen]\ntype = "PipeSignature"\n' },
+            { uri: siblingUri, name: 'screen.mthds', content: mockState.docContents['/project/methods/screen.mthds'] },
+        ];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'screen', nodeId: 'node-screen', domainCode: '' });
+        await new Promise(r => setTimeout(r, 20));
+
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(siblingUri);
+        panel.dispose();
+    });
+
+    it('navigateToPipe uses the clicked node domain when two nodes share a pipe_code', async () => {
+        const vscode = await import('vscode');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+        const alphaUri = makeUri('/project/methods/alpha.mthds');
+        const betaUri = makeUri('/project/methods/beta.mthds');
+
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [
+                { id: 'alpha-process', pipe_code: 'process', domain_code: 'alpha', kind: 'operator' },
+                { id: 'beta-process', pipe_code: 'process', domain_code: 'beta', kind: 'operator' },
+            ],
+            edges: [],
+            pipe_registry: {
+                'alpha.process': { code: 'process', domain_code: 'alpha', source: '/project/methods/alpha.mthds' },
+                'beta.process': { code: 'process', domain_code: 'beta', source: '/project/methods/beta.mthds' },
+            },
+        };
+        mockState.docContents['/project/methods/alpha.mthds'] = 'domain = "alpha"\n[pipe.process]\n';
+        mockState.docContents['/project/methods/beta.mthds'] = 'domain = "beta"\n[pipe.process]\n';
+        mockState.bundleFiles = [
+            { uri: primaryUri, name: 'bundle.mthds', content: 'domain = "root"\n[pipe.main]\n' },
+            { uri: alphaUri, name: 'alpha.mthds', content: mockState.docContents['/project/methods/alpha.mthds'] },
+            { uri: betaUri, name: 'beta.mthds', content: mockState.docContents['/project/methods/beta.mthds'] },
+        ];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'process', nodeId: 'beta-process', domainCode: 'beta' });
+        await new Promise(r => setTimeout(r, 20));
+
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(betaUri);
+        panel.dispose();
+    });
+
+    it('navigateToPipe does not use a domainless registry source for a domain-specific click', async () => {
+        const vscode = await import('vscode');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+        const domainlessUri = makeUri('/project/methods/shared.mthds');
+        const betaUri = makeUri('/project/methods/beta.mthds');
+
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [{ id: 'beta-process', pipe_code: 'process', domain_code: 'beta', kind: 'operator' }],
+            edges: [],
+            pipe_registry: {
+                '.process': { code: 'process', domain_code: '', source: '/project/methods/shared.mthds' },
+            },
+        };
+        mockState.docContents['/project/methods/shared.mthds'] = '[pipe.process]\n';
+        mockState.docContents['/project/methods/beta.mthds'] = 'domain = "beta"\n[pipe.process]\n';
+        mockState.bundleFiles = [
+            { uri: primaryUri, name: 'bundle.mthds', content: 'domain = "root"\n[pipe.main]\n' },
+            { uri: domainlessUri, name: 'shared.mthds', content: mockState.docContents['/project/methods/shared.mthds'] },
+            { uri: betaUri, name: 'beta.mthds', content: mockState.docContents['/project/methods/beta.mthds'] },
+        ];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'process', nodeId: 'beta-process', domainCode: 'beta' });
+        await new Promise(r => setTimeout(r, 20));
+
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(betaUri);
+        expect(vscode.workspace.openTextDocument).not.toHaveBeenCalledWith(domainlessUri);
+        panel.dispose();
+    });
+
+    it('navigateToPipe falls back to the declaration scan when registry `source` is stale', async () => {
+        const vscode = await import('vscode');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+        const staleUri = makeUri('/project/methods/stale.mthds');
+        const siblingUri = makeUri('/project/methods/helpers.mthds');
+
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [{ id: 'node-build', pipe_code: 'build', domain_code: 'rec', kind: 'operator' }],
+            edges: [],
+            pipe_registry: { 'rec.build': { code: 'build', domain_code: 'rec', source: '/project/methods/stale.mthds' } },
+        };
+        mockState.docContents['/project/methods/helpers.mthds'] = 'domain = "rec"\n[pipe.build]\ntype = "PipeLLM"\n';
+        mockState.bundleFiles = [
+            { uri: primaryUri, name: 'bundle.mthds', content: 'domain = "rec"\n[pipe.main]\n' },
+            { uri: staleUri, name: 'stale.mthds', content: 'domain = "rec"\n[pipe.other]\n' },
+            { uri: siblingUri, name: 'helpers.mthds', content: mockState.docContents['/project/methods/helpers.mthds'] },
+        ];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'build', nodeId: 'node-build', domainCode: 'rec' });
+        await new Promise(r => setTimeout(r, 20));
+
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(siblingUri);
+        panel.dispose();
+    });
+
     it('navigateToPipe keeps a primary-declared pipe on the primary file (single-file regression)', async () => {
         const vscode = await import('vscode');
         const primaryUri = makeUri('/project/methods/bundle.mthds');
@@ -634,6 +767,43 @@ describe('MethodGraphPanel', () => {
 
         // No source → scan locates `[pipe.helper]` in the sibling.
         expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(siblingUri);
+        panel.dispose();
+    });
+
+    it('navigateToPipe aborts if the panel switches files while gathering siblings', async () => {
+        const vscode = await import('vscode');
+        const bundleGather = await import('../validation/bundleGather');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+        const siblingUri = makeUri('/project/methods/helpers.mthds');
+        let resolveGather: ((files: any[]) => void) | undefined;
+        vi.mocked(bundleGather.gatherBundleFiles).mockImplementationOnce(() => new Promise(resolve => {
+            resolveGather = resolve;
+        }));
+
+        const graphspec = {
+            meta: { format: 'mthds' },
+            nodes: [{ id: 'node-helper', pipe_code: 'helper', domain_code: 'rec', kind: 'operator' }],
+            edges: [],
+            pipe_registry: { 'rec.helper': { code: 'helper', domain_code: 'rec', source: '/project/methods/helpers.mthds' } },
+        };
+        mockState.docContents['/project/methods/helpers.mthds'] = 'domain = "rec"\n[pipe.helper]\n';
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const messageHandler = await showGraphWithSpec(panel, primaryUri, graphspec);
+
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToPipe', pipeCode: 'helper', nodeId: 'node-helper', domainCode: 'rec' });
+        await vi.waitFor(() => {
+            expect(resolveGather).toBeDefined();
+        });
+        (panel as any).currentUri = makeUri('/project/methods/other.mthds');
+        resolveGather!([
+            { uri: primaryUri, name: 'bundle.mthds', content: 'domain = "rec"\n[pipe.main]\n' },
+            { uri: siblingUri, name: 'helpers.mthds', content: mockState.docContents['/project/methods/helpers.mthds'] },
+        ]);
+        await new Promise(r => setTimeout(r, 20));
+
+        expect(vscode.workspace.openTextDocument).not.toHaveBeenCalled();
         panel.dispose();
     });
 

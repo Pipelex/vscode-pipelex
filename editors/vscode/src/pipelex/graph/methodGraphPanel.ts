@@ -36,8 +36,8 @@ const WEBVIEW_ALLOWED_COMMANDS = new Set<string>([SET_API_KEY_COMMAND]);
  * full graphspec it forwarded to the webview and reads only these fields.
  */
 interface GraphspecForNav {
-    nodes?: Array<{ pipe_code?: string; domain_code?: string }>;
-    pipe_registry?: Record<string, { source?: string } | undefined>;
+    nodes?: Array<{ id?: string; pipe_code?: string; domain_code?: string }>;
+    pipe_registry?: Record<string, { code?: string; domain_code?: string; source?: string } | undefined>;
 }
 
 /** A clicked pipe node's resolved identity bits, recovered from the retained graphspec. */
@@ -179,6 +179,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     show(uri: vscode.Uri) {
+        this.clearNavigationState();
         this.currentUri = uri;
         this.sourceKind = 'mthds';
         const filename = uri.fsPath.replace(/^.*[\\/]/, '');
@@ -204,6 +205,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     restore(panel: vscode.WebviewPanel, uri: vscode.Uri) {
+        this.clearNavigationState();
         this.panel = panel;
         this.currentUri = uri;
         this.sourceKind = 'mthds';
@@ -222,6 +224,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     showGraphspecJson(uri: vscode.Uri) {
+        this.clearNavigationState();
         this.currentUri = uri;
         this.sourceKind = 'graphspec-json';
         const filename = uri.fsPath.replace(/^.*[\\/]/, '');
@@ -247,6 +250,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     restoreGraphspecJson(panel: vscode.WebviewPanel, uri: vscode.Uri) {
+        this.clearNavigationState();
         this.panel = panel;
         this.currentUri = uri;
         this.sourceKind = 'graphspec-json';
@@ -274,7 +278,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             this.currentUri = undefined;
             this.sourceKind = undefined;
             this.webviewReady = false;
-            this.currentGraphspec = undefined;
+            this.clearNavigationState();
         });
         this.panel.webview.onDidReceiveMessage(
             message => this.handleWebviewMessage(message),
@@ -391,6 +395,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             return;
         }
 
+        this.clearNavigationState();
         this.setHtml(messageHtml('No Graph Available', 'The bundle did not produce a method graph.'));
     }
 
@@ -401,6 +406,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * {@link errorTargets} for index-based navigation.
      */
     private async renderValidationErrors(uri: vscode.Uri, errors: ValidationErrorItem[]): Promise<void> {
+        this.clearNavigationState();
         // The CLI path resolves siblings itself, so `refresh()` does not gather them;
         // the clickable list needs their contents to place an error on its owning file.
         // A gather failure (transient read error, deleted primary file) must NOT reject:
@@ -459,10 +465,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     applySkipped(uri: vscode.Uri, message: string): void {
         if (!this.panel) return;
         if (this.currentUri?.toString() !== uri.toString()) return;
+        this.clearNavigationState();
         this.setHtml(messageHtml('Graph Unavailable', escapeHtml(message)));
     }
 
     private renderBackendError(err: unknown): void {
+        this.clearNavigationState();
         if (err instanceof BackendError) {
             switch (err.kind) {
                 case 'not-found':
@@ -549,21 +557,24 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             try {
                 content = await fs.promises.readFile(uri.fsPath, 'utf-8');
             } catch (err: any) {
+                if (this.currentUri?.toString() !== uri.toString()) return;
+                this.clearNavigationState();
                 this.setHtml(messageHtml('Read Error', `Could not read file: ${escapeHtml(err.message ?? String(err))}`, { retry: true }));
                 return;
             }
         }
 
+        if (this.currentUri?.toString() !== uri.toString()) return;
+
         const graphspec = parseGraphspecFile(content);
         if (!graphspec) {
+            this.clearNavigationState();
             this.setHtml(messageHtml(
                 'Invalid GraphSpec',
                 'File does not contain a valid MTHDS GraphSpec JSON (missing <code>meta.format</code>, <code>nodes</code>, or <code>edges</code>).'
             ));
             return;
         }
-
-        if (this.currentUri?.toString() !== uri.toString()) return;
 
         const pipelexConfig = vscode.workspace.getConfiguration('pipelex');
         const direction = pipelexConfig.get<string>('graph.direction', 'top_down');
@@ -600,6 +611,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         // Retain the graphspec so a pipe-node click can recover its declaring
         // domain + registry `source` (see navigateToPipe). Set alongside the send
         // so it always matches what the webview is rendering.
+        this.errorTargets = [];
         this.currentGraphspec = graphspec;
 
         const setDataPayload = {
@@ -635,6 +647,11 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             this.pendingData = setDataPayload;
             this.setHtml(webviewHtml);
         }
+    }
+
+    private clearNavigationState(): void {
+        this.currentGraphspec = undefined;
+        this.errorTargets = [];
     }
 
     private buildWebviewHtml(): string | undefined {
@@ -757,7 +774,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {
             if (this.sourceKind === 'graphspec-json') return;
-            this.navigateToPipe(message.pipeCode);
+            const domainCode = typeof message.domainCode === 'string' ? message.domainCode : undefined;
+            const nodeId = typeof message.nodeId === 'string' ? message.nodeId : undefined;
+            this.navigateToPipe(message.pipeCode, domainCode, nodeId);
             return;
         }
         if (message.type === 'navigateToError' && typeof message.index === 'number' && this.currentUri) {
@@ -796,22 +815,44 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
     /**
      * Recover a clicked pipe node's identity from the retained graphspec. The
-     * webview message carries only the bare `pipeCode`, so the node is matched by
-     * `pipe_code` to recover its `domain_code`, which keys into `pipe_registry`
-     * for the declaration `source` path.
-     *
-     * v1 edge: if the same `pipe_code` appears under two domains as two nodes, a
-     * bare `pipeCode` can't say which was clicked — the first node match wins, and
-     * the scan fallback still finds a correct declaration. The bulletproof upgrade
-     * (wiring mthds-ui's `onNodeSelect(nodeId, nodeData)`) is recorded but not done
-     * here, to keep the webview message contract unchanged.
+     * webview normally sends the clicked node id/domain recovered through
+     * GraphViewer's `onNodeSelect`; older renderers/messages may still send only
+     * the bare `pipeCode`. Prefer exact node/domain matching, then fall back to a
+     * unique bare-code match. Registry keys are tried with both `domain.code` and
+     * `.code` because domain-less pipes are serialized with an empty-domain key.
      */
-    private lookupPipeNode(pipeCode: string): PipeNodeIdentity {
+    private lookupPipeNode(pipeCode: string, clickedDomainCode?: string, clickedNodeId?: string): PipeNodeIdentity {
         const spec = this.currentGraphspec as GraphspecForNav | undefined;
-        const node = spec?.nodes?.find(n => n.pipe_code === pipeCode);
-        const domainCode = node?.domain_code;
-        const source = domainCode ? spec?.pipe_registry?.[`${domainCode}.${pipeCode}`]?.source : undefined;
+        const candidates = spec?.nodes?.filter(n => n.pipe_code === pipeCode) ?? [];
+        const node =
+            (clickedNodeId ? candidates.find(n => n.id === clickedNodeId) : undefined)
+            ?? (clickedDomainCode !== undefined ? candidates.find(n => (n.domain_code ?? '') === clickedDomainCode) : undefined)
+            ?? (candidates.length === 1 ? candidates[0] : undefined);
+        const domainCode = clickedDomainCode ?? node?.domain_code;
+        const source = this.lookupPipeRegistrySource(pipeCode, domainCode);
         return { domainCode, source };
+    }
+
+    private lookupPipeRegistrySource(pipeCode: string, domainCode?: string): string | undefined {
+        const registry = (this.currentGraphspec as GraphspecForNav | undefined)?.pipe_registry;
+        if (!registry) return undefined;
+
+        const keys = domainCode
+            ? [`${domainCode}.${pipeCode}`]
+            : [`.${pipeCode}`];
+        for (const key of keys) {
+            const source = registry[key]?.source;
+            if (source) return source;
+        }
+
+        const matches = Object.entries(registry).filter(([key, value]) => {
+            const registryCode = value?.code ?? key.substring(key.lastIndexOf('.') + 1);
+            if (registryCode !== pipeCode) return false;
+            if (domainCode === undefined) return true;
+            const registryDomain = value?.domain_code ?? key.substring(0, key.length - pipeCode.length - 1);
+            return registryDomain === domainCode;
+        });
+        return matches.length === 1 ? matches[0][1]?.source : undefined;
     }
 
     /**
@@ -826,12 +867,13 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * the exact line still comes from scanning the opened document, so the live
      * (possibly unsaved) buffer of the primary is honored.
      */
-    private async navigateToPipe(pipeCode: string) {
+    private async navigateToPipe(pipeCode: string, clickedDomainCode?: string, clickedNodeId?: string) {
         const primaryUri = this.currentUri;
         if (!primaryUri) return;
+        const primaryUriString = primaryUri.toString();
 
         try {
-            const { domainCode, source } = this.lookupPipeNode(pipeCode);
+            const { domainCode, source } = this.lookupPipeNode(pipeCode, clickedDomainCode, clickedNodeId);
 
             // The CLI path doesn't gather siblings during refresh (it reads them via
             // --library-dir), so gather them here to resolve a cross-file declaration.
@@ -842,6 +884,19 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             } catch {
                 files = [];
             }
+            if (!this.panel || this.currentUri?.toString() !== primaryUriString) return;
+
+            const linesCache = new Map<string, string[]>();
+            const getLines = (file: BundleFile): string[] => {
+                const key = file.uri.toString();
+                let lines = linesCache.get(key);
+                if (!lines) {
+                    const openDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === key);
+                    lines = openDoc ? textDocumentLines(openDoc) : file.content.split(/\r\n|\r|\n/);
+                    linesCache.set(key, lines);
+                }
+                return lines;
+            };
 
             const owner = resolveDeclaringFile({
                 kind: 'pipe',
@@ -849,11 +904,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 domainCode,
                 source,
                 files,
-                getLines: f => f.content.split(/\r\n|\r|\n/),
+                getLines,
             });
             const targetUri = owner?.uri ?? primaryUri;
 
             const document = await vscode.workspace.openTextDocument(targetUri);
+            if (!this.panel || this.currentUri?.toString() !== primaryUriString) return;
             const headerLine = findTableHeader(document, 'pipe', pipeCode);
             if (headerLine === -1) {
                 this.output.appendLine(`Could not find [pipe.${pipeCode}] in ${targetUri.fsPath}`);
@@ -1057,6 +1113,14 @@ function basename(fsPath: string): string {
     return fsPath.replace(/^.*[\\/]/, '');
 }
 
+function textDocumentLines(document: vscode.TextDocument): string[] {
+    const lines: string[] = [];
+    for (let i = 0; i < document.lineCount; i++) {
+        lines.push(document.lineAt(i).text);
+    }
+    return lines;
+}
+
 /**
  * Render the validation errors as a clickable list. Each row posts
  * `{ type: 'navigateToError', index }` (never a path) so the extension can open
@@ -1128,4 +1192,3 @@ ${items}
 </script>
 </div></body></html>`;
 }
-

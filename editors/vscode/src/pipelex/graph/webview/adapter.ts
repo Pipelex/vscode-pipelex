@@ -40,10 +40,36 @@ let lastReportedMode: GraphThemeMode | undefined;
 // Held so we can preserve the viewport across same-file refreshes.
 let reactFlowInstance: any = null;
 
+let lastSelectedPipeNode: { nodeId: string; pipeCode?: string; domainCode?: string } | null = null;
+
 // --- Callbacks passed to GraphViewer ---
 
 function onNavigateToPipe(pipeCode: string) {
-    vscode.postMessage({ type: 'navigateToPipe', pipeCode });
+    const selected = lastSelectedPipeNode?.pipeCode === pipeCode ? lastSelectedPipeNode : null;
+    vscode.postMessage({
+        type: 'navigateToPipe',
+        pipeCode,
+        nodeId: selected?.nodeId,
+        domainCode: selected?.domainCode,
+    });
+}
+
+function onNodeSelect(nodeId: string, nodeData: any) {
+    const pipeCode = typeof nodeData?.pipeCode === 'string'
+        ? nodeData.pipeCode
+        : typeof nodeData?.labelText === 'string'
+            ? nodeData.labelText
+            : undefined;
+    if (!pipeCode) {
+        lastSelectedPipeNode = null;
+        return;
+    }
+    const specNode = currentGraphspec?.nodes?.find(n => n.id === nodeId && n.pipe_code === pipeCode);
+    lastSelectedPipeNode = {
+        nodeId,
+        pipeCode,
+        domainCode: specNode?.domain_code,
+    };
 }
 
 function onReactFlowInit(instance: any) {
@@ -103,6 +129,7 @@ function handleMessage(event: { data: any }) {
         }
 
         currentUri = message.uri || null;
+        lastSelectedPipeNode = null;
 
         currentGraphspec = message.graphspec || null;
         currentConfig = message.config || {};
@@ -166,6 +193,7 @@ function App() {
         // survives panel reloads and VS Code restarts.
         onThemeChange,
         onNavigateToPipe,
+        onNodeSelect,
         onReactFlowInit,
         canEmbedPdf: false,
         onOpenExternally,

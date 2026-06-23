@@ -1,5 +1,5 @@
 import type { BundleFile } from './backend';
-import { findTableHeaderInLines } from './sourceLocator';
+import { escapeRegex, findTableHeaderInLines } from './sourceLocator';
 
 /** A declaration kind addressable by a `[<kind>.<code>]` table header. */
 export type DeclarationKind = 'pipe' | 'concept';
@@ -32,7 +32,7 @@ export function resolveDeclaringFile(args: {
 
     if (source) {
         const match = matchSourceFile(source, files);
-        if (match) {
+        if (match && findTableHeaderInLines(getLines(match), kind, code) !== -1) {
             return match;
         }
     }
@@ -56,7 +56,7 @@ export function matchSourceFile(source: string, files: BundleFile[]): BundleFile
     const src = source.replace(/\\/g, '/');
     const srcBase = src.substring(src.lastIndexOf('/') + 1);
     const isBareName = src === srcBase;
-    return files.find(f => {
+    const matches = files.filter(f => {
         const fsPath = f.uri.fsPath.replace(/\\/g, '/');
         const fsBase = fsPath.substring(fsPath.lastIndexOf('/') + 1);
         const name = f.name.replace(/\\/g, '/');
@@ -67,6 +67,10 @@ export function matchSourceFile(source: string, files: BundleFile[]): BundleFile
             fsPath.endsWith('/' + src)
         );
     });
+    if (isBareName && matches.length > 1) {
+        return undefined;
+    }
+    return matches[0];
 }
 
 /**
@@ -92,7 +96,7 @@ export function findDeclaringFileByScan(
 
 /** Whether a file's lines declare a top-level `domain = "<domainCode>"`. */
 function fileDeclaresDomain(lines: string[], domainCode: string): boolean {
-    const pattern = new RegExp(`^\\s*domain\\s*=\\s*["']${escapeRegex(domainCode)}["']`);
+    const pattern = new RegExp(`^\\s*domain\\s*=\\s*(["'])${escapeRegex(domainCode)}\\1\\s*(?:#.*)?$`);
     for (const line of lines) {
         if (pattern.test(line)) {
             return true;
@@ -104,8 +108,4 @@ function fileDeclaresDomain(lines: string[], domainCode: string): boolean {
         }
     }
     return false;
-}
-
-function escapeRegex(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

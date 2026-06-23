@@ -65,6 +65,14 @@ describe('resolveDeclaringFile — source-first tier', () => {
         });
         expect(owner?.uri.toString()).toBe(CONCRETE.uri.toString());
     });
+
+    it('falls through to the scan when `source` names a file without the declaration header', () => {
+        const stale = makeFile(`${DIR}/stale.mthds`, 'stale.mthds', 'domain = "rec"\n[pipe.other]\n');
+        const owner = resolveDeclaringFile({
+            kind: 'pipe', code: 'build', source: `${DIR}/stale.mthds`, files: [SIGNATURE, stale, CONCRETE], getLines,
+        });
+        expect(owner?.uri.toString()).toBe(CONCRETE.uri.toString());
+    });
 });
 
 describe('resolveDeclaringFile — scan fallback tier (no source)', () => {
@@ -129,14 +137,20 @@ describe('findDeclaringFileByScan — domain-disambiguated collision', () => {
         // isn't found → first match (fileA) wins.
         expect(owner?.uri.toString()).toBe(fileA.uri.toString());
     });
+
+    it('does not accept mismatched quotes in a top-level domain declaration', () => {
+        const malformed = makeFile(`${DIR}/malformed.mthds`, 'malformed.mthds',
+            'domain = "beta\'\n[pipe.process]\ntype = "PipeLLM"\n');
+        const owner = findDeclaringFileByScan('pipe', 'process', [fileA, malformed], 'beta', getLines);
+        expect(owner?.uri.toString()).toBe(fileA.uri.toString());
+    });
 });
 
 describe('matchSourceFile — path normalization', () => {
-    it('does not misroute a bare source onto a path-qualified sibling', () => {
+    it('does not guess when a bare source basename is ambiguous', () => {
         const a = makeFile('/x/foo/a.mthds', 'a.mthds', '');
         const b = makeFile('/x/bar/a.mthds', 'a.mthds', '');
-        // A bare `a.mthds` matches by basename — first basename match.
-        expect(matchSourceFile('a.mthds', [a, b])?.uri.toString()).toBe(a.uri.toString());
+        expect(matchSourceFile('a.mthds', [a, b])).toBeUndefined();
     });
 
     it('matches a Windows backslash fsPath from a POSIX relative source', () => {
