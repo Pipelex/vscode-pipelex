@@ -1353,6 +1353,11 @@ describe('MethodGraphPanel', () => {
 
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/methods/bundle.mthds');
+        const helperUri = makeUri('/project/methods/helper.mthds');
+        mockState.bundleFiles = [
+            { uri, name: 'bundle.mthds', content: 'domain = "rec"\nmain_pipe = "main"\n[pipe.main]\n' },
+            { uri: helperUri, name: 'helper.mthds', content: 'domain = "rec"\n[pipe.helper]\n' },
+        ];
         panel.show(uri);
         await new Promise(r => setTimeout(r, 20));
 
@@ -1362,12 +1367,75 @@ describe('MethodGraphPanel', () => {
         expect(editorChangeHandler).not.toBeNull();
 
         await editorChangeHandler!({
-            document: { languageId: 'mthds', uri: makeUri('/project/methods/helper.mthds') },
+            document: { languageId: 'mthds', uri: helperUri },
             viewColumn: 1,
         });
 
         expect(processUtils.spawnCli).not.toHaveBeenCalled();
         expect(mockState.mockPanel.title).toBe(originalTitle);
+        panel.dispose();
+    });
+
+    it('onDidChangeActiveTextEditor refreshes when a same-directory file has its own graph primary', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/bundle.mthds');
+        const otherUri = makeUri('/project/methods/other.mthds');
+        mockState.bundleFiles = [
+            { uri, name: 'bundle.mthds', content: 'domain = "rec"\nmain_pipe = "main"\n[pipe.main]\n' },
+            { uri: otherUri, name: 'other.mthds', content: 'domain = "rec"\nmain_pipe = "other"\n[pipe.other]\n' },
+        ];
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        vi.mocked(processUtils.spawnCli).mockClear();
+        const editorChangeHandler = mockState.onEditorChangeHandler;
+        expect(editorChangeHandler).not.toBeNull();
+
+        await editorChangeHandler!({
+            document: { languageId: 'mthds', uri: otherUri },
+            viewColumn: 1,
+        });
+
+        await vi.waitFor(() => {
+            expect(processUtils.spawnCli).toHaveBeenCalled();
+        });
+        expect(mockState.mockPanel.title).toBe('Method Graph — other.mthds');
+        panel.dispose();
+    });
+
+    it('onDidChangeActiveTextEditor switches from graphspec JSON to a same-directory mthds graph', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const jsonUri = makeUri('/project/methods/run.json');
+        mockState.openTextDocuments = [
+            {
+                uri: jsonUri,
+                getText: () => JSON.stringify({ meta: { format: 'mthds' }, nodes: [], edges: [] }),
+            },
+        ];
+        panel.showGraphspecJson(jsonUri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const mthdsUri = makeUri('/project/methods/bundle.mthds');
+        mockState.bundleFiles = [
+            { uri: mthdsUri, name: 'bundle.mthds', content: 'domain = "rec"\nmain_pipe = "main"\n[pipe.main]\n' },
+        ];
+        vi.mocked(processUtils.spawnCli).mockClear();
+        const editorChangeHandler = mockState.onEditorChangeHandler;
+        expect(editorChangeHandler).not.toBeNull();
+
+        await editorChangeHandler!({
+            document: { languageId: 'mthds', uri: mthdsUri },
+            viewColumn: 1,
+        });
+
+        await vi.waitFor(() => {
+            expect(processUtils.spawnCli).toHaveBeenCalled();
+        });
+        expect(mockState.mockPanel.title).toBe('Method Graph — bundle.mthds');
         panel.dispose();
     });
 

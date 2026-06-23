@@ -142,15 +142,24 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
                 if (editor.document.languageId === 'mthds' && editor.document.uri.scheme === 'file') {
                     const newUri = editor.document.uri;
-                    if (
-                        !this.currentUri ||
-                        (
-                            newUri.toString() !== this.currentUri.toString() &&
-                            !sameDirectory(newUri, this.currentUri)
-                        )
-                    ) {
+                    const currentUri = this.currentUri;
+                    if (!currentUri || this.sourceKind !== 'mthds') {
                         this.show(newUri);
+                        return;
                     }
+                    if (newUri.toString() === currentUri.toString()) {
+                        return;
+                    }
+                    if (sameDirectory(newUri, currentUri)) {
+                        const samePrimary = await resolvesToSameGraphPrimary(newUri, currentUri);
+                        if (this.currentUri?.toString() !== currentUri.toString() || this.sourceKind !== 'mthds') {
+                            return;
+                        }
+                        if (samePrimary) {
+                            return;
+                        }
+                    }
+                    this.show(newUri);
                 } else if (editor.document.languageId === 'json' && editor.document.uri.scheme === 'file') {
                     const graphspec = parseGraphspecFile(editor.document.getText());
                     if (graphspec) {
@@ -1123,6 +1132,18 @@ function basename(fsPath: string): string {
 
 function sameDirectory(a: vscode.Uri, b: vscode.Uri): boolean {
     return dirname(a.fsPath) === dirname(b.fsPath);
+}
+
+async function resolvesToSameGraphPrimary(a: vscode.Uri, b: vscode.Uri): Promise<boolean> {
+    try {
+        const [aPrimary, bPrimary] = await Promise.all([
+            resolveGraphPrimaryBundle(a),
+            resolveGraphPrimaryBundle(b),
+        ]);
+        return aPrimary.primaryUri.toString() === bPrimary.primaryUri.toString();
+    } catch {
+        return false;
+    }
 }
 
 function dirname(fsPath: string): string {
