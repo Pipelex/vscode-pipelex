@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { cancelInflightByKey, cancelInflightInDir } from './processUtils';
 import { gatherBundleFiles } from './bundleGather';
+import { resolveGraphPrimaryBundle } from './graphPrimary';
 import { buildBundleDiagnostics } from './crossFileDiagnostics';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { BackendFactory } from './backendFactory';
@@ -132,9 +133,13 @@ export class PipelexValidator implements vscode.Disposable {
 
         try {
             const backend = this.factory.getBackend(document.uri);
-            const files = await gatherBundleFiles(document.uri);
+            const graphPrimary = withGraph
+                ? await resolveGraphPrimaryBundle(document.uri)
+                : undefined;
+            const analysisPrimaryUri = graphPrimary?.primaryUri ?? document.uri;
+            const files = graphPrimary?.files ?? await gatherBundleFiles(document.uri);
             const analysis = await backend.analyze(
-                { primaryUri: document.uri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
+                { primaryUri: analysisPrimaryUri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
                 { withGraph, direction },
                 controller.signal,
             );
@@ -145,7 +150,7 @@ export class PipelexValidator implements vscode.Disposable {
             // per-file and guarded separately by the panel's own currentUri check, so it
             // still updates for the file the user is viewing.
             if (this.dirGeneration.get(dir) === myGen) {
-                this.applyValidation(document, files, analysis);
+                this.applyValidation(document, analysisPrimaryUri, files, analysis);
                 this.lastNotifiedMessage = undefined;
             }
 
@@ -174,6 +179,7 @@ export class PipelexValidator implements vscode.Disposable {
 
     private applyValidation(
         document: vscode.TextDocument,
+        analysisPrimaryUri: vscode.Uri,
         files: { uri: vscode.Uri; name: string; content: string }[],
         analysis: BundleAnalysis,
     ): void {
@@ -186,7 +192,7 @@ export class PipelexValidator implements vscode.Disposable {
         const fileDiags = buildBundleDiagnostics({
             errors: validation.errors,
             files,
-            primaryUri: document.uri,
+            primaryUri: analysisPrimaryUri,
             diagnosticSource: DIAGNOSTIC_SOURCE,
             primaryDocument: document,
         });

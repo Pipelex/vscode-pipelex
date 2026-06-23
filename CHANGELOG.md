@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+ - **Cross-file pipe-node graph navigation:** Clicking a pipe node in the method graph now opens that pipe's declaration even when it lives in a sibling `.mthds` file. Navigation uses the runtime registry's `source` hint when valid, falls back to declaration scanning when stale/missing, and preserves domain identity when multiple domains reuse the same pipe code.
  - **Python library bindings (`pipelex-tools-py`)**: New, independently versioned PyPI package exposing MTHDS linting and formatting as in-process functions (`format_mthds`, `lint_mthds`). Built with PyO3 over the existing `taplo`/`taplo-common` engine, it returns structured diagnostics (`{kind, severity, message, location, range}`) instead of raising exceptions, validates against the embedded official MTHDS schema fully offline, and ships PEP 561 type stubs (`pipelex_tools.pyi`, `py.typed`) for static typing and editor autocomplete.
  - **Parity test suite** (`crates/pipelex-cli/tests/parity.rs`): Asserts the Python library's output is byte-for-byte identical to the `plxt` CLI, preventing drift between the two interfaces.
  - **Dedicated CI workflows**: `.github/workflows/check.yml` runs the core PR quality gate (`make check`: formatting, clippy, tests, WASM compilation), and `.github/workflows/test-all.yml` runs `make test-all`, including the Python wheel build and import smoke tests.

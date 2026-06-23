@@ -53,9 +53,9 @@ fn no_quiet_invalid_file_has_tracing() {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    // Without --quiet, tracing INFO lines should appear
+    // Without --quiet, the redundant tracing trailer should appear.
     assert!(
-        stderr.contains("INFO") || stderr.contains("found"),
+        stderr.contains("operation failed"),
         "expected tracing output without --quiet, got: {stderr}"
     );
 }

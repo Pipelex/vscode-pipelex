@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import type { BundleFile } from './backend';
 import type { ValidationErrorItem } from './types';
-import { locateError, locateErrorInLines, findTableHeaderInLines } from './sourceLocator';
+import { locateError, locateErrorInLines } from './sourceLocator';
+import { matchSourceFile, findDeclaringFileByScan } from './bundleResolution';
 
 /** Diagnostics computed for one file in the bundle. */
 export interface FileDiagnostics {
@@ -105,41 +106,33 @@ export function buildBundleDiagnostics(args: {
     return [...byUri.values()];
 }
 
+/**
+ * Resolve a validation error to its owning file, in priority order:
+ * `error.source` → `pipe_code` declaration → `concept_code` declaration.
+ *
+ * The matching primitives are shared with the method-graph pipe-node navigation
+ * path ({@link resolveDeclaringFile}) so the two surfaces can never disagree on
+ * how a source path is matched or how a declaration header is found. The error
+ * path keeps its own source→pipe→concept ordering (an error may carry both a
+ * `pipe_code` and a `concept_code`); the navigation path resolves a single kind.
+ */
 function resolveOwner(
     error: ValidationErrorItem,
     files: BundleFile[],
     getLines: (file: BundleFile) => string[],
 ): BundleFile | undefined {
     if (error.source) {
-        // The backend can report a POSIX-style relative source (e.g. `subdir/a.mthds`)
-        // even on Windows, where `fsPath` uses `\`. Normalize both sides to forward
-        // slashes before matching, so a path-qualified source is not misrouted by a
-        // separator mismatch (`\` vs `/`) in the basename or segment-boundary checks.
-        const src = error.source.replace(/\\/g, '/');
-        const srcBase = src.substring(src.lastIndexOf('/') + 1);
-        const isBareName = src === srcBase;
-        // A bare filename matches by basename; a path-qualified source (e.g. `foo/a.mthds`)
-        // must match exactly or on a path-segment boundary, so it can't misroute onto a
-        // similarly-named sibling like `/project/bar/a.mthds` via either branch.
-        const match = files.find(f => {
-            const fsPath = f.uri.fsPath.replace(/\\/g, '/');
-            const fsBase = fsPath.substring(fsPath.lastIndexOf('/') + 1);
-            const name = f.name.replace(/\\/g, '/');
-            return (
-                name === src ||
-                fsPath === src ||
-                (isBareName && fsBase === srcBase) ||
-                fsPath.endsWith('/' + src)
-            );
-        });
+        const match = matchSourceFile(error.source, files);
         if (match) {
             return match;
         }
     }
 
+    const domainCode = error.domain_code ?? undefined;
+
     const pipeCode = error.pipe_code ?? undefined;
     if (pipeCode) {
-        const match = files.find(f => findTableHeaderInLines(getLines(f), 'pipe', pipeCode) !== -1);
+        const match = findDeclaringFileByScan('pipe', pipeCode, files, domainCode, getLines);
         if (match) {
             return match;
         }
@@ -147,7 +140,7 @@ function resolveOwner(
 
     const conceptCode = error.concept_code ?? undefined;
     if (conceptCode) {
-        const match = files.find(f => findTableHeaderInLines(getLines(f), 'concept', conceptCode) !== -1);
+        const match = findDeclaringFileByScan('concept', conceptCode, files, domainCode, getLines);
         if (match) {
             return match;
         }

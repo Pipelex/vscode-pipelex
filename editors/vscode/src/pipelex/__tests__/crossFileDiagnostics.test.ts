@@ -66,6 +66,20 @@ describe('buildBundleDiagnostics — owner resolution', () => {
         expect(result[0].uri.toString()).toBe(SIBLING.uri.toString());
     });
 
+    it('places a same-code pipe error on the file whose domain matches the error', () => {
+        const alpha = makeFile('alpha.mthds', 'domain = "alpha"\n[pipe.process]\ntype = "PipeLLM"\n');
+        const beta = makeFile('beta.mthds', 'domain = "beta"\n[pipe.process]\ntype = "PipeLLM"\n');
+        const result = buildBundleDiagnostics({
+            errors: [{ category: 'pipe_factory', message: 'beta process broke', pipe_code: 'process', domain_code: 'beta' }],
+            files: [alpha, beta],
+            primaryUri: alpha.uri as any,
+            diagnosticSource: 'pipelex',
+        });
+        expect(result).toHaveLength(1);
+        expect(result[0].uri.toString()).toBe(beta.uri.toString());
+        expect(result[0].diagnostics[0].range.start.line).toBe(1);
+    });
+
     it('falls back to the concept-declaring file when only concept_code is known', () => {
         const result = build([{ category: 'pipe_factory', message: 'Foo missing', concept_code: 'Foo' }]);
         expect(result[0].uri.toString()).toBe(SIBLING.uri.toString());

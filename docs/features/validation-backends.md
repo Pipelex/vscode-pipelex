@@ -57,7 +57,7 @@ When a `.mthds` bundle fails validation it produces **no** method graph, so the 
 
 - A header counts the errors and reminds you to **fix and save to regenerate the graph**.
 - Each row shows the error message, its `pipe.<code>` / `concept.<code>` context when the error names one, and — for an error that lives in a **sibling** file — that file's name, so a cross-file failure is attributed to the right place (single-file bundles, and errors on the file you saved, stay clean with no file label).
-- Each row is **clickable**: it opens the owning file (which may be a sibling) at the error's line, in the editor column beside the panel — the same navigation the graph's pipe nodes use.
+- Each row is **clickable**: it opens the owning file (which may be a sibling) at the error's line, in the editor column beside the panel — the same owner resolver and open-and-reveal the graph's pipe nodes use for [cross-file pipe navigation](./graph-pipe-navigation.md).
 - A **Retry** button re-runs the analysis, matching the panel's other error states.
 
 Fix the reported errors and save: the panel regenerates the graph. (This applies to `.mthds` sources only — a run-graph GraphSpec JSON never yields validation errors.)

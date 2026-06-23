@@ -121,6 +121,6 @@ function fullLineRange(lines: string[], line: number): vscode.Range {
     return new vscode.Range(safeLine, 0, safeLine, lines[safeLine].length);
 }
 
-function escapeRegex(s: string): string {
+export function escapeRegex(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
