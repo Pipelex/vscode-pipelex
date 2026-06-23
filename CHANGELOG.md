@@ -13,7 +13,7 @@
 ### Changed
  - **Granular test targets**: Split the monolithic `make test` recipe into per-package targets (e.g., `test-taplo`, `test-pipelex-cli`, `test-pipelex-py`, `test-ext`). `make test` now aggregates the fast native/extension targets, while the new `make test-all` also runs the heavier Python library smoke tests.
  - **CI pipeline refactoring**: Delegated PR quality gates entirely to the new `check.yml` and `test-all.yml` workflows, removing the monolithic `fmt-lint`, `test`, and `check_wasm32` jobs from `ci.yaml` so CI runs the exact same `make` targets developers run locally.
- - **Release scripts & AI skills**: Updated the `.claude/skills/release` scripts and prompts to handle the new dual-package architecture, independently identifying, versioning, and annotating changes for both the `pipelex-tools` CLI and the `pipelex-tools-py` library.
+ - **Release automation**: Updated the release workflows to handle the new dual-package architecture, independently identifying, versioning, and annotating changes for both the `pipelex-tools` CLI and the `pipelex-tools-py` library.
  - **VS Code extension resolver**: Refactored `crossFileDiagnostics.ts` to delegate to a new shared `bundleResolution.ts` module, so validation-error placement and graph pipe-node navigation use the same source-of-truth logic for resolving declaring files.
 
 ### Fixed
