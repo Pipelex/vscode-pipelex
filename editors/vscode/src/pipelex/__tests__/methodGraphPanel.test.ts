@@ -1348,6 +1348,29 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it('onDidChangeActiveTextEditor keeps the current graph when switching bundles in the same directory', async () => {
+        const processUtils = await import('../validation/processUtils');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/bundle.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        vi.mocked(processUtils.spawnCli).mockClear();
+        const originalTitle = mockState.mockPanel.title;
+        const editorChangeHandler = mockState.onEditorChangeHandler;
+        expect(editorChangeHandler).not.toBeNull();
+
+        await editorChangeHandler!({
+            document: { languageId: 'mthds', uri: makeUri('/project/methods/helper.mthds') },
+            viewColumn: 1,
+        });
+
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
+        expect(mockState.mockPanel.title).toBe(originalTitle);
+        panel.dispose();
+    });
+
     // --- onDidChangeTextDocument: external file changes ---
 
     it('external file change triggers debounced refresh after 500ms', async () => {

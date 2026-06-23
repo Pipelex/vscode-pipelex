@@ -142,7 +142,13 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
                 if (editor.document.languageId === 'mthds' && editor.document.uri.scheme === 'file') {
                     const newUri = editor.document.uri;
-                    if (!this.currentUri || newUri.toString() !== this.currentUri.toString()) {
+                    if (
+                        !this.currentUri ||
+                        (
+                            newUri.toString() !== this.currentUri.toString() &&
+                            !sameDirectory(newUri, this.currentUri)
+                        )
+                    ) {
                         this.show(newUri);
                     }
                 } else if (editor.document.languageId === 'json' && editor.document.uri.scheme === 'file') {
@@ -1113,6 +1119,16 @@ function errorContext(error: ValidationErrorItem): string | undefined {
 /** Last path segment of a file path, cross-platform (handles `/` and `\`). */
 function basename(fsPath: string): string {
     return fsPath.replace(/^.*[\\/]/, '');
+}
+
+function sameDirectory(a: vscode.Uri, b: vscode.Uri): boolean {
+    return dirname(a.fsPath) === dirname(b.fsPath);
+}
+
+function dirname(fsPath: string): string {
+    const normalized = fsPath.replace(/\\/g, '/');
+    const index = normalized.lastIndexOf('/');
+    return index === -1 ? '' : normalized.slice(0, index);
 }
 
 function textDocumentLines(document: vscode.TextDocument): string[] {
