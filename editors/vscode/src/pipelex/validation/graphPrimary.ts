@@ -20,12 +20,7 @@ export interface GraphPrimaryBundle {
  * graph should still be generated from the directory's main bundle.
  */
 export async function resolveGraphPrimaryBundle(openedUri: vscode.Uri): Promise<GraphPrimaryBundle> {
-    let files: BundleFile[];
-    try {
-        files = await gatherBundleFiles(openedUri);
-    } catch {
-        return { primaryUri: openedUri, files: [] };
-    }
+    const files = await gatherBundleFiles(openedUri);
     const primary = selectGraphPrimaryFile(openedUri, files);
     return {
         primaryUri: primary?.uri ?? openedUri,

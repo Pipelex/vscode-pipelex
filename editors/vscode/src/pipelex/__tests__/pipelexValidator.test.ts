@@ -245,4 +245,40 @@ describe('PipelexValidator — per-directory generation gate', () => {
 
         validator.dispose();
     });
+
+    it('places source-less graph-analysis diagnostics on the selected bundle primary', async () => {
+        const backend = {
+            kind: 'cli',
+            analyze: () => Promise.resolve({
+                validation: {
+                    ok: false,
+                    errors: [{ category: 'dry_run', message: 'Dry run failed' }],
+                },
+                graph: null,
+            }),
+        };
+        const factory = { getBackend: () => backend } as any;
+        const graphSink = {
+            isShowingMthds: vi.fn(() => true),
+            applyAnalysis: vi.fn(),
+            applyBackendError: vi.fn(),
+            applySkipped: vi.fn(),
+        };
+        const validator = new PipelexValidator({ appendLine: vi.fn() } as any, factory);
+        validator.setGraphSink(graphSink as any);
+
+        const helper = mkDoc('/proj/helper.mthds');
+        const bundleUri = { scheme: 'file', fsPath: '/proj/bundle.mthds', toString: () => 'file:///proj/bundle.mthds' };
+        mockState.bundleFiles = [
+            { uri: helper.uri, name: 'helper.mthds', content: 'domain = "rec"\n[pipe.helper]\n' },
+            { uri: bundleUri, name: 'bundle.mthds', content: 'domain = "rec"\nmain_pipe = "main"\n[pipe.main]\n' },
+        ];
+
+        await mockState.onSaveHandler!(helper);
+
+        expect(mockState.diagStore.get('file:///proj/bundle.mthds')).toEqual([{ message: 'Dry run failed' }]);
+        expect(mockState.diagStore.has('file:///proj/helper.mthds')).toBe(false);
+
+        validator.dispose();
+    });
 });

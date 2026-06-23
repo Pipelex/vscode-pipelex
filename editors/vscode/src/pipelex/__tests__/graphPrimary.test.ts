@@ -6,7 +6,12 @@ vi.mock('vscode', () => ({
     },
 }));
 
-import { hasTopLevelMainPipe, selectGraphPrimaryFile } from '../validation/graphPrimary';
+vi.mock('../validation/bundleGather', () => ({
+    gatherBundleFiles: vi.fn(),
+}));
+
+import { hasTopLevelMainPipe, resolveGraphPrimaryBundle, selectGraphPrimaryFile } from '../validation/graphPrimary';
+import * as bundleGather from '../validation/bundleGather';
 import type { BundleFile } from '../validation/backend';
 
 const DIR = '/project/methods';
@@ -61,5 +66,12 @@ describe('graph primary resolution', () => {
     it('only treats pre-table main_pipe as top-level', () => {
         expect(hasTopLevelMainPipe('domain = "d"\nmain_pipe = "run"\n[pipe.run]\n')).toBe(true);
         expect(hasTopLevelMainPipe('domain = "d"\n[pipe.run]\nmain_pipe = "run"\n')).toBe(false);
+    });
+
+    it('propagates gather failures instead of returning an empty API bundle', async () => {
+        const opened = uri(`${DIR}/helper.mthds`);
+        vi.mocked(bundleGather.gatherBundleFiles).mockRejectedValueOnce(new Error('disk gone'));
+
+        await expect(resolveGraphPrimaryBundle(opened)).rejects.toThrow('disk gone');
     });
 });

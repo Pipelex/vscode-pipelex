@@ -150,7 +150,7 @@ export class PipelexValidator implements vscode.Disposable {
             // per-file and guarded separately by the panel's own currentUri check, so it
             // still updates for the file the user is viewing.
             if (this.dirGeneration.get(dir) === myGen) {
-                this.applyValidation(document, files, analysis);
+                this.applyValidation(document, analysisPrimaryUri, files, analysis);
                 this.lastNotifiedMessage = undefined;
             }
 
@@ -179,6 +179,7 @@ export class PipelexValidator implements vscode.Disposable {
 
     private applyValidation(
         document: vscode.TextDocument,
+        analysisPrimaryUri: vscode.Uri,
         files: { uri: vscode.Uri; name: string; content: string }[],
         analysis: BundleAnalysis,
     ): void {
@@ -191,7 +192,7 @@ export class PipelexValidator implements vscode.Disposable {
         const fileDiags = buildBundleDiagnostics({
             errors: validation.errors,
             files,
-            primaryUri: document.uri,
+            primaryUri: analysisPrimaryUri,
             diagnosticSource: DIAGNOSTIC_SOURCE,
             primaryDocument: document,
         });
