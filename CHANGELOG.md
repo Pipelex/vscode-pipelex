@@ -18,7 +18,7 @@
 
 ### Fixed
  - **Graph panel navigation**: Clicking a pipe node defined in a sibling file no longer silently fails; the owner file is now correctly resolved across the bundle directory.
- - **Quiet flag output**: Adjusted `quiet_flag.rs` test assertions to match the updated CLI stderr output behavior on failures. (plxt 0.7.1)
+ - **Lost final stderr log line on exit**: The CLIs (`plxt`, `taplo`) now flush each stderr log line synchronously to the file descriptor. Previously the error logged immediately before `std::process::exit()` (e.g. `operation failed`) could be dropped, because tokio's buffered/async stderr write performs the real write on a background thread and the process exited before it drained — this intermittently failed the `quiet_flag.rs` tests in CI under load. (plxt 0.7.1)
 
 ## [0.10.0] - 2026-06-21
 

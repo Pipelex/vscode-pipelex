@@ -108,6 +108,7 @@ When modifying graph rendering, always consult `../pipelex/pipelex/graph/graphsp
 
 ## CI/CD
 - **Branching:** feature branches PR into `dev`; `dev` (via `release/*`) feeds `main`. Both `dev` and `main` are protected.
+  - **PR base by branch type:** a `release/*` branch targets **`main`** (that merge is what triggers auto-tagging + publishing). Every other branch targets **`dev`**. Don't open a release PR into `dev` — it lands the version bump without publishing.
 - **PR quality gate (required, Makefile-driven so CI = local gate):**
   - `check.yml` → runs `make check` (fmt + clippy + crate/extension tests + locked compile checks, incl. both WASM crates)
   - `test-all.yml` → runs `make test-all` (every fast suite + the Python library smoke test)
