@@ -10,7 +10,17 @@ impl<W: AsyncWrite + Unpin> Write for BlockingWrite<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            futures::executor::block_on(self.0.write(buf))
+            // Flush after every write so each log line is durably on the fd
+            // before control returns. The CLIs call std::process::exit() right
+            // after logging their final error, which skips destructors; without
+            // this flush, tokio's in-flight background stderr write for the last
+            // line (e.g. "operation failed") can be dropped when the process
+            // exits — flaky under load and intermittently failing in CI.
+            futures::executor::block_on(async {
+                let n = self.0.write(buf).await?;
+                self.0.flush().await?;
+                Ok(n)
+            })
         }
 
         // On WASM we cannot do blocking writes without blocking

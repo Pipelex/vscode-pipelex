@@ -1,6 +1,6 @@
 ---
 name: release
-description: Prepare a release for the Pipelex IDE extension and/or plxt CLI — detect changed components, bump versions in all relevant files, and update CHANGELOG.md with proper annotations. Invoke with /release when ready to cut a release.
+description: Prepare a release for the Pipelex IDE extension, the plxt CLI, and/or the pipelex-tools-py Python library — detect changed components, bump versions in all relevant files, and update CHANGELOG.md with proper annotations. Invoke with /release when ready to cut a release.
 ---
 
 # Release Workflow
@@ -18,9 +18,11 @@ bash .claude/skills/release/scripts/detect_changes.sh
 If the user specified a base ref, pass `--base <ref>`.
 
 Parse the structured output to identify:
-- Which components have code changes (extension, cli, common)
+- Which components have code changes (extension, cli, lib, common)
 - Current versions of all components
 - Whether `[Unreleased]` in CHANGELOG.md has content
+
+`lib` is the `pipelex-tools-py` Python library (`crates/pipelex-py`) — an independently versioned, independently published artifact (its own `pipelex-tools-py/v*` tag), separate from the `plxt` CLI. It is built on the shared taplo/taplo-common engine, so a `common` change marks it affected too (the script already folds that in).
 
 ## Step 2: Report findings
 
@@ -36,6 +38,7 @@ If only CI/docs changed (no code), inform the user and ask whether to proceed.
 Use AskUserQuestion to ask for each affected component:
 - Extension: patch / minor / major (suggest patch)
 - CLI: patch / minor / major (suggest patch)
+- Library (`pipelex-tools-py`): patch / minor / major (suggest patch) — only ask if `lib: true`. Its version is independent of the CLI and extension.
 - Internal crates (pipelex-common, pipelex-lsp): only ask if they have changes; suggest keeping current unless public API changed
 
 ## Step 3b: Create release branch
@@ -46,7 +49,7 @@ If not already on a release branch, create one:
 git checkout -b release/vX.Y.Z
 ```
 
-where X.Y.Z is the new extension version (or CLI version if extension wasn't bumped).
+where X.Y.Z is the new extension version (or the CLI version if the extension wasn't bumped, or the library version if only the library was bumped).
 
 ## Step 4: Bump versions
 
@@ -55,6 +58,7 @@ Read `references/version-map.md` for file locations and the dependency cascade.
 Edit version strings in:
 - `editors/vscode/package.json` `.version` field (if extension bump)
 - `crates/pipelex-cli/Cargo.toml` `version` under `[package]` (if CLI bump)
+- `crates/pipelex-py/Cargo.toml` `version` under `[package]` (if library bump) — maturin reads this as the `pipelex-tools-py` PyPI version via `dynamic = ["version"]`; do not edit `crates/pipelex-py/pyproject.toml`
 - Internal crate Cargo.toml files (if bumping those)
 - Dependency version strings that reference bumped internal crates
 
@@ -68,6 +72,7 @@ cargo update --workspace
 Read CHANGELOG.md and the commit history since the last release tag. Use the appropriate tag prefix for the component being released:
 - Extension releases: `git log $(git tag -l 'pipelex-vscode-ext/v*' --sort=-v:refname | head -1)..HEAD --oneline`
 - CLI-only releases: `git log $(git tag -l 'plxt-cli/v*' --sort=-v:refname | head -1)..HEAD --oneline`
+- Library-only releases: `git log $(git tag -l 'pipelex-tools-py/v*' --sort=-v:refname | head -1)..HEAD --oneline`
 
 The `[Unreleased]` section (if there is one) may already contain some entries, but it is often incomplete or empty. Your job is to **reconcile** it with the actual changes:
 
@@ -84,8 +89,9 @@ Then apply these transformations **as a single edit**:
    - X.Y.Z = new extension version (or new CLI version if extension wasn't bumped)
    - YYYY-MM-DD = today's date
 2. **Annotate** CLI-specific entries with `(plxt X.Y.Z)` using the new CLI version
-3. **Replace** any `(plxt >=X.Y.Z)` placeholders with `(plxt X.Y.Z)` using the actual new version
-4. Entries that are extension-only or affect both: leave without annotation
+3. **Annotate** library-specific entries with `(pipelex-tools-py X.Y.Z)` using the new library version
+4. **Replace** any `(plxt >=X.Y.Z)` / `(pipelex-tools-py >=X.Y.Z)` placeholders with the actual new versions
+5. Entries that are extension-only or affect both: leave without annotation
 
 **Do NOT add a new empty `## [Unreleased]` section.** The versioned heading replaces `[Unreleased]` and becomes the first section in the file (after the title). An `[Unreleased]` section is added manually later when new work begins.
 
@@ -129,6 +135,9 @@ Run checks for affected targets:
 cargo check -p pipelex-cli
 # If extension/common changed:
 cargo check -p pipelex-wasm --target wasm32-unknown-unknown
+# If library changed (the PyO3 glue is behind the `python` feature, so a plain
+# check skips the binding code that actually ships in the wheel):
+cargo check -p pipelex-py --features python --locked
 ```
 
 Report any failures before proceeding.

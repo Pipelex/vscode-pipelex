@@ -1,0 +1,69 @@
+name: Test all
+
+# Runs `make test-all` on PRs — every fast suite (`make test`: Rust crates +
+# VS Code extension) PLUS the Python library smoke test, which builds the
+# pipelex_tools wheel with maturin and imports it. This is the gate that
+# exercises the PyO3 bindings end to end from the .mthds toolchain side.
+
+on:
+  pull_request:
+    # Must match the protected branches (dev + main). If you protect another
+    # branch, add it here too, or PRs into it will hang on a check that never runs.
+    branches:
+      - main
+      - dev
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-all:
+    name: make test-all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install latest Rust toolchain
+        run: rustup update --no-self-update
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+
+      - name: Install Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+
+      - name: Install uv
+        # The enterprise actions allowlist permits only actions/* and four
+        # third-party actions, so install uv from a pinned release archive rather
+        # than astral-sh/setup-uv or the mutable remote installer script.
+        run: |
+          UV_VERSION=0.11.24
+          UV_ARCHIVE=uv-x86_64-unknown-linux-gnu.tar.gz
+          UV_SHA256=5ce1ad074a78f96c5c8122088bb85a12eb282195bc1453151a48762e4fc31fed
+          curl -LsSf "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${UV_ARCHIVE}" -o "${UV_ARCHIVE}"
+          echo "${UV_SHA256}  ${UV_ARCHIVE}" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf "${UV_ARCHIVE}" --strip-components=1 -C "$HOME/.local/bin" "uv-x86_64-unknown-linux-gnu/uv"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install VS Code extension deps
+        # `make test-all` -> test -> test-ext needs editors/vscode node_modules
+        # (the target itself doesn't install them — see check.yml).
+        run: |
+          corepack enable
+          cd editors/vscode && yarn install --immutable
+
+      - name: Provision the Python venv with maturin
+        # `make test-all` -> test-pipelex-lib -> pipelex-lib -> env creates
+        # ./.venv via uv but does NOT install maturin (devs have it already).
+        # Pre-create the venv with maturin so `make env` is a no-op and the
+        # `maturin develop` step resolves.
+        run: |
+          uv venv .venv --python 3.13
+          . .venv/bin/activate
+          uv pip install maturin
+
+      - name: Run make test-all
+        run: make test-all

@@ -1,5 +1,25 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.11.0] - 2026-06-24
+
+### Added
+ - **Python library bindings (`pipelex-tools-py`)**: New, independently versioned PyPI package exposing MTHDS linting and formatting as in-process Python functions (`format_mthds`, `lint_mthds`). Built with PyO3 over the existing `taplo`/`taplo-common` engine, it returns structured diagnostics for malformed content instead of raising content errors, validates against the embedded official MTHDS schema fully offline, and ships PEP 561 type stubs (`pipelex_tools.pyi`, `py.typed`) for static typing and editor autocomplete. (pipelex-tools-py 0.1.0)
+ - **Cross-file pipe navigation**: Clicking a pipe node in the VS Code extension's method graph now opens that pipe's declaration even when it lives in a sibling `.mthds` file, using the runtime registry's `source` hint when valid and falling back to declaration scanning otherwise. Resolution preserves domain identity when multiple domains reuse the same pipe code.
+ - **Parity test suite**: Added `crates/pipelex-cli/tests/parity.rs` to assert the Python library's output is byte-for-byte identical to the `plxt` CLI, preventing drift between the two interfaces.
+ - **Dedicated CI workflows**: `.github/workflows/check.yml` runs the core PR quality gate (`make check` for formatting, clippy, tests, and WASM compilation), and `.github/workflows/test-all.yml` runs `make test-all`, including the Python wheel build and import smoke tests.
+ - **Python library release automation**: Added automated tagging, building, testing, and PyPI publishing of the `pipelex-tools-py` wheel across Ubuntu, Windows, and macOS in `releases.yaml` and `ci.yaml`. (pipelex-tools-py 0.1.0)
+ - **Documentation**: Added `docs/dev/pipelex-tools-python-bindings.md` (bindings architecture and API), `docs/dev/ci-and-branch-protection.md` (new CI workflow structure), and `docs/features/graph-pipe-navigation.md` (cross-file navigation resolution logic).
+
+### Changed
+ - **Granular test targets**: Split the monolithic `make test` recipe into per-package targets (e.g., `test-taplo`, `test-pipelex-cli`, `test-pipelex-py`, `test-ext`). `make test` now aggregates the fast native/extension targets, while the new `make test-all` also runs the heavier Python library smoke tests.
+ - **CI pipeline refactoring**: Delegated PR quality gates entirely to the new `check.yml` and `test-all.yml` workflows, removing the monolithic `fmt-lint`, `test`, and `check_wasm32` jobs from `ci.yaml` so CI runs the exact same `make` targets developers run locally.
+ - **Release automation**: Updated the release workflows to handle the new dual-package architecture, independently identifying, versioning, and annotating changes for both the `pipelex-tools` CLI and the `pipelex-tools-py` library.
+ - **VS Code extension resolver**: Refactored `crossFileDiagnostics.ts` to delegate to a new shared `bundleResolution.ts` module, so validation-error placement and graph pipe-node navigation use the same source-of-truth logic for resolving declaring files.
+
+### Fixed
+ - **Graph panel navigation**: Clicking a pipe node defined in a sibling file no longer silently fails; the owner file is now correctly resolved across the bundle directory.
+ - **Lost final stderr log line on exit**: The CLIs (`plxt`, `taplo`) now flush each stderr log line synchronously to the file descriptor. Previously the error logged immediately before `std::process::exit()` (e.g. `operation failed`) could be dropped, because tokio's buffered/async stderr write performs the real write on a background thread and the process exited before it drained — this intermittently failed the `quiet_flag.rs` tests in CI under load. (plxt 0.7.1)
+
 ## [0.10.0] - 2026-06-21
 
 ### Added

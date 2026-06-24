@@ -37,7 +37,9 @@ Run `make help` to see all targets. Here are the key ones:
 | `make vsix` | Package the extension into `editors/vscode/pipelex.vsix` |
 | `make ext-install` | Build, package, and install the `.vsix` into your IDE |
 | `make ext-uninstall` | Remove the extension from your IDE |
-| `make test` | Run all tests (Rust + extension) and type-check the extension |
+| `make test` | Run all fast tests (every Rust crate with tests + extension) and type-check the extension. Aggregates the per-package `test-*` targets |
+| `make test-<package>` | Run one package's tests: `test-taplo`, `test-taplo-common`, `test-taplo-lsp`, `test-lsp-async-stub`, `test-pipelex-common`, `test-pipelex-cli`, `test-pipelex-py`, `test-ext`, `test-pipelex-lib` |
+| `make test-all` | `make test` plus `test-pipelex-lib` (Python smoke test — needs `uv` + a `maturin` build, so it's excluded from plain `make test`) |
 | `make check` | Full quality gate: format + lint + all tests (incl. extension type-check) + compilation checks (CLI + WASM) |
 | `make clean` | Remove all build artifacts |
 

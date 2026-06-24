@@ -8,6 +8,7 @@ const mockState = vi.hoisted(() => ({
     diagStore: new Map<string, any>(),
     setCalls: [] as string[],
     configEnabled: true,
+    bundleFiles: [] as any[],
 }));
 
 vi.mock('vscode', () => {
@@ -43,9 +44,8 @@ vi.mock('vscode', () => {
     };
 });
 
-// gatherBundleFiles is irrelevant to the generation-gating logic — stub it.
 vi.mock('../validation/bundleGather', () => ({
-    gatherBundleFiles: vi.fn(async () => []),
+    gatherBundleFiles: vi.fn(async () => mockState.bundleFiles),
 }));
 
 // Isolate the test from the real diagnostics resolver (needs vscode.Range / sourceLocator):
@@ -57,6 +57,7 @@ vi.mock('../validation/crossFileDiagnostics', () => ({
 }));
 
 import { PipelexValidator } from '../validation/pipelexValidator';
+import { buildBundleDiagnostics } from '../validation/crossFileDiagnostics';
 
 function makeDeferred<T>() {
     let resolve!: (v: T) => void;
@@ -80,6 +81,7 @@ describe('PipelexValidator — per-directory generation gate', () => {
         mockState.diagStore.clear();
         mockState.setCalls.length = 0;
         mockState.configEnabled = true;
+        mockState.bundleFiles = [];
     });
 
     it('a stale sibling run does not clobber a newer save in the same directory', async () => {
@@ -202,6 +204,86 @@ describe('PipelexValidator — per-directory generation gate', () => {
         await p;
 
         expect(mockState.diagStore.get('file:///proj/solo.mthds')).toEqual([{ message: 'solo-error' }]);
+        validator.dispose();
+    });
+
+    it('uses the directory main bundle for save-time graph analysis of an ancillary file', async () => {
+        let capturedRequest: any;
+        let capturedOptions: any;
+        const backend = {
+            kind: 'cli',
+            analyze: (req: any, opts: any) => {
+                capturedRequest = req;
+                capturedOptions = opts;
+                return Promise.resolve({ validation: { ok: true, errors: [] }, graph: { nodes: [], edges: [] } });
+            },
+        };
+        const factory = { getBackend: () => backend } as any;
+        const graphSink = {
+            isShowingMthds: vi.fn(() => true),
+            applyAnalysis: vi.fn(),
+            applyBackendError: vi.fn(),
+            applySkipped: vi.fn(),
+        };
+        const validator = new PipelexValidator({ appendLine: vi.fn() } as any, factory);
+        validator.setGraphSink(graphSink as any);
+
+        const helper = mkDoc('/proj/helper.mthds');
+        const bundleUri = { scheme: 'file', fsPath: '/proj/bundle.mthds', toString: () => 'file:///proj/bundle.mthds' };
+        mockState.bundleFiles = [
+            { uri: helper.uri, name: 'helper.mthds', content: 'domain = "rec"\n[pipe.helper]\n' },
+            { uri: bundleUri, name: 'bundle.mthds', content: 'domain = "rec"\nmain_pipe = "main"\n[pipe.main]\n' },
+        ];
+
+        await mockState.onSaveHandler!(helper);
+
+        expect(capturedOptions.withGraph).toBe(true);
+        expect(capturedRequest.primaryUri.fsPath).toBe('/proj/bundle.mthds');
+        expect(capturedRequest.files.map((file: any) => file.name)).toEqual(['bundle.mthds', 'helper.mthds']);
+        expect(graphSink.applyAnalysis).toHaveBeenCalledWith(helper.uri, expect.objectContaining({
+            graph: { nodes: [], edges: [] },
+        }));
+
+        validator.dispose();
+    });
+
+    it('places source-less graph-analysis diagnostics on the selected bundle primary', async () => {
+        const backend = {
+            kind: 'cli',
+            analyze: () => Promise.resolve({
+                validation: {
+                    ok: false,
+                    errors: [{ category: 'dry_run', message: 'Dry run failed' }],
+                },
+                graph: null,
+            }),
+        };
+        const factory = { getBackend: () => backend } as any;
+        const graphSink = {
+            isShowingMthds: vi.fn(() => true),
+            applyAnalysis: vi.fn(),
+            applyBackendError: vi.fn(),
+            applySkipped: vi.fn(),
+        };
+        const validator = new PipelexValidator({ appendLine: vi.fn() } as any, factory);
+        validator.setGraphSink(graphSink as any);
+
+        const helper = mkDoc('/proj/helper.mthds');
+        const bundleUri = { scheme: 'file', fsPath: '/proj/bundle.mthds', toString: () => 'file:///proj/bundle.mthds' };
+        mockState.bundleFiles = [
+            { uri: helper.uri, name: 'helper.mthds', content: 'domain = "rec"\n[pipe.helper]\n' },
+            { uri: bundleUri, name: 'bundle.mthds', content: 'domain = "rec"\nmain_pipe = "main"\n[pipe.main]\n' },
+        ];
+
+        await mockState.onSaveHandler!(helper);
+
+        expect(mockState.diagStore.get('file:///proj/bundle.mthds')).toEqual([{ message: 'Dry run failed' }]);
+        expect(mockState.diagStore.has('file:///proj/helper.mthds')).toBe(false);
+        expect(buildBundleDiagnostics).toHaveBeenCalledWith(expect.objectContaining({
+            primaryUri: bundleUri,
+            primaryDocument: undefined,
+        }));
+
         validator.dispose();
     });
 });

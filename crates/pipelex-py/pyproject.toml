@@ -1,0 +1,51 @@
+[project]
+name = "pipelex-tools-py"
+description = "Pipelex Tools as a Python library — MTHDS lint & format, importable as `pipelex_tools`"
+authors = [
+  { name = "Evotis S.A.S.", email = "oss@pipelex.com" },
+  { name = "tamasfe" },
+]
+maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
+license = "MIT"
+requires-python = ">=3.8,<3.15"
+dynamic = ["version"]
+
+keywords = [
+  "toml",
+  "mthds",
+  "pipelex",
+  "linter",
+  "formatter",
+]
+
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+  "Programming Language :: Python",
+  "Programming Language :: Rust",
+  "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage      = "https://github.com/Pipelex/vscode-pipelex"
+Repository    = "https://github.com/Pipelex/vscode-pipelex.git"
+Documentation = "https://docs.pipelex.com/"
+Changelog     = "https://github.com/Pipelex/vscode-pipelex/blob/main/CHANGELOG.md"
+Tracker       = "https://github.com/Pipelex/vscode-pipelex/issues"
+
+[build-system]
+requires      = ["maturin>=1.4"]
+build-backend = "maturin"
+
+[tool.maturin]
+# Library wheel: the `pipelex_tools` pyo3 extension module only (no binary).
+# The native `plxt` CLI ships separately as the `pipelex-tools` wheel
+# (root pyproject.toml, `bindings = "bin"`).
+bindings      = "pyo3"
+manifest-path = "Cargo.toml"
+features      = ["python"]
