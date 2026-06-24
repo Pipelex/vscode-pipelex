@@ -3,6 +3,26 @@
 
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.11.0] - 2026-06-24
+
+### Added
+ - **Python library bindings (`pipelex-tools-py`)**: New, independently versioned PyPI package exposing MTHDS linting and formatting as in-process Python functions (`format_mthds`, `lint_mthds`). Built with PyO3 over the existing `taplo`/`taplo-common` engine, it returns structured diagnostics for malformed content instead of raising content errors, validates against the embedded official MTHDS schema fully offline, and ships PEP 561 type stubs (`pipelex_tools.pyi`, `py.typed`) for static typing and editor autocomplete. (pipelex-tools-py 0.1.0)
+ - **Cross-file pipe navigation**: Clicking a pipe node in the VS Code extension's method graph now opens that pipe's declaration even when it lives in a sibling `.mthds` file, using the runtime registry's `source` hint when valid and falling back to declaration scanning otherwise. Resolution preserves domain identity when multiple domains reuse the same pipe code.
+ - **Parity test suite**: Added `crates/pipelex-cli/tests/parity.rs` to assert the Python library's output is byte-for-byte identical to the `plxt` CLI, preventing drift between the two interfaces.
+ - **Dedicated CI workflows**: `.github/workflows/check.yml` runs the core PR quality gate (`make check` for formatting, clippy, tests, and WASM compilation), and `.github/workflows/test-all.yml` runs `make test-all`, including the Python wheel build and import smoke tests.
+ - **Python library release automation**: Added automated tagging, building, testing, and PyPI publishing of the `pipelex-tools-py` wheel across Ubuntu, Windows, and macOS in `releases.yaml` and `ci.yaml`. (pipelex-tools-py 0.1.0)
+ - **Documentation**: Added `docs/dev/pipelex-tools-python-bindings.md` (bindings architecture and API), `docs/dev/ci-and-branch-protection.md` (new CI workflow structure), and `docs/features/graph-pipe-navigation.md` (cross-file navigation resolution logic).
+
+### Changed
+ - **Granular test targets**: Split the monolithic `make test` recipe into per-package targets (e.g., `test-taplo`, `test-pipelex-cli`, `test-pipelex-py`, `test-ext`). `make test` now aggregates the fast native/extension targets, while the new `make test-all` also runs the heavier Python library smoke tests.
+ - **CI pipeline refactoring**: Delegated PR quality gates entirely to the new `check.yml` and `test-all.yml` workflows, removing the monolithic `fmt-lint`, `test`, and `check_wasm32` jobs from `ci.yaml` so CI runs the exact same `make` targets developers run locally.
+ - **Release automation**: Updated the release workflows to handle the new dual-package architecture, independently identifying, versioning, and annotating changes for both the `pipelex-tools` CLI and the `pipelex-tools-py` library.
+ - **VS Code extension resolver**: Refactored `crossFileDiagnostics.ts` to delegate to a new shared `bundleResolution.ts` module, so validation-error placement and graph pipe-node navigation use the same source-of-truth logic for resolving declaring files.
+
+### Fixed
+ - **Graph panel navigation**: Clicking a pipe node defined in a sibling file no longer silently fails; the owner file is now correctly resolved across the bundle directory.
+ - **Quiet flag output**: Adjusted `quiet_flag.rs` test assertions to match the updated CLI stderr output behavior on failures. (plxt 0.7.1)
+
 ## [0.10.0] - 2026-06-21
 
 ### Added
@@ -12,6 +32,7 @@
  - **Interactive error view in graph panel:** Failed validations now display a clickable list of errors; clicking one opens the owning file (even a sibling) at the offending line. Includes a **Retry** button for transient failures and an "API key required" state with one-click **Set API Key** / **Get an API Key** actions for HTTP 401/403 rejections.
  - **Privacy safeguard:** Added a one-time confirmation prompt before the `api` backend sends directory-wide bundle contents to a non-localhost remote server.
  - **Documentation & tooling:** Added documentation for the new backends (`docs/features/validation-backends.md`) and a Claude skill (`.claude/skills/bump-pipelex-version/SKILL.md`) to standardize bumping the minimum `pipelex-agent` CLI version.
+ - **Type-check gate for the VS Code extension:** A standalone `tsc --noEmit` type-check (`editors/vscode/tsconfig.typecheck.json` + `yarn typecheck`) now runs in `make check` and CI. The extension's TypeScript pipeline is esbuild-based and never type-checked the source, so the host↔webview message protocol and the cross-repo GraphSpec contract had zero static checking. The gate models the real runtime environments (node host, DOM webview, web worker) and resolves `@pipelex/mthds-ui`'s subpath exports, leaving the esbuild build config untouched. Added `@types/react`/`@types/react-dom` for the webview adapter and a `docs/dev/local-dev-setup.md` section on type-checking the extension.
 
 ### Changed
  - **Minimum CLI version bumped to `0.34.0`:** Required for the structured `validation_errors[]` fields (`source`, `field_name`) that power cross-file diagnostics. The version floor is now strictly enforced *before* trusting CLI output, preventing older CLIs (which exit 0 but lack structured fields) from silently degrading diagnostics.
@@ -21,6 +42,7 @@
  - **Method graph theme follows the editor:** The graph now opens in the palette matching the active VS Code color theme by default. The new `pipelex.graph.theme` setting (`auto`/`dark`/`light`) pins it, and the in-graph theme button still toggles live. Toggling it now **persists** your choice back into `pipelex.graph.theme` (Workspace scope when a value already lives there, otherwise Global — the same scopes the renderer reads), so a dark/light/system pick is restored on the next open and after restarting VS Code. Toggling to *system* when nothing is explicitly set is a no-op, so it never pins an explicit `auto` over a `pipelex.toml` `style.theme`. A `pipelex.toml` `style.theme` pin is also honored — only an *explicitly set* `pipelex.graph.theme` overrides it, so the contributed `auto` default no longer silently clobbers the toml value.
  - **Dependencies:** Pinned `@pipelex/mthds-ui` to `0.9.0` (was a floating `npm:latest`, which could pull a renderer with a changed theme contract on any lockfile refresh) and added `mthds` `0.12.0`.
  - **Language label renamed to "MTHDS Language":** The VS Code language alias for `.mthds` files changed from "Pipelex Language" to "MTHDS Language", completing the retirement of the "Pipelex Language" branding (the language is MTHDS; Pipelex is the runtime).
+ - **Full `strict` type-checking for the extension:** The new type-check gate runs in full `strict` mode, ratcheted on one flag at a time. Strictness lives only in `tsconfig.typecheck.json` — the base build `tsconfig.json` stays at `strict: false` per the fork rule, since the esbuild/rollup build strips types per file and never type-checks.
 
 ### Fixed
  - **MTHDS syntax highlighting in light themes:** `.mthds` code is now readable in light VS Code themes instead of the dark-tuned colors bleeding through. The extension ships its palette via `configurationDefaults`, but VS Code ignores theme-scoped keys from that source, so a declarative light variant is impossible. Instead, when a light theme is active with a `.mthds` file open, the extension offers a one-time prompt (**Apply** / **Not now** / **Don't ask again**) to write a managed `[*Light*]` block into the user's own `editor.tokenColorCustomizations` — a merge-safe, idempotent write. Each rule the extension writes is tagged with a sentinel `name`, so apply and remove only ever touch the extension's own rules and never disturb a user-authored rule that happens to target the same MTHDS scope. The light palette covers the full `pipelex-light` storybook look (brand colors plus strings, property names, booleans, numbers, punctuation, and Jinja/HTML), every scope `.mthds`-suffixed so it never recolors other languages, and matches on any light theme. Dark-only users get zero settings changes. New commands **Pipelex: Apply / Remove Light Theme Colors for MTHDS** opt in later or clean up.
@@ -29,6 +51,12 @@
  - **Stale graph prevention:** An open method-graph panel no longer shows a stale graph when on-save analysis fails or is skipped; backend/transport failures render the error directly in the panel.
  - **Race condition on skipped saves:** A skipped save (e.g., when another extension reports syntax errors) now cancels any in-flight analysis for that file, preventing a slow prior run from re-publishing stale diagnostics.
  - **Concurrent sibling-save race:** Saving two `.mthds` files in the same directory in quick succession no longer lets a slower earlier run overwrite the newer save's diagnostics. Diagnostics are written per directory but analyses are cancelled per file, so each save is now stamped with a per-directory generation and a stale run's write is dropped.
+ - **Disabling validation mid-flight:** Turning off `pipelex.validation.enabled` while an analysis is running now cancels in-flight runs for that directory, so a slower earlier sibling run can't publish diagnostics after validation is off.
+ - **Latent null-safety bugs (surfaced by `strictNullChecks`):** `server.ts` could pass `undefined` env values through to the LSP `Environment`, and `process.send` (typed `| undefined`) was called unguarded — it's now guarded so a missing IPC channel fails loudly instead of silently dropping every LSP response.
+ - **Dead `handleInitializeResult` override:** Removed from both language clients — it's no longer an override point in `vscode-languageclient` 9 (it called a `super` method that no longer exists, so it never ran). UTF-16 position negotiation stays in `fillInitializeParams`.
+ - **Missing browser worker `envVars`:** The browser server worker's `Environment` was missing the required `envVars` member; added it.
+ - **API-validation test mocks realigned:** Updated the `mthds` exception mocks to the current message-first `ApiResponseError`/`ApiUnreachableError` constructor signatures, so the test call sites type-check against the real classes.
+ - **Type-check gate green in CI:** `yarn typecheck` resolves the portal dependency `@pipelex/lsp` through its `dist/index.d.ts`, which is gitignored and absent on a fresh checkout — so CI failed with `Cannot find module '@pipelex/lsp'` (and the cascade of implicit-`any` errors that followed). CI and `make test` now emit just the declarations first via a new `@pipelex/lsp` `build:types` script (`tsc --emitDeclarationOnly`, no WASM/Rust build required) before type-checking the extension.
 
 ### Removed
  - **`pipelex.graph.palette` setting:** Dropped the `dracula`/`yellow_blue` palette override. It duplicated and overrode the renderer's own light/dark palette (which is what broke light mode); theming is now driven by `pipelex.graph.theme` and the in-graph toggle.
