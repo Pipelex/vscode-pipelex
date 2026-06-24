@@ -3,17 +3,22 @@
 ## [Unreleased]
 
 ### Added
- - **Cross-file pipe-node graph navigation:** Clicking a pipe node in the method graph now opens that pipe's declaration even when it lives in a sibling `.mthds` file. Navigation uses the runtime registry's `source` hint when valid, falls back to declaration scanning when stale/missing, and preserves domain identity when multiple domains reuse the same pipe code.
- - **Python library bindings (`pipelex-tools-py`)**: New, independently versioned PyPI package exposing MTHDS linting and formatting as in-process functions (`format_mthds`, `lint_mthds`). Built with PyO3 over the existing `taplo`/`taplo-common` engine, it returns structured diagnostics (`{kind, severity, message, location, range}`) instead of raising exceptions, validates against the embedded official MTHDS schema fully offline, and ships PEP 561 type stubs (`pipelex_tools.pyi`, `py.typed`) for static typing and editor autocomplete.
- - **Parity test suite** (`crates/pipelex-cli/tests/parity.rs`): Asserts the Python library's output is byte-for-byte identical to the `plxt` CLI, preventing drift between the two interfaces.
- - **Dedicated CI workflows**: `.github/workflows/check.yml` runs the core PR quality gate (`make check`: formatting, clippy, tests, WASM compilation), and `.github/workflows/test-all.yml` runs `make test-all`, including the Python wheel build and import smoke tests.
- - **Release automation for the Python library**: Automated tagging, building, testing, and PyPI publishing of the `pipelex-tools-py` wheel across Ubuntu, Windows, and macOS, added to `releases.yaml` and `ci.yaml`.
- - **Developer documentation**: `docs/dev/pipelex-tools-python-bindings.md` covering the Python bindings' architecture, API, and testing strategy, and `docs/dev/ci-and-branch-protection.md` explaining the CI workflow structure and branch protection rules.
+ - **Python library bindings (`pipelex-tools-py`)**: New, independently versioned PyPI package exposing MTHDS linting and formatting as in-process Python functions (`format_mthds`, `lint_mthds`). Built with PyO3 over the existing `taplo`/`taplo-common` engine, it returns structured diagnostics for malformed content instead of raising content errors, validates against the embedded official MTHDS schema fully offline, and ships PEP 561 type stubs (`pipelex_tools.pyi`, `py.typed`) for static typing and editor autocomplete.
+ - **Cross-file pipe navigation**: Clicking a pipe node in the VS Code extension's method graph now opens that pipe's declaration even when it lives in a sibling `.mthds` file, using the runtime registry's `source` hint when valid and falling back to declaration scanning otherwise. Resolution preserves domain identity when multiple domains reuse the same pipe code.
+ - **Parity test suite**: Added `crates/pipelex-cli/tests/parity.rs` to assert the Python library's output is byte-for-byte identical to the `plxt` CLI, preventing drift between the two interfaces.
+ - **Dedicated CI workflows**: `.github/workflows/check.yml` runs the core PR quality gate (`make check` for formatting, clippy, tests, and WASM compilation), and `.github/workflows/test-all.yml` runs `make test-all`, including the Python wheel build and import smoke tests.
+ - **Python library release automation**: Added automated tagging, building, testing, and PyPI publishing of the `pipelex-tools-py` wheel across Ubuntu, Windows, and macOS in `releases.yaml` and `ci.yaml`.
+ - **Documentation**: Added `docs/dev/pipelex-tools-python-bindings.md` (bindings architecture and API), `docs/dev/ci-and-branch-protection.md` (new CI workflow structure), and `docs/features/graph-pipe-navigation.md` (cross-file navigation resolution logic).
 
 ### Changed
- - **Granular test targets**: Split the monolithic `make test` recipe into per-package targets (e.g., `test-taplo`, `test-pipelex-cli`, `test-pipelex-py`, `test-ext`). `make test` now aggregates all fast native and extension targets, closing a gap where `taplo-common` and `lsp-async-stub` were previously skipped. A new `make test-all` runs everything in `make test` plus the heavier Python library smoke tests (requiring `uv` and `maturin`).
+ - **Granular test targets**: Split the monolithic `make test` recipe into per-package targets (e.g., `test-taplo`, `test-pipelex-cli`, `test-pipelex-py`, `test-ext`). `make test` now aggregates the fast native/extension targets, while the new `make test-all` also runs the heavier Python library smoke tests.
  - **CI pipeline refactoring**: Delegated PR quality gates entirely to the new `check.yml` and `test-all.yml` workflows, removing the monolithic `fmt-lint`, `test`, and `check_wasm32` jobs from `ci.yaml` so CI runs the exact same `make` targets developers run locally.
- - **Release scripts & Claude skills**: Updated the `.claude/skills/release` scripts and prompts to handle the dual-package architecture, independently identifying, versioning, and annotating changes for both the `pipelex-tools` CLI and the `pipelex-tools-py` library.
+ - **Release automation**: Updated the release workflows to handle the new dual-package architecture, independently identifying, versioning, and annotating changes for both the `pipelex-tools` CLI and the `pipelex-tools-py` library.
+ - **VS Code extension resolver**: Refactored `crossFileDiagnostics.ts` to delegate to a new shared `bundleResolution.ts` module, so validation-error placement and graph pipe-node navigation use the same source-of-truth logic for resolving declaring files.
+
+### Fixed
+ - **Graph panel navigation**: Clicking a pipe node defined in a sibling file no longer silently fails; the owner file is now correctly resolved across the bundle directory.
+ - **Quiet flag output**: Adjusted `quiet_flag.rs` test assertions to match the updated CLI stderr output behavior on failures.
 
 ## [0.10.0] - 2026-06-21
 
