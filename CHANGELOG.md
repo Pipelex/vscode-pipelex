@@ -1,13 +1,13 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
-## [Unreleased]
+## [0.11.0] - 2026-06-24
 
 ### Added
- - **Python library bindings (`pipelex-tools-py`)**: New, independently versioned PyPI package exposing MTHDS linting and formatting as in-process Python functions (`format_mthds`, `lint_mthds`). Built with PyO3 over the existing `taplo`/`taplo-common` engine, it returns structured diagnostics for malformed content instead of raising content errors, validates against the embedded official MTHDS schema fully offline, and ships PEP 561 type stubs (`pipelex_tools.pyi`, `py.typed`) for static typing and editor autocomplete.
+ - **Python library bindings (`pipelex-tools-py`)**: New, independently versioned PyPI package exposing MTHDS linting and formatting as in-process Python functions (`format_mthds`, `lint_mthds`). Built with PyO3 over the existing `taplo`/`taplo-common` engine, it returns structured diagnostics for malformed content instead of raising content errors, validates against the embedded official MTHDS schema fully offline, and ships PEP 561 type stubs (`pipelex_tools.pyi`, `py.typed`) for static typing and editor autocomplete. (pipelex-tools-py 0.1.0)
  - **Cross-file pipe navigation**: Clicking a pipe node in the VS Code extension's method graph now opens that pipe's declaration even when it lives in a sibling `.mthds` file, using the runtime registry's `source` hint when valid and falling back to declaration scanning otherwise. Resolution preserves domain identity when multiple domains reuse the same pipe code.
  - **Parity test suite**: Added `crates/pipelex-cli/tests/parity.rs` to assert the Python library's output is byte-for-byte identical to the `plxt` CLI, preventing drift between the two interfaces.
  - **Dedicated CI workflows**: `.github/workflows/check.yml` runs the core PR quality gate (`make check` for formatting, clippy, tests, and WASM compilation), and `.github/workflows/test-all.yml` runs `make test-all`, including the Python wheel build and import smoke tests.
- - **Python library release automation**: Added automated tagging, building, testing, and PyPI publishing of the `pipelex-tools-py` wheel across Ubuntu, Windows, and macOS in `releases.yaml` and `ci.yaml`.
+ - **Python library release automation**: Added automated tagging, building, testing, and PyPI publishing of the `pipelex-tools-py` wheel across Ubuntu, Windows, and macOS in `releases.yaml` and `ci.yaml`. (pipelex-tools-py 0.1.0)
  - **Documentation**: Added `docs/dev/pipelex-tools-python-bindings.md` (bindings architecture and API), `docs/dev/ci-and-branch-protection.md` (new CI workflow structure), and `docs/features/graph-pipe-navigation.md` (cross-file navigation resolution logic).
 
 ### Changed
@@ -18,7 +18,7 @@
 
 ### Fixed
  - **Graph panel navigation**: Clicking a pipe node defined in a sibling file no longer silently fails; the owner file is now correctly resolved across the bundle directory.
- - **Quiet flag output**: Adjusted `quiet_flag.rs` test assertions to match the updated CLI stderr output behavior on failures.
+ - **Quiet flag output**: Adjusted `quiet_flag.rs` test assertions to match the updated CLI stderr output behavior on failures. (plxt 0.7.1)
 
 ## [0.10.0] - 2026-06-21
 
