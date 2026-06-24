@@ -1379,7 +1379,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it('onDidChangeActiveTextEditor keeps the current graph when switching bundles in the same directory', async () => {
+    it('onDidChangeActiveTextEditor reuses the current graph when switching files with the same graph primary', async () => {
         const processUtils = await import('../validation/processUtils');
 
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
@@ -1403,7 +1403,9 @@ describe('MethodGraphPanel', () => {
         });
 
         expect(processUtils.spawnCli).not.toHaveBeenCalled();
-        expect(mockState.mockPanel.title).toBe(originalTitle);
+        expect(originalTitle).toBe('Method Graph — bundle.mthds');
+        expect(mockState.mockPanel.title).toBe('Method Graph — helper.mthds');
+        expect((panel as any).currentUri.toString()).toBe(helperUri.toString());
         panel.dispose();
     });
 

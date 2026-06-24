@@ -36,10 +36,16 @@ jobs:
 
       - name: Install uv
         # The enterprise actions allowlist permits only actions/* and four
-        # third-party actions, so install uv via the official script rather
-        # than astral-sh/setup-uv. Mirrors the Makefile's `env` target.
+        # third-party actions, so install uv from a pinned release archive rather
+        # than astral-sh/setup-uv or the mutable remote installer script.
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+          UV_VERSION=0.11.24
+          UV_ARCHIVE=uv-x86_64-unknown-linux-gnu.tar.gz
+          UV_SHA256=5ce1ad074a78f96c5c8122088bb85a12eb282195bc1453151a48762e4fc31fed
+          curl -LsSf "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${UV_ARCHIVE}" -o "${UV_ARCHIVE}"
+          echo "${UV_SHA256}  ${UV_ARCHIVE}" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf "${UV_ARCHIVE}" --strip-components=1 -C "$HOME/.local/bin" "uv-x86_64-unknown-linux-gnu/uv"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install VS Code extension deps

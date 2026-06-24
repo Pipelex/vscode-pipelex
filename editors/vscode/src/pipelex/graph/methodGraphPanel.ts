@@ -156,6 +156,8 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                             return;
                         }
                         if (samePrimary) {
+                            this.currentUri = newUri;
+                            this.panel.title = `Method Graph — ${basename(newUri.fsPath)}`;
                             return;
                         }
                     }

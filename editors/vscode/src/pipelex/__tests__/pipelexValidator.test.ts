@@ -57,6 +57,7 @@ vi.mock('../validation/crossFileDiagnostics', () => ({
 }));
 
 import { PipelexValidator } from '../validation/pipelexValidator';
+import { buildBundleDiagnostics } from '../validation/crossFileDiagnostics';
 
 function makeDeferred<T>() {
     let resolve!: (v: T) => void;
@@ -278,6 +279,10 @@ describe('PipelexValidator — per-directory generation gate', () => {
 
         expect(mockState.diagStore.get('file:///proj/bundle.mthds')).toEqual([{ message: 'Dry run failed' }]);
         expect(mockState.diagStore.has('file:///proj/helper.mthds')).toBe(false);
+        expect(buildBundleDiagnostics).toHaveBeenCalledWith(expect.objectContaining({
+            primaryUri: bundleUri,
+            primaryDocument: undefined,
+        }));
 
         validator.dispose();
     });

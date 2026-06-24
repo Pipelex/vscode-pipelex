@@ -194,7 +194,7 @@ export class PipelexValidator implements vscode.Disposable {
             files,
             primaryUri: analysisPrimaryUri,
             diagnosticSource: DIAGNOSTIC_SOURCE,
-            primaryDocument: document,
+            primaryDocument: document.uri.toString() === analysisPrimaryUri.toString() ? document : undefined,
         });
         this.setDiagnosticsForDir(dir, fileDiags);
     }
