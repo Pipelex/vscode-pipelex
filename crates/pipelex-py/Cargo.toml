@@ -33,6 +33,7 @@ tokio = { workspace = true, features = ["rt"] }
 pyo3 = { version = "0.23", features = [
   "abi3-py38",
   "extension-module",
+  "generate-import-lib",
 ], optional = true }
 pythonize = { version = "0.23", optional = true }
 
