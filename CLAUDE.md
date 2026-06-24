@@ -3,6 +3,9 @@
 ## Project Overview
 Fork of [tamasfe/taplo](https://github.com/tamasfe/taplo) (TOML toolkit) extended with MTHDS (the language for AI methods) support.
 Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packages + VitePress docs site.
+Publishes two PyPI packages from separate `pyproject.toml` files:
+- `pipelex-tools`: native `plxt` CLI, published from the repo-root `pyproject.toml`
+- `pipelex-tools-py`: importable Python library (`import pipelex_tools`), published from `crates/pipelex-py/pyproject.toml`
 
 ## Critical Rule: Preserve Upstream Taplo Behavior
 **By default, unless expressly and clearly stated otherwise, all existing taplo upstream features and behavior must be kept as-is.** Do not modify, remove, or alter any taplo functionality. Our work is exclusively focused on **adding** new features for MTHDS files and the Pipelex VS Code extension. When making changes, ensure they do not regress or interfere with existing TOML support.

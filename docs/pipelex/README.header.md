@@ -2,9 +2,18 @@
 
 # vscode-pipelex
 
-The reference toolchain for the MTHDS open standard — editing, formatting, linting, and language-server support for `.mthds` and `.toml` files. Built on a [Taplo](https://github.com/tamasfe/taplo) fork. Ships a **VS Code / Cursor extension**, the **`plxt` CLI**, and the **`pipelex-tools` PyPI package**.
+The reference toolchain for the MTHDS open standard — editing, formatting, linting, and language-server support for `.mthds` and `.toml` files. Built on a [Taplo](https://github.com/tamasfe/taplo) fork. Ships a **VS Code / Cursor extension**, the **`plxt` CLI**, and two PyPI packages: **`pipelex-tools`** for the native CLI and **`pipelex-tools-py`** for the importable Python library.
 
 > **What is MTHDS?** — An open standard for defining AI methods as typed, composable, human-readable files. A `.mthds` file describes what an AI should do — its inputs, outputs, logic, and data types — in plain TOML that both people and machines can read. [Pipelex](https://github.com/Pipelex/pipelex) is the runtime that executes them. Learn more at [docs.pipelex.com](https://docs.pipelex.com).
+
+## Published PyPI Packages
+
+This repo publishes two separate PyPI packages:
+
+| Package | Use | Source metadata |
+|---------|-----|-----------------|
+| `pipelex-tools` | Native `plxt` CLI for formatting, linting, and LSP support | root `pyproject.toml` |
+| `pipelex-tools-py` | Importable Python library, `import pipelex_tools` | `crates/pipelex-py/pyproject.toml` |
 
 ## `plxt` CLI
 

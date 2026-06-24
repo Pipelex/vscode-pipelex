@@ -17,6 +17,7 @@
  - **VS Code extension resolver**: Refactored `crossFileDiagnostics.ts` to delegate to a new shared `bundleResolution.ts` module, so validation-error placement and graph pipe-node navigation use the same source-of-truth logic for resolving declaring files.
 
 ### Fixed
+ - **PyPI project description for `pipelex-tools-py`**: Added library-specific long-description metadata and bumped the package to 0.1.1 so PyPI can display the corrected project page on the next publish. The already-uploaded 0.1.0 files cannot be replaced in-place.
  - **Graph panel navigation**: Clicking a pipe node defined in a sibling file no longer silently fails; the owner file is now correctly resolved across the bundle directory.
  - **Lost final stderr log line on exit**: The CLIs (`plxt`, `taplo`) now flush each stderr log line synchronously to the file descriptor. Previously the error logged immediately before `std::process::exit()` (e.g. `operation failed`) could be dropped, because tokio's buffered/async stderr write performs the real write on a background thread and the process exited before it drained — this intermittently failed the `quiet_flag.rs` tests in CI under load. (plxt 0.7.1)
 
