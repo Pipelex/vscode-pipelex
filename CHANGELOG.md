@@ -5,6 +5,9 @@
 ### Added
  - **Configurable method graph toolbar position:** New `pipelex.graph.toolbarPosition` setting anchors the in-graph floating toolbar (direction toggle, fold/expand, zoom, theme) to any of the eight `@pipelex/mthds-ui` `GraphViewer` anchors (`top-left` … `center-right`). Defaults to `top-right`; corner and top/bottom-center anchors render a horizontal bar while the two edge-center anchors render a vertical bar. Changing the setting **updates an already-open graph live** — the toolbar moves immediately without re-running analysis or resetting the viewport.
 
+### Fixed
+ - **Graph render settings scope:** Corrected `pipelex.graph.toolbarPosition`, `pipelex.graph.edgeType`, and `pipelex.graph.theme` from `resource` to `window` scope. These are resolved by `resolveGraphConfig` *without* a resource URI (they blend with the machine-level `~/.pipelex/pipelex.toml`), so a `resource` scope advertised a per-workspace-folder override that the reader silently ignored. `window` scope matches the unscoped read — they stay settable at the user and workspace level. The per-resource graph settings (`graph.direction`/`showControllers`/`foldMode`, read *with* the URI) are unaffected.
+
 ## [0.11.0] - 2026-06-24
 
 ### Added

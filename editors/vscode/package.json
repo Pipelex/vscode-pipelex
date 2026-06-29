@@ -606,7 +606,7 @@
             "Sharp right-angle paths",
             "Straight lines"
           ],
-          "scope": "resource",
+          "scope": "window",
           "description": "Edge curve type for the graph renderer. Overrides pipelex.toml."
         },
         "pipelex.graph.theme": {
@@ -621,7 +621,7 @@
             "Always render the graph with the dark palette",
             "Always render the graph with the light palette"
           ],
-          "scope": "resource",
+          "scope": "window",
           "default": "auto",
           "description": "Color theme for the method graph renderer. 'auto' follows the editor's color theme. Overrides pipelex.toml."
         },
@@ -683,7 +683,7 @@
             "Left edge, centered (vertical bar)",
             "Right edge, centered (vertical bar)"
           ],
-          "scope": "resource",
+          "scope": "window",
           "default": "top-right",
           "description": "Anchor for the method graph's floating toolbar (direction toggle, fold/expand, zoom, theme). Corner and top/bottom-center anchors render a horizontal bar; the two edge-center anchors render a vertical bar."
         },
