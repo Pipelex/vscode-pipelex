@@ -14,6 +14,28 @@ export type GraphTheme = 'dark' | 'light';
  */
 export type GraphThemeMode = 'dark' | 'light' | 'system';
 
+/**
+ * Anchor for the GraphViewer's built-in floating toolbar — passed straight to
+ * the renderer's `config.toolbarPosition`. Mirrors mthds-ui's `ToolbarPosition`
+ * union (and matches ReactFlow's `PanelPosition`). Defined locally so the
+ * extension host doesn't import the webview-only `@pipelex/mthds-ui` package —
+ * same reason {@link GraphTheme}/{@link GraphThemeMode} are local.
+ */
+export type GraphToolbarPosition =
+    | 'top-left' | 'top-center' | 'top-right'
+    | 'bottom-left' | 'bottom-center' | 'bottom-right'
+    | 'center-left' | 'center-right';
+
+const TOOLBAR_POSITIONS: readonly GraphToolbarPosition[] = [
+    'top-left', 'top-center', 'top-right',
+    'bottom-left', 'bottom-center', 'bottom-right',
+    'center-left', 'center-right',
+];
+
+function isToolbarPosition(value: unknown): value is GraphToolbarPosition {
+    return typeof value === 'string' && (TOOLBAR_POSITIONS as readonly string[]).includes(value);
+}
+
 export interface GraphRenderConfig {
     edgeType: string;
     nodesep: number;
@@ -29,6 +51,12 @@ export interface GraphRenderConfig {
      * switch (see methodGraphPanel.onColorThemeChanged).
      */
     systemTheme: GraphTheme;
+    /**
+     * Anchor for the GraphViewer's built-in floating toolbar. Defaults to
+     * `'top-right'` (the mthds-ui default); pinned by the
+     * `pipelex.graph.toolbarPosition` setting.
+     */
+    toolbarPosition: GraphToolbarPosition;
 }
 
 const DEFAULTS: Omit<GraphRenderConfig, 'theme' | 'systemTheme'> = {
@@ -37,6 +65,7 @@ const DEFAULTS: Omit<GraphRenderConfig, 'theme' | 'systemTheme'> = {
     ranksep: 30,
     initialZoom: undefined,
     panToTop: true,
+    toolbarPosition: 'top-right',
 };
 
 function isGraphTheme(value: unknown): value is GraphTheme {
@@ -112,6 +141,12 @@ export async function resolveGraphConfig(): Promise<GraphRenderConfig> {
     const cfg = vscode.workspace.getConfiguration('pipelex');
     const edgeType = cfg.get<string>('graph.edgeType');
     if (edgeType) merged.edgeType = edgeType;
+
+    // `pipelex.graph.toolbarPosition` pins the toolbar anchor. pipelex.toml has no
+    // toolbar key, so this is the only source; the guard ignores a malformed value
+    // and falls back to the `'top-right'` default.
+    const toolbarPosition = cfg.get<string>('graph.toolbarPosition');
+    if (isToolbarPosition(toolbarPosition)) merged.toolbarPosition = toolbarPosition;
 
     // `pipelex.graph.theme`: `auto` follows the editor (`system` mode);
     // `dark`/`light` pin it. Inspect rather than `get` so the contributed

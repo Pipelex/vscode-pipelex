@@ -107,6 +107,15 @@ function handleMessage(event: { data: any }) {
         if (renderApp) renderApp();
         return;
     }
+    if (message.type === 'setToolbarPosition') {
+        // The pipelex.graph.toolbarPosition setting changed. Update only that
+        // config field and re-render — GraphViewer re-resolves
+        // `config.toolbarPosition` reactively, so the toolbar moves without
+        // re-running analysis or resetting the viewport.
+        currentConfig = { ...currentConfig, toolbarPosition: message.toolbarPosition };
+        if (renderApp) renderApp();
+        return;
+    }
     if (message.type === 'setData') {
         // Persist the source file URI so VS Code can restore after reload
         if (message.uri) {
