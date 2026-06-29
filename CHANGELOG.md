@@ -1,6 +1,6 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
-## [Unreleased]
+## [0.12.0] - 2026-06-29
 
 ### Added
  - **Configurable method graph toolbar position:** New `pipelex.graph.toolbarPosition` setting anchors the in-graph floating toolbar (direction toggle, fold/expand, zoom, theme) to any of the eight `@pipelex/mthds-ui` `GraphViewer` anchors (`top-left` … `center-right`). Defaults to `top-right`; corner and top/bottom-center anchors render a horizontal bar while the two edge-center anchors render a vertical bar. Changing the setting **updates an already-open graph live** — the toolbar moves immediately without re-running analysis or resetting the viewport.
