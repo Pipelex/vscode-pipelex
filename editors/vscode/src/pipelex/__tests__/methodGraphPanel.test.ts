@@ -321,6 +321,31 @@ describe('MethodGraphPanel', () => {
         expect(setData.config.theme).toBe('system');
         expect(setData.config.systemTheme).toBe('dark');
         expect(setData.config).not.toHaveProperty('paletteColors');
+        // Toolbar anchor defaults to top-right (the mthds-ui default) when the
+        // pipelex.graph.toolbarPosition setting is unset.
+        expect(setData.config.toolbarPosition).toBe('top-right');
+        panel.dispose();
+    });
+
+    it('forwards the pinned pipelex.graph.toolbarPosition into setData config', async () => {
+        mockState.configOverrides['graph.toolbarPosition'] = 'center-left';
+        const graphspec = { nodes: [], edges: [] };
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ graphspec, pipe_code: 'main' }),
+            stderr: '',
+        };
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+
+        const setData = mockState.mockWebview.postMessage.mock.calls
+            .map(c => c[0])
+            .find((m: any) => m?.type === 'setData');
+        expect(setData.config.toolbarPosition).toBe('center-left');
         panel.dispose();
     });
 

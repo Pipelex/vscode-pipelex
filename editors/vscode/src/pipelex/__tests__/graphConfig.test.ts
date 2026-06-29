@@ -6,6 +6,8 @@ const state = vi.hoisted(() => ({
     tomlContent: undefined as string | undefined, // undefined → readFile rejects (no file)
     themeInspect: { defaultValue: 'auto' } as Record<string, unknown>,
     activeKind: 2, // ColorThemeKind.Dark
+    // `pipelex.graph.toolbarPosition` setting value (undefined → not set).
+    toolbarPosition: undefined as string | undefined,
 }));
 
 vi.mock('fs', () => ({
@@ -29,7 +31,7 @@ vi.mock('vscode', () => ({
     },
     workspace: {
         getConfiguration: vi.fn(() => ({
-            get: (_key: string) => undefined,
+            get: (key: string) => (key === 'graph.toolbarPosition' ? state.toolbarPosition : undefined),
             inspect: (key: string) => (key === 'graph.theme' ? state.themeInspect : undefined),
         })),
     },
@@ -47,6 +49,7 @@ describe('resolveGraphConfig theme priority', () => {
         state.tomlContent = undefined;
         state.themeInspect = { defaultValue: 'auto' };
         state.activeKind = 2;
+        state.toolbarPosition = undefined;
     });
 
     it('honors a pipelex.toml theme pin when graph.theme is not explicitly set', async () => {
@@ -78,5 +81,31 @@ describe('resolveGraphConfig theme priority', () => {
         const cfg = await resolveGraphConfig();
         expect(cfg.theme).toBe('system');
         expect(cfg.systemTheme).toBe('light');
+    });
+});
+
+describe('resolveGraphConfig toolbar position', () => {
+    beforeEach(() => {
+        state.tomlContent = undefined;
+        state.themeInspect = { defaultValue: 'auto' };
+        state.activeKind = 2;
+        state.toolbarPosition = undefined;
+    });
+
+    it('defaults to top-right when the setting is unset', async () => {
+        const cfg = await resolveGraphConfig();
+        expect(cfg.toolbarPosition).toBe('top-right');
+    });
+
+    it('honors a valid toolbarPosition setting', async () => {
+        state.toolbarPosition = 'center-left';
+        const cfg = await resolveGraphConfig();
+        expect(cfg.toolbarPosition).toBe('center-left');
+    });
+
+    it('ignores a malformed toolbarPosition value, keeping the default', async () => {
+        state.toolbarPosition = 'middle-of-nowhere';
+        const cfg = await resolveGraphConfig();
+        expect(cfg.toolbarPosition).toBe('top-right');
     });
 });

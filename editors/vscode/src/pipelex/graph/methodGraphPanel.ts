@@ -647,6 +647,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 edgeType: graphConfig.edgeType,
                 initialZoom: graphConfig.initialZoom,
                 panToTop: graphConfig.panToTop,
+                // Anchor for the renderer's floating toolbar. GraphViewer reads
+                // `config.toolbarPosition` reactively on every render, so the
+                // pinned value takes effect on the next analysis / open.
+                toolbarPosition: graphConfig.toolbarPosition,
                 // The renderer derives its full light/dark palette from `theme`.
                 // Do NOT send `paletteColors` here — GraphViewer merges it *over*
                 // the theme palette, which would pin node/edge colors to one theme
