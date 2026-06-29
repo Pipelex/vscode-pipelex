@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -606,7 +606,7 @@
             "Sharp right-angle paths",
             "Straight lines"
           ],
-          "scope": "resource",
+          "scope": "window",
           "description": "Edge curve type for the graph renderer. Overrides pipelex.toml."
         },
         "pipelex.graph.theme": {
@@ -621,7 +621,7 @@
             "Always render the graph with the dark palette",
             "Always render the graph with the light palette"
           ],
-          "scope": "resource",
+          "scope": "window",
           "default": "auto",
           "description": "Color theme for the method graph renderer. 'auto' follows the editor's color theme. Overrides pipelex.toml."
         },
@@ -660,6 +660,32 @@
           ],
           "scope": "resource",
           "default": "folded"
+        },
+        "pipelex.graph.toolbarPosition": {
+          "type": "string",
+          "enum": [
+            "top-left",
+            "top-center",
+            "top-right",
+            "bottom-left",
+            "bottom-center",
+            "bottom-right",
+            "center-left",
+            "center-right"
+          ],
+          "enumDescriptions": [
+            "Top-left corner (horizontal bar)",
+            "Top edge, centered (horizontal bar)",
+            "Top-right corner (default, horizontal bar)",
+            "Bottom-left corner (horizontal bar)",
+            "Bottom edge, centered (horizontal bar)",
+            "Bottom-right corner (horizontal bar)",
+            "Left edge, centered (vertical bar)",
+            "Right edge, centered (vertical bar)"
+          ],
+          "scope": "window",
+          "default": "top-right",
+          "description": "Anchor for the method graph's floating toolbar (direction toggle, fold/expand, zoom, theme). Corner and top/bottom-center anchors render a horizontal bar; the two edge-center anchors render a vertical bar."
         },
         "pipelex.formatter.alignEntries": {
           "scope": "resource",
@@ -800,7 +826,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "npm:0.9.0",
+    "@pipelex/mthds-ui": "npm:0.10.0",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",

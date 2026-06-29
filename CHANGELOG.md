@@ -1,5 +1,13 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.12.0] - 2026-06-29
+
+### Added
+ - **Configurable method graph toolbar position:** New `pipelex.graph.toolbarPosition` setting anchors the in-graph floating toolbar (direction toggle, fold/expand, zoom, theme) to any of the eight `@pipelex/mthds-ui` `GraphViewer` anchors (`top-left` … `center-right`). Defaults to `top-right`; corner and top/bottom-center anchors render a horizontal bar while the two edge-center anchors render a vertical bar. Changing the setting **updates an already-open graph live** — the toolbar moves immediately without re-running analysis or resetting the viewport.
+
+### Fixed
+ - **Graph render settings scope:** Corrected `pipelex.graph.toolbarPosition`, `pipelex.graph.edgeType`, and `pipelex.graph.theme` from `resource` to `window` scope. These are resolved by `resolveGraphConfig` *without* a resource URI (they blend with the machine-level `~/.pipelex/pipelex.toml`), so a `resource` scope advertised a per-workspace-folder override that the reader silently ignored. `window` scope matches the unscoped read — they stay settable at the user and workspace level. The per-resource graph settings (`graph.direction`/`showControllers`/`foldMode`, read *with* the URI) are unaffected.
+
 ## [0.11.0] - 2026-06-24
 
 ### Added
@@ -17,6 +25,7 @@
  - **VS Code extension resolver**: Refactored `crossFileDiagnostics.ts` to delegate to a new shared `bundleResolution.ts` module, so validation-error placement and graph pipe-node navigation use the same source-of-truth logic for resolving declaring files.
 
 ### Fixed
+ - **PyPI project description for `pipelex-tools-py`**: Added library-specific long-description metadata and bumped the package to 0.1.1 so PyPI can display the corrected project page on the next publish. The already-uploaded 0.1.0 files cannot be replaced in-place.
  - **Graph panel navigation**: Clicking a pipe node defined in a sibling file no longer silently fails; the owner file is now correctly resolved across the bundle directory.
  - **Lost final stderr log line on exit**: The CLIs (`plxt`, `taplo`) now flush each stderr log line synchronously to the file descriptor. Previously the error logged immediately before `std::process::exit()` (e.g. `operation failed`) could be dropped, because tokio's buffered/async stderr write performs the real write on a background thread and the process exited before it drained — this intermittently failed the `quiet_flag.rs` tests in CI under load. (plxt 0.7.1)
 
