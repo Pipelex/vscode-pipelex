@@ -48,6 +48,7 @@ const mockState = vi.hoisted(() => {
         onEditorChangeHandler: null as ((editor: any) => void) | null,
         onDocChangeHandler: null as ((event: any) => void) | null,
         onColorThemeChangeHandler: null as ((theme: any) => void) | null,
+        onConfigChangeHandler: null as ((event: any) => void) | null,
     };
 });
 
@@ -90,6 +91,10 @@ vi.mock('vscode', () => ({
         }),
         onDidSaveTextDocument: vi.fn((handler: any) => {
             mockState.onSaveHandler = handler;
+            return { dispose: vi.fn() };
+        }),
+        onDidChangeConfiguration: vi.fn((handler: any) => {
+            mockState.onConfigChangeHandler = handler;
             return { dispose: vi.fn() };
         }),
         getWorkspaceFolder: () => ({ uri: { fsPath: '/workspace' } }),
@@ -245,6 +250,7 @@ describe('MethodGraphPanel', () => {
         mockState.onEditorChangeHandler = null;
         mockState.onDocChangeHandler = null;
         mockState.onColorThemeChangeHandler = null;
+        mockState.onConfigChangeHandler = null;
         mockState.configOverrides = {};
         mockState.configInspect = {};
         mockState.configUpdates = [];
@@ -413,6 +419,75 @@ describe('MethodGraphPanel', () => {
         mockState.mockWebview.postMessage.mockClear();
         mockState.activeColorThemeKind = 1;
         mockState.onColorThemeChangeHandler!({ kind: 1 });
+
+        expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    it('re-sends the toolbar position when pipelex.graph.toolbarPosition changes', async () => {
+        const graphspec = { nodes: [], edges: [] };
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ graphspec, pipe_code: 'main' }),
+            stderr: '',
+        };
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+
+        // Complete the handshake so the panel is ready to receive live updates.
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+
+        // The constructor registered a configuration listener.
+        expect(mockState.onConfigChangeHandler).not.toBeNull();
+
+        // User picks a new anchor in settings; the host re-sends only the
+        // resolved toolbar position so the toolbar moves live.
+        mockState.mockWebview.postMessage.mockClear();
+        mockState.configOverrides['graph.toolbarPosition'] = 'bottom-center';
+        mockState.onConfigChangeHandler!({ affectsConfiguration: (k: string) => k === 'pipelex.graph.toolbarPosition' });
+        await new Promise(r => setTimeout(r, 10)); // onToolbarPositionChanged awaits resolveGraphConfig
+
+        expect(mockState.mockWebview.postMessage).toHaveBeenCalledWith({
+            type: 'setToolbarPosition',
+            toolbarPosition: 'bottom-center',
+        });
+        panel.dispose();
+    });
+
+    it('ignores configuration changes unrelated to the toolbar position', async () => {
+        const graphspec = { nodes: [], edges: [] };
+        mockState.spawnCliResult = {
+            stdout: JSON.stringify({ graphspec, pipe_code: 'main' }),
+            stderr: '',
+        };
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+
+        // An unrelated setting changed — no toolbar message should be posted.
+        mockState.mockWebview.postMessage.mockClear();
+        mockState.onConfigChangeHandler!({ affectsConfiguration: (k: string) => k === 'pipelex.graph.edgeType' });
+        await new Promise(r => setTimeout(r, 10));
+
+        expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    it('does not post a toolbar update when no graph is showing yet (not ready)', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+
+        // No webviewReady handshake → the webview can't receive a live update.
+        mockState.mockWebview.postMessage.mockClear();
+        mockState.configOverrides['graph.toolbarPosition'] = 'bottom-center';
+        mockState.onConfigChangeHandler!({ affectsConfiguration: (k: string) => k === 'pipelex.graph.toolbarPosition' });
+        await new Promise(r => setTimeout(r, 10));
 
         expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
         panel.dispose();

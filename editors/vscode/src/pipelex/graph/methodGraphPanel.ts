@@ -177,6 +177,14 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         this.disposables.push(
             vscode.window.onDidChangeActiveColorTheme(() => this.onColorThemeChanged())
         );
+
+        this.disposables.push(
+            vscode.workspace.onDidChangeConfiguration(event => {
+                if (event.affectsConfiguration('pipelex.graph.toolbarPosition')) {
+                    void this.onToolbarPositionChanged();
+                }
+            })
+        );
     }
 
     /**
@@ -193,6 +201,27 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         this.panel.webview.postMessage({
             type: 'setSystemTheme',
             systemTheme: activeEditorGraphTheme(),
+        });
+    }
+
+    /**
+     * The `pipelex.graph.toolbarPosition` setting changed. If a graph is live,
+     * re-send just the resolved anchor so the toolbar moves immediately —
+     * GraphViewer reads `config.toolbarPosition` reactively, so the lightweight
+     * `setToolbarPosition` message repaints the toolbar without re-running
+     * analysis or resetting the viewport (mirrors onColorThemeChanged). Resolved
+     * through `resolveGraphConfig` so the live update applies the exact same
+     * guard + default as the initial send.
+     */
+    private async onToolbarPositionChanged(): Promise<void> {
+        if (!this.panel || !this.webviewReady) return;
+        const config = await resolveGraphConfig();
+        // Re-check liveness: resolveGraphConfig is async (it reads pipelex.toml),
+        // so the panel may have closed or swapped to a non-graph view meanwhile.
+        if (!this.panel || !this.webviewReady) return;
+        this.panel.webview.postMessage({
+            type: 'setToolbarPosition',
+            toolbarPosition: config.toolbarPosition,
         });
     }
 
