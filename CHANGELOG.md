@@ -1,6 +1,6 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
-## [0.12.1] - 2026-06-30
+## [0.13.0] - 2026-06-30
 
 ### Changed
  - **API validation backend moved to `@pipelex/sdk`'s `PipelexApiClient`** (from `mthds`'s `MthdsApiClient`). The Pipelex-API `/v1/validate` narrowing now lives in `@pipelex/sdk` — the `mthds` package exposes only the standard's neutral verdict — so the extension takes its typed validation client and `PipelexValidationResult` from the SDK and drops the direct `mthds` dependency (it arrives transitively via the SDK). **Breaking:** the hosted-API token's environment-variable fallback is now `PIPELEX_API_KEY` (was `MTHDS_API_KEY`) — set a key with the "Pipelex: Set Hosted API Key" command or the `PIPELEX_API_KEY` env var.

@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
