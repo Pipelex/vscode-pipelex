@@ -3,6 +3,14 @@
 
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.12.1] - 2026-06-30
+
+### Changed
+ - **API validation backend moved to `@pipelex/sdk`'s `PipelexApiClient`** (from `mthds`'s `MthdsApiClient`). The Pipelex-API `/v1/validate` narrowing now lives in `@pipelex/sdk` — the `mthds` package exposes only the standard's neutral verdict — so the extension takes its typed validation client and `PipelexValidationResult` from the SDK and drops the direct `mthds` dependency (it arrives transitively via the SDK). **Breaking:** the hosted-API token's environment-variable fallback is now `PIPELEX_API_KEY` (was `MTHDS_API_KEY`) — set a key with the "Pipelex: Set Hosted API Key" command or the `PIPELEX_API_KEY` env var.
+
+### Fixed
+ - **`PipeStructure` nodes no longer blank the method graph:** Bumped `@pipelex/mthds-ui` to 0.11.0. A method containing a `PipeStructure` operator (an LLM-backed pipe that turns `Text` into a structured concept) now renders as an ordinary operator card instead of throwing a validation error and collapsing the entire graph to a "Failed to render method graph" screen. The detail panel surfaces its structuring config (model — including an inline `llm_choice` setting — text variable, output multiplicity, and rendered prompt), and any operator or controller node whose blueprint can't be resolved now falls back to the generic execution-data dump rather than hiding its runtime values.
+
 ## [0.12.0] - 2026-06-29
 
 ### Added

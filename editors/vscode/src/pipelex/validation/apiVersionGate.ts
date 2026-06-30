@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { MthdsApiClient } from 'mthds';
+import type { PipelexApiClient } from '@pipelex/sdk';
 import { type Semver, compareSemver, formatSemver } from './agentCliVersion';
 
 /**
@@ -98,7 +98,7 @@ export class ApiVersionGate {
      * callers (tests) can probe without an abort context.
      */
     async ensureCapable(
-        client: MthdsApiClient,
+        client: PipelexApiClient,
         baseUrl: string,
         signal?: AbortSignal,
         timeoutMs?: number,

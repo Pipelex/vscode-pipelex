@@ -16,8 +16,8 @@ const PIPELEX_API_KEY_PREFIX = 'plx_sk_';
  * Resolve the API token with SecretStorage → environment precedence.
  *
  * A stored secret (set via `Pipelex: Set Hosted API Key`) wins. When none is
- * stored we return `undefined`, letting `MthdsApiClient` fall back to its native
- * `MTHDS_API_KEY` env read — so the wrapper overrides the env when a key is
+ * stored we return `undefined`, letting `PipelexApiClient` fall back to its native
+ * `PIPELEX_API_KEY` env read — so the wrapper overrides the env when a key is
  * stored, and defers to it otherwise. The token is never read from settings
  * (plaintext), by design.
  */
