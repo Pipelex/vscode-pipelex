@@ -527,12 +527,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pipelex/sdk@npm:0.1.4":
-  version: 0.1.4
-  resolution: "@pipelex/sdk@npm:0.1.4"
+"@pipelex/sdk@npm:0.1.5":
+  version: 0.1.5
+  resolution: "@pipelex/sdk@npm:0.1.5"
   dependencies:
-    mthds: "npm:^0.14.0"
-  checksum: dd1fb36e88977c767ceff837c0fea1bb1d70b7c20a5eab762f9ea88c96a8e4a9c121bb9fd5f8ea25efb0f1cf9358ae021bf0f6d7636bf1fca47651061856a1c2
+    mthds: "npm:^0.15.0"
+  checksum: 0a0844b233c358b3d456c4bd6bece2583b1e591998020bbed6bf8a84c45f9af5880e8328efb22f04f79b56d85339acdfb128e98aceb115af18d872438c443f52
   languageName: node
   linkType: hard
 
@@ -3471,9 +3471,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mthds@npm:^0.14.0":
-  version: 0.14.0
-  resolution: "mthds@npm:0.14.0"
+"mthds@npm:^0.15.0":
+  version: 0.15.0
+  resolution: "mthds@npm:0.15.0"
   dependencies:
     "@clack/prompts": "npm:^1.0.0"
     chalk: "npm:^5.4.1"
@@ -3486,7 +3486,7 @@ __metadata:
   bin:
     mthds: dist/cli.js
     mthds-agent: dist/agent-cli.js
-  checksum: f234c876a9066688df1b743ae0f0cc8c22c46c1d19f6fd75ef3fae84692c7091b57b5d29bbdee175f7bb37f0ea57419e5f6f7e7d52297fb68e38cd413caccf5b
+  checksum: e9437d1f2528cec407053fe91a072b7cbc3b2fc244a439aaad32a346c9e47a1dce60b0be94c4239d9a7a56cbb472b977c736a0971a66cc4e0eec7a79952a814b
   languageName: node
   linkType: hard
 
@@ -3785,7 +3785,7 @@ __metadata:
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
     "@pipelex/mthds-ui": "npm:0.11.0"
-    "@pipelex/sdk": "npm:0.1.4"
+    "@pipelex/sdk": "npm:0.1.5"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
     "@rollup/plugin-replace": "npm:^5.0.5"
