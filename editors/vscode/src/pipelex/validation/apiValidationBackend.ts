@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { MthdsApiClient, ApiResponseError, ApiUnreachableError, PipelineRequestError } from 'mthds';
-import type { PipelexInvalidReport, PipelexValidationReport, PipelexValidationResult } from 'mthds';
+import { PipelexApiClient, ApiResponseError, ApiUnreachableError, PipelineRequestError } from '@pipelex/sdk';
+import type { PipelexInvalidReport, PipelexValidationReport, PipelexValidationResult } from '@pipelex/sdk';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
 import type { ValidationErrorItem } from './types';
@@ -55,10 +55,10 @@ export class ApiValidationBackend implements ValidationBackend {
         // non-host-only `pipelex.api.baseUrl`, e.g. one with a `/v1` path). Doing it here,
         // inside a try, turns a misconfiguration into an actionable BackendError instead
         // of a throw that escapes `handleError` — and fails fast, before the privacy modal.
-        let client: MthdsApiClient;
+        let client: PipelexApiClient;
         try {
             const token = await this.deps.getToken();
-            client = new MthdsApiClient({ baseUrl, apiToken: token });
+            client = new PipelexApiClient({ baseUrl, apiToken: token });
         } catch (err: unknown) {
             throw setupError(err, baseUrl);
         }
@@ -327,7 +327,7 @@ function authMessage(baseUrl: string, status: number): string {
             `locally with Docker, or switch \`pipelex.backend\` to \`cli\` to validate without a key.`;
     }
     return `The Pipelex API at ${baseUrl} rejected the request (HTTP ${status}) — it requires authentication. ` +
-        `Set a key with the "Pipelex: Set Hosted API Key" command (or set the MTHDS_API_KEY environment variable). ` +
+        `Set a key with the "Pipelex: Set Hosted API Key" command (or set the PIPELEX_API_KEY environment variable). ` +
         `You can also switch \`pipelex.backend\` to \`cli\` to validate locally.`;
 }
 
@@ -350,7 +350,7 @@ function authDetailHtml(baseUrl: string, status: number): string {
             `to validate locally.`;
     }
     return `The Pipelex API at ${host} rejected the request (HTTP ${status}) — it requires authentication.` +
-        `</p><p>Click <strong>Set API Key</strong> below, or set the <code>MTHDS_API_KEY</code> environment ` +
+        `</p><p>Click <strong>Set API Key</strong> below, or set the <code>PIPELEX_API_KEY</code> environment ` +
         `variable. You can also switch <code>pipelex.backend</code> to <code>cli</code> to validate locally.`;
 }
 

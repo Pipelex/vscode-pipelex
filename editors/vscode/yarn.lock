@@ -505,9 +505,9 @@ __metadata:
   languageName: node
   linkType: soft
 
-"@pipelex/mthds-ui@npm:0.10.0":
-  version: 0.10.0
-  resolution: "@pipelex/mthds-ui@npm:0.10.0"
+"@pipelex/mthds-ui@npm:0.11.0":
+  version: 0.11.0
+  resolution: "@pipelex/mthds-ui@npm:0.11.0"
   dependencies:
     "@xyflow/react": "npm:^12"
     dompurify: "npm:^3.3.3"
@@ -523,7 +523,16 @@ __metadata:
       optional: true
     shiki:
       optional: true
-  checksum: 7ef5f10a5b0aef6a815d872bc1360719c37fda00f380175757a97ffe3f5ec693e4b7c71a297c78f4fa20e8f257dc4292efa2dd9647db48a835d1e169de80f8dc
+  checksum: c4e1ae0040f60c69c09d51d08a07591e1d794438ad37cd2a038f541b08ca6a24d33b7a16fa8df762f187a918039c67556a55a4d64ef694bd917e1edce05911e8
+  languageName: node
+  linkType: hard
+
+"@pipelex/sdk@npm:0.1.4":
+  version: 0.1.4
+  resolution: "@pipelex/sdk@npm:0.1.4"
+  dependencies:
+    mthds: "npm:^0.14.0"
+  checksum: dd1fb36e88977c767ceff837c0fea1bb1d70b7c20a5eab762f9ea88c96a8e4a9c121bb9fd5f8ea25efb0f1cf9358ae021bf0f6d7636bf1fca47651061856a1c2
   languageName: node
   linkType: hard
 
@@ -3462,9 +3471,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mthds@npm:0.12.0":
-  version: 0.12.0
-  resolution: "mthds@npm:0.12.0"
+"mthds@npm:^0.14.0":
+  version: 0.14.0
+  resolution: "mthds@npm:0.14.0"
   dependencies:
     "@clack/prompts": "npm:^1.0.0"
     chalk: "npm:^5.4.1"
@@ -3477,7 +3486,7 @@ __metadata:
   bin:
     mthds: dist/cli.js
     mthds-agent: dist/agent-cli.js
-  checksum: 1c0353ae86e1fca1b57629d46fbb7e2e365b3f8ef2680a5e6644d685525d797d4daa6898aa3c876a060ce73ef2e4833b9fd1025c04d6f4e54c8514146a497414
+  checksum: f234c876a9066688df1b743ae0f0cc8c22c46c1d19f6fd75ef3fae84692c7091b57b5d29bbdee175f7bb37f0ea57419e5f6f7e7d52297fb68e38cd413caccf5b
   languageName: node
   linkType: hard
 
@@ -3775,7 +3784,8 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
-    "@pipelex/mthds-ui": "npm:0.10.0"
+    "@pipelex/mthds-ui": "npm:0.11.0"
+    "@pipelex/sdk": "npm:0.1.4"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
     "@rollup/plugin-replace": "npm:^5.0.5"
@@ -3790,7 +3800,6 @@ __metadata:
     encoding: "npm:^0.1.13"
     esbuild: "npm:^0.20.0"
     fast-glob: "npm:^3.3.2"
-    mthds: "npm:0.12.0"
     node-fetch: "npm:^3.3.2"
     react: "npm:^19"
     react-dom: "npm:^19"
