@@ -29,7 +29,7 @@ The `api` backend's default `baseUrl` is the hosted Pipelex API (`https://api.pi
 - Run **`Pipelex: Set Hosted API Key`** from the Command Palette — the key is saved in VS Code **SecretStorage**, never in plaintext settings.
 - **`Pipelex: Clear Hosted API Key`** removes it.
 
-Token resolution is **SecretStorage → `MTHDS_API_KEY` environment variable**: a stored key wins; with none stored, the client falls back to the env var.
+Token resolution is **SecretStorage → `PIPELEX_API_KEY` environment variable**: a stored key wins; with none stored, the client falls back to the env var.
 
 ## Running a local `pipelex-api`
 
