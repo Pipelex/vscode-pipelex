@@ -45,6 +45,29 @@ class SmokeTest(unittest.TestCase):
         # import above; this also pins the loaded module's name.
         self.assertEqual(pipelex_tools.__name__, "pipelex_tools")
 
+    def test_all_matches_runtime_exports(self) -> None:
+        # Drift guard: the advertised `__all__` must be exactly the runtime
+        # export surface, and every name in it must actually resolve. This is
+        # what catches the stub/runtime `__all__` drift where the `.pyi` listed
+        # type-check-only TypedDicts (Diagnostic/Range/FormatResult/LintResult)
+        # that raise ImportError at runtime.
+        self.assertEqual(pipelex_tools.__all__, ["format_mthds", "lint_mthds"])
+        for name in pipelex_tools.__all__:
+            self.assertTrue(
+                callable(getattr(pipelex_tools, name)),
+                f"{name} listed in __all__ but not a runtime export",
+            )
+
+    def test_type_only_typeddicts_are_not_runtime_exports(self) -> None:
+        # The flip side of the guard above: the TypedDicts are deliberately
+        # absent at runtime (they exist only in pipelex_tools.pyi for
+        # type-checkers), so importing them must fail rather than silently work.
+        for name in ("Diagnostic", "Range", "FormatResult", "LintResult"):
+            self.assertFalse(
+                hasattr(pipelex_tools, name),
+                f"{name} is type-check-only and must not be a runtime attribute",
+            )
+
     def test_format_canonicalizes_unformatted_input(self) -> None:
         result = pipelex_tools.format_mthds("a=1")
         self.assertEqual(result["formatted"], "a = 1\n")
@@ -127,6 +150,9 @@ class SmokeTest(unittest.TestCase):
     def test_diagnostic_range_has_one_based_coords(self) -> None:
         diag = pipelex_tools.lint_mthds("key = ")["diagnostics"][0]
         rng = diag["range"]
+        # A syntax error always carries a position (`range` is Optional only for
+        # positionless semantic/schema errors); assert to narrow it for pyright.
+        assert rng is not None
         self.assertEqual(rng["start_line"], 1)
         self.assertIn("start_col", rng)
         self.assertIn("start_offset", rng)
