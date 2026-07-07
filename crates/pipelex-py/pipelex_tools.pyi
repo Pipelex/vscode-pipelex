@@ -23,13 +23,19 @@ breaking change to these dict shapes.
 
 from typing import Literal, Optional, TypedDict
 
+# ``__all__`` mirrors the module's *runtime* export surface, which is only the
+# two functions (see ``src/python.rs::pipelex_tools``). The ``Diagnostic`` /
+# ``Range`` / ``FormatResult`` / ``LintResult`` TypedDicts below are
+# **type-checking-only** — defined here so downstream code can annotate against
+# the return shapes (typically under an ``if TYPE_CHECKING:`` import), but they
+# are NOT runtime exports of the compiled module. ``from pipelex_tools import
+# FormatResult`` type-checks but raises ``ImportError`` at runtime; leaving them
+# out of ``__all__`` keeps the advertised runtime surface honest. A
+# ``tests/test_smoke.py`` guard asserts this list equals the module's runtime
+# ``__all__``.
 __all__ = [
     "format_mthds",
     "lint_mthds",
-    "Diagnostic",
-    "Range",
-    "FormatResult",
-    "LintResult",
 ]
 
 class Range(TypedDict):

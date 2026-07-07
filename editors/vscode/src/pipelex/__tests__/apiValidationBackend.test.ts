@@ -73,6 +73,28 @@ vi.mock('@pipelex/sdk', () => {
 
 import { ApiResponseError, ApiUnreachableError } from '@pipelex/sdk';
 import { ApiValidationBackend } from '../validation/apiValidationBackend';
+
+// ---------- Compile-time conformance: lock the mock to the real @pipelex/sdk ----------
+// `vi.mock` swaps the SDK's runtime impl, but TypeScript still resolves these
+// `import type`s to the published `.d.ts`. The bindings below fail `yarn typecheck`
+// (strict, in `make check` + CI) if the SDK renames/removes any surface this mock
+// stands in for — so the mock cannot silently drift from the real contract. (The
+// SDK's *runtime behavior* — what a verdict/error actually carries — is covered by
+// the integration tests against the published artifact, not here.)
+import type {
+    PipelexApiClient as RealPipelexApiClient,
+    PipelexApiClientOptions,
+    ApiResponseError as RealApiResponseError,
+    ApiUnreachableError as RealApiUnreachableError,
+} from '@pipelex/sdk';
+// Methods the backend invokes on the client must exist on the real client.
+type _ClientSurface = Pick<RealPipelexApiClient, 'validate' | 'version'>;
+// Constructor option keys the backend passes must be the real option keys.
+type _ClientOptions = Required<Pick<PipelexApiClientOptions, 'baseUrl' | 'apiToken'>>;
+// Error fields the backend reads off these classes must exist on the real classes.
+type _ResponseErrorFields = Pick<RealApiResponseError, 'status' | 'statusText' | 'serverMessage' | 'code'>;
+type _UnreachableErrorFields = Pick<RealApiUnreachableError, 'code'>;
+
 import { ApiVersionGate } from '../validation/apiVersionGate';
 import { BackendError } from '../validation/backend';
 
