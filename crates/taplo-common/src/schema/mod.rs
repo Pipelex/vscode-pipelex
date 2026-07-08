@@ -141,8 +141,21 @@ fn build_definition_sub_schema(schema: &Value, definition_name: &str) -> Option<
     Some(sub_schema)
 }
 
+const PIPE_SIGNATURE_DEFINITION: &str = "PipeSignatureBlueprint";
+
+fn mthds_pipe_definition_name(pipe_dom_node: &dom::Node) -> Option<String> {
+    let pipe_dom_table = pipe_dom_node.as_table()?;
+    match pipe_dom_table.get("type") {
+        Some(type_node) => type_node
+            .as_str()
+            .map(|s| format!("{}Blueprint", s.value())),
+        None => Some(PIPE_SIGNATURE_DEFINITION.to_string()),
+    }
+}
+
 impl<E: Environment> Schemas<E> {
     /// MTHDS-specific: validate each pipe individually using the `type` discriminator.
+    /// A typeless pipe table is a `PipeSignature` stub in the current MTHDS schema.
     /// Returns specific leaf errors per pipe, or None if this validation path doesn't apply.
     fn validate_mthds_pipes(
         &self,
@@ -200,20 +213,12 @@ impl<E: Environment> Schemas<E> {
                 continue;
             };
 
-            // Read the `type` string from the DOM
-            let type_str = match pipe_dom_node.as_table() {
-                Some(t) => match t.get("type") {
-                    Some(type_node) => match type_node.as_str() {
-                        Some(s) => s.value().to_string(),
-                        None => continue,
-                    },
-                    None => continue,
-                },
-                None => continue,
+            // Map the pipe to its blueprint definition. A missing `type` is the
+            // typeless PipeSignature form; a malformed non-string type is left
+            // to the generic validator.
+            let Some(definition_name) = mthds_pipe_definition_name(pipe_dom_node) else {
+                continue;
             };
-
-            // Map to definition name: "{type}Blueprint"
-            let definition_name = format!("{type_str}Blueprint");
 
             // Get or compile the validator for this definition
             let validator = match validator_cache.get(&definition_name) {
@@ -1795,6 +1800,64 @@ prompt      = "$img_prompt"
         assert!(
             messages.iter().any(|m| m.contains("aspect_ratio")),
             "Should see specific error about 'aspect_ratio' — got: {messages:?}",
+        );
+    }
+
+    #[tokio::test]
+    async fn mthds_pipe_validation_checks_typeless_signature_stubs() {
+        let env = MockEnv {
+            files: std::collections::HashMap::new(),
+        };
+        let schemas = super::Schemas::new(env, None);
+
+        let mthds_content = r#"
+domain = "rec"
+
+[pipe.contract]
+description = "Contract-only stub"
+
+[pipe.generate]
+type = "PipeImgGen"
+description = "Generate an image"
+output = "Image"
+prompt = "Draw it"
+aspect_ratio = "not_an_aspect_ratio"
+"#;
+
+        let parsed = taplo::parser::parse(mthds_content);
+        let dom = parsed.into_dom();
+
+        let schema_url: Url = super::builtins::MTHDS_SCHEMA_URL.parse().unwrap();
+        let mthds_schema = super::builtins::mthds_schema();
+        schemas.add_schema(&schema_url, mthds_schema).await;
+
+        let errors = schemas.validate_root(&schema_url, &dom).await.unwrap();
+        let messages: Vec<String> = errors
+            .iter()
+            .map(super::NodeValidationError::display_message)
+            .collect();
+        let locations: Vec<Option<String>> = errors
+            .iter()
+            .map(super::NodeValidationError::instance_location)
+            .collect();
+
+        assert!(
+            !messages
+                .iter()
+                .any(|m| m.contains("does not match any of the allowed schemas")),
+            "Should NOT see generic 'does not match' — got: {messages:?}",
+        );
+        assert!(
+            messages.iter().any(|m| m.contains("output")),
+            "Should validate the typeless signature stub's missing output — got: {messages:?}",
+        );
+        assert!(
+            locations.contains(&Some("pipe.contract".to_string())),
+            "Should locate the typeless signature error at pipe.contract — got: {locations:?}",
+        );
+        assert!(
+            messages.iter().any(|m| m.contains("aspect_ratio")),
+            "Should keep typed pipe errors alongside the typeless signature error — got: {messages:?}",
         );
     }
 }
