@@ -155,7 +155,7 @@ fn mthds_pipe_definition_name(pipe_dom_node: &dom::Node) -> Option<String> {
 
 impl<E: Environment> Schemas<E> {
     /// MTHDS-specific: validate each pipe individually using the `type` discriminator.
-    /// A typeless pipe table is a PipeSignature stub in the current MTHDS schema.
+    /// A typeless pipe table is a `PipeSignature` stub in the current MTHDS schema.
     /// Returns specific leaf errors per pipe, or None if this validation path doesn't apply.
     fn validate_mthds_pipes(
         &self,
