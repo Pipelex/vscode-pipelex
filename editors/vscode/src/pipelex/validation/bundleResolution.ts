@@ -140,14 +140,18 @@ function pipeDeclarationIsSignature(lines: string[], code: string): boolean {
     if (headerLine === -1) {
         return false;
     }
+    let hasType = false;
     for (let i = headerLine + 1; i < lines.length; i++) {
         const text = lines[i];
         if (/^\s*\[/.test(text)) {
             break;
         }
+        if (/^\s*type\s*=/.test(text)) {
+            hasType = true;
+        }
         if (/^\s*type\s*=\s*(["'])PipeSignature\1\s*(?:#.*)?$/.test(text)) {
             return true;
         }
     }
-    return false;
+    return !hasType;
 }

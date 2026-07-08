@@ -23,6 +23,8 @@ const getLines = (f: BundleFile): string[] => f.content.split(/\r\n|\r|\n/);
 // A signature/concrete split: the primary holds the signature, a sibling the concrete impl.
 const SIGNATURE = makeFile(`${DIR}/bundle.mthds`, 'bundle.mthds',
     'domain = "rec"\n[pipe.screen]\ntype = "PipeSignature"\n');
+const TYPELESS_SIGNATURE = makeFile(`${DIR}/bundle-typeless.mthds`, 'bundle-typeless.mthds',
+    'domain = "rec"\n[pipe.screen]\ndescription = "Screen contract"\noutput = "Image"\n');
 const CONCRETE = makeFile(`${DIR}/screen.mthds`, 'screen.mthds',
     'domain = "rec"\n[pipe.screen]\ntype = "PipeSequence"\n[pipe.build]\ntype = "PipeLLM"\n');
 const CONCEPTS = makeFile(`${DIR}/concepts.mthds`, 'concepts.mthds',
@@ -46,6 +48,14 @@ describe('resolveDeclaringFile — source-first tier', () => {
         const owner = resolveDeclaringFile({
             kind: 'pipe', code: 'screen', domainCode: 'rec',
             source: `${DIR}/bundle.mthds`, files, getLines,
+        });
+        expect(owner?.uri.toString()).toBe(CONCRETE.uri.toString());
+    });
+
+    it('supersedes a typeless signature `source` with a same-domain concrete declaration', () => {
+        const owner = resolveDeclaringFile({
+            kind: 'pipe', code: 'screen', domainCode: 'rec',
+            source: `${DIR}/bundle-typeless.mthds`, files: [TYPELESS_SIGNATURE, CONCRETE, CONCEPTS], getLines,
         });
         expect(owner?.uri.toString()).toBe(CONCRETE.uri.toString());
     });
@@ -87,6 +97,13 @@ describe('resolveDeclaringFile — scan fallback tier (no source)', () => {
     it('prefers a concrete pipe over a same-code signature when source is absent', () => {
         const owner = resolveDeclaringFile({
             kind: 'pipe', code: 'screen', files: [SIGNATURE, CONCRETE, CONCEPTS], getLines,
+        });
+        expect(owner?.uri.toString()).toBe(CONCRETE.uri.toString());
+    });
+
+    it('prefers a concrete pipe over a same-code typeless signature when source is absent', () => {
+        const owner = resolveDeclaringFile({
+            kind: 'pipe', code: 'screen', files: [TYPELESS_SIGNATURE, CONCRETE, CONCEPTS], getLines,
         });
         expect(owner?.uri.toString()).toBe(CONCRETE.uri.toString());
     });
