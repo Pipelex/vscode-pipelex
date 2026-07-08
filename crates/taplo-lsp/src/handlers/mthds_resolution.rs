@@ -54,6 +54,16 @@ static NATIVE_CONCEPTS: &[NativeConcept] = &[
         fields: &[("number", "int | float")],
     },
     NativeConcept {
+        name: "YesNo",
+        description: "The answer to a yes/no question.",
+        fields: &[("yes_no", "bool")],
+    },
+    NativeConcept {
+        name: "Date",
+        description: "A calendar date, optionally with a time of day.",
+        fields: &[("date", "date"), ("time", "time?")],
+    },
+    NativeConcept {
         name: "Image",
         description: "An image with URL and optional metadata.",
         fields: &[
@@ -92,9 +102,9 @@ static NATIVE_CONCEPTS: &[NativeConcept] = &[
         fields: &[("json_obj", "dict")],
     },
     NativeConcept {
-        name: "ImgGenPrompt",
-        description: "A prompt for image generation. Refines Text.",
-        fields: &[("text", "str")],
+        name: "SearchResult",
+        description: "A web search result with answer and sources.",
+        fields: &[("answer", "str"), ("sources", "list[DocumentContent]")],
     },
     NativeConcept {
         name: "Anything",
@@ -104,6 +114,11 @@ static NATIVE_CONCEPTS: &[NativeConcept] = &[
     NativeConcept {
         name: "Dynamic",
         description: "Dynamic content with user-defined fields.",
+        fields: &[],
+    },
+    NativeConcept {
+        name: "Composite",
+        description: "A named composition of contents.",
         fields: &[],
     },
 ];
