@@ -274,6 +274,93 @@ prompt = "hello"
 }
 
 #[test]
+fn test_hover_native_concept_yes_no() {
+    let src = r#"
+domain = "test"
+
+[pipe.classify]
+type = "PipeLLM"
+output = "YesNo"
+prompt = "Answer yes or no."
+"#;
+    let offset = offset_inside_string(src, r#"output = "YesNo""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    let classified = classify_reference(&query).expect("should classify");
+    assert_eq!(classified.ref_name, "YesNo");
+
+    let native = find_native_concept(&classified.ref_name).expect("YesNo is native");
+    let content = build_native_concept_hover(native);
+
+    assert!(content.contains("**YesNo** *(native)*"), "got: {content}");
+    assert!(
+        content.contains("yes/no question"),
+        "should contain description"
+    );
+    assert!(
+        content.contains("`yes_no`: bool"),
+        "should list yes_no field"
+    );
+}
+
+#[test]
+fn test_hover_native_concept_date() {
+    let src = r#"
+domain = "test"
+
+[pipe.extract_date]
+type = "PipeLLM"
+output = "Date"
+prompt = "Extract the date."
+"#;
+    let offset = offset_inside_string(src, r#"output = "Date""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    let classified = classify_reference(&query).expect("should classify");
+    assert_eq!(classified.ref_name, "Date");
+
+    let native = find_native_concept(&classified.ref_name).expect("Date is native");
+    let content = build_native_concept_hover(native);
+
+    assert!(content.contains("**Date** *(native)*"), "got: {content}");
+    assert!(
+        content.contains("calendar date"),
+        "should contain description"
+    );
+    assert!(content.contains("`date`: date"), "should list date field");
+    assert!(content.contains("`time`: time?"), "should list time field");
+}
+
+#[test]
+fn test_native_concept_registry_matches_current_language_surface() {
+    for name in [
+        "Text",
+        "Number",
+        "YesNo",
+        "Date",
+        "Image",
+        "Document",
+        "Html",
+        "TextAndImages",
+        "Page",
+        "JSON",
+        "SearchResult",
+        "Anything",
+        "Dynamic",
+        "Composite",
+    ] {
+        assert!(
+            find_native_concept(name).is_some(),
+            "{name} should be native"
+        );
+    }
+    assert!(
+        find_native_concept("ImgGenPrompt").is_none(),
+        "ImgGenPrompt is no longer native"
+    );
+}
+
+#[test]
 fn test_hover_native_concept_with_multiplicity() {
     let src = r#"
 domain = "test"
