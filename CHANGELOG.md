@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+ - **Bundled MTHDS schema refreshed to pipelex `v0.38.0`:** The offline schema now reflects typeless `PipeSignature` authoring, `PipeParallel`'s always-combined declared `output`, first-class optional presence markers, and the current image-size schema additions. This direct local copy is intentionally ahead of hosted `mthds.ai` until the docs site is manually deployed with the new schema.
+
 ### Fixed
  - **`pipelex-tools-py` `__all__` no longer advertises unimportable names:** The hand-maintained stub `pipelex_tools.pyi` listed `Diagnostic`, `Range`, `FormatResult`, and `LintResult` in `__all__`, but those are type-checking-only TypedDicts — the compiled PyO3 module only exports `format_mthds` and `lint_mthds`, so `from pipelex_tools import Diagnostic` type-checked but raised `ImportError` at runtime. The module now defines a real runtime `__all__` (the two functions), the stub's `__all__` is narrowed to match with the TypedDicts documented as type-check-only (still importable under `TYPE_CHECKING` for annotating return shapes), and a smoke-test guard asserts the stub and runtime `__all__` agree. **Breaking for type-checkers:** the four TypedDicts leave `__all__`; downstream code that imports them should do so under `if TYPE_CHECKING:`. No runtime consumer is affected — they were never importable at runtime. (pipelex-tools-py 0.1.2)
 
