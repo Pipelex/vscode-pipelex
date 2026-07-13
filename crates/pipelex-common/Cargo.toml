@@ -13,9 +13,8 @@ license      = { workspace = true }
 # `taplo-common/schema` has no reqwest-free build (`Schemas` holds an
 # `Option<reqwest::Client>` unconditionally), so `reqwest` must ride along; the
 # engine never constructs a client (`http: None`), keeping it provably offline.
-# `rustls-tls` rides along too: taplo-common's no-TLS `get_certs` fallback does
-# not compile (pre-existing upstream signature bug in a never-built combo), and
-# this matches the feature set the wheel always shipped with.
+# `rustls-tls` rides along too, matching the feature set the wheel has always
+# shipped with (it is unused dead code on this path, like reqwest itself).
 tools = [
   "dep:serde",
   "taplo-common/reqwest",
