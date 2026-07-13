@@ -7,14 +7,13 @@
 //! `pipelex-tools` wheel via maturin's `bin` bindings (maturin cannot package a
 //! native binary and a pyo3 cdylib in the same wheel).
 //!
-//! The PyO3 glue lives in [`python`] and is gated behind the `python` cargo
-//! feature so that plain `cargo build` / `cargo test` stay PyO3-free. The pure
-//! lint/format logic ([`format`], [`lint`], [`diagnostic`]) is *not* gated, so
-//! it compiles and unit-tests without a Python interpreter.
+//! The lint/format engine itself lives in `pipelex_common::tools` (the shared
+//! impl behind this wheel and the `@pipelex/tools-wasm` npm package); this
+//! crate re-exports it and adds only the PyO3 glue. The glue lives in
+//! [`python`] and is gated behind the `python` cargo feature so that plain
+//! `cargo build` / `cargo test` stay PyO3-free.
 
-pub mod diagnostic;
-pub mod format;
-pub mod lint;
+pub use pipelex_common::tools::{diagnostic, format, lint};
 
 #[cfg(feature = "python")]
 mod python;

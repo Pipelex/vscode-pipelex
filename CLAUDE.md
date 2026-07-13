@@ -7,10 +7,8 @@ Publishes two PyPI packages from separate `pyproject.toml` files:
 - `pipelex-tools`: native `plxt` CLI, published from the repo-root `pyproject.toml`
 - `pipelex-tools-py`: importable Python library (`import pipelex_tools`), published from `crates/pipelex-py/pyproject.toml`
 
-## Critical Rule: Preserve Upstream Taplo Behavior
-**By default, unless expressly and clearly stated otherwise, all existing taplo upstream features and behavior must be kept as-is.** Do not modify, remove, or alter any taplo functionality. Our work is exclusively focused on **adding** new features for MTHDS files and the Pipelex VS Code extension. When making changes, ensure they do not regress or interfere with existing TOML support.
-
-**Exception — bug fixes in common code:** If fixing a bug requires modifying shared/upstream taplo code (e.g. crates outside of MTHDS-specific paths), you must explicitly notify the developer before making the change, explaining what the bug is, which common code is affected, and why the fix is necessary.
+## Upstream Taplo Code: OK to Change, but Always Say So
+**By default, existing taplo upstream features and behavior are kept as-is** — our work is chiefly focused on **adding** features for MTHDS files and the Pipelex VS Code extension, and changes must not regress existing TOML support. It **is** OK to modify upstream taplo code (`taplo`, `taplo-cli`, `taplo-common`, `taplo-lsp`, `taplo-wasm`, `lsp-async-stub`) when the work calls for it — bug fixes, extension points, behavior we genuinely want changed. But **whenever upstream code changes, you must tell the developer it happened**: name the upstream crate/file, what changed, and why — in your summary and in the PR description. (Rule relaxed 2026-07-13; upstream edits previously required prior approval.)
 
 ## Repository Structure
 

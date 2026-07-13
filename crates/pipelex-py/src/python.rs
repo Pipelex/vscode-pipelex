@@ -109,5 +109,11 @@ fn lint_mthds(py: Python<'_>, content: String, source: Option<String>) -> PyResu
 fn pipelex_tools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(format_mthds, m)?)?;
     m.add_function(wrap_pyfunction!(lint_mthds, m)?)?;
+    // ⚠️ PUBLIC PYTHON SURFACE — the genuine *runtime* export surface. Only the
+    // two functions exist at runtime; the `Diagnostic`/`Range`/`FormatResult`/
+    // `LintResult` TypedDicts live only in `pipelex_tools.pyi` for type-checkers
+    // and are NOT importable here. Keep this list in sync with the stub's
+    // `__all__`; a `tests/test_smoke.py` guard asserts they match.
+    m.add("__all__", vec!["format_mthds", "lint_mthds"])?;
     Ok(())
 }

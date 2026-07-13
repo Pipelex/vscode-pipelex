@@ -1,15 +1,19 @@
 {
-  "name": "@pipelex/lsp",
-  "version": "0.2.0",
-  "description": "A JavaScript wrapper for the Pipelex TOML/MTHDS language server.",
+  "name": "@pipelex/tools-wasm",
+  "version": "0.1.0",
+  "description": "MTHDS lint & format compiled to WASM — fully offline (embedded schema), same engine and Diagnostic wire shape as pipelex-tools-py and the Pipelex API.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "yarn rollup --silent -c rollup.config.mjs",
-    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly --skipLibCheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublish": "RELEASE=true yarn build",
     "clean": "rm -rf dist"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "homepage": "https://github.com/Pipelex/vscode-pipelex",
   "repository": "https://github.com/Pipelex/vscode-pipelex",
   "author": {
@@ -27,9 +31,7 @@
     "rollup": "^4.9.6",
     "rollup-plugin-esbuild": "^6.1.1",
     "tslib": "^2.6.2",
-    "typescript": "^5.3.3"
-  },
-  "dependencies": {
-    "@taplo/core": "^0.2.0"
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.18"
   }
 }

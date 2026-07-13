@@ -682,7 +682,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it('navigateToPipe prefers a concrete sibling over a same-code signature when registry source is absent', async () => {
+    it('navigateToPipe prefers a concrete sibling over a same-code typeless signature when registry source is absent', async () => {
         const vscode = await import('vscode');
         const primaryUri = makeUri('/project/methods/bundle.mthds');
         const siblingUri = makeUri('/project/methods/screen.mthds');
@@ -698,7 +698,7 @@ describe('MethodGraphPanel', () => {
         mockState.docContents['/project/methods/screen.mthds'] =
             'domain = "rec"\n[pipe.screen]\ntype = "PipeSequence"\n';
         mockState.bundleFiles = [
-            { uri: primaryUri, name: 'bundle.mthds', content: 'domain = "rec"\n[pipe.screen]\ntype = "PipeSignature"\n' },
+            { uri: primaryUri, name: 'bundle.mthds', content: 'domain = "rec"\n[pipe.screen]\ndescription = "Screen contract"\noutput = "Image"\n' },
             { uri: siblingUri, name: 'screen.mthds', content: mockState.docContents['/project/methods/screen.mthds'] },
         ];
 

@@ -1583,7 +1583,7 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "pipelex-cli"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "async-ctrlc",
@@ -1609,6 +1609,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
+ "serde",
  "taplo",
  "taplo-common",
  "time",
@@ -1631,17 +1632,25 @@ dependencies = [
 
 [[package]]
 name = "pipelex-py"
-version = "0.1.1"
+version = "0.1.3"
 dependencies = [
- "anyhow",
+ "pipelex-common",
  "pyo3",
  "pythonize",
  "serde",
+]
+
+[[package]]
+name = "pipelex-tools-wasm"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "getrandom",
+ "pipelex-common",
+ "serde",
+ "serde-wasm-bindgen",
  "serde_json",
- "taplo",
- "taplo-common",
- "tokio",
- "url",
+ "wasm-bindgen",
 ]
 
 [[package]]

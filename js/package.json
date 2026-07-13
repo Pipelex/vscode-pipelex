@@ -5,7 +5,8 @@
   "workspaces": [
     "cli",
     "lib",
-    "lsp"
+    "lsp",
+    "tools-wasm"
   ],
   "packageManager": "yarn@4.0.2",
   "scripts": {

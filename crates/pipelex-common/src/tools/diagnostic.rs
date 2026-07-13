@@ -2,16 +2,16 @@
 //!
 //! These are pure-data `#[derive(Serialize)]` shapes — the native analog of the
 //! wasm crate's `LintError`, enriched with a `kind`, a dotted `location`, and
-//! codespan-style line/column coordinates. They are handed to Python via
-//! `pythonize`. They are deliberately **not** behind the `python` feature so the
-//! pure `format_mthds_impl` / `lint_mthds_impl` can be unit-tested without a
-//! Python interpreter.
+//! codespan-style line/column coordinates. Every binding serializes them as-is
+//! (`pythonize` in `pipelex-py`, `serde-wasm-bindgen` in `pipelex-tools-wasm`),
+//! so serde's snake_case field names ARE the wire contract.
 
 use serde::Serialize;
 use taplo::rowan::TextRange;
 
-// ⚠️ PUBLIC PYTHON SURFACE — these variants are serialized lowercase into each
-// diagnostic's `kind`; mirror any change in `pipelex_tools.pyi` (`Diagnostic.kind`).
+// ⚠️ PUBLIC BINDING SURFACE — these variants are serialized lowercase into each
+// diagnostic's `kind`; mirror any change in `pipelex_tools.pyi`
+// (`Diagnostic.kind`) and in `js/tools-wasm`'s `DiagnosticKind` TS type.
 /// Which validation stage produced a diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -24,8 +24,9 @@ pub enum DiagnosticKind {
     Schema,
 }
 
-// ⚠️ PUBLIC PYTHON SURFACE — serialized into each diagnostic's `range`; mirror
-// any field change in `pipelex_tools.pyi` (`Range`).
+// ⚠️ PUBLIC BINDING SURFACE — serialized into each diagnostic's `range`; mirror
+// any field change in `pipelex_tools.pyi` (`Range`) and in `js/tools-wasm`'s
+// `DiagnosticRange` TS type.
 /// A source range, as both raw byte offsets and 1-based codespan-style
 /// line/column coordinates. Coordinates match the `plxt` CLI exactly (the
 /// offset→line/col mapping is replicated from the CLI; see
@@ -59,13 +60,15 @@ impl Range {
     }
 }
 
-// ⚠️ PUBLIC PYTHON SURFACE — serialized into the Python diagnostic dicts via
-// `pythonize`; mirror any field change in `pipelex_tools.pyi` (`Diagnostic`).
+// ⚠️ PUBLIC BINDING SURFACE — serialized into the Python diagnostic dicts via
+// `pythonize` and into JS objects via `serde-wasm-bindgen`; mirror any field
+// change in `pipelex_tools.pyi` (`Diagnostic`) and in `js/tools-wasm`'s
+// `Diagnostic` TS type.
 /// A single lint/format diagnostic.
 ///
 /// Field names are kept neutral — the `pipelex-api` repo owns the wire contract
 /// and will `model_validate` these. `location` and `range` are always present
-/// (as `null` when absent) so the Python shape is stable.
+/// (as `null` when absent) so the serialized shape is stable.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Diagnostic {
     pub kind: DiagnosticKind,

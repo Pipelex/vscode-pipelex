@@ -12,8 +12,8 @@ exported surface you MUST update this stub in the same commit.** Map of what
 mirrors what:
 
   - ``format_mthds`` / ``lint_mthds`` signatures  → ``src/python.rs``
-  - ``Diagnostic`` / ``Range`` / kind values      → ``src/diagnostic.rs``
-  - ``format_mthds`` return fields                 → ``src/format.rs`` (``FormatOutcome``)
+  - ``Diagnostic`` / ``Range`` / kind values      → ``pipelex-common/src/tools/diagnostic.rs``
+  - ``format_mthds`` return fields                 → ``pipelex-common/src/tools/format.rs`` (``FormatOutcome``)
   - ``lint_mthds`` return field                    → ``src/python.rs`` (``LintOutput``)
 
 Keys come from ``#[derive(Serialize)]`` field names handed to Python via
@@ -23,18 +23,25 @@ breaking change to these dict shapes.
 
 from typing import Literal, Optional, TypedDict
 
+# ``__all__`` mirrors the module's *runtime* export surface, which is only the
+# two functions (see ``src/python.rs::pipelex_tools``). The ``Diagnostic`` /
+# ``Range`` / ``FormatResult`` / ``LintResult`` TypedDicts below are
+# **type-checking-only** — defined here so downstream code can annotate against
+# the return shapes (typically under an ``if TYPE_CHECKING:`` import), but they
+# are NOT runtime exports of the compiled module. ``from pipelex_tools import
+# FormatResult`` type-checks but raises ``ImportError`` at runtime; leaving them
+# out of ``__all__`` keeps the advertised runtime surface honest. A
+# ``tests/test_smoke.py`` guard asserts this list equals the module's runtime
+# ``__all__``.
 __all__ = [
     "format_mthds",
     "lint_mthds",
-    "Diagnostic",
-    "Range",
-    "FormatResult",
-    "LintResult",
 ]
 
 class Range(TypedDict):
-    """Mirror of ``Range`` in ``src/diagnostic.rs`` — byte offsets plus 1-based
-    codespan-style line/column coordinates (matching the ``plxt`` CLI)."""
+    """Mirror of ``Range`` in ``pipelex-common/src/tools/diagnostic.rs`` — byte
+    offsets plus 1-based codespan-style line/column coordinates (matching the
+    ``plxt`` CLI)."""
 
     start_offset: int
     end_offset: int
@@ -44,7 +51,8 @@ class Range(TypedDict):
     end_col: int
 
 class Diagnostic(TypedDict):
-    """Mirror of ``Diagnostic`` (+ ``DiagnosticKind``) in ``src/diagnostic.rs``.
+    """Mirror of ``Diagnostic`` (+ ``DiagnosticKind``) in
+    ``pipelex-common/src/tools/diagnostic.rs``.
 
     ``kind`` is the serde ``rename_all = "lowercase"`` form of ``DiagnosticKind``.
     ``location`` and ``range`` are always present (``None`` when absent) so the
@@ -58,7 +66,8 @@ class Diagnostic(TypedDict):
     range: Optional[Range]  # None for semantic/schema errors with no position
 
 class FormatResult(TypedDict):
-    """Mirror of ``FormatOutcome`` in ``src/format.rs`` — the ``format_mthds`` return."""
+    """Mirror of ``FormatOutcome`` in ``pipelex-common/src/tools/format.rs`` —
+    the ``format_mthds`` return."""
 
     formatted: str
     changed: bool

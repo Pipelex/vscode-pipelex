@@ -38,21 +38,13 @@ pub async fn prepare_rename<E: Environment>(
 
     let query = Query::at(&doc.dom, offset);
 
-    let position_info = match query.before.clone().and_then(|p| {
-        if p.syntax.kind() == SyntaxKind::IDENT {
-            Some(p)
-        } else {
-            None
-        }
-    }) {
+    let position_info = match query
+        .before
+        .clone()
+        .filter(|p| p.syntax.kind() == SyntaxKind::IDENT)
+    {
         Some(before) => before,
-        None => match query.after.and_then(|p| {
-            if p.syntax.kind() == SyntaxKind::IDENT {
-                Some(p)
-            } else {
-                None
-            }
-        }) {
+        None => match query.after.filter(|p| p.syntax.kind() == SyntaxKind::IDENT) {
             Some(after) => after,
             None => return Ok(None),
         },
@@ -92,21 +84,17 @@ pub async fn rename<E: Environment>(
 
     let query = Query::at(&doc.dom, offset);
 
-    let position_info = match query.before.clone().and_then(|p| {
-        if p.syntax.kind() == SyntaxKind::IDENT {
-            Some(p)
-        } else {
-            None
-        }
-    }) {
+    let position_info = match query
+        .before
+        .clone()
+        .filter(|p| p.syntax.kind() == SyntaxKind::IDENT)
+    {
         Some(before) => before,
-        None => match query.after.clone().and_then(|p| {
-            if p.syntax.kind() == SyntaxKind::IDENT {
-                Some(p)
-            } else {
-                None
-            }
-        }) {
+        None => match query
+            .after
+            .clone()
+            .filter(|p| p.syntax.kind() == SyntaxKind::IDENT)
+        {
             Some(after) => after,
             None => return Ok(None),
         },

@@ -127,10 +127,14 @@
         "landscape_3_2",
         "landscape_16_9",
         "landscape_21_9",
+        "landscape_4_1",
+        "landscape_8_1",
         "portrait_3_4",
         "portrait_2_3",
         "portrait_9_16",
-        "portrait_9_21"
+        "portrait_9_21",
+        "portrait_1_4",
+        "portrait_1_8"
       ],
       "title": "AspectRatio",
       "type": "string"
@@ -522,6 +526,28 @@
       "title": "ImageFormat",
       "type": "string"
     },
+    "ImageSize": {
+      "properties": {
+        "width": {
+          "exclusiveMinimum": true,
+          "title": "Width",
+          "type": "integer",
+          "minimum": 0
+        },
+        "height": {
+          "exclusiveMinimum": true,
+          "title": "Height",
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "ImageSize",
+      "type": "object"
+    },
     "ImgGenSetting": {
       "additionalProperties": false,
       "properties": {
@@ -569,9 +595,16 @@
           "title": "Guidance Scale"
         },
         "is_moderated": {
-          "default": false,
-          "title": "Is Moderated",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Is Moderated"
         },
         "safety_tolerance": {
           "anyOf": [
@@ -1224,6 +1257,25 @@
           ],
           "default": null
         },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SizeTier"
+            },
+            {
+              "pattern": "^([1-9]\\d*)x([1-9]\\d*)$",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ImageSize"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size"
+        },
         "is_raw": {
           "anyOf": [
             {
@@ -1445,18 +1497,6 @@
           "default": false,
           "title": "Add Each Output",
           "type": "boolean"
-        },
-        "combined_output": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Combined Output"
         }
       },
       "required": [
@@ -1667,14 +1707,6 @@
       "additionalProperties": false,
       "description": "Contract-only pipe blueprint.\n\nA `PipeSignature` declares inputs and output but has no implementation. It exists so\nthat an in-progress pipeline can be validated (dry-run mocks the declared output)\nbefore all its pipes are implemented.",
       "properties": {
-        "type": {
-          "default": "PipeSignature",
-          "title": "Type",
-          "type": "string",
-          "enum": [
-            "PipeSignature"
-          ]
-        },
         "description": {
           "title": "Description",
           "type": "string"
@@ -1713,8 +1745,7 @@
       },
       "required": [
         "description",
-        "output",
-        "type"
+        "output"
       ],
       "title": "PipeSignatureBlueprint",
       "type": "object"
@@ -1792,8 +1823,7 @@
         "PipeBatch",
         "PipeCondition",
         "PipeParallel",
-        "PipeSequence",
-        "PipeSignature"
+        "PipeSequence"
       ],
       "title": "PipeType",
       "type": "string"
@@ -1888,6 +1918,17 @@
       ],
       "title": "SearchSetting",
       "type": "object"
+    },
+    "SizeTier": {
+      "description": "Portable image size classes.\n\nA tier promises a pixel class at the pipe's chosen aspect ratio, not identical\npixel dimensions across providers: each provider maps the tier to its own grid\nor computed dimensions.",
+      "enum": [
+        "0.5k",
+        "1k",
+        "2k",
+        "4k"
+      ],
+      "title": "SizeTier",
+      "type": "string"
     },
     "SpecialOutcome": {
       "enum": [
@@ -2075,7 +2116,7 @@
     }
   },
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "$comment": "Generated from PipelexBundleBlueprint v0.31.0. Do not edit manually.",
+  "$comment": "Generated from PipelexBundleBlueprint v0.38.0. Do not edit manually.",
   "x-taplo": {
     "initKeys": [
       "domain"

@@ -2,7 +2,7 @@
 
 `pipelex_tools` is an importable Python library that exposes MTHDS **lint** and **format** as in-process functions, so a Python host (e.g. the `pipelex-api` FastAPI server) can validate and format `.mthds` content without shelling out to the `plxt` binary. It is a thin PyO3 wrapper around the same `taplo`/`taplo-common` engine the `plxt` CLI uses, so the library and the binary cannot drift (enforced by parity tests — see [Testing](#testing)).
 
-The bindings live in the `crates/pipelex-py` crate (Python module name `pipelex_tools`, published as the `pipelex-tools-py` wheel).
+The bindings live in the `crates/pipelex-py` crate (Python module name `pipelex_tools`, published as the `pipelex-tools-py` wheel). The lint/format engine itself lives in `crates/pipelex-common` (the `tools` module, behind the `tools` cargo feature) — `pipelex-py` re-exports it and adds only the PyO3 glue. The same shared engine backs the `@pipelex/tools-wasm` npm package, so the two bindings agree by construction — see [`mthds-engine-bindings.md`](mthds-engine-bindings.md) for the full multi-binding picture.
 
 ## Two packages, one repo
 
@@ -90,20 +90,22 @@ The line/column coordinates match the `plxt` CLI exactly. The `pipelex-api` repo
 
 The stub is hand-written at `crates/pipelex-py/pipelex_tools.pyi` (alongside a `py.typed` marker). When maturin finds it, it builds the wheel as a PEP 561 **package** — `pipelex_tools/{__init__.py, __init__.pyi, py.typed, *.abi3.so}` — placing the marker inside the package where PEP 561 wants it. The import surface is unchanged: `import pipelex_tools` / `pipelex_tools.format_mthds(...)` work exactly as before, because maturin's generated `__init__.py` re-exports from the compiled submodule. (Verified: a built wheel resolves `format_mthds(...)` to `FormatResult` under mypy, and the smoke suite passes against the installed package.)
 
-**The stub is a hand-maintained mirror — nothing enforces it against the Rust at compile time.** If you change the exported surface, update the stub in the same commit. The Rust definitions that feed it carry `⚠️ PUBLIC PYTHON SURFACE` markers (grep for them) pointing back to the stub:
+**Runtime exports vs. type-check-only symbols.** Only `format_mthds` and `lint_mthds` are *runtime* exports of the compiled module. `Diagnostic`, `Range`, `FormatResult`, and `LintResult` are `TypedDict`s that exist **only in the stub** — they describe the dict shapes the two functions return, for static typing and editor autocomplete. They are *not* importable at runtime: `from pipelex_tools import FormatResult` type-checks but raises `ImportError`, so downstream code that annotates against them must import under `if TYPE_CHECKING:`. To keep the advertised surface honest, `src/python.rs`'s `#[pymodule]` defines a real runtime `__all__ = ["format_mthds", "lint_mthds"]` (maturin's generated `__init__.py` propagates it up to the package via its `if hasattr(...__all__)` branch — without it the package would have *no* `__all__` at all), and the stub's `__all__` is narrowed to match (the TypedDicts stay defined in the stub for `TYPE_CHECKING` use but are omitted from `__all__`). `tests/test_smoke.py` guards both directions: the runtime `__all__` equals the two functions and every name resolves, and the four TypedDicts are absent at runtime.
+
+**The stub is a hand-maintained mirror — nothing enforces it against the Rust at compile time.** If you change the exported surface, update the stub in the same commit. The Rust definitions that feed it carry `⚠️ PUBLIC PYTHON SURFACE` / `⚠️ PUBLIC BINDING SURFACE` markers (grep for them) pointing back to the stub:
 
 | Stub symbol | Rust source |
 | --- | --- |
-| `format_mthds` / `lint_mthds` signatures | `src/python.rs` |
-| `Diagnostic`, `Range`, `kind` values | `src/diagnostic.rs` |
-| `FormatResult` (the `format_mthds` return) | `src/format.rs` (`FormatOutcome`) |
-| `LintResult` (the `lint_mthds` return) | `src/python.rs` (`LintOutput`) |
+| `format_mthds` / `lint_mthds` signatures | `crates/pipelex-py/src/python.rs` |
+| `Diagnostic`, `Range`, `kind` values | `crates/pipelex-common/src/tools/diagnostic.rs` |
+| `FormatResult` (the `format_mthds` return) | `crates/pipelex-common/src/tools/format.rs` (`FormatOutcome`) |
+| `LintResult` (the `lint_mthds` return) | `crates/pipelex-py/src/python.rs` (`LintOutput`) |
 
 ## Testing
 
 The surface is covered at three levels:
 
-1. **Rust unit** (`cargo test -p pipelex-py`) — the pure `format_mthds_impl` / `lint_mthds_impl` (which return `#[derive(Serialize)]` structs) tested without a Python interpreter: every reachable diagnostic path (format known-good / syntax-error / baked-default / caller-override / line-col mapping; lint clean / syntax / semantic / schema-with-location / offline).
+1. **Rust unit** (`cargo test -p pipelex-common --features tools`) — the pure `format_mthds_impl` / `lint_mthds_impl` (which return `#[derive(Serialize)]` structs) tested without a Python interpreter, in the shared engine's home crate: every reachable diagnostic path (format known-good / syntax-error / baked-default / caller-override / line-col mapping; lint clean / syntax / semantic / schema-with-location / offline). `cargo test -p pipelex-py` additionally guards the re-export wiring.
 2. **Rust parity** (`crates/pipelex-cli/tests/parity.rs`) — the in-process library output must match the shipped `plxt` binary (`plxt fmt -` / `plxt lint -`) on the `test-data/mthds` corpus, so the two can't drift. It lives in `pipelex-cli` (not `pipelex-py`) because only the bin-owning crate gets `CARGO_BIN_EXE_plxt`; `pipelex-py` is a pure-Rust dev-dependency there.
 3. **Python e2e from the built wheel** (`crates/pipelex-py/tests/test_smoke.py`) — `pip install pipelex-tools-py`, then exercise the *shipped* module asserting on the structured `diagnostics`. Run locally via `make pipelex-lib-smoke`, and in CI on every release OS (incl. Windows, where abi3 linking differs) by the `pypi_test_pipelex_lib` job.
 

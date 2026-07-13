@@ -7,6 +7,21 @@ authors      = { workspace = true }
 edition      = { workspace = true }
 license      = { workspace = true }
 
+[features]
+# The shared MTHDS lint/format engine (`tools` module) — the single impl behind
+# the `pipelex-tools-py` wheel and the `@pipelex/tools-wasm` npm package.
+# `taplo-common/schema` has no reqwest-free build (`Schemas` holds an
+# `Option<reqwest::Client>` unconditionally), so `reqwest` must ride along; the
+# engine never constructs a client (`http: None`), keeping it provably offline.
+# `rustls-tls` rides along too, matching the feature set the wheel has always
+# shipped with (it is unused dead code on this path, like reqwest itself).
+tools = [
+  "dep:serde",
+  "taplo-common/reqwest",
+  "taplo-common/rustls-tls",
+  "taplo-common/schema",
+]
+
 [dependencies]
 taplo        = { version = "0.14.0", path = "../taplo", features = ["serde"] }
 taplo-common = { version = "0.6.0", path = "../taplo-common" }
@@ -14,6 +29,7 @@ taplo-common = { version = "0.6.0", path = "../taplo-common" }
 anyhow      = { workspace = true }
 async-trait = { workspace = true }
 futures     = { workspace = true }
+serde       = { workspace = true, features = ["derive"], optional = true }
 time        = { workspace = true }
 tracing     = { workspace = true }
 url         = { workspace = true }

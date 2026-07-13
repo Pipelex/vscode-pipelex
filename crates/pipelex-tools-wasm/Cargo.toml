@@ -1,0 +1,34 @@
+[package]
+name         = "pipelex-tools-wasm"
+description  = "WASM bindings for Pipelex Tools — MTHDS lint & format for Node/hook consumption"
+version      = "0.1.0"
+publish      = false
+rust-version = { workspace = true }
+authors      = { workspace = true }
+edition      = { workspace = true }
+license      = { workspace = true }
+homepage     = { workspace = true }
+repository   = { workspace = true }
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# The shared lint/format engine; this crate is only the wasm-bindgen glue over
+# it. Deliberately NO taplo-lsp / lsp-async-stub / clap / CLI deps — shedding
+# that baggage (vs `pipelex-wasm`) is the whole point of this crate.
+pipelex-common = { path = "../pipelex-common", features = ["tools"] }
+
+console_error_panic_hook = { version = "0.1.7" }
+# ahash (via taplo-common) seeds its hashers from getrandom, which needs the
+# `js` backend on wasm32-unknown-unknown.
+getrandom  = { workspace = true, features = ["js"] }
+serde      = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+# Bump together with pipelex-wasm/taplo-wasm since it's a monorepo
+serde-wasm-bindgen = { version = "0.6.5" }
+wasm-bindgen       = { version = "0.2.95" }
+
+[lints]
+workspace = true

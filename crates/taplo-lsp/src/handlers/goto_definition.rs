@@ -284,10 +284,16 @@ fn pipe_node(dom: &Node, pipe_name: &str) -> Option<Node> {
 }
 
 fn pipe_definition_is_signature(node: &Node) -> bool {
-    node.get("type")
-        .as_str()
-        .map(|s| s.value() == "PipeSignature")
-        .unwrap_or(false)
+    let Some(table) = node.as_table() else {
+        return false;
+    };
+    match table.get("type") {
+        Some(type_node) => type_node
+            .as_str()
+            .map(|s| s.value() == "PipeSignature")
+            .unwrap_or(false),
+        None => true,
+    }
 }
 
 fn document_domain(dom: &Node) -> Option<String> {
@@ -339,10 +345,42 @@ mod tests {
     }
 
     #[test]
+    fn prefers_concrete_definition_over_typeless_signature() {
+        let signature = pipe_definition(
+            "file:///project/bundle.mthds",
+            "domain = \"rec\"\n[pipe.screen]\ndescription = \"Screen contract\"\noutput = \"Image\"\n",
+            "screen",
+        );
+        let concrete = pipe_definition(
+            "file:///project/screen.mthds",
+            "domain = \"rec\"\n[pipe.screen]\ntype = \"PipeSequence\"\n",
+            "screen",
+        );
+
+        let selected =
+            select_preferred_pipe_definition(vec![signature, concrete], Some("rec")).unwrap();
+
+        assert_eq!(selected.uri.as_str(), "file:///project/screen.mthds");
+    }
+
+    #[test]
     fn falls_back_to_first_signature_when_no_concrete_exists() {
         let signature = pipe_definition(
             "file:///project/bundle.mthds",
             "domain = \"rec\"\n[pipe.screen]\ntype = \"PipeSignature\"\n",
+            "screen",
+        );
+
+        let selected = select_preferred_pipe_definition(vec![signature], Some("rec")).unwrap();
+
+        assert_eq!(selected.uri.as_str(), "file:///project/bundle.mthds");
+    }
+
+    #[test]
+    fn falls_back_to_typeless_signature_when_no_concrete_exists() {
+        let signature = pipe_definition(
+            "file:///project/bundle.mthds",
+            "domain = \"rec\"\n[pipe.screen]\ndescription = \"Screen contract\"\noutput = \"Image\"\n",
             "screen",
         );
 

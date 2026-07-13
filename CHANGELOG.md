@@ -1,5 +1,23 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.14.0] - 2026-07-13
+
+### Added
+ - **`@pipelex/tools-wasm` npm package**: A lean, fully offline WASM binding exposing `lintMthds`/`formatMthds` to Node consumers — no HTTP, filesystem, or config discovery, and small enough to vendor inside a plugin hook bundle, unlike `@pipelex/lsp` which carries the whole language server. Emits the same `Diagnostic` wire shape as `pipelex-tools-py` and the Pipelex API's `/v1/lint`/`/v1/format`, with the same snake_case format-option keys as `plxt fmt -o key=value`. Built from a new `crates/pipelex-tools-wasm` crate, packaged in `js/tools-wasm`, wired into `make test`/`make check`, and published manually via `publish-tools-wasm.sh`. (@pipelex/tools-wasm 0.1.0)
+ - **Shared lint/format engine**: Hoisted the MTHDS lint/format implementation out of `pipelex-py` into a new `pipelex_common::tools` module, giving `pipelex-tools-py` and `@pipelex/tools-wasm` a single shared engine (parity guarded by the parity corpus and wheel smoke tests). `plxt` itself is unaffected — it still delegates `fmt`/`lint`/`get` to `taplo-cli` unchanged. (pipelex-tools-py 0.1.3)
+ - **Documentation**: Added `docs/dev/mthds-engine-bindings.md` describing the multi-binding engine architecture (plxt CLI / `pipelex-tools-py` / `@pipelex/lsp` / `@pipelex/tools-wasm` — one impl, several bindings, parity by construction), and rewrote the `@pipelex/lsp` README, which still carried upstream `@taplo/cli` boilerplate, to describe the actual package and clarify when to use it versus `@pipelex/tools-wasm`. (@pipelex/lsp 0.2.0)
+
+### Changed
+ - **Typeless pipe declarations**: A pipe declared without an explicit `type` field is now treated as an implicit `PipeSignature`, matching the schema's typeless authoring support. Fixes Go to Definition and the extension's cross-file bundle resolution to still prefer a concrete implementation when one exists, and still find the declaration when none does. (plxt 0.7.2)
+ - **MTHDS schema updated to `v0.38.0`**: Refreshed the bundled offline schema for typeless `PipeSignature` authoring, `PipeParallel`'s always-combined declared `output`, first-class optional presence markers, and new `ImageSize`/`SizeTier` definitions. This local copy is intentionally ahead of hosted `mthds.ai` until the docs site is redeployed with the new schema. (plxt 0.7.2, pipelex-tools-py 0.1.3)
+ - **Native concept hovers**: The LSP's native concept registry now matches the current language surface — adds `YesNo`, `Date`, `SearchResult`, and `Composite`, and drops the removed `ImgGenPrompt`.
+ - **`pipelex-tools-py` exports narrowed**: `__all__` now advertises only the runtime functions (`format_mthds`, `lint_mthds`). **Breaking:** `Diagnostic`, `Range`, `FormatResult`, and `LintResult` leave `__all__` — they're type-checking-only `TypedDict`s and must be imported under `if TYPE_CHECKING:`. No runtime consumer is affected; they were never importable at runtime. (pipelex-tools-py 0.1.3)
+
+### Fixed
+ - **Upstream `taplo`/`taplo-lsp` clippy warnings**: Fixed Rust 1.97 clippy lints (redundant references, manual `Option::filter` patterns, `match`-to-`?` conversions) that broke the `make check` gate under CI's unpinned stable Rust. (plxt 0.7.2, pipelex-tools-py 0.1.3)
+ - **Upstream `taplo-common` no-TLS compilation**: `get_certs`'s non-TLS fallback took `OsString` by value while the shared call site passes a reference, breaking any reqwest-without-TLS build. Now takes `&OsString` like the TLS variant. (plxt 0.7.2, pipelex-tools-py 0.1.3)
+ - **CI**: `test-all.yml` now installs the `wasm32-unknown-unknown` target, which `make test` needs to build the `@pipelex/tools-wasm` bundle.
+
 ## [0.13.0] - 2026-06-30
 
 ### Changed
