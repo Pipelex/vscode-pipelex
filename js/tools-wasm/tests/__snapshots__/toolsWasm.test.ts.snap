@@ -1,0 +1,1053 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`corpus snapshots (committed expected outputs) > format concept-tables.mthds 1`] = `
+{
+  "changed": true,
+  "diagnostics": [],
+  "formatted": "# Test: Concept table header variations
+# Covers: [concept], [concept.Name], [concept.Name.structure], generic tables
+
+domain      = "test_concept-tables"
+description = "Test fixture for concept tables"
+
+[concept]
+Name = "Description"
+
+[concept.FeatureAnalysis]
+description = "Analysis of features"
+
+[concept.FeatureAnalysis.structure]
+field       = { type = "text", required = true }
+description = "A plain text field"
+nested_ref  = { type = "text", description = "Nested field definition" }
+
+# Namespaced concept in refines
+[concept.ImagePrompt]
+description = "A prompt for image generation"
+refines     = "images.ImgGenPrompt"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format false-positives.mthds 1`] = `
+{
+  "changed": true,
+  "diagnostics": [],
+  "formatted": "# Test: Ensure plain strings are NOT colored as Jinja/HTML/injections
+# Covers: literal strings (no MTHDS patterns), plain definition values, structure fields
+
+domain      = "test_false-positives"
+description = "Test fixture for false positives"
+
+[concept.PlainText]
+description = "A simple text concept with words that could false-match"
+remark      = "The variable foo should not be colored"
+
+# Literal strings must NOT match @injection or $template or {{ jinja }}
+note = 'Literal string: @not_injection $not_template {{ not_jinja }}'
+multiline_literal = '''
+@also_not_injection
+$also_not_template
+{% not_jinja %}
+<not_html>
+'''
+
+# Structure fields with type = "text" should NOT get pipe-type coloring
+[concept.PlainText.structure]
+field_a = { type = "text", required = true }
+field_b = { type = "text", description = "A plain text field" }
+
+# Boolean and number values
+enabled = true
+count   = 42
+ratio   = 3.14
+hex_val = 0xFF
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/concept_inputs_inline.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "test_concept_inputs_inline"
+description = "Test fixture for concept inputs inline"
+
+[concept.FeatureAnalysis]
+description = "Feature analysis"
+
+[pipe.my_pipe]
+inputs = { photo = "FeatureAnalysis" }
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/concept_output.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "test_concept_output"
+description = "Test fixture for concept output"
+
+[concept.DocumentAnalysis]
+description = "Analysis"
+
+[pipe.analyze]
+output = "DocumentAnalysis"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/concept_refines.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "test_concept_refines"
+description = "Test fixture for concept refines"
+
+[concept.Base]
+description = "Base concept"
+
+[concept.Child]
+refines = "Base"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/concept_with_multiplicity.mthds 1`] = `
+{
+  "changed": true,
+  "diagnostics": [],
+  "formatted": "domain      = "test"
+description = "Test concept reference with multiplicity suffix"
+
+[concept.Slide]
+description = "A slide"
+
+[pipe.extract]
+type   = "PipeLLM"
+output = "Slide[]"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/document_comparison.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "document_comparison"
+description = "Extract and compare two PDF documents, producing a structured comparison report"
+main_pipe   = "compare_documents"
+
+[concept.DocumentAnalysis]
+description = "Structured analysis of a document's key content"
+
+[concept.DocumentAnalysis.structure]
+title      = { type = "text", description = "Document title or identifier", required = true }
+key_points = { type = "text", description = "Main points and arguments", required = true }
+structure  = { type = "text", description = "Document structure and organization", required = true }
+tone       = { type = "text", description = "Writing tone and style" }
+
+[concept.ComparisonReport]
+description = "Detailed comparison between two documents"
+
+[concept.ComparisonReport.structure]
+similarities     = { type = "text", description = "Key similarities between the documents", required = true }
+differences      = { type = "text", description = "Key differences between the documents", required = true }
+unique_to_first  = { type = "text", description = "Points unique to the first document", required = true }
+unique_to_second = { type = "text", description = "Points unique to the second document", required = true }
+recommendation   = { type = "text", description = "Overall assessment and recommendation", required = true }
+
+[pipe.compare_documents]
+type = "PipeSequence"
+description = "Main pipeline: extract both documents in parallel, analyze them, compare, and produce a report"
+inputs = { doc_a = "Document", doc_b = "Document" }
+output = "Html"
+steps = [
+  { pipe = "extract_both", result = "extracted" },
+  { pipe = "analyze_both", result = "analyzed" },
+  { pipe = "compare_analyses", result = "comparison" },
+  { pipe = "render_comparison_report", result = "report_html" },
+]
+
+[pipe.analyze_doc_a]
+type = "PipeLLM"
+description = "Analyze the first document's content"
+inputs = { pages_a = "Page" }
+output = "DocumentAnalysis"
+model = "$retrieval"
+system_prompt = "You are a document analysis expert. Extract structured information from documents."
+prompt = """
+Analyze the following document and extract its key information:
+
+@pages_a
+"""
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/extract_slides.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "extract_slides"
+description = "The domain of extracting slides from documents"
+main_pipe   = "extract_slides"
+
+[concept]
+[concept.Slide]
+description = "A slide from a presentation"
+[concept.Slide.structure]
+title = { type = "text", description = "The title of the slide" }
+
+[pipe]
+
+[pipe.extract_slides]
+type = "PipeSequence"
+description = "Extract markdown from a document"
+inputs = { document = "Document" }
+output = "Text"
+steps = [
+  { pipe = "describe_slide", result = "slides" },
+]
+
+[pipe.describe_slide]
+type        = "PipeLLM"
+description = "Describe a slide"
+inputs      = { page = "Page" }
+output      = "Slide"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/namespaced_concept.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "test_namespaced_concept"
+description = "Test fixture for namespaced concept"
+
+[pipe.my_pipe]
+output = "images.Photo"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/pipe_reference.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "test_pipe_reference"
+description = "Test fixture for pipe reference"
+
+[pipe.my_pipe]
+description = "A pipe"
+
+[pipe.other]
+pipe = "my_pipe"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/unrelated_key.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "test_unrelated_key"
+description = "Test fixture for unrelated key"
+
+[pipe.my_pipe]
+description = "SomeString"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format hover/concept_hover.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "hover_test"
+description = "Test fixture for concept hover"
+
+[concept.Base]
+description = "A base concept"
+
+[concept.Analysis]
+description = "Structured analysis output"
+refines     = "Base"
+
+[concept.Analysis.structure]
+summary = { type = "text", required = true }
+details = { type = "text" }
+score   = { type = "number" }
+
+[pipe.analyze]
+type        = "PipeLLM"
+description = "Run analysis"
+output      = "Analysis"
+prompt      = "Analyze this."
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format hover/pipe_hover.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "hover_test"
+description = "Test fixture for pipe hover"
+main_pipe   = "run_analysis"
+
+[concept.Report]
+description = "A generated report"
+
+[concept.Report.structure]
+title   = { type = "text", required = true }
+content = { type = "text", required = true }
+
+[pipe.run_analysis]
+type = "PipeLLM"
+description = "Analyze input and produce a report"
+inputs = { doc = "Document", query = "Text" }
+output = "Report"
+model = "$default"
+prompt = """
+Analyze the document and answer the query.
+
+@doc
+@query
+"""
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format jinja-templates.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "# Test: Jinja2 templates with HTML, filters, control flow
+# Covers: jinja2 block strings, {% %}, {{ }}, {# #}, HTML tags, attributes
+
+domain      = "test_jinja-templates"
+description = "Test fixture for jinja templates"
+
+[pipe.format]
+type = "PipeJinja2"
+description = "Format items into HTML"
+inputs = { items = "ItemList", title = "Text" }
+output = "HtmlOutput"
+jinja2 = """
+{% for item in items %}
+  <h2>{{ item.title }}</h2>
+  <p>{{ item.body | truncate(200) }}</p>
+{% endfor %}
+<!-- end of items -->
+"""
+
+# Jinja with complex filters and conditionals
+[pipe.filter_content]
+type = "PipeJinja2"
+description = "Filter and format content"
+inputs = { channel_summaries = "ChannelSummary" }
+output = "HtmlNewsletter"
+jinja2 = """
+{# Main content section #}
+{% set regular_channels = channel_summaries.content.items | selectattr('category', 'equalto', 'Share') | list | sort(attribute='position') %}
+{% if regular_channels %}
+  {% for channel in regular_channels %}
+    <h2>{{ channel.channel_name }}</h2>
+    <div class="summary">
+      {% for item in channel.summary_items_as_html %}
+        <p>{{ item }}</p>
+      {% endfor %}
+    </div>
+  {% endfor %}
+{% endif %}
+"""
+
+# Single-line jinja2
+[pipe.inline_format]
+type   = "PipeJinja2"
+jinja2 = "{{ title | upper }}: {{ body }}"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format lint/invalid_schema.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "test_lint_invalid"
+description = "An MTHDS file with schema errors for lint tests"
+
+[concept]
+
+[concept.Greeting]
+description = "A simple greeting"
+
+[pipe]
+
+[pipe.bad_pipe]
+type        = "UnknownPipeType"
+description = "This pipe has an invalid type"
+output      = "Greeting"
+model       = "$default"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format lint/valid.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "test_lint"
+description = "A minimal valid MTHDS file for lint tests"
+
+[concept]
+
+[concept.Greeting]
+description = "A simple greeting"
+
+[pipe]
+
+[pipe.say_hello]
+type        = "PipeLLM"
+description = "Generate a greeting"
+output      = "Greeting"
+model       = "$default"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format pipe-definitions.mthds 1`] = `
+{
+  "changed": true,
+  "diagnostics": [],
+  "formatted": "# Test: Pipe table headers, type entries, model entries, inputs/output
+# Covers: [pipe], [pipe.name], type, output, model, inputs (single-line)
+
+domain      = "test_pipe-definitions"
+description = "Test fixture for pipe definitions"
+
+[pipe]
+
+[pipe.analyze_features]
+type        = "PipeLLM"
+description = "Analyze features"
+inputs      = { photo = "native.Image" }
+output      = "FeatureAnalysis"
+model       = "$gpt-4o"
+
+[pipe.create_prompt]
+type        = "PipeLLM"
+description = "Create a prompt for image generation"
+inputs      = { opposite_concept = "OppositeConcept" }
+output      = "ImagePrompt"
+model       = "@my-alias"
+
+[pipe.generate_image]
+type        = "PipeImgGen"
+description = "Generate the image"
+inputs      = { image_prompt = "ImagePrompt" }
+output      = "images.Photo"
+model       = "~waterfall"
+
+[pipe.simple_gen]
+type        = "PipeLLM"
+description = "Simple generation"
+output      = "Text"
+model       = "claude-3-opus"
+
+# Multi-input pipe
+[pipe.combine_data]
+type        = "PipeLLM"
+description = "Combine multiple data sources"
+inputs      = { a = "TypeA", b = "TypeB", c = "native.TypeC" }
+output      = "CombinedResult"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format prompt-templates.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "# Test: Prompt templates with data injection and template variables
+# Covers: prompt_template block strings, @injection, $template_variable
+
+domain      = "test_prompt-templates"
+description = "Test fixture for prompt templates"
+
+[pipe.ask]
+type = "PipeLLM"
+description = "Analyze input data using a template"
+inputs = { input_data = "RawData" }
+output = "Analysis"
+prompt_template = """
+Analyze this:
+@input_data
+
+Using template: $template_name
+
+Be concise.
+"""
+
+# Prompt with multiple injections
+[pipe.compare]
+type = "PipeLLM"
+description = "Compare two items"
+inputs = { item_a = "ItemA", item_b = "ItemB" }
+output = "Comparison"
+prompt_template = """
+Compare these two items:
+
+First item:
+@item_a
+
+Second item:
+@item_b
+
+$comparison_format
+"""
+
+# Single-line prompt_template
+[pipe.simple_ask]
+type            = "PipeLLM"
+prompt_template = "Summarize: @document"
+
+# Prompt with dotted variable names
+[pipe.nested_ref]
+type = "PipeLLM"
+prompt_template = """
+@context.details
+$output.format
+"""
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format steps.mthds 1`] = `
+{
+  "changed": true,
+  "diagnostics": [],
+  "formatted": "# Test: Step objects with pipe references, result, batch_over, batch_as
+# Covers: pipe = "name" in inline tables, result/batch_as/batch_over variables
+
+domain      = "test_steps"
+description = "Test fixture for steps"
+
+[pipe.sequence]
+type = "PipeSequence"
+description = "A multi-step pipeline"
+inputs = { data = "InputData" }
+output = "FinalResult"
+steps = [
+  { pipe = "step_one", result = "first_result" },
+  { pipe = "step_two", batch_over = "items", batch_as = "item", result = "second_result" },
+  { pipe = "step_three", result = "final_output" },
+]
+
+# Condition pipe with pipe_map
+[pipe.condition]
+type              = "PipeCondition"
+description       = "Route based on condition"
+inputs            = { data = "InputData" }
+output            = "OutputData"
+expression        = "data.category"
+pipe_map          = { "type_a" = "handle_type_a", "type_b" = "handle_type_b" }
+default_pipe_code = "handle_default"
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint concept-tables.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "concept",
+    "message": "'concept' does not match any of the allowed schemas",
+    "range": {
+      "end_col": 35,
+      "end_line": 21,
+      "end_offset": 628,
+      "start_col": 14,
+      "start_line": 21,
+      "start_offset": 607,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint false-positives.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "concept.PlainText",
+    "message": "Additional properties are not allowed ('remark', 'note', 'multiline_literal' were unexpected)",
+    "range": {
+      "end_col": 15,
+      "end_line": 29,
+      "end_offset": 925,
+      "start_col": 11,
+      "start_line": 29,
+      "start_offset": 921,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/concept_inputs_inline.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.my_pipe",
+    "message": ""description" is a required property",
+    "range": {
+      "end_col": 37,
+      "end_line": 8,
+      "end_offset": 210,
+      "start_col": 20,
+      "start_line": 8,
+      "start_offset": 193,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.my_pipe",
+    "message": ""output" is a required property",
+    "range": {
+      "end_col": 37,
+      "end_line": 8,
+      "end_offset": 210,
+      "start_col": 20,
+      "start_line": 8,
+      "start_offset": 193,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/concept_output.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.analyze",
+    "message": ""description" is a required property",
+    "range": {
+      "end_col": 28,
+      "end_line": 8,
+      "end_offset": 180,
+      "start_col": 10,
+      "start_line": 8,
+      "start_offset": 162,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/concept_refines.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "concept.Child",
+    "message": ""description" is a required property",
+    "range": {
+      "end_col": 17,
+      "end_line": 8,
+      "end_offset": 164,
+      "start_col": 11,
+      "start_line": 8,
+      "start_offset": 158,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/concept_with_multiplicity.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.extract",
+    "message": ""description" is a required property",
+    "range": {
+      "end_col": 19,
+      "end_line": 9,
+      "end_offset": 172,
+      "start_col": 10,
+      "start_line": 9,
+      "start_offset": 163,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/document_comparison.mthds 1`] = `[]`;
+
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/extract_slides.mthds 1`] = `[]`;
+
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/namespaced_concept.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.my_pipe",
+    "message": ""description" is a required property",
+    "range": {
+      "end_col": 24,
+      "end_line": 5,
+      "end_offset": 131,
+      "start_col": 10,
+      "start_line": 5,
+      "start_offset": 117,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/pipe_reference.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.my_pipe",
+    "message": ""output" is a required property",
+    "range": {
+      "end_col": 23,
+      "end_line": 5,
+      "end_offset": 122,
+      "start_col": 15,
+      "start_line": 5,
+      "start_offset": 114,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.other",
+    "message": "Additional properties are not allowed ('pipe' was unexpected)",
+    "range": {
+      "end_col": 17,
+      "end_line": 8,
+      "end_offset": 153,
+      "start_col": 8,
+      "start_line": 8,
+      "start_offset": 144,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.other",
+    "message": ""description" is a required property",
+    "range": {
+      "end_col": 17,
+      "end_line": 8,
+      "end_offset": 153,
+      "start_col": 8,
+      "start_line": 8,
+      "start_offset": 144,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.other",
+    "message": ""output" is a required property",
+    "range": {
+      "end_col": 17,
+      "end_line": 8,
+      "end_offset": 153,
+      "start_col": 8,
+      "start_line": 8,
+      "start_offset": 144,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/unrelated_key.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.my_pipe",
+    "message": ""output" is a required property",
+    "range": {
+      "end_col": 27,
+      "end_line": 5,
+      "end_offset": 124,
+      "start_col": 15,
+      "start_line": 5,
+      "start_offset": 112,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint hover/concept_hover.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "concept",
+    "message": "'concept' does not match any of the allowed schemas",
+    "range": {
+      "end_col": 28,
+      "end_line": 14,
+      "end_offset": 335,
+      "start_col": 20,
+      "start_line": 14,
+      "start_offset": 327,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint hover/pipe_hover.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "concept",
+    "message": "'concept' does not match any of the allowed schemas",
+    "range": {
+      "end_col": 43,
+      "end_line": 10,
+      "end_offset": 268,
+      "start_col": 39,
+      "start_line": 10,
+      "start_offset": 264,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint jinja-templates.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe",
+    "message": "'pipe' does not match any of the allowed schemas",
+    "range": {
+      "end_col": 43,
+      "end_line": 44,
+      "end_offset": 1278,
+      "start_col": 10,
+      "start_line": 44,
+      "start_offset": 1245,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint lint/invalid_schema.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.bad_pipe",
+    "message": "Additional properties are not allowed ('type', 'model' were unexpected)",
+    "range": {
+      "end_col": 25,
+      "end_line": 15,
+      "end_offset": 315,
+      "start_col": 15,
+      "start_line": 15,
+      "start_offset": 305,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint lint/valid.mthds 1`] = `[]`;
+
+exports[`corpus snapshots (committed expected outputs) > lint pipe-definitions.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.generate_image",
+    "message": ""prompt" is a required property",
+    "range": {
+      "end_col": 26,
+      "end_line": 28,
+      "end_offset": 803,
+      "start_col": 14,
+      "start_line": 28,
+      "start_offset": 791,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint prompt-templates.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.ask",
+    "message": "Additional properties are not allowed ('prompt_template' was unexpected)",
+    "range": {
+      "end_col": 4,
+      "end_line": 19,
+      "end_offset": 462,
+      "start_col": 19,
+      "start_line": 12,
+      "start_offset": 384,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.compare",
+    "message": "Additional properties are not allowed ('prompt_template' was unexpected)",
+    "range": {
+      "end_col": 4,
+      "end_line": 37,
+      "end_offset": 747,
+      "start_col": 19,
+      "start_line": 27,
+      "start_offset": 652,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.simple_ask",
+    "message": "Additional properties are not allowed ('prompt_template' was unexpected)",
+    "range": {
+      "end_col": 41,
+      "end_line": 42,
+      "end_offset": 865,
+      "start_col": 19,
+      "start_line": 42,
+      "start_offset": 843,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.simple_ask",
+    "message": ""description" is a required property",
+    "range": {
+      "end_col": 41,
+      "end_line": 42,
+      "end_offset": 865,
+      "start_col": 19,
+      "start_line": 42,
+      "start_offset": 843,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.simple_ask",
+    "message": ""output" is a required property",
+    "range": {
+      "end_col": 41,
+      "end_line": 42,
+      "end_offset": 865,
+      "start_col": 19,
+      "start_line": 42,
+      "start_offset": 843,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.nested_ref",
+    "message": "Additional properties are not allowed ('prompt_template' was unexpected)",
+    "range": {
+      "end_col": 4,
+      "end_line": 50,
+      "end_offset": 995,
+      "start_col": 19,
+      "start_line": 47,
+      "start_offset": 956,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.nested_ref",
+    "message": ""description" is a required property",
+    "range": {
+      "end_col": 4,
+      "end_line": 50,
+      "end_offset": 995,
+      "start_col": 19,
+      "start_line": 47,
+      "start_offset": 956,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.nested_ref",
+    "message": ""output" is a required property",
+    "range": {
+      "end_col": 4,
+      "end_line": 50,
+      "end_offset": 995,
+      "start_col": 19,
+      "start_line": 47,
+      "start_offset": 956,
+    },
+    "severity": "error",
+  },
+]
+`;
+
+exports[`corpus snapshots (committed expected outputs) > lint steps.mthds 1`] = `
+[
+  {
+    "kind": "schema",
+    "location": "pipe.condition",
+    "message": "Additional properties are not allowed ('pipe_map', 'default_pipe_code' were unexpected)",
+    "range": {
+      "end_col": 37,
+      "end_line": 26,
+      "end_offset": 916,
+      "start_col": 21,
+      "start_line": 26,
+      "start_offset": 900,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.condition",
+    "message": ""default_outcome" is a required property",
+    "range": {
+      "end_col": 37,
+      "end_line": 26,
+      "end_offset": 916,
+      "start_col": 21,
+      "start_line": 26,
+      "start_offset": 900,
+    },
+    "severity": "error",
+  },
+  {
+    "kind": "schema",
+    "location": "pipe.condition",
+    "message": ""outcomes" is a required property",
+    "range": {
+      "end_col": 37,
+      "end_line": 26,
+      "end_offset": 916,
+      "start_col": 21,
+      "start_line": 26,
+      "start_offset": 900,
+    },
+    "severity": "error",
+  },
+]
+`;
