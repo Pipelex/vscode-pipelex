@@ -8,7 +8,9 @@
  * validates against the MTHDS schema embedded at build time (no HTTP, no
  * filesystem), and format does no config discovery.
  *
- * Usage:
+ * Usage (bundlers resolve named imports from the UMD bundle; native Node ESM
+ * must default-import and destructure — see the README for the per-environment
+ * import forms):
  *
  * ```js
  * import { initialize, lintMthds, formatMthds } from "@pipelex/tools-wasm";

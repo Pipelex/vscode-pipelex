@@ -7,9 +7,23 @@ MTHDS lint & format compiled to WebAssembly — a lean, fully offline binding ov
 
 ## Usage
 
+The package ships a single UMD bundle (like its `@taplo/lib` / `@pipelex/lsp` siblings), so pick the import form for your environment:
+
 ```js
+// Bundlers (esbuild, rollup, webpack, vite) — the primary use-case of
+// vendoring into a plugin hook bundle — resolve named imports from UMD:
 import { initialize, lintMthds, formatMthds } from "@pipelex/tools-wasm";
 
+// Native Node ESM cannot see named exports through the minified UMD wrapper;
+// default-import and destructure instead:
+import pkg from "@pipelex/tools-wasm";
+const { initialize, lintMthds, formatMthds } = pkg;
+
+// CommonJS:
+const { initialize, lintMthds, formatMthds } = require("@pipelex/tools-wasm");
+```
+
+```js
 // Once, at startup (loads the WASM module).
 await initialize();
 
