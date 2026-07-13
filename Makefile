@@ -16,6 +16,7 @@ MTHDS_SCHEMA_FILE := crates/taplo-common/schemas/mthds_schema.json
 EXT_DIR           := editors/vscode
 
 JS_LSP_DIR        := js/lsp
+JS_TOOLS_WASM_DIR := js/tools-wasm
 VSIX              := $(EXT_DIR)/pipelex.vsix
 VIRTUAL_ENV       := $(CURDIR)/.venv
 PYTHON_VERSION    ?= 3.13
@@ -23,8 +24,8 @@ PYTHON_VERSION    ?= 3.13
 # ── Targets ──────────────────────────────────────────────────────────────────
 
 .PHONY: help sync-grammar s update-schema up
-.PHONY: build cli pipelex-tools pipelex-lib pipelex-lib-smoke env lock ext ext-deps lsp-types ext-install ext-uninstall vsix clean check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
-.PHONY: test test-all test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-ext test-pipelex-lib
+.PHONY: build cli pipelex-tools pipelex-lib pipelex-lib-smoke env lock ext ext-deps lsp-types tools-wasm ext-install ext-uninstall vsix clean check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
+.PHONY: test test-all test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-pipelex-tools-wasm test-tools-wasm-js test-ext test-pipelex-lib
 .PHONY: use-local use-npm ul un
 
 help: ## Show this help
@@ -33,7 +34,7 @@ help: ## Show this help
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
-build: cli pipelex-tools pipelex-lib ext ## Build everything (CLI + Python CLI/library wheels + VS Code extension)
+build: cli pipelex-tools pipelex-lib tools-wasm ext ## Build everything (CLI + Python CLI/library wheels + @pipelex/tools-wasm + VS Code extension)
 
 cli: ## Build the plxt CLI (release mode)
 	cargo build -p pipelex-cli --release
@@ -64,6 +65,9 @@ ext-deps: ## Build the @pipelex/lsp WASM bundle (prerequisite for ext)
 
 lsp-types: ## Emit @pipelex/lsp type declarations only (fast, no WASM) for the typecheck gate
 	cd $(JS_LSP_DIR) && yarn install && yarn build:types
+
+tools-wasm: ## Build the @pipelex/tools-wasm package (WASM + JS bundle, debug; RELEASE=true for the release artifact)
+	cd $(JS_TOOLS_WASM_DIR) && yarn install && yarn build
 
 ext: ext-deps ## Build the VS Code extension
 	cd $(EXT_DIR) && yarn install && yarn build
@@ -111,6 +115,9 @@ lint: ## Run Clippy on the workspace
 	# workspace clippy above (feature off) never sees it. Lint it feature-on too,
 	# `--locked` so this is also the lockfile gate for the pyo3/pythonize subgraph.
 	cargo clippy -p pipelex-py --features python --locked --all-targets -- -D warnings
+	# The shared lint/format engine in pipelex-common is `tools`-feature-gated,
+	# so the workspace clippy never sees it either. Lint it feature-on.
+	cargo clippy -p pipelex-common --features tools --locked --all-targets -- -D warnings
 
 plxt-lint: ## Lint TOML/MTHDS files with plxt
 	cargo run --bin plxt -- lint
@@ -119,7 +126,7 @@ plxt-lint: ## Lint TOML/MTHDS files with plxt
 # native + extension suites; `make test-all` additionally builds the Python
 # library wheel and runs its smoke test (needs uv + maturin).
 
-test: test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-ext ## Run all fast tests (Rust crates + VS Code extension)
+test: test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-pipelex-tools-wasm test-tools-wasm-js test-ext ## Run all fast tests (Rust crates + JS packages + VS Code extension)
 
 test-all: test test-pipelex-lib ## Run every test suite, incl. the Python library smoke test (builds the wheel)
 
@@ -137,14 +144,22 @@ test-lsp-async-stub: ## Test the lsp-async-stub crate
 	cargo test -p lsp-async-stub
 
 # Rust crates — Pipelex
-test-pipelex-common: ## Test the pipelex-common crate
-	cargo test -p pipelex-common
+test-pipelex-common: ## Test the pipelex-common crate (incl. the tools engine)
+	# `--features tools` is a strict superset: it compiles everything the
+	# default build does plus the shared lint/format engine and its tests.
+	cargo test -p pipelex-common --features tools
 
 test-pipelex-cli: ## Test the pipelex-cli (plxt) crate
 	cargo test -p pipelex-cli
 
 test-pipelex-py: ## Test the pipelex-py crate (Rust side, python feature off)
 	cargo test -p pipelex-py
+
+test-pipelex-tools-wasm: ## Test the pipelex-tools-wasm crate (native-side unit tests)
+	cargo test -p pipelex-tools-wasm
+
+test-tools-wasm-js: tools-wasm ## Build @pipelex/tools-wasm and run its vitest suite (binding + corpus snapshots)
+	cd $(JS_TOOLS_WASM_DIR) && yarn test
 
 # VS Code extension
 test-ext: lsp-types ## Type-check (tsc) and test (vitest) the VS Code extension
@@ -168,9 +183,9 @@ check: check-no-local-deps fmt-check lint test ## Full quality gate (format + li
 	cargo check -p pipelex-py --locked
 	# The feature-on PyO3 path is already compiled (and lock-checked) by the
 	# `cargo clippy -p pipelex-py --features python --locked` step in `lint`.
-	# Check both WASM crates so `make check` is the full WASM compile gate
-	# (taplo-wasm is upstream, pipelex-wasm is ours).
-	cargo check -p taplo-wasm -p pipelex-wasm --target wasm32-unknown-unknown --locked
+	# Check all WASM crates so `make check` is the full WASM compile gate
+	# (taplo-wasm is upstream, pipelex-wasm and pipelex-tools-wasm are ours).
+	cargo check -p taplo-wasm -p pipelex-wasm -p pipelex-tools-wasm --target wasm32-unknown-unknown --locked
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
 
@@ -183,6 +198,7 @@ s: sync-grammar
 clean: ## Remove build artifacts
 	cargo clean
 	rm -rf $(JS_LSP_DIR)/dist
+	rm -rf $(JS_TOOLS_WASM_DIR)/dist
 	rm -rf $(EXT_DIR)/dist $(VSIX)
 
 update-schema: ## Download the latest MTHDS JSON Schema

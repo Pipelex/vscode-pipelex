@@ -116,21 +116,17 @@ pub(crate) async fn hover<E: Environment>(
         }
     }
 
-    let position_info = match query.before.clone().and_then(|p| {
-        if p.syntax.kind() == IDENT || is_primitive(p.syntax.kind()) {
-            Some(p)
-        } else {
-            None
-        }
-    }) {
+    let position_info = match query
+        .before
+        .clone()
+        .filter(|p| p.syntax.kind() == IDENT || is_primitive(p.syntax.kind()))
+    {
         Some(before) => before,
-        None => match query.after.clone().and_then(|p| {
-            if p.syntax.kind() == IDENT || is_primitive(p.syntax.kind()) {
-                Some(p)
-            } else {
-                None
-            }
-        }) {
+        None => match query
+            .after
+            .clone()
+            .filter(|p| p.syntax.kind() == IDENT || is_primitive(p.syntax.kind()))
+        {
             Some(after) => after,
             None => return Ok(None),
         },

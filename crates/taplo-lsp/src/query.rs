@@ -180,10 +180,7 @@ impl Query {
 
     #[must_use]
     pub fn entry_key(&self) -> Option<SyntaxNode> {
-        let syntax = match self.before.as_ref().or(self.after.as_ref()) {
-            Some(p) => &p.syntax,
-            None => return None,
-        };
+        let syntax = &self.before.as_ref().or(self.after.as_ref())?.syntax;
 
         let keys = syntax
             .parent_ancestors()
@@ -195,10 +192,7 @@ impl Query {
 
     #[must_use]
     pub fn entry_value(&self) -> Option<SyntaxNode> {
-        let syntax = match self.before.as_ref().or(self.after.as_ref()) {
-            Some(p) => &p.syntax,
-            None => return None,
-        };
+        let syntax = &self.before.as_ref().or(self.after.as_ref())?.syntax;
 
         let value = syntax
             .parent_ancestors()

@@ -8,8 +8,8 @@
 //!
 //! Like `format_mthds`, this **never raises on bad content** (decision #2):
 //! malformed input — including the schema stage's "errors that couldn't be
-//! mapped to document positions" bail-out — is surfaced as diagnostics, not as a
-//! `ValueError`.
+//! mapped to document positions" bail-out — is surfaced as diagnostics, not as
+//! an error.
 //!
 //! The schema stage validates against the embedded official MTHDS schema only
 //! (`pipelex://mthds.schema.json`), fully offline: it constructs `Schemas` with
@@ -17,38 +17,42 @@
 //! directly — deliberately skipping the association machinery the CLI/wasm use
 //! to *choose* a schema. There is no code path that can reach out for another
 //! schema (settled decision #3). Because validation hits only the in-memory
-//! builtin (no external `$ref`s, no env IO, no `spawn`), a current-thread tokio
-//! runtime `block_on` is sufficient.
+//! builtin (no external `$ref`s, no env IO, no `spawn`), the future returned by
+//! [`lint_mthds_with_env`] resolves without ever yielding — which is what lets
+//! the native wrapper `block_on` a current-thread runtime and the offline
+//! wrapper poll it exactly once.
 //!
-//! **Precondition — not for use inside a Tokio runtime.** The schema stage
-//! builds its *own* current-thread runtime and `block_on`s it, so calling this
-//! helper from a thread that is already driving a Tokio runtime panics
-//! ("Cannot start a runtime from within a runtime"). This is sound for the only
-//! caller — the PyO3 wrapper (`python.rs`), invoked via `Python::allow_threads`
-//! from plain Python/OS threads (e.g. a FastAPI threadpool) that have no
-//! ambient runtime. We can't simply offload the `block_on` to a worker thread:
-//! `Schemas::validate_root` borrows the `dom::Node` across its `.await` for
-//! error-position mapping, and the DOM is `!Send` (rowan's `Rc`-based syntax
-//! tree), so it cannot cross a thread boundary. A future Rust caller that needs
-//! this from within a runtime must re-parse and validate on its own dedicated
-//! thread.
+//! Three entry points, one engine:
+//! - [`lint_mthds_with_env`] — the shared async core, generic over
+//!   [`Environment`].
+//! - [`lint_mthds_impl`] (native only) — the `pipelex-py` binding's path:
+//!   `NativeEnvironment` driven by a fresh current-thread tokio runtime.
+//! - [`lint_mthds_offline`] — the `pipelex-tools-wasm` binding's path:
+//!   [`NullEnvironment`] polled synchronously via `now_or_never`. Compiles and
+//!   runs on every target, so native tests can prove it agrees with
+//!   [`lint_mthds_impl`].
 
 use std::collections::HashSet;
 
 use anyhow::Context;
 use taplo::{dom, parser, rowan::TextRange};
 use taplo_common::{
-    environment::native::NativeEnvironment,
+    environment::Environment,
     schema::{builtins::MTHDS_SCHEMA_URL, Schemas},
 };
 use url::Url;
 
-use crate::diagnostic::{Diagnostic, Range};
+use crate::tools::diagnostic::{Diagnostic, Range};
+use crate::tools::environment::NullEnvironment;
 
-/// Lint MTHDS `content` against the embedded MTHDS schema, fully offline.
+/// Lint MTHDS `content` against the embedded MTHDS schema, fully offline,
+/// using `env` for the schema machinery's bookkeeping (nothing else).
 ///
 /// Returns the diagnostics from the first failing stage (empty == clean).
-pub fn lint_mthds_impl(content: &str) -> Result<Vec<Diagnostic>, anyhow::Error> {
+pub async fn lint_mthds_with_env<E: Environment>(
+    env: E,
+    content: &str,
+) -> Result<Vec<Diagnostic>, anyhow::Error> {
     // Stage 1 — syntax. Dedup by range, mirroring the CLI's
     // `print_parse_errors_compact` (`.unique_by(|e| e.range)`), so duplicate
     // parser errors at one span don't surface as repeated diagnostics.
@@ -81,26 +85,18 @@ pub fn lint_mthds_impl(content: &str) -> Result<Vec<Diagnostic>, anyhow::Error> 
             .collect());
     }
 
-    // Stage 3 — schema, offline against the embedded builtin.
+    // Stage 3 — schema, offline against the embedded builtin. `http: None` is
+    // what makes this provably offline — there is no client to fetch with.
     let url = Url::parse(MTHDS_SCHEMA_URL).context("invalid builtin MTHDS schema URL")?;
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .context("failed to build tokio runtime for schema validation")?;
-
-    let validation = runtime.block_on(async {
-        // `NativeEnvironment::new()` calls `Handle::current()`, so it must be
-        // constructed inside the runtime context. `http: None` is what makes
-        // this provably offline — there is no client to fetch with.
-        let schemas = Schemas::new(NativeEnvironment::new(), None);
-        schemas.validate_root(&url, &dom).await
-    });
+    let schemas = Schemas::new(env, None);
+    let validation = schemas.validate_root(&url, &dom).await;
 
     // Uphold the never-raise-on-bad-content contract that `format_mthds` honors
     // (settled decision #2): when validation itself fails — most notably when
     // the validator produced errors that could not be mapped to document
     // positions (`Schemas::validate_root` bails out with an error rather than
     // reporting a false-clean) — surface that as a single, location-less schema
-    // diagnostic instead of propagating it out as a `ValueError`.
+    // diagnostic instead of propagating it out as an error.
     let errors = match validation {
         Ok(errors) => errors,
         Err(err) => return Ok(vec![Diagnostic::schema(format!("{err:#}"), None, None)]),
@@ -137,6 +133,49 @@ pub fn lint_mthds_impl(content: &str) -> Result<Vec<Diagnostic>, anyhow::Error> 
         .collect())
 }
 
+/// Lint MTHDS `content` on a native host — the `pipelex-py` binding's path.
+///
+/// **Precondition — not for use inside a Tokio runtime.** This builds its
+/// *own* current-thread runtime and `block_on`s it, so calling it from a
+/// thread that is already driving a Tokio runtime panics ("Cannot start a
+/// runtime from within a runtime"). This is sound for the only caller — the
+/// PyO3 wrapper (`pipelex-py`'s `python.rs`), invoked via
+/// `Python::allow_threads` from plain Python/OS threads (e.g. a FastAPI
+/// threadpool) that have no ambient runtime. We can't simply offload the
+/// `block_on` to a worker thread: `Schemas::validate_root` borrows the
+/// `dom::Node` across its `.await` for error-position mapping, and the DOM is
+/// `!Send` (rowan's `Rc`-based syntax tree), so it cannot cross a thread
+/// boundary. A Rust caller that needs this from within a runtime should use
+/// [`lint_mthds_offline`] instead — it never blocks.
+#[cfg(not(target_family = "wasm"))]
+pub fn lint_mthds_impl(content: &str) -> Result<Vec<Diagnostic>, anyhow::Error> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .context("failed to build tokio runtime for schema validation")?;
+
+    runtime.block_on(async {
+        // `NativeEnvironment::new()` calls `Handle::current()`, so it must be
+        // constructed inside the runtime context.
+        let env = taplo_common::environment::native::NativeEnvironment::new();
+        lint_mthds_with_env(env, content).await
+    })
+}
+
+/// Lint MTHDS `content` with no host capabilities at all — the
+/// `pipelex-tools-wasm` binding's path.
+///
+/// Polls the [`lint_mthds_with_env`] future exactly once (`now_or_never`),
+/// which suffices because the offline schema stage never yields (see the
+/// module docs). Runs on every target — native tests use this to prove the
+/// wasm code path agrees with [`lint_mthds_impl`].
+pub fn lint_mthds_offline(content: &str) -> Result<Vec<Diagnostic>, anyhow::Error> {
+    use futures::FutureExt;
+
+    lint_mthds_with_env(NullEnvironment, content)
+        .now_or_never()
+        .context("offline lint future did not resolve synchronously — the offline schema stage must never yield")?
+}
+
 /// Derive a text range for a semantic `dom::Error`, mirroring the CLI's
 /// `print_semantic_errors_compact` (`taplo-cli/src/printing.rs`) exactly so the
 /// coordinates match. Some variants carry no position.
@@ -156,11 +195,12 @@ fn semantic_error_range(error: &dom::Error) -> Option<TextRange> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagnostic::DiagnosticKind;
+    use crate::tools::diagnostic::DiagnosticKind;
     use std::time::{Duration, Instant};
 
-    const VALID: &str = include_str!("../../../test-data/mthds/lint/valid.mthds");
-    const INVALID_SCHEMA: &str = include_str!("../../../test-data/mthds/lint/invalid_schema.mthds");
+    const VALID: &str = include_str!("../../../../test-data/mthds/lint/valid.mthds");
+    const INVALID_SCHEMA: &str =
+        include_str!("../../../../test-data/mthds/lint/invalid_schema.mthds");
 
     #[test]
     fn clean_input_has_no_diagnostics() {
@@ -213,5 +253,31 @@ mod tests {
             start.elapsed() < Duration::from_secs(5),
             "offline in-memory validation should be near-instant"
         );
+    }
+
+    #[test]
+    fn offline_path_matches_native_path_on_every_stage() {
+        // `lint_mthds_offline` (NullEnvironment, now_or_never) is the exact
+        // code path the wasm binding runs; assert it produces byte-identical
+        // diagnostics to the native NativeEnvironment/block_on path across
+        // clean input and all three failing stages.
+        for fixture in [
+            VALID,
+            INVALID_SCHEMA,
+            "key = ",       // syntax stage
+            "a = 1\na = 2", // semantic stage
+        ] {
+            let native = lint_mthds_impl(fixture).expect("native lint should succeed");
+            let offline = lint_mthds_offline(fixture).expect("offline lint should succeed");
+            assert_eq!(native, offline, "environments must not affect diagnostics");
+        }
+    }
+
+    #[test]
+    fn offline_path_resolves_synchronously() {
+        // Guards the `now_or_never` contract: the offline schema stage must
+        // never yield, so the single poll always produces a result.
+        let diagnostics = lint_mthds_offline(INVALID_SCHEMA).expect("single poll must resolve");
+        assert!(!diagnostics.is_empty());
     }
 }

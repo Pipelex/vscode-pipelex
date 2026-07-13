@@ -13,13 +13,15 @@ use serde::Serialize;
 use taplo::{formatter, parser};
 use taplo_common::config::Config;
 
-use crate::diagnostic::{Diagnostic, Range};
+use crate::tools::diagnostic::{Diagnostic, Range};
 
-// ⚠️ PUBLIC PYTHON SURFACE — serialized into the `format_mthds` dict via `pythonize`.
-// Mirror any field change in the hand-maintained stub `pipelex_tools.pyi` (`FormatResult`);
-// nothing enforces the match at compile time.
-/// Result of [`format_mthds_impl`] — the native analog of the binding's
-/// `{ "formatted", "changed", "diagnostics" }` dict.
+// ⚠️ PUBLIC BINDING SURFACE — serialized into the `format_mthds` dict via
+// `pythonize` and into a JS object via `serde-wasm-bindgen`. Mirror any field
+// change in the hand-maintained stub `pipelex_tools.pyi` (`FormatResult`) and
+// in `js/tools-wasm`'s `FormatResult` TS type; nothing enforces the match at
+// compile time.
+/// Result of [`format_mthds_impl`] — the native analog of the bindings'
+/// `{ "formatted", "changed", "diagnostics" }` shape.
 #[derive(Debug, Clone, Serialize)]
 pub struct FormatOutcome {
     /// The formatted document. On a syntax error this is the input verbatim.
@@ -131,12 +133,13 @@ pub fn format_mthds_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagnostic::DiagnosticKind;
+    use crate::tools::diagnostic::DiagnosticKind;
 
-    const VALID: &str = include_str!("../../../test-data/mthds/lint/valid.mthds");
-    const PIPE_DEFINITIONS: &str = include_str!("../../../test-data/mthds/pipe-definitions.mthds");
-    const STEPS: &str = include_str!("../../../test-data/mthds/steps.mthds");
-    const CONCEPT_TABLES: &str = include_str!("../../../test-data/mthds/concept-tables.mthds");
+    const VALID: &str = include_str!("../../../../test-data/mthds/lint/valid.mthds");
+    const PIPE_DEFINITIONS: &str =
+        include_str!("../../../../test-data/mthds/pipe-definitions.mthds");
+    const STEPS: &str = include_str!("../../../../test-data/mthds/steps.mthds");
+    const CONCEPT_TABLES: &str = include_str!("../../../../test-data/mthds/concept-tables.mthds");
 
     fn format(content: &str) -> FormatOutcome {
         format_mthds_impl(content, &[]).expect("format should not error on valid input")

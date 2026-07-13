@@ -1609,6 +1609,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
+ "serde",
  "taplo",
  "taplo-common",
  "time",
@@ -1633,15 +1634,23 @@ dependencies = [
 name = "pipelex-py"
 version = "0.1.2"
 dependencies = [
- "anyhow",
+ "pipelex-common",
  "pyo3",
  "pythonize",
  "serde",
+]
+
+[[package]]
+name = "pipelex-tools-wasm"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "getrandom",
+ "pipelex-common",
+ "serde",
+ "serde-wasm-bindgen",
  "serde_json",
- "taplo",
- "taplo-common",
- "tokio",
- "url",
+ "wasm-bindgen",
 ]
 
 [[package]]

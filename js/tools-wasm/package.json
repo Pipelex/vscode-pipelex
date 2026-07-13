@@ -1,0 +1,37 @@
+{
+  "name": "@pipelex/tools-wasm",
+  "version": "0.1.0",
+  "description": "MTHDS lint & format compiled to WASM — fully offline (embedded schema), same engine and Diagnostic wire shape as pipelex-tools-py and the Pipelex API.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "yarn rollup --silent -c rollup.config.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublish": "RELEASE=true yarn build",
+    "clean": "rm -rf dist"
+  },
+  "homepage": "https://github.com/Pipelex/vscode-pipelex",
+  "repository": "https://github.com/Pipelex/vscode-pipelex",
+  "author": {
+    "name": "Pipelex",
+    "url": "https://github.com/Pipelex"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^12.1.1",
+    "@types/node": "^20.11.9",
+    "@wasm-tool/rollup-plugin-rust": "^2.4.5",
+    "esbuild": "^0.20.0",
+    "rollup": "^4.9.6",
+    "rollup-plugin-esbuild": "^6.1.1",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.18"
+  }
+}
