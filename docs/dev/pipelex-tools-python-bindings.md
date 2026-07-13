@@ -2,7 +2,7 @@
 
 `pipelex_tools` is an importable Python library that exposes MTHDS **lint** and **format** as in-process functions, so a Python host (e.g. the `pipelex-api` FastAPI server) can validate and format `.mthds` content without shelling out to the `plxt` binary. It is a thin PyO3 wrapper around the same `taplo`/`taplo-common` engine the `plxt` CLI uses, so the library and the binary cannot drift (enforced by parity tests — see [Testing](#testing)).
 
-The bindings live in the `crates/pipelex-py` crate (Python module name `pipelex_tools`, published as the `pipelex-tools-py` wheel). The lint/format engine itself lives in `crates/pipelex-common` (the `tools` module, behind the `tools` cargo feature) — `pipelex-py` re-exports it and adds only the PyO3 glue. The same shared engine backs the `@pipelex/tools-wasm` npm package, so the two bindings agree by construction.
+The bindings live in the `crates/pipelex-py` crate (Python module name `pipelex_tools`, published as the `pipelex-tools-py` wheel). The lint/format engine itself lives in `crates/pipelex-common` (the `tools` module, behind the `tools` cargo feature) — `pipelex-py` re-exports it and adds only the PyO3 glue. The same shared engine backs the `@pipelex/tools-wasm` npm package, so the two bindings agree by construction — see [`mthds-engine-bindings.md`](mthds-engine-bindings.md) for the full multi-binding picture.
 
 ## Two packages, one repo
 
