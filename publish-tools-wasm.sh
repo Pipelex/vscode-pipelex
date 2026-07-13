@@ -29,7 +29,10 @@ cd "$JS_DIR" || {
 
 # Use yarn workspace commands (best practice for yarn workspaces)
 echo "📦 Building release bundle..."
-yarn workspace @pipelex/tools-wasm run clean
+yarn workspace @pipelex/tools-wasm run clean || {
+    echo "❌ Error: Clean failed"
+    exit 1
+}
 RELEASE=true yarn workspace @pipelex/tools-wasm run build || {
     echo "❌ Error: Build failed"
     exit 1
