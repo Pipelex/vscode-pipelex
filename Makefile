@@ -24,7 +24,7 @@ PYTHON_VERSION    ?= 3.13
 
 .PHONY: help sync-grammar s update-schema up
 .PHONY: build cli pipelex-tools pipelex-lib pipelex-lib-smoke env lock ext ext-deps lsp-types ext-install ext-uninstall vsix clean check check-no-local-deps fmt-check fmt lint plxt-lint docs setup-hooks
-.PHONY: test test-all test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-ext test-pipelex-lib
+.PHONY: test test-all test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-pipelex-tools-wasm test-ext test-pipelex-lib
 .PHONY: use-local use-npm ul un
 
 help: ## Show this help
@@ -122,7 +122,7 @@ plxt-lint: ## Lint TOML/MTHDS files with plxt
 # native + extension suites; `make test-all` additionally builds the Python
 # library wheel and runs its smoke test (needs uv + maturin).
 
-test: test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-ext ## Run all fast tests (Rust crates + VS Code extension)
+test: test-taplo test-taplo-common test-taplo-lsp test-lsp-async-stub test-pipelex-common test-pipelex-cli test-pipelex-py test-pipelex-tools-wasm test-ext ## Run all fast tests (Rust crates + VS Code extension)
 
 test-all: test test-pipelex-lib ## Run every test suite, incl. the Python library smoke test (builds the wheel)
 
@@ -151,6 +151,9 @@ test-pipelex-cli: ## Test the pipelex-cli (plxt) crate
 test-pipelex-py: ## Test the pipelex-py crate (Rust side, python feature off)
 	cargo test -p pipelex-py
 
+test-pipelex-tools-wasm: ## Test the pipelex-tools-wasm crate (native-side unit tests)
+	cargo test -p pipelex-tools-wasm
+
 # VS Code extension
 test-ext: lsp-types ## Type-check (tsc) and test (vitest) the VS Code extension
 	cd $(EXT_DIR) && { yarn typecheck; tc=$$?; yarn test; vt=$$?; [ $$tc -eq 0 ] && [ $$vt -eq 0 ]; }
@@ -173,9 +176,9 @@ check: check-no-local-deps fmt-check lint test ## Full quality gate (format + li
 	cargo check -p pipelex-py --locked
 	# The feature-on PyO3 path is already compiled (and lock-checked) by the
 	# `cargo clippy -p pipelex-py --features python --locked` step in `lint`.
-	# Check both WASM crates so `make check` is the full WASM compile gate
-	# (taplo-wasm is upstream, pipelex-wasm is ours).
-	cargo check -p taplo-wasm -p pipelex-wasm --target wasm32-unknown-unknown --locked
+	# Check all WASM crates so `make check` is the full WASM compile gate
+	# (taplo-wasm is upstream, pipelex-wasm and pipelex-tools-wasm are ours).
+	cargo check -p taplo-wasm -p pipelex-wasm -p pipelex-tools-wasm --target wasm32-unknown-unknown --locked
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
 
