@@ -1609,6 +1609,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
+ "serde",
  "taplo",
  "taplo-common",
  "time",
@@ -1633,15 +1634,10 @@ dependencies = [
 name = "pipelex-py"
 version = "0.1.2"
 dependencies = [
- "anyhow",
+ "pipelex-common",
  "pyo3",
  "pythonize",
  "serde",
- "serde_json",
- "taplo",
- "taplo-common",
- "tokio",
- "url",
 ]
 
 [[package]]

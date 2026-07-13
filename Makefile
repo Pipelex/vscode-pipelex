@@ -111,6 +111,9 @@ lint: ## Run Clippy on the workspace
 	# workspace clippy above (feature off) never sees it. Lint it feature-on too,
 	# `--locked` so this is also the lockfile gate for the pyo3/pythonize subgraph.
 	cargo clippy -p pipelex-py --features python --locked --all-targets -- -D warnings
+	# The shared lint/format engine in pipelex-common is `tools`-feature-gated,
+	# so the workspace clippy never sees it either. Lint it feature-on.
+	cargo clippy -p pipelex-common --features tools --locked --all-targets -- -D warnings
 
 plxt-lint: ## Lint TOML/MTHDS files with plxt
 	cargo run --bin plxt -- lint
@@ -137,8 +140,10 @@ test-lsp-async-stub: ## Test the lsp-async-stub crate
 	cargo test -p lsp-async-stub
 
 # Rust crates — Pipelex
-test-pipelex-common: ## Test the pipelex-common crate
-	cargo test -p pipelex-common
+test-pipelex-common: ## Test the pipelex-common crate (incl. the tools engine)
+	# `--features tools` is a strict superset: it compiles everything the
+	# default build does plus the shared lint/format engine and its tests.
+	cargo test -p pipelex-common --features tools
 
 test-pipelex-cli: ## Test the pipelex-cli (plxt) crate
 	cargo test -p pipelex-cli
