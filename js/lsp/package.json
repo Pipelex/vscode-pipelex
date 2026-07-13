@@ -1,6 +1,6 @@
 {
   "name": "@pipelex/lsp",
-  "version": "0.1.34",
+  "version": "0.2.0",
   "description": "A JavaScript wrapper for the Pipelex TOML/MTHDS language server.",
   "scripts": {
     "build": "yarn rollup --silent -c rollup.config.mjs",
