@@ -35,6 +35,10 @@ The issue list is composed host-side (`methodGraphPanel` + the pure helpers in `
 - `valid` → static warnings only; a static *error* contradicted by the authoritative verdict is dropped.
 - `error` → the failure description first, then the static diagnostics.
 
+### Node decorations
+
+Issues that target a pipe also decorate the graph nodes themselves (rendered by `@pipelex/mthds-ui` from the same issue list — see its `docs/validation-widget.md`): a severity ring plus a corner count badge on every invocation of the affected pipe, with the messages and `Fix:` lines as the badge tooltip. The extension's only contribution is filling the targets: `validationErrorsToIssues` copies the validator error's `pipe_code` onto the issue's `pipeCode`, and static diagnostics get `pipeCode`/`nodeId` auto-filled by the mthds-ui mapper. Issues without a resolvable target (bundle-level parse errors, concept-only errors, diagnostics about pipes the static walk skipped) simply stay panel-only. Folding rolls decorations up — a folded controller's badge aggregates its hidden descendants' issues. Clicking a badge opens the widget dropdown; clicking a dropdown row does the usual source jump *and* pans/flashes the target node in the graph.
+
 ## Message protocol
 
 Two additions to the host ↔ webview protocol:

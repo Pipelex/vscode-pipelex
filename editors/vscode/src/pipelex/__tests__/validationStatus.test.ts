@@ -43,6 +43,7 @@ describe('validationErrorsToIssues', () => {
                 file: undefined,
                 suggestedFix: 'Align the output.',
                 origin: 'validator',
+                pipeCode: 'analyze',
             },
             {
                 severity: 'error',
@@ -51,6 +52,7 @@ describe('validationErrorsToIssues', () => {
                 file: 'concepts.mthds',
                 suggestedFix: undefined,
                 origin: 'validator',
+                pipeCode: undefined,
             },
         ]);
     });
@@ -61,6 +63,15 @@ describe('validationErrorsToIssues', () => {
         ]);
         expect(issues[0].suggestedFix).toBeUndefined();
         expect(issues[0].file).toBeUndefined();
+    });
+
+    it('fills the graph target pipeCode from pipe_code, tolerating null', () => {
+        const issues = validationErrorsToIssues([
+            { category: 'x', message: 'm', pipe_code: 'my_pipe' },
+            { category: 'x', message: 'm', pipe_code: null },
+            { category: 'x', message: 'm', concept_code: 'Foo' },
+        ]);
+        expect(issues.map(issue => issue.pipeCode)).toEqual(['my_pipe', undefined, undefined]);
     });
 });
 

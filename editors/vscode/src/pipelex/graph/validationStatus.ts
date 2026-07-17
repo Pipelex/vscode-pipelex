@@ -21,6 +21,14 @@ export interface GraphValidationIssue {
     /** Human-readable fix line from the runtime's fix planner. */
     suggestedFix?: string;
     origin?: 'validator' | 'static';
+    /**
+     * Graph target: the renderer decorates every node invoking this pipe
+     * (severity ring + count badge). Filled from the validator's `pipe_code`
+     * here; static issues get theirs from the mthds-ui mapper.
+     */
+    pipeCode?: string;
+    /** Graph target: one precise invocation node id (static walk diagnostics only). */
+    nodeId?: string;
 }
 
 /** What the webview receives — on the `setData` payload and via `setValidationStatus`. */
@@ -55,6 +63,7 @@ export function validationErrorsToIssues(
         file: ownerFiles?.[index],
         suggestedFix: error.suggested_fix?.description ?? undefined,
         origin: 'validator' as const,
+        pipeCode: error.pipe_code ?? undefined,
     }));
 }
 
