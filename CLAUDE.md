@@ -83,10 +83,11 @@ Publishes two PyPI packages from separate `pyproject.toml` files:
 
 ## Graph Rendering (ReactFlow)
 
-The extension includes a webview panel that renders method/pipe graphs using ReactFlow. The extension receives a **GraphSpec** (JSON with nodes and edges) from `pipelex-agent validate --view` and renders the graph itself using ReactFlow in the webview. This gives full control over layout, styling, and interactivity.
+The extension includes a webview panel that renders method/pipe graphs using ReactFlow. Since the static-first flow, the **GraphSpec is built statically in the extension host** by `@pipelex/mthds-ui`'s static-graph module (`buildStaticGraphSpecFromToml` over the bundle's raw `.mthds` text, primary file first) and rendered immediately — `pipelex-agent validate` runs only in the background for the **verdict** (never with `--view`), which drives a validation widget in the graph toolbar (states: validating / valid / invalid / error; hidden for graphspec-json views). An invalid bundle keeps its (static) graph on screen — the errors live in the widget's dropdown with click-to-navigate; full-page message views remain only for pre-graph failures (unreadable files, missing webview assets, invalid graphspec JSON). See `docs/features/method-graph.md` for the full flow, the per-state issue-list policy, and the `setValidationStatus` message.
 
 ### Extension-side code
-- `editors/vscode/src/pipelex/graph/methodGraphPanel.ts` — webview panel manager (extension host); builds the `setData` config payload
+- `editors/vscode/src/pipelex/graph/methodGraphPanel.ts` — webview panel manager (extension host); builds the static GraphSpec, drives the validation widget, builds the `setData` config payload
+- `editors/vscode/src/pipelex/graph/validationStatus.ts` — pure helpers for the widget: issue mappers (validator errors / backend failures → widget issues), static-diagnostic context parsing
 - `editors/vscode/src/pipelex/graph/graphConfig.ts` — resolves render config (edge type, layout, theme) from `~/.pipelex/pipelex.toml` + VS Code settings
 - `editors/vscode/src/pipelex/graph/webview/adapter.ts` — webview entry; mounts `@pipelex/mthds-ui`'s `GraphViewer` (the actual ReactFlow renderer) and bridges VS Code messages. Bundled to `graph.js`.
 - `editors/vscode/src/pipelex/graph/webview/graph.html` — webview HTML template

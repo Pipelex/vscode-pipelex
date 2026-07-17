@@ -72,6 +72,14 @@ vi.mock('vscode', () => ({
         openExternal: vi.fn(() => Promise.resolve(true)),
     },
     Selection: vi.fn(),
+    Range: class {
+        start: any;
+        end: any;
+        constructor(startLine: number, startCharacter: number, endLine: number, endCharacter: number) {
+            this.start = { line: startLine, character: startCharacter };
+            this.end = { line: endLine, character: endCharacter };
+        }
+    },
     TextEditorRevealType: { InCenter: 2 },
     ColorThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },
     ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
@@ -233,6 +241,27 @@ function makeExtensionUri() {
     } as any;
 }
 
+// A minimal valid bundle — the REAL static builder (unmocked) renders it
+// without pipelex, which is the whole point of the static-first flow.
+const VALID_BUNDLE = [
+    'domain = "demo"',
+    'main_pipe = "greet"',
+    '',
+    '[pipe.greet]',
+    'type = "PipeLLM"',
+    'description = "Greet the user"',
+    'output = "Text"',
+    'prompt = "Say hello"',
+    '',
+].join('\n');
+
+/** Seed the gathered bundle files with one file (the shown one) holding `content`. */
+function seedBundle(uri: any, content: string = VALID_BUNDLE) {
+    mockState.bundleFiles = [
+        { uri, name: uri.fsPath.replace(/^.*[\\/]/, ''), content },
+    ];
+}
+
 describe('MethodGraphPanel', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -286,20 +315,13 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    // --- GraphSpec (--view) path ---
+    // --- Static-first graph path ---
 
-    it('refresh() uses extension-owned webview when graphspec is present', async () => {
-        const graphspec = {
-            nodes: [{ id: 'n1', label: 'test', kind: 'operator', status: 'succeeded', ui: {}, inspector: {} }],
-            edges: [],
-        };
-        mockState.spawnCliResult = {
-            stdout: JSON.stringify({ graphspec, pipe_code: 'main' }),
-            stderr: '',
-        };
+    it('refresh() renders the STATIC graph immediately and carries the validation payload', async () => {
+        const uri = makeUri('/project/file.mthds');
+        seedBundle(uri);
 
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
         panel.show(uri);
         await new Promise(r => setTimeout(r, 50));
 
@@ -313,15 +335,20 @@ describe('MethodGraphPanel', () => {
         expect(mockState.mockWebview.postMessage).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: 'setData',
-                graphspec: graphspec,
                 config: expect.objectContaining({ direction: 'TB' }),
             })
         );
-        // The renderer owns the palette via `theme`; the host must never send a
-        // `paletteColors` override (it would shadow the light/dark palette).
         const setData = mockState.mockWebview.postMessage.mock.calls
             .map(c => c[0])
             .find((m: any) => m?.type === 'setData');
+        // The graphspec is the static builder's output, not a CLI product.
+        expect(setData.graphspec.meta.mode).toBe('static');
+        expect(JSON.stringify(setData.graphspec)).toContain('greet');
+        // The verdict rode onto the pending setData: the default spawnCli mock
+        // succeeded (exit 0) before the handshake, so the widget shows `valid`.
+        expect(setData.validation.state).toBe('valid');
+        // The renderer owns the palette via `theme`; the host must never send a
+        // `paletteColors` override (it would shadow the light/dark palette).
         // Default mode is `system`, following the (mocked dark) editor via the
         // injected `systemTheme`.
         expect(setData.config.theme).toBe('system');
@@ -969,7 +996,7 @@ describe('MethodGraphPanel', () => {
 
     // --- CLI flags ---
 
-    it('refresh() sends --view flag', async () => {
+    it('refresh() analyzes for the verdict only — never requests --view (the graph is static)', async () => {
         const processUtils = await import('../validation/processUtils');
 
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
@@ -978,8 +1005,9 @@ describe('MethodGraphPanel', () => {
         await new Promise(r => setTimeout(r, 50));
 
         const args = vi.mocked(processUtils.spawnCli).mock.calls[0][1] as string[];
-        expect(args).toContain('--view');
-        expect(args).not.toContain('--graph');
+        expect(args).toEqual(expect.arrayContaining(['validate', 'bundle', '--format', 'json']));
+        expect(args).not.toContain('--view');
+        expect(args).not.toContain('--direction');
         panel.dispose();
     });
 
@@ -1000,11 +1028,6 @@ describe('MethodGraphPanel', () => {
 
     it('refresh() analyzes sibling bundle.mthds when opened file has no main_pipe', async () => {
         const processUtils = await import('../validation/processUtils');
-        const graphspec = { nodes: [], edges: [] };
-        mockState.spawnCliResult = {
-            stdout: JSON.stringify({ graphspec, pipe_code: 'main' }),
-            stderr: '',
-        };
         const helperUri = makeUri('/project/methods/helper.mthds');
         const bundleUri = makeUri('/project/methods/bundle.mthds');
         mockState.bundleFiles = [
@@ -1025,15 +1048,15 @@ describe('MethodGraphPanel', () => {
             '/project/methods',
         ]));
 
+        // The static graph is anchored on the directory's main bundle too
+        // (primary-first file ordering feeds the static builder's entry heuristic).
         const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
         messageHandler({ type: 'webviewReady' });
-        expect(mockState.mockWebview.postMessage).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'setData',
-                uri: helperUri.toString(),
-                graphspec,
-            }),
-        );
+        const setData = mockState.mockWebview.postMessage.mock.calls
+            .map(c => c[0])
+            .find((m: any) => m?.type === 'setData');
+        expect(setData.uri).toBe(helperUri.toString());
+        expect(setData.graphspec.meta.mode).toBe('static');
         panel.dispose();
     });
 
@@ -1052,46 +1075,38 @@ describe('MethodGraphPanel', () => {
 
     // --- Regression: staleness after spawnCli (previous Bug 1) ---
 
-    it('refresh() discards spawnCli result when file switched during spawn', async () => {
-        let resolveSpawn: ((v: any) => void) | null = null;
+    it('refresh() discards a stale analyze verdict when the file switched during the spawn', async () => {
+        const resolvers: ((v: any) => void)[] = [];
         const processUtils = await import('../validation/processUtils');
         vi.mocked(processUtils.spawnCli).mockImplementation(() => {
             return new Promise((resolve) => {
-                resolveSpawn = resolve;
+                resolvers.push(resolve);
             });
         });
 
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri1 = makeUri('/project/file1.mthds');
         panel.show(uri1);
-
-        // Wait for spawnCli to be called
         await vi.waitFor(() => {
-            expect(resolveSpawn).not.toBeNull();
+            expect(resolvers.length).toBe(1);
         });
 
-        // Simulate user switching files
+        // User switches files: the panel re-renders the static graph for file2
+        // and starts its own analyze.
         const uri2 = makeUri('/project/file2.mthds');
-        (panel as any).currentUri = uri2;
-
-        // Resolve spawnCli for the stale file
-        resolveSpawn!({
-            stdout: JSON.stringify({ graphspec: { nodes: [], edges: [] } }),
-            stderr: '',
+        panel.show(uri2);
+        await vi.waitFor(() => {
+            expect(resolvers.length).toBe(2);
         });
+
+        // The STALE spawn resolves (exit 0 → a `valid` verdict for file1).
+        resolvers[0]({ stdout: '', stderr: '' });
         await new Promise(r => setTimeout(r, 10));
 
-        // The staleness check after spawnCli should prevent the stale
-        // graphspec from being buffered or sent to the webview.
-        expect((panel as any).pendingData).toBeNull();
-
-        // Even after webviewReady handshake, stale data must not be delivered
-        const receiveMessageCall = mockState.mockWebview.onDidReceiveMessage.mock.calls[0];
-        expect(receiveMessageCall).toBeDefined();
-        const messageHandler = receiveMessageCall[0];
-        messageHandler({ type: 'webviewReady' });
-
-        expect(mockState.mockWebview.postMessage).not.toHaveBeenCalled();
+        // The staleness check discards it: the buffered payload belongs to file2
+        // and its widget still shows `validating` (file2's spawn is unresolved).
+        expect((panel as any).pendingData.uri).toBe(uri2.toString());
+        expect((panel as any).pendingData.validation.state).toBe('validating');
 
         panel.dispose();
     });
@@ -1125,27 +1140,61 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    // --- Retry button on the error view ---
+    // --- Backend failures: the graph stays, the widget flips to `error` ---
 
-    it('renders a Retry button on the error view and re-runs the analysis when clicked', async () => {
+    it('CLI not found → static graph stays, widget flips to error, one-time toast', async () => {
         const processUtils = await import('../validation/processUtils');
-        mockState.resolveCliResult = null; // → CLI Not Found error view
+        mockState.resolveCliResult = null; // analyze → BackendError('not-found')
+        const uri = makeUri('/project/file.mthds');
+        seedBundle(uri);
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // The static graph rendered regardless — pipelex is not needed for it.
+        const pending = (panel as any).pendingData;
+        expect(pending.type).toBe('setData');
+        expect(pending.graphspec.meta.mode).toBe('static');
+        // The widget carries the failure as its lead issue.
+        expect(pending.validation.state).toBe('error');
+        expect(pending.validation.issues[0].message).toContain('pipelex-agent');
+        // One-time toast; the analysis never reached spawnCli.
+        expect(mockState.showWarningMessage).toHaveBeenCalledWith(
+            expect.stringContaining('pipelex-agent'),
+        );
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    it('falls back to a Read Error view (with Retry) when the bundle files cannot be read', async () => {
+        const processUtils = await import('../validation/processUtils');
+        const bundleGather = await import('../validation/bundleGather');
+        // Attacker-influenced text in the failure must be escaped, and only our
+        // own Retry script may carry the nonce.
+        vi.mocked(bundleGather.gatherBundleFiles).mockRejectedValueOnce(
+            new Error('<script>globalThis.pwned = 1;</script> disk gone'),
+        );
 
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/file.mthds');
         panel.show(uri);
         await new Promise(r => setTimeout(r, 20));
 
-        // The error view carries a Retry button wired to post { type: 'retry' }.
-        expect(mockState.mockWebview.html).toContain('CLI Not Found');
-        expect(mockState.mockWebview.html).toContain('id="pipelex-retry"');
-        expect(mockState.mockWebview.html).toMatch(/postMessage\(\s*\{\s*type:\s*'retry'/);
-        expect(mockState.mockWebview.html).toContain("script-src 'nonce-");
-        // resolveCli returned null, so the analysis never reached spawnCli.
+        const html = mockState.mockWebview.html;
+        expect(html).toContain('Read Error');
+        expect(html).toContain('id="pipelex-retry"');
+        expect(html).toMatch(/postMessage\(\s*\{\s*type:\s*'retry'/);
+        expect(html).toContain("script-src 'nonce-");
+        expect(html).not.toContain('PIPELEX_RETRY_NONCE');
+        // The injected payload is escaped (not a live <script>), so it can never execute.
+        expect(html).not.toContain('<script>globalThis.pwned');
+        expect(html).toContain('&lt;script&gt;globalThis.pwned');
+        // No graph was rendered, so the analyze was never started.
         expect(processUtils.spawnCli).not.toHaveBeenCalled();
 
-        // CLI becomes available; clicking Retry re-runs and now reaches spawnCli.
-        mockState.resolveCliResult = { command: 'pipelex-agent', args: [] };
+        // Clicking Retry re-runs the full refresh; the gather now succeeds and
+        // the analysis reaches spawnCli.
         const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
         messageHandler({ type: 'retry' });
         await vi.waitFor(() => {
@@ -1166,11 +1215,13 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it('renders a non-auth api-error (e.g. HTTP 503) under "Pipelex API Error", not "Unreachable"', async () => {
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+    it('applyBackendError (validator path) flips the widget to error without a toast', async () => {
         const uri = makeUri('/project/file.mthds');
+        seedBundle(uri);
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         panel.show(uri);
         await new Promise(r => setTimeout(r, 20));
+        mockState.showWarningMessage.mockClear();
 
         panel.applyBackendError(uri, new BackendError({
             kind: 'api-error',
@@ -1178,80 +1229,51 @@ describe('MethodGraphPanel', () => {
             userMessage: 'Pipelex API error at https://api.pipelex.com (HTTP 503): service unavailable.',
         }));
 
-        const html = mockState.mockWebview.html;
-        expect(html).toContain('Pipelex API Error');
-        expect(html).not.toContain('Pipelex API Unreachable');
-        expect(html).toContain('HTTP 503');
+        // The graph HTML is untouched (no full-page error view since static-first).
+        expect(mockState.mockWebview.html).not.toContain('Pipelex API Error');
+        const pending = (panel as any).pendingData;
+        expect(pending.validation.state).toBe('error');
+        expect(pending.validation.issues[0].message).toContain('HTTP 503');
+        // On the validator path the validator owns notifications — no toast here.
+        expect(mockState.showWarningMessage).not.toHaveBeenCalled();
         panel.dispose();
     });
 
-    it('renders an auth error under "Pipelex API Key Required" with buttons + clickable inline links', async () => {
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+    it("the panel's own analyze failure (auth) toasts with the backend's remedy actions", async () => {
         const uri = makeUri('/project/file.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 20));
-
-        panel.applyBackendError(uri, new BackendError({
+        seedBundle(uri);
+        const authError = new BackendError({
             kind: 'auth',
             logMessage: 'Pipelex API 401 at https://api.pipelex.com: unauthorized',
-            userMessage: 'plain text fallback (should not be used when detailHtml is present)',
-            detailHtml: 'The hosted Pipelex API needs an API key.</p><p>Get it at ' +
-                '<a class="pipelex-link" href="https://app.pipelex.com/">app.pipelex.com</a>, or self-host the ' +
-                '<a class="pipelex-link" href="https://github.com/Pipelex/pipelex-api">pipelex-api</a> — ' +
-                '<code>docker run -p 8081:8081 pipelex/pipelex-api</code>.',
+            userMessage: 'The hosted Pipelex API needs an API key.',
             actions: [
                 { label: 'Set API Key', command: 'pipelex.setApiKey' },
                 { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
             ],
-        }));
-
-        const html = mockState.mockWebview.html;
-        expect(html).toContain('Pipelex API Key Required');
-        expect(html).not.toContain('Pipelex API Unreachable');
-        // Both remedy buttons plus Retry are rendered.
-        expect(html).toContain('Set API Key');
-        expect(html).toContain('Get an API Key');
-        expect(html).toContain('Retry');
-        // Buttons post the safe, whitelisted message shapes (command dispatch + http open).
-        expect(html).toContain('"type":"runCommand","command":"pipelex.setApiKey"');
-        expect(html).toContain('"type":"openExternally","url":"https://app.pipelex.com/"');
-        // detailHtml is rendered as real HTML (not escaped), with clickable links + the Docker command.
-        expect(html).toContain('<a class="pipelex-link" href="https://app.pipelex.com/"');
-        expect(html).toContain('<a class="pipelex-link" href="https://github.com/Pipelex/pipelex-api"');
-        expect(html).toContain('docker run -p 8081:8081 pipelex/pipelex-api');
-        // The script wires inline-link clicks to open externally.
-        expect(html).toContain("querySelectorAll('a.pipelex-link')");
-        expect(html).not.toContain('plain text fallback');
-        panel.dispose();
-    });
-
-    it('never blesses attacker-influenced error text with a nonce (only the trusted Retry script gets one)', async () => {
-        // A backend failure carrying server-influenced text (here via the CLI's stderr;
-        // the same body path serves the API "unreachable" message, whose text a malicious
-        // baseUrl controls). Even WITH the Retry script's script-src active, a <script>
-        // smuggled into the body must stay inert.
-        const processUtils = await import('../validation/processUtils');
-        vi.mocked(processUtils.spawnCli).mockRejectedValueOnce({
-            exitCode: 1,
-            stderr: '<script>globalThis.pwned = 1;</script>',
         });
+        const backend = { kind: 'api', analyze: vi.fn(() => Promise.reject(authError)) } as any;
+        mockState.showWarningMessage.mockReturnValueOnce(Promise.resolve('Set API Key'));
 
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri(), () => backend);
         panel.show(uri);
         await new Promise(r => setTimeout(r, 20));
 
-        const html = mockState.mockWebview.html;
-        // Our own Retry script is the ONLY thing that got a nonce, and the sentinel is consumed.
-        expect(html).toMatch(/<script nonce="[^"]+">[\s\S]*postMessage/);
-        expect(html).not.toContain('PIPELEX_RETRY_NONCE');
-        // The injected payload is escaped (not a live <script>), so it can never execute.
-        expect(html).not.toContain('<script>globalThis.pwned');
-        expect(html).toContain('&lt;script&gt;globalThis.pwned');
+        // Toast with the remedies as actions; picking one dispatches its command.
+        expect(mockState.showWarningMessage).toHaveBeenCalledWith(
+            expect.stringContaining('API key'),
+            'Set API Key',
+            'Get an API Key',
+        );
+        await new Promise(r => setTimeout(r, 10));
+        expect(mockState.executeCommand).toHaveBeenCalledWith('pipelex.setApiKey');
+        // And the widget carries the failure.
+        const pending = (panel as any).pendingData;
+        expect(pending.validation.state).toBe('error');
+        expect(pending.validation.issues[0].message).toContain('API key');
         panel.dispose();
     });
 
-    // --- Validation-error list view (clickable, owner-attributed) ---
+    // --- Invalid verdict → widget issues (clickable, owner-attributed) ---
 
     // Drive the invalid-bundle branch of applyAnalysis. resolveErrorLocations is mocked,
     // so each fixture supplies its own resolved owner uri + range.
@@ -1262,7 +1284,17 @@ describe('MethodGraphPanel', () => {
         };
     }
 
-    it('renders the validation errors with a count header, messages, context chips, and Retry', async () => {
+    /** The validation payload the webview would render (buffered or posted). */
+    function currentValidationPayload(panel: any): any {
+        const posted = mockState.mockWebview.postMessage.mock.calls
+            .map(c => c[0])
+            .filter((m: any) => m?.type === 'setValidationStatus')
+            .pop();
+        if (posted) return { state: posted.state, issues: posted.issues };
+        return panel.pendingData?.validation;
+    }
+
+    it('posts the invalid verdict as widget issues with messages, context chips, and fixes', async () => {
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/methods/main.mthds');
         panel.show(uri);
@@ -1270,27 +1302,39 @@ describe('MethodGraphPanel', () => {
 
         const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
         mockState.errorLocations = [
-            { error: { category: 'pipe_validation', message: 'missing concept Foo', pipe_code: 'my_pipe' }, uri, range },
+            {
+                error: {
+                    category: 'pipe_validation',
+                    message: 'missing concept Foo',
+                    pipe_code: 'my_pipe',
+                    suggested_fix: { fix_code: 'declare-concept', description: 'Declare [concept.Foo].', ops: [] },
+                },
+                uri,
+                range,
+            },
             { error: { category: 'concept_validation', message: 'unknown concept Bar', concept_code: 'Bar' }, uri, range },
         ];
         await panel.applyAnalysis(uri, invalidAnalysis());
 
-        const html = mockState.mockWebview.html;
-        expect(html).toContain('2 Validation Errors');
-        expect(html).toContain('Fix and save to regenerate the graph');
-        expect(html).toContain('missing concept Foo');
-        expect(html).toContain('unknown concept Bar');
-        expect(html).toContain('pipe.my_pipe');
-        expect(html).toContain('concept.Bar');
-        expect(html).toContain('id="pipelex-retry"');
-        expect(html).toMatch(/postMessage\(\s*\{\s*type:\s*'navigateToError'/);
-        expect(html).toContain("script-src 'nonce-");
-        // Both errors are owned by the saved file → no owning-file chip.
-        expect(html).not.toContain('class="file"');
+        const validation = currentValidationPayload(panel);
+        expect(validation.state).toBe('invalid');
+        expect(validation.issues).toEqual([
+            expect.objectContaining({
+                severity: 'error',
+                message: 'missing concept Foo',
+                context: 'pipe.my_pipe',
+                suggestedFix: 'Declare [concept.Foo].',
+                origin: 'validator',
+            }),
+            expect.objectContaining({ message: 'unknown concept Bar', context: 'concept.Bar' }),
+        ]);
+        // Both errors are owned by the shown file → no owning-file label.
+        expect(validation.issues[0].file).toBeUndefined();
+        expect(validation.issues[1].file).toBeUndefined();
         panel.dispose();
     });
 
-    it('still renders the error list when gathering bundle files fails (no unhandled rejection)', async () => {
+    it('still posts the verdict when gathering bundle files fails (no unhandled rejection)', async () => {
         const bundleGather = await import('../validation/bundleGather');
 
         const output = mockOutput();
@@ -1306,13 +1350,13 @@ describe('MethodGraphPanel', () => {
         ];
 
         // The validator calls applyAnalysis fire-and-forget, so a gather failure must
-        // resolve (not reject) — otherwise the rejection is unhandled and the panel
-        // keeps a stale graph instead of the verdict.
+        // resolve (not reject) — otherwise the rejection is unhandled and the widget
+        // keeps showing a stale state instead of the verdict.
         await expect(panel.applyAnalysis(uri, invalidAnalysis())).resolves.toBeUndefined();
 
-        const html = mockState.mockWebview.html;
-        expect(html).toContain('1 Validation Error');
-        expect(html).toContain('still shown despite gather failure');
+        const validation = currentValidationPayload(panel);
+        expect(validation.state).toBe('invalid');
+        expect(validation.issues[0].message).toBe('still shown despite gather failure');
         // The failure was logged, not thrown.
         expect(output.appendLine).toHaveBeenCalledWith(
             expect.stringContaining('could not gather bundle files'),
@@ -1320,24 +1364,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it('uses a singular header for a single validation error', async () => {
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
-        const uri = makeUri('/project/methods/main.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 20));
-
-        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
-        mockState.errorLocations = [
-            { error: { category: 'pipe_validation', message: 'only one' }, uri, range },
-        ];
-        await panel.applyAnalysis(uri, invalidAnalysis());
-
-        expect(mockState.mockWebview.html).toContain('1 Validation Error');
-        expect(mockState.mockWebview.html).not.toContain('1 Validation Errors');
-        panel.dispose();
-    });
-
-    it('shows the owning-file basename for an error that lives in a sibling file', async () => {
+    it('labels an issue with the owning-file basename when it lives in a sibling file', async () => {
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/methods/main.mthds');
         const siblingUri = makeUri('/project/methods/concepts.mthds');
@@ -1350,10 +1377,49 @@ describe('MethodGraphPanel', () => {
         ];
         await panel.applyAnalysis(uri, invalidAnalysis());
 
-        const html = mockState.mockWebview.html;
-        expect(html).toContain('class="file"');
-        expect(html).toContain('concepts.mthds');
-        expect(html).toContain('helper broke');
+        const validation = currentValidationPayload(panel);
+        expect(validation.issues[0].file).toBe('concepts.mthds');
+        expect(validation.issues[0].message).toBe('helper broke');
+        panel.dispose();
+    });
+
+    it('a valid verdict keeps only the static analyzer warnings', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // Seed static analysis results directly: one warning, one error.
+        (panel as any).staticIssues = [
+            { severity: 'warning', message: 'tolerated with fallback', origin: 'static' },
+            { severity: 'error', message: 'static thought this was broken', origin: 'static' },
+        ];
+        (panel as any).staticTargets = [undefined, undefined];
+
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any);
+
+        // The verdict is authoritative: static errors are dropped, warnings kept.
+        const validation = currentValidationPayload(panel);
+        expect(validation.state).toBe('valid');
+        expect(validation.issues).toEqual([
+            expect.objectContaining({ severity: 'warning', message: 'tolerated with fallback' }),
+        ]);
+        panel.dispose();
+    });
+
+    it('applySkipped flips the widget to error with the skip reason', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        panel.applySkipped(uri, 'This file has errors reported by another extension.');
+
+        const validation = currentValidationPayload(panel);
+        expect(validation.state).toBe('error');
+        expect(validation.issues[0].message).toContain('another extension');
+        // The graph HTML is untouched — no full-page notice since static-first.
+        expect(mockState.mockWebview.html).not.toContain('Graph Unavailable');
         panel.dispose();
     });
 
@@ -1428,28 +1494,50 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it('escapes attacker-influenced error text in the list; only the trusted script is nonced', async () => {
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+    it('on save with validation enabled, rebuilds only the static graph and flips to validating', async () => {
+        const processUtils = await import('../validation/processUtils');
         const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri);
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         panel.show(uri);
         await new Promise(r => setTimeout(r, 20));
 
-        const evil = '<script>globalThis.pwned = 1;</script><img src=x onerror=alert(1)>';
-        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
-        mockState.errorLocations = [
-            { error: { category: 'x', message: evil }, uri, range },
-        ];
-        await panel.applyAnalysis(uri, invalidAnalysis());
+        // Complete the handshake so live messages flow.
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+        mockState.mockWebview.postMessage.mockClear();
+        vi.mocked(processUtils.spawnCli).mockClear();
 
-        const html = mockState.mockWebview.html;
-        // Our own row/Retry script is the ONLY thing nonced; the sentinel is consumed.
-        expect(html).toMatch(/<script nonce="[^"]+">[\s\S]*navigateToError/);
-        expect(html).not.toContain('PIPELEX_RETRY_NONCE');
-        // The payload is escaped, never a live tag, so it can never execute.
-        expect(html).not.toContain('<script>globalThis.pwned');
-        expect(html).toContain('&lt;script&gt;globalThis.pwned');
-        expect(html).not.toContain('<img src=x onerror=');
-        expect(html).toContain('&lt;img src=x onerror=');
+        // Save: the panel rebuilds the static graph immediately, but the analyze
+        // call belongs to the on-save validator — the panel must NOT spawn.
+        mockState.onSaveHandler!({ uri });
+        await new Promise(r => setTimeout(r, 20));
+
+        const setData = mockState.mockWebview.postMessage.mock.calls
+            .map(c => c[0])
+            .find((m: any) => m?.type === 'setData');
+        expect(setData.graphspec.meta.mode).toBe('static');
+        expect(setData.validation.state).toBe('validating');
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
+        panel.dispose();
+    });
+
+    it('graphspec-json views carry no validation payload (widget stays hidden)', async () => {
+        const uri = makeUri('/project/run/graphspec.json');
+        mockState.openTextDocuments = [{
+            uri,
+            getText: () => JSON.stringify({ meta: { format: 'mthds' }, nodes: [], edges: [] }),
+        }];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.showGraphspecJson(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const pending = (panel as any).pendingData;
+        expect(pending.type).toBe('setData');
+        expect(pending.sourceKind).toBe('graphspec-json');
+        expect(pending.validation).toBeUndefined();
         panel.dispose();
     });
 

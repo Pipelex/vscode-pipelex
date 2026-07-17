@@ -1,0 +1,47 @@
+# Method graph: static-first rendering + validation widget
+
+The Method Graph panel (`Pipelex: Show Method Graph` on any `.mthds` editor) renders in two decoupled stages: the **graph appears instantly**, and the **validation verdict arrives asynchronously** in a toolbar widget.
+
+## Static-first rendering
+
+The graph is built **statically inside the extension host** by `@pipelex/mthds-ui`'s static-graph module (`buildStaticGraphSpecFromToml`): the panel gathers the bundle's `.mthds` files (primary first, via `resolveGraphPrimaryBundle`), feeds their raw TOML text to the builder, and sends the resulting GraphSpec (`meta.mode: "static"`) to the same `GraphViewer` webview as before. Consequences:
+
+- **No pipelex round-trip for the graph.** Opening the panel no longer blocks on `pipelex-agent validate --view`; the analyze call still runs, but only for the verdict (`--view` is never passed anymore).
+- **Invalid methods still render.** The static builder is lenient by design — half-written bundles, unresolved refs, and cycles all produce a best-effort graph plus diagnostics, never an error page.
+- **Works without pipelex.** If `pipelex-agent` isn't installed, the graph still renders; only the validation verdict is unavailable (widget `error` state + a one-time install hint).
+- **Saves are instant.** On save the panel rebuilds the static graph immediately (same-file refresh preserves the viewport) and flips the widget to `validating`; the on-save validator's single analyze call then delivers the verdict. When `pipelex.validation.enabled` is off, the panel runs the analyze itself.
+
+The only cases that still replace the graph with a message view are pre-graph failures: unreadable bundle files, missing webview assets, or an invalid graphspec JSON in the Run Graph path.
+
+## The validation widget
+
+The graph toolbar's first section is a validation status widget (rendered by `GraphViewer` when the host passes a `validationState` — the Run Graph / graphspec-json view passes none, so it shows no widget):
+
+| State | Meaning |
+| --- | --- |
+| spinner | Verdict pending (`validating`) |
+| green check | `pipelex-agent validate` accepted the bundle (`valid`) |
+| red cross + count badge | The bundle is invalid; the badge counts the issues |
+| warning triangle | No verdict could be produced (`error`): CLI not found or too old, timeout, API auth failure, or the save was skipped because another tool reported errors |
+
+Clicking the widget opens a dropdown listing the issues: severity accent, `pipe.…`/`concept.…` locator chip, message, the runtime's **suggested fix** (`validation_errors[].suggested_fix.description`, when the fix planner derived one), and the owning-file basename when the issue lives in a sibling file. Clicking a row jumps to the issue's source location — the same index-based `navigateToError` mechanism as before, resolved through `resolveErrorLocations` so the widget and the Problems panel always agree.
+
+### Which issues are listed per state
+
+The issue list is composed host-side (`methodGraphPanel` + the pure helpers in `graph/validationStatus.ts`):
+
+- `validating` → the static analyzer's diagnostics (best-effort navigation via the declaration's table header).
+- `invalid` → the validator's errors only (the static analyzer would double-report the same problems).
+- `valid` → static warnings only; a static *error* contradicted by the authoritative verdict is dropped.
+- `error` → the failure description first, then the static diagnostics.
+
+## Message protocol
+
+Two additions to the host ↔ webview protocol:
+
+- `setData` carries an optional `validation: { state, issues }` payload so a fresh webview paints the widget without a follow-up message (absent for graphspec-json views).
+- `setValidationStatus { state, issues }` is a lightweight live update in the `setSystemTheme`/`setToolbarPosition` family: the adapter updates only the widget props and re-renders — no re-layout, no viewport reset.
+
+## Backends
+
+Both validation backends (`cli` / `api`, see `validation-backends.md`) feed the widget identically: a produced verdict maps to `valid`/`invalid`, a `BackendError` to the `error` state (with its per-kind wording as the lead issue). Toast notifications stay rate-limited: the panel toasts only for its own open-time analyze failures (one-time CLI-install hint; actionable API auth errors with the Set API Key button), while on-save failures keep being notified by the validator.

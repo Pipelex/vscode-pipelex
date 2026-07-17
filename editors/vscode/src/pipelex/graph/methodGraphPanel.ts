@@ -1,23 +1,25 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import { buildStaticGraphSpecFromToml, staticDiagnosticsToValidationIssues } from '@pipelex/mthds-ui/static-graph';
 import { cancelAllInflight } from '../validation/processUtils';
 import { gatherBundleFiles } from '../validation/bundleGather';
 import { resolveGraphPrimaryBundle } from '../validation/graphPrimary';
+import type { GraphPrimaryBundle } from '../validation/graphPrimary';
 import { resolveErrorLocations } from '../validation/crossFileDiagnostics';
 import { resolveDeclaringFile } from '../validation/bundleResolution';
 import { AnalyzeAbortError, BackendError } from '../validation/backend';
-import type { BackendErrorAction, BundleAnalysis, BundleFile, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
+import type { BundleAnalysis, BundleFile, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
 import { CliValidationBackend } from '../validation/cliValidationBackend';
-import { SET_API_KEY_COMMAND } from '../validation/apiKey';
-import { findTableHeader } from '../validation/sourceLocator';
-import type { ValidationErrorItem } from '../validation/types';
+import { findTableHeader, findTableHeaderInLines } from '../validation/sourceLocator';
 import { resolveGraphConfig, activeEditorGraphTheme } from './graphConfig';
 import { parseGraphspecFile } from './graphspecDetector';
 import { escapeHtml } from '../htmlEscape';
+import { describeBackendErrorIssue, parseStaticIssueContext, validationErrorsToIssues } from './validationStatus';
+import type { GraphValidationIssue, GraphValidationPayload } from './validationStatus';
 
 /**
- * Placeholder for the CSP nonce inside the error view's Retry `<script>`.
+ * Placeholder for the CSP nonce inside the message view's Retry `<script>`.
  * `setHtml()` swaps ONLY this exact token for the real per-render nonce — it never
  * blesses a bare `<script>` tag — so escaped page content can never smuggle in an
  * executable (nonce-bearing) script even if a future interpolation forgets to escape.
@@ -26,8 +28,8 @@ import { escapeHtml } from '../htmlEscape';
  */
 const RETRY_NONCE_SENTINEL = 'PIPELEX_RETRY_NONCE';
 
-/** Commands the message-view buttons may dispatch — a closed allowlist, not arbitrary command execution. */
-const WEBVIEW_ALLOWED_COMMANDS = new Set<string>([SET_API_KEY_COMMAND]);
+/** A resolved jump target for one validation-widget issue row (sparse: non-navigable rows are undefined). */
+type ErrorTarget = { uri: vscode.Uri; range: vscode.Range };
 
 /**
  * The subset of a GraphSpec the panel reads to map a clicked pipe node back to
@@ -65,11 +67,29 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     private pendingData: any = null;
     private fileWatcherDebounce: ReturnType<typeof setTimeout> | undefined;
     /**
-     * Resolved jump targets for the rows of the current validation-error view,
-     * indexed positionally. The webview navigates by index only (never by path),
-     * so it can never request an arbitrary file — see {@link navigateToError}.
+     * Resolved jump targets for the rows of the validation widget's issue list,
+     * indexed positionally (sparse — a row without a resolvable source is
+     * undefined and its click no-ops). The webview navigates by index only
+     * (never by path), so it can never request an arbitrary file — see
+     * {@link navigateToError}.
      */
-    private errorTargets: { uri: vscode.Uri; range: vscode.Range }[] = [];
+    private errorTargets: (ErrorTarget | undefined)[] = [];
+    /**
+     * The static analyzer's issues (+ aligned best-effort jump targets) for the
+     * graph currently shown, kept so verdict updates can re-compose the issue
+     * list per state: all of them while `validating`, warnings only on `valid`,
+     * appended after the failure description on `error`.
+     */
+    private staticIssues: GraphValidationIssue[] = [];
+    private staticTargets: (ErrorTarget | undefined)[] = [];
+    /**
+     * The validation payload the webview currently shows (state + issues).
+     * Single source of truth: `setData` embeds it and `setValidationStatus`
+     * updates it, so a rebuild can never resurrect a stale verdict.
+     */
+    private currentValidation: GraphValidationPayload | undefined;
+    /** Last backend-failure toast shown from the panel's own refresh, deduped until the next verdict. */
+    private lastNotifiedMessage: string | undefined;
     /**
      * The graphspec last forwarded to the webview, retained so a `navigateToPipe`
      * click can recover the clicked node's `domain_code` and registry `source`
@@ -94,14 +114,21 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                     this.refreshJson(doc.uri);
                     return;
                 }
-                // For .mthds, the on-save validator drives ONE analyze call and hands us the
-                // graph (see setGraphSink). Only self-refresh when validation is disabled, so
-                // the panel still updates on save without the validator running.
+                // For .mthds the static graph rebuilds immediately on every save; the
+                // verdict channel depends on the validator. When validation is enabled
+                // the on-save validator owns the single analyze call and hands the
+                // verdict to the widget (see setGraphSink), so only rebuild the static
+                // graph here; when disabled, run the full refresh (static + analyze).
                 const validationEnabled = vscode.workspace
                     .getConfiguration('pipelex', doc.uri)
                     .get<boolean>('validation.enabled', true);
-                if (!validationEnabled) {
-                    this.refresh(doc.uri);
+                if (validationEnabled) {
+                    // Flip to "validating" synchronously so a fast verdict from the
+                    // validator can never be overwritten by this rebuild's async reads.
+                    this.currentValidation = { state: 'validating', issues: this.staticIssues };
+                    void this.renderStaticGraph(doc.uri);
+                } else {
+                    void this.refresh(doc.uri);
                 }
             })
         );
@@ -369,43 +396,140 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const uriKey = uri.toString();
         this.inflight.set(uriKey, controller);
 
+        // Verdict pending — the static graph below renders immediately with the
+        // widget spinning; the analyze result flips it.
+        this.currentValidation = { state: 'validating', issues: this.staticIssues };
+
         // Show loading screen only on first load; keep the current graph visible
         // during subsequent refreshes so the viewport position is preserved.
         if (!this.webviewReady) {
             this.setHtml(loadingHtml());
         }
 
+        // 1) Static graph, immediately — no backend involved.
+        const graphPrimary = await this.renderStaticGraph(uri);
+        if (!graphPrimary) {
+            if (this.inflight.get(uriKey) === controller) {
+                this.inflight.delete(uriKey);
+            }
+            return;
+        }
+
+        // 2) Verdict in the background. The graph is NOT requested (`withGraph:
+        // false`): since the static-first flow, the rendered graph is the static
+        // one and the backend call only produces the verdict.
         const pipelexConfig = vscode.workspace.getConfiguration('pipelex', uri);
         const timeout = pipelexConfig.get<number>('validation.timeout', 30000);
-        const direction = pipelexConfig.get<string>('graph.direction', 'top_down');
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
 
         try {
             const backend = this.getBackend(uri);
-            const graphPrimary = await resolveGraphPrimaryBundle(uri);
             // The CLI reads siblings via `--library-dir` itself; only the API path needs contents.
             const files = backend.kind === 'api' ? graphPrimary.files : [];
             const analysis = await backend.analyze(
                 { primaryUri: graphPrimary.primaryUri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
-                { withGraph: true, direction },
+                { withGraph: false },
                 controller.signal,
             );
 
             if (controller.signal.aborted) return;
             // Staleness check: if the user switched files while we were waiting,
-            // discard this result so it doesn't overwrite the new file's graph.
+            // discard this result so it doesn't overwrite the new file's status.
             if (this.currentUri?.toString() !== uri.toString()) return;
 
             await this.applyAnalysis(uri, analysis);
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
-            this.renderBackendError(err);
+            this.notifyBackendError(err);
+            this.showBackendErrorInWidget(err);
         } finally {
             if (this.inflight.get(uriKey) === controller) {
                 this.inflight.delete(uriKey);
             }
         }
+    }
+
+    /**
+     * Build the static graph from the bundle's files and send it to the webview
+     * with the current validation payload. Never involves pipelex: the static
+     * builder is best-effort and its diagnostics become widget issues (listed
+     * while `validating` and folded into later verdict states).
+     *
+     * Returns the resolved bundle (for the follow-up analyze call), or undefined
+     * when nothing was rendered (stale URI, panel closed, or unreadable files —
+     * the latter falls back to the message view).
+     */
+    private async renderStaticGraph(uri: vscode.Uri): Promise<GraphPrimaryBundle | undefined> {
+        if (!this.panel) return undefined;
+
+        let graphPrimary: GraphPrimaryBundle;
+        try {
+            graphPrimary = await resolveGraphPrimaryBundle(uri);
+        } catch (err: any) {
+            if (!this.panel) return undefined;
+            if (this.currentUri?.toString() !== uri.toString()) return undefined;
+            this.clearNavigationState();
+            this.setHtml(messageHtml(
+                'Read Error',
+                `Could not read the bundle files: ${escapeHtml(err?.message ?? String(err))}`,
+                { retry: true },
+            ));
+            return undefined;
+        }
+        if (!this.panel) return undefined;
+        if (this.currentUri?.toString() !== uri.toString()) return undefined;
+
+        const { spec, diagnostics } = buildStaticGraphSpecFromToml(graphPrimary.files.map(f => f.content));
+        this.staticIssues = staticDiagnosticsToValidationIssues(diagnostics);
+        this.staticTargets = this.resolveStaticIssueTargets(this.staticIssues, graphPrimary.files);
+
+        // While the verdict is pending, the widget lists the static issues; a
+        // verdict that already landed (the validator racing ahead of these file
+        // reads) is authoritative and keeps its own issue list.
+        if (!this.currentValidation || this.currentValidation.state === 'validating') {
+            this.currentValidation = { state: 'validating', issues: this.staticIssues };
+            this.errorTargets = this.staticTargets;
+        }
+
+        const config = vscode.workspace.getConfiguration('pipelex', uri);
+        const direction = config.get<string>('graph.direction', 'top_down');
+        const showControllers = config.get<boolean>('graph.showControllers', true);
+        const foldMode = config.get<string>('graph.foldMode', 'folded');
+        await this.sendGraphspecToWebview(uri, spec, direction, showControllers, foldMode);
+        return graphPrimary;
+    }
+
+    /**
+     * Best-effort jump targets for static issues: when a diagnostic's TOML path
+     * names a `[pipe.<code>]` / `[concept.<code>]` declaration, point the row at
+     * that table header in its declaring file. Rows that resolve nowhere stay
+     * undefined (non-navigable) rather than jumping somewhere wrong.
+     */
+    private resolveStaticIssueTargets(
+        issues: GraphValidationIssue[],
+        files: BundleFile[],
+    ): (ErrorTarget | undefined)[] {
+        const linesCache = new Map<string, string[]>();
+        const getLines = (file: BundleFile): string[] => {
+            const key = file.uri.toString();
+            let lines = linesCache.get(key);
+            if (!lines) {
+                lines = file.content.split(/\r\n|\r|\n/);
+                linesCache.set(key, lines);
+            }
+            return lines;
+        };
+        return issues.map(issue => {
+            const ref = parseStaticIssueContext(issue.context);
+            if (!ref) return undefined;
+            const owner = resolveDeclaringFile({ kind: ref.kind, code: ref.code, files, getLines });
+            if (!owner) return undefined;
+            const lines = getLines(owner);
+            const line = findTableHeaderInLines(lines, ref.kind, ref.code);
+            if (line === -1) return undefined;
+            return { uri: owner.uri, range: new vscode.Range(line, 0, line, lines[line].length) };
+        });
     }
 
     /** Whether the panel currently shows the method graph of this `.mthds` file. */
@@ -416,58 +540,49 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     /**
-     * Render a backend analysis: the graph when present, the validation errors
-     * when the bundle is invalid, otherwise a "no graph" notice. Public so the
-     * on-save validator can hand it the analysis from its single backend call.
+     * Apply a verdict to the validation widget. Public so the on-save validator
+     * can hand over the outcome of its single analyze call. The graph itself is
+     * NOT touched — since the static-first flow, the rendered graph is the
+     * static one and stays on screen whatever the verdict.
      *
-     * Async because the error branch resolves each error to its owning file +
-     * range (a few sibling-file reads) so the rendered list can be clickable;
-     * the common graph / no-graph branches stay synchronous.
+     * Issue policy per state: `invalid` shows the validator's errors only (the
+     * static analyzer would double-report the same problems); `valid` keeps
+     * static warnings but drops static errors (contradicted by the
+     * authoritative verdict).
+     *
+     * Async because the invalid branch resolves each error to its owning file +
+     * range (a few sibling-file reads) so the issue rows can be clickable;
+     * callers may fire-and-forget — a gather failure never rejects.
      */
     async applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): Promise<void> {
         if (!this.panel) return;
+        if (this.sourceKind !== 'mthds') return;
         if (this.currentUri?.toString() !== uri.toString()) return;
 
-        if (analysis.graph) {
-            const config = vscode.workspace.getConfiguration('pipelex', uri);
-            const direction = config.get<string>('graph.direction', 'top_down');
-            const showControllers = config.get<boolean>('graph.showControllers', true);
-            const foldMode = config.get<string>('graph.foldMode', 'folded');
-            void this.sendGraphspecToWebview(uri, analysis.graph, direction, showControllers, foldMode);
-            return;
-        }
-
         const validation = analysis.validation;
-        if (!validation.ok && validation.errors.length > 0) {
-            await this.renderValidationErrors(uri, validation.errors);
+        if (validation.ok) {
+            this.lastNotifiedMessage = undefined;
+            const kept = this.staticIssues
+                .map((issue, index) => ({ issue, target: this.staticTargets[index] }))
+                .filter(entry => entry.issue.severity === 'warning');
+            this.postValidationStatus(
+                { state: 'valid', issues: kept.map(entry => entry.issue) },
+                kept.map(entry => entry.target),
+            );
             return;
         }
 
-        this.clearNavigationState();
-        this.setHtml(messageHtml('No Graph Available', 'The bundle did not produce a method graph.'));
-    }
-
-    /**
-     * Render the structured validation errors as a clickable list. Each error is
-     * resolved to its owning file + range (reusing the diagnostics resolver, so the
-     * panel and the Problems panel can never disagree) and stashed in
-     * {@link errorTargets} for index-based navigation.
-     */
-    private async renderValidationErrors(uri: vscode.Uri, errors: ValidationErrorItem[]): Promise<void> {
-        this.clearNavigationState();
-        // The CLI path resolves siblings itself, so `refresh()` does not gather them;
-        // the clickable list needs their contents to place an error on its owning file.
-        // A gather failure (transient read error, deleted primary file) must NOT reject:
-        // the validator calls applyAnalysis fire-and-forget, so an unhandled rejection
-        // would leave the previous graph stale instead of showing the verdict. Fall back
-        // to no siblings — resolveErrorLocations then places every error on the primary
-        // file (non-clickable to siblings) rather than throwing.
-        let files: Awaited<ReturnType<typeof gatherBundleFiles>>;
+        // Invalid: place each error on its owning file + range (reusing the
+        // diagnostics resolver, so the widget and the Problems panel can never
+        // disagree). The CLI path resolves siblings itself, so they are gathered
+        // here; a gather failure falls back to no siblings, which places every
+        // error on the primary file rather than rejecting.
+        let files: BundleFile[];
         try {
             files = await gatherBundleFiles(uri);
         } catch (err) {
             this.output.appendLine(
-                `pipelex graph: could not gather bundle files for the error view: ${String(err)}`,
+                `pipelex graph: could not gather bundle files for the validation issues: ${String(err)}`,
             );
             files = [];
         }
@@ -479,110 +594,128 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const primaryDocument = vscode.workspace.textDocuments.find(
             d => d.uri.toString() === uri.toString(),
         );
-        const locations = resolveErrorLocations({ errors, files, primaryUri: uri, primaryDocument });
-
-        this.errorTargets = locations.map(loc => ({ uri: loc.uri, range: loc.range }));
-
-        const entries: ErrorListEntry[] = locations.map((loc, index) => ({
-            index,
-            message: loc.error.message,
-            context: errorContext(loc.error),
-            // Name the owning file only when it differs from the saved one, so a
+        const locations = resolveErrorLocations({ errors: validation.errors, files, primaryUri: uri, primaryDocument });
+        const issues = validationErrorsToIssues(
+            validation.errors,
+            // Name the owning file only when it differs from the shown one, so a
             // single-file bundle (or an error on the file you saved) stays clean.
-            file: loc.uri.toString() !== uri.toString() ? basename(loc.uri.fsPath) : undefined,
-        }));
-
-        this.setHtml(errorListHtml(entries));
+            locations.map(loc => loc.uri.toString() !== uri.toString() ? basename(loc.uri.fsPath) : undefined),
+        );
+        this.postValidationStatus(
+            { state: 'invalid', issues },
+            locations.map(loc => ({ uri: loc.uri, range: loc.range })),
+        );
     }
 
     /**
-     * The on-save analysis threw. Render the failure rather than leave a stale
-     * graph — with validation enabled the panel no longer self-refreshes on save,
-     * so the validator drives this for the file it is showing.
+     * The on-save analysis threw (validator path). The static graph stays; the
+     * widget flips to `error`. Notifications are the validator's job on this
+     * path, so none are shown here. A no-op when the panel is not showing `uri`.
      */
     applyBackendError(uri: vscode.Uri, err: unknown): void {
         if (!this.panel) return;
+        if (this.sourceKind !== 'mthds') return;
         if (this.currentUri?.toString() !== uri.toString()) return;
-        this.renderBackendError(err);
+        this.showBackendErrorInWidget(err);
     }
 
     /**
      * The on-save validation was skipped for this file (another tool reported
-     * errors). Replace the stale graph with a short notice.
+     * errors). The static graph stays; the widget flips to `error` with the
+     * skip reason as its lead issue.
      */
     applySkipped(uri: vscode.Uri, message: string): void {
         if (!this.panel) return;
+        if (this.sourceKind !== 'mthds') return;
         if (this.currentUri?.toString() !== uri.toString()) return;
-        this.clearNavigationState();
-        this.setHtml(messageHtml('Graph Unavailable', escapeHtml(message)));
+        this.postValidationStatus(
+            {
+                state: 'error',
+                issues: [{ severity: 'error', message, origin: 'validator' }, ...this.staticIssues],
+            },
+            [undefined, ...this.staticTargets],
+        );
     }
 
-    private renderBackendError(err: unknown): void {
-        this.clearNavigationState();
-        if (err instanceof BackendError) {
-            switch (err.kind) {
-                case 'not-found':
-                    if (!this.cliWarningShown) {
-                        this.cliWarningShown = true;
-                        vscode.window.showWarningMessage(
-                            'Pipelex graph: could not find pipelex-agent. ' +
-                            'Install it or set pipelex.validation.agentCliPath in settings.'
-                        );
-                    }
-                    this.setHtml(messageHtml(
-                        'CLI Not Found',
-                        'Could not find <code>pipelex-agent</code>. Install it or set ' +
-                        '<code>pipelex.validation.agentCliPath</code> in settings.',
-                        { retry: true }
-                    ));
-                    return;
-                case 'too-old':
-                    this.output.appendLine(err.logMessage);
-                    this.setHtml(messageHtml(
-                        'Update Pipelex',
-                        `Your installed <code>pipelex-agent</code> is <strong>${escapeHtml(err.installedVersion ?? '?')}</strong>, ` +
-                        `but the method graph requires <strong>≥ ${escapeHtml(err.minVersion ?? '?')}</strong> ` +
-                        `(structured validation errors landed in that release).` +
-                        `</p><p>` +
-                        `Upgrade Pipelex and try again:<br>` +
-                        `<code>mthds runner setup pipelex</code> (mthds-managed install)<br>` +
-                        `<code>uv tool upgrade pipelex</code> (uv tool install)<br>` +
-                        `<code>uv pip install -U pipelex</code> or <code>pip install -U pipelex</code> (project virtualenv)`,
-                        { retry: true }
-                    ));
-                    return;
-                case 'unreachable':
-                    this.output.appendLine(err.logMessage);
-                    this.setHtml(messageHtml('Pipelex API Unreachable', escapeHtml(err.userMessage ?? err.logMessage), { retry: true }));
-                    return;
-                case 'api-error':
-                    this.output.appendLine(err.logMessage);
-                    this.setHtml(messageHtml('Pipelex API Error', escapeHtml(err.userMessage ?? err.logMessage), { retry: true }));
-                    return;
-                case 'auth':
-                    this.output.appendLine(err.logMessage);
-                    this.setHtml(messageHtml(
-                        'Pipelex API Key Required',
-                        err.detailHtml ?? escapeHtml(err.userMessage ?? err.logMessage),
-                        { retry: true, actions: (err.actions ?? []).map(toPanelAction) },
-                    ));
-                    return;
-                case 'declined':
-                    this.setHtml(messageHtml('Not Sent', 'Sending bundle contents to the remote Pipelex API was declined.', { retry: true }));
-                    return;
-                case 'infra':
-                    this.output.appendLine(err.logMessage);
-                    this.setHtml(messageHtml('Validation Failed', escapeHtml(err.logMessage.slice(0, 500)), { retry: true }));
-                    return;
-            }
+    /**
+     * Update the validation widget: retain the payload (so a later `setData`
+     * carries it), swap the navigation targets to match the new issue list, and
+     * push a lightweight `setValidationStatus` to a live webview — the
+     * `setSystemTheme` pattern: no re-layout, no viewport reset. Before the
+     * webview is ready the payload rides on the pending `setData` instead.
+     */
+    private postValidationStatus(
+        payload: GraphValidationPayload,
+        targets: (ErrorTarget | undefined)[],
+    ): void {
+        this.currentValidation = payload;
+        this.errorTargets = targets;
+        if (this.webviewReady && this.panel) {
+            this.panel.webview.postMessage({
+                type: 'setValidationStatus',
+                state: payload.state,
+                issues: payload.issues,
+            });
+        } else if (this.pendingData) {
+            this.pendingData.validation = payload;
         }
-        const message = err instanceof Error ? err.message : String(err);
-        this.output.appendLine(`pipelex graph error: ${message}`);
-        this.setHtml(messageHtml(
-            'Error',
-            'An error occurred while generating the method graph. Check the output panel for details.',
-            { retry: true }
-        ));
+    }
+
+    /** Flip the widget to `error`: the failure as lead issue, static issues after it. */
+    private showBackendErrorInWidget(err: unknown): void {
+        if (err instanceof BackendError) {
+            this.output.appendLine(`pipelex graph: ${err.logMessage}`);
+        } else {
+            this.output.appendLine(
+                `pipelex graph error: ${err instanceof Error ? err.message : String(err)}`,
+            );
+        }
+        this.postValidationStatus(
+            { state: 'error', issues: [describeBackendErrorIssue(err), ...this.staticIssues] },
+            [undefined, ...this.staticTargets],
+        );
+    }
+
+    /**
+     * Toast side-channel for the panel's own analyze failures (the open /
+     * external-change path — on save the validator owns notifications). One-time
+     * for a missing CLI; deduped-by-message otherwise (until the next `valid`
+     * verdict), with the backend's remedies (e.g. Set API Key) as toast actions.
+     */
+    private notifyBackendError(err: unknown): void {
+        if (!(err instanceof BackendError)) return;
+        if (err.kind === 'declined') return;
+        if (err.kind === 'not-found') {
+            if (!this.cliWarningShown) {
+                this.cliWarningShown = true;
+                vscode.window.showWarningMessage(
+                    'Pipelex graph: could not find pipelex-agent. ' +
+                    'Install it or set pipelex.validation.agentCliPath in settings.'
+                );
+            }
+            return;
+        }
+        const message = err.userMessage
+            ?? (err.kind === 'too-old'
+                ? `Your pipelex-agent is ${err.installedVersion ?? '?'}, but the extension needs ` +
+                  `≥ ${err.minVersion ?? '?'}. Upgrade pipelex.`
+                : undefined);
+        if (!message || this.lastNotifiedMessage === message) return;
+        this.lastNotifiedMessage = message;
+        const actions = err.actions ?? [];
+        if (actions.length === 0) {
+            void vscode.window.showWarningMessage(message);
+            return;
+        }
+        void vscode.window.showWarningMessage(message, ...actions.map(a => a.label)).then(choice => {
+            const action = actions.find(a => a.label === choice);
+            if (!action) return;
+            if ('command' in action) {
+                void vscode.commands.executeCommand(action.command);
+            } else {
+                void vscode.env.openExternal(vscode.Uri.parse(action.externalUrl));
+            }
+        });
     }
 
     private async refreshJson(uri: vscode.Uri) {
@@ -658,8 +791,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
         // Retain the graphspec so a pipe-node click can recover its declaring
         // domain + registry `source` (see navigateToPipe). Set alongside the send
-        // so it always matches what the webview is rendering.
-        this.errorTargets = [];
+        // so it always matches what the webview is rendering. The navigation
+        // targets are NOT reset here — they track the validation issue list
+        // (postValidationStatus / renderStaticGraph), not the graphspec.
         this.currentGraphspec = graphspec;
 
         const setDataPayload = {
@@ -667,6 +801,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             uri: uri.toString(),
             sourceKind: this.sourceKind,
             graphspec,
+            // The validation widget state rides on setData so a fresh webview
+            // paints it without waiting for a follow-up message; graphspec-json
+            // views never validate, so the widget stays hidden there.
+            validation: this.sourceKind === 'mthds' ? this.currentValidation : undefined,
             config: {
                 direction: dagreDirection,
                 showControllers,
@@ -704,6 +842,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     private clearNavigationState(): void {
         this.currentGraphspec = undefined;
         this.errorTargets = [];
+        this.staticIssues = [];
+        this.staticTargets = [];
+        this.currentValidation = undefined;
     }
 
     private buildWebviewHtml(): string | undefined {
@@ -813,15 +954,6 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
         if (message.type === 'themeModeChanged' && typeof message.mode === 'string') {
             void this.persistThemeMode(message.mode);
-            return;
-        }
-        if (message.type === 'runCommand' && typeof message.command === 'string') {
-            // Only commands we explicitly expose — never an arbitrary command from the webview.
-            if (WEBVIEW_ALLOWED_COMMANDS.has(message.command)) {
-                void vscode.commands.executeCommand(message.command);
-            } else {
-                this.output.appendLine(`runCommand: refused non-whitelisted command "${message.command}"`);
-            }
             return;
         }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {
@@ -1056,67 +1188,24 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 </style></head><body><p>Loading method graph...</p></body></html>`;
 }
 
-/** A button rendered in a message view; clicking it posts `message` back to the extension. */
-interface PanelAction {
-    label: string;
-    message: Record<string, unknown>;
-}
-
 /**
- * Convert a backend remedy into a pane button. The posted message is one the
- * webview handler explicitly allows (a whitelisted command, or an http(s) open);
- * the webview never gets to run an arbitrary command.
+ * Render a simple message view — only for pre-graph failures now (webview
+ * assets missing, unreadable bundle files, invalid graphspec JSON); backend
+ * failures with a graph on screen go to the validation widget instead. `title`
+ * is plain text and is escaped here. `body` is trusted HTML by contract —
+ * callers MUST pass either a static string or their own `escapeHtml(...)` output.
  */
-function toPanelAction(action: BackendErrorAction): PanelAction {
-    if ('command' in action) {
-        return { label: action.label, message: { type: 'runCommand', command: action.command } };
-    }
-    return { label: action.label, message: { type: 'openExternally', url: action.externalUrl } };
-}
-
-/**
- * Render a simple message view. `title` is plain text and is escaped here. `body`
- * is trusted HTML by contract — callers MUST pass either a static string, their own
- * `escapeHtml(...)` output, or pre-escaped HTML (e.g. `BackendError.detailHtml`).
- */
-function messageHtml(title: string, body: string, options?: { retry?: boolean; actions?: PanelAction[] }): string {
-    // Buttons post back to the extension (see handleWebviewMessage); the single
-    // inline <script> runs under the nonce that setHtml() injects for simple HTML.
-    // Remedy buttons come first, Retry last.
-    const actions = options?.actions ?? [];
-    const buttons: string[] = actions.map(
-        (a, i) => `<button class="pipelex-action" data-action-index="${i}" type="button">${escapeHtml(a.label)}</button>`,
-    );
-    if (options?.retry) {
-        buttons.push(`<button id="pipelex-retry" type="button">Retry</button>`);
-    }
-    // JSON of each action's message, hardened against a `</script>` breakout even
-    // though every message here is built from our own constants, not server input.
-    const actionMessagesJson = JSON.stringify(actions.map(a => a.message)).replace(/</g, '\\u003c');
-    const actionsBlock = buttons.length
-        ? `<p class="actions">${buttons.join(' ')}</p>
+function messageHtml(title: string, body: string, options?: { retry?: boolean }): string {
+    // The Retry button posts back to the extension (see handleWebviewMessage);
+    // its single inline <script> runs under the nonce that setHtml() injects
+    // for simple HTML.
+    const actionsBlock = options?.retry
+        ? `<p class="actions"><button id="pipelex-retry" type="button">Retry</button></p>
 <script nonce="${RETRY_NONCE_SENTINEL}">
 (function () {
   var vscode = acquireVsCodeApi();
   var retry = document.getElementById('pipelex-retry');
   if (retry) { retry.addEventListener('click', function () { vscode.postMessage({ type: 'retry' }); }); }
-  var messages = ${actionMessagesJson};
-  var actionButtons = document.querySelectorAll('.pipelex-action');
-  for (var i = 0; i < actionButtons.length; i++) {
-    (function (idx) {
-      actionButtons[idx].addEventListener('click', function () { vscode.postMessage(messages[idx]); });
-    })(i);
-  }
-  // Inline links open externally via the extension (preventDefault stops the
-  // webview from trying to navigate to them itself).
-  var links = document.querySelectorAll('a.pipelex-link');
-  for (var j = 0; j < links.length; j++) {
-    links[j].addEventListener('click', function (e) {
-      e.preventDefault();
-      var href = this.getAttribute('href');
-      if (href) { vscode.postMessage({ type: 'openExternally', url: href }); }
-    });
-  }
 }());
 </script>`
         : '';
@@ -1130,8 +1219,6 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 .msg { text-align: center; max-width: 480px; }
 h2 { margin-bottom: 0.5em; }
 code { background: var(--vscode-textCodeBlock-background, #2d2d2d); padding: 2px 6px; border-radius: 3px; }
-a.pipelex-link { color: var(--vscode-textLink-foreground, #3794ff); text-decoration: underline; cursor: pointer; }
-a.pipelex-link:hover { color: var(--vscode-textLink-activeForeground, #4daafc); }
 .actions { margin-top: 1.25em; }
 button { font-family: inherit; font-size: 13px; padding: 4px 14px; cursor: pointer;
          color: var(--vscode-button-foreground, #fff); background: var(--vscode-button-background, #0e639c);
@@ -1139,25 +1226,6 @@ button { font-family: inherit; font-size: 13px; padding: 4px 14px; cursor: point
 button:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
 button:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 2px; }
 </style></head><body><div class="msg"><h2>${escapeHtml(title)}</h2><p>${body}</p>${actionsBlock}</div></body></html>`;
-}
-
-/** One row in the clickable validation-error list. `index` keys into {@link MethodGraphPanel.errorTargets}. */
-interface ErrorListEntry {
-    index: number;
-    message: string;
-    /** `pipe.<code>` / `concept.<code>`, when the error names one. */
-    context?: string;
-    /** Owning-file basename, set only when the error lives in a sibling (not the saved file). */
-    file?: string;
-}
-
-/** The `pipe.<code>` / `concept.<code>` chip for an error, or undefined when it names neither. */
-function errorContext(error: ValidationErrorItem): string | undefined {
-    return error.pipe_code
-        ? `pipe.${error.pipe_code}`
-        : error.concept_code
-            ? `concept.${error.concept_code}`
-            : undefined;
 }
 
 /** Last path segment of a file path, cross-platform (handles `/` and `\`). */
@@ -1193,76 +1261,4 @@ function textDocumentLines(document: vscode.TextDocument): string[] {
         lines.push(document.lineAt(i).text);
     }
     return lines;
-}
-
-/**
- * Render the validation errors as a clickable list. Each row posts
- * `{ type: 'navigateToError', index }` (never a path) so the extension can open
- * the owning file at the error's line. The single inline `<script>` carries
- * {@link RETRY_NONCE_SENTINEL}: `setHtml()` swaps that token for the real nonce
- * and adds `script-src` only because our own script is present — escaped page
- * content can never acquire a runnable nonce.
- */
-function errorListHtml(entries: ErrorListEntry[]): string {
-    const count = entries.length;
-    const heading = `${count} ${count === 1 ? 'Validation Error' : 'Validation Errors'}`;
-    const items = entries.map(e => {
-        const ctx = e.context ? `<span class="ctx">${escapeHtml(e.context)}</span>` : '';
-        const file = e.file ? `<span class="file">${escapeHtml(e.file)}</span>` : '';
-        const meta = (ctx || file) ? `<div class="meta">${ctx}${file}</div>` : '';
-        // `data-error-index` is our own integer, not page content; the message is escaped.
-        return `<li class="error-row" role="button" tabindex="0" data-error-index="${e.index}">`
-            + `${meta}<div class="message">${escapeHtml(e.message)}</div></li>`;
-    }).join('\n');
-    return `<!DOCTYPE html>
-<html>
-<head>
-<style>
-body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; margin: 0; padding: 24px;
-       font-family: var(--vscode-font-family, sans-serif); color: var(--vscode-foreground, #ccc);
-       background: var(--vscode-editor-background, #1e1e1e); box-sizing: border-box; }
-.msg { max-width: 600px; width: 100%; }
-h2 { margin-bottom: 0.25em; }
-.hint { margin: 0 0 1.25em; color: var(--vscode-descriptionForeground, #999); }
-ul { list-style: none; padding: 0; margin: 0; }
-li.error-row { padding: 6px 10px; margin-bottom: 4px; border-left: 3px solid var(--vscode-errorForeground, #f44);
-     border-radius: 2px; background: var(--vscode-textCodeBlock-background, #2d2d2d); cursor: pointer; }
-li.error-row:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); }
-li.error-row:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 1px; }
-.meta { margin-bottom: 2px; }
-.ctx { font-weight: 600; color: var(--vscode-symbolIcon-fieldForeground, #75beff); margin-right: 8px; }
-.ctx::after { content: ":"; }
-.file { font-size: 0.85em; color: var(--vscode-descriptionForeground, #999); }
-.message { white-space: pre-wrap; }
-.actions { margin-top: 1.25em; }
-button { font-family: inherit; font-size: 13px; padding: 4px 14px; cursor: pointer;
-         color: var(--vscode-button-foreground, #fff); background: var(--vscode-button-background, #0e639c);
-         border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; }
-button:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
-button:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 2px; }
-</style></head><body><div class="msg"><h2>${escapeHtml(heading)}</h2>
-<p class="hint">Fix and save to regenerate the graph.</p>
-<ul>
-${items}
-</ul>
-<p class="actions"><button id="pipelex-retry" type="button">Retry</button></p>
-<script nonce="${RETRY_NONCE_SENTINEL}">
-(function () {
-  var vscode = acquireVsCodeApi();
-  var retry = document.getElementById('pipelex-retry');
-  if (retry) { retry.addEventListener('click', function () { vscode.postMessage({ type: 'retry' }); }); }
-  var rows = document.querySelectorAll('.error-row');
-  for (var i = 0; i < rows.length; i++) {
-    (function (row) {
-      var idx = parseInt(row.getAttribute('data-error-index'), 10);
-      function go() { vscode.postMessage({ type: 'navigateToError', index: idx }); }
-      row.addEventListener('click', go);
-      row.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
-      });
-    })(rows[i]);
-  }
-}());
-</script>
-</div></body></html>`;
 }

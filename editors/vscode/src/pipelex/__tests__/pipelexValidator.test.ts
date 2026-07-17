@@ -237,11 +237,14 @@ describe('PipelexValidator — per-directory generation gate', () => {
 
         await mockState.onSaveHandler!(helper);
 
-        expect(capturedOptions.withGraph).toBe(true);
+        // The panel renders the STATIC graph itself, so the analyze call never
+        // requests one — but it still anchors on the directory's main bundle so
+        // the verdict handed to the widget matches the graph.
+        expect(capturedOptions.withGraph).toBe(false);
         expect(capturedRequest.primaryUri.fsPath).toBe('/proj/bundle.mthds');
         expect(capturedRequest.files.map((file: any) => file.name)).toEqual(['bundle.mthds', 'helper.mthds']);
         expect(graphSink.applyAnalysis).toHaveBeenCalledWith(helper.uri, expect.objectContaining({
-            graph: { nodes: [], edges: [] },
+            validation: { ok: true, errors: [] },
         }));
 
         validator.dispose();

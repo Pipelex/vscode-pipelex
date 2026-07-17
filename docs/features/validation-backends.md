@@ -1,11 +1,11 @@
 # Validation backends (CLI vs API)
 
-The extension validates `.mthds` bundles on save and renders method graphs. Both happen through a **backend**, selected by the `pipelex.backend` setting:
+The extension validates `.mthds` bundles on save through a **backend**, selected by the `pipelex.backend` setting. (The method graph itself is no longer a backend product — it is built statically in the extension, see `method-graph.md`; the backend supplies the validation verdict shown in the graph's toolbar widget.)
 
 - **`cli`** (default, zero-config) — spawns the local `pipelex-agent` Python CLI, exactly as before. Nothing to configure: if `pipelex-agent` is on `PATH` or in a workspace `.venv`, it just works.
-- **`api`** (opt-in) — calls a Pipelex API server over HTTP via the `mthds` client. Use this when you run a [`pipelex-api`](https://github.com/Pipelex/pipelex-api) server (self-hosted or the hosted endpoint) and want validation/graphs without a local Python install.
+- **`api`** (opt-in) — calls a Pipelex API server over HTTP via the `mthds` client. Use this when you run a [`pipelex-api`](https://github.com/Pipelex/pipelex-api) server (self-hosted or the hosted endpoint) and want validation without a local Python install.
 
-Both backends produce the same diagnostics and the same `GraphSpec`, so the editor experience is identical. The graph webview, the Problems panel, and the on-save flow do not know which backend ran.
+Both backends produce the same structured diagnostics, so the editor experience is identical. The graph webview, the Problems panel, and the on-save flow do not know which backend ran.
 
 ## Choosing a backend
 

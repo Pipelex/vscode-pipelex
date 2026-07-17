@@ -15,9 +15,10 @@ const DIAGNOSTIC_SOURCE = 'pipelex';
  *
  * The validator is the single on-save orchestration point: one `analyze()` call
  * produces the diagnostics AND — when the method-graph panel is showing the same
- * file — the graph, which it hands to the panel (no second backend call). It
- * works against either backend (CLI / API) via {@link BackendFactory}; the
- * structured errors are placed on their owning file (cross-file diagnostics).
+ * file — the verdict for the panel's validation widget (no second backend
+ * call; the graph itself is static-built by the panel). It works against either
+ * backend (CLI / API) via {@link BackendFactory}; the structured errors are
+ * placed on their owning file (cross-file diagnostics).
  */
 export class PipelexValidator implements vscode.Disposable {
     private readonly diagnostics: vscode.DiagnosticCollection;
@@ -127,20 +128,23 @@ export class PipelexValidator implements vscode.Disposable {
         this.inflight.set(uriKey, controller);
 
         const timeout = config.get<number>('validation.timeout', 30000);
-        const direction = config.get<string>('graph.direction', 'top_down');
-        const withGraph = this.graphSink?.isShowingMthds(document.uri) ?? false;
+        // The panel shows the STATIC graph since the static-first flow, so the
+        // analyze call never requests one (`withGraph: false`) — but when the
+        // panel is open, the analysis still anchors on the graph primary so the
+        // verdict handed to the widget matches the bundle the graph renders.
+        const panelShowing = this.graphSink?.isShowingMthds(document.uri) ?? false;
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
 
         try {
             const backend = this.factory.getBackend(document.uri);
-            const graphPrimary = withGraph
+            const graphPrimary = panelShowing
                 ? await resolveGraphPrimaryBundle(document.uri)
                 : undefined;
             const analysisPrimaryUri = graphPrimary?.primaryUri ?? document.uri;
             const files = graphPrimary?.files ?? await gatherBundleFiles(document.uri);
             const analysis = await backend.analyze(
                 { primaryUri: analysisPrimaryUri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
-                { withGraph, direction },
+                { withGraph: false },
                 controller.signal,
             );
             if (controller.signal.aborted) return;
@@ -154,9 +158,9 @@ export class PipelexValidator implements vscode.Disposable {
                 this.lastNotifiedMessage = undefined;
             }
 
-            if (withGraph) {
-                // Fire-and-forget: the panel render (incl. the async error branch)
-                // is independent of publishing diagnostics for this save.
+            if (panelShowing) {
+                // Fire-and-forget: the widget update (incl. the async invalid
+                // branch) is independent of publishing diagnostics for this save.
                 void this.graphSink?.applyAnalysis(document.uri, analysis);
             }
         } catch (err: unknown) {
