@@ -1314,7 +1314,7 @@ describe('MethodGraphPanel', () => {
             },
             { error: { category: 'concept_validation', message: 'unknown concept Bar', concept_code: 'Bar' }, uri, range },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis());
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
 
         const validation = currentValidationPayload(panel);
         expect(validation.state).toBe('invalid');
@@ -1352,7 +1352,7 @@ describe('MethodGraphPanel', () => {
         // The validator calls applyAnalysis fire-and-forget, so a gather failure must
         // resolve (not reject) — otherwise the rejection is unhandled and the widget
         // keeps showing a stale state instead of the verdict.
-        await expect(panel.applyAnalysis(uri, invalidAnalysis())).resolves.toBeUndefined();
+        await expect(panel.applyAnalysis(uri, invalidAnalysis(), uri)).resolves.toBeUndefined();
 
         const validation = currentValidationPayload(panel);
         expect(validation.state).toBe('invalid');
@@ -1375,7 +1375,7 @@ describe('MethodGraphPanel', () => {
         mockState.errorLocations = [
             { error: { category: 'pipe_validation', message: 'helper broke', pipe_code: 'helper' }, uri: siblingUri, range },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis());
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
 
         const validation = currentValidationPayload(panel);
         expect(validation.issues[0].file).toBe('concepts.mthds');
@@ -1396,7 +1396,7 @@ describe('MethodGraphPanel', () => {
         ];
         (panel as any).staticTargets = [undefined, undefined];
 
-        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any);
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any, uri);
 
         // The verdict is authoritative: static errors are dropped, warnings kept.
         const validation = currentValidationPayload(panel);
@@ -1404,6 +1404,133 @@ describe('MethodGraphPanel', () => {
         expect(validation.issues).toEqual([
             expect.objectContaining({ severity: 'warning', message: 'tolerated with fallback' }),
         ]);
+        panel.dispose();
+    });
+
+    it('a static rebuild finishing after a fast valid verdict refreshes the kept warnings', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri); // clean bundle → the rebuild yields no static warnings
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+
+        // A previous render left a static warning behind…
+        (panel as any).staticIssues = [
+            { severity: 'warning', message: 'stale warning from previous render', origin: 'static' },
+        ];
+        (panel as any).staticTargets = [undefined];
+        // …the user saves (flips to validating + starts the async rebuild), and
+        // the verdict lands BEFORE the rebuild's file reads complete.
+        mockState.onSaveHandler!({ uri });
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any, uri);
+        expect(currentValidationPayload(panel).issues).toEqual([
+            expect.objectContaining({ message: 'stale warning from previous render' }),
+        ]);
+
+        await new Promise(r => setTimeout(r, 30));
+
+        // The rebuild rebuilt the valid state's static portion: no warnings left.
+        const validation = (panel as any).pendingData?.validation ?? currentValidationPayload(panel);
+        expect(validation.state).toBe('valid');
+        expect(validation.issues).toEqual([]);
+        panel.dispose();
+    });
+
+    it('a static rebuild finishing after applySkipped refreshes the static tail behind the lead', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri); // clean bundle → the rebuild yields no static issues
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+
+        (panel as any).staticIssues = [
+            { severity: 'warning', message: 'stale static issue', origin: 'static' },
+        ];
+        (panel as any).staticTargets = [undefined];
+        // The skip decision needs no CLI run, so it can land before the rebuild.
+        mockState.onSaveHandler!({ uri });
+        panel.applySkipped(uri, 'This file has errors reported by another extension.');
+        expect(currentValidationPayload(panel).issues).toHaveLength(2);
+
+        await new Promise(r => setTimeout(r, 30));
+
+        // Lead issue kept, stale static tail dropped (fresh static is clean).
+        const validation = (panel as any).pendingData?.validation ?? currentValidationPayload(panel);
+        expect(validation.state).toBe('error');
+        expect(validation.issues).toEqual([
+            expect.objectContaining({ message: expect.stringContaining('another extension') }),
+        ]);
+        panel.dispose();
+    });
+
+    it('anchors unattributed errors on the analysis primary, not the shown helper', async () => {
+        const crossFile = await import('../validation/crossFileDiagnostics');
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/helper.mthds');
+        const primaryUri = makeUri('/project/methods/bundle.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [
+            { error: { category: 'dry_run', message: 'Dry run failed' }, uri: primaryUri, range },
+        ];
+        await panel.applyAnalysis(uri, invalidAnalysis(), primaryUri);
+
+        // The resolver anchors on the analysis primary — where the Problems
+        // panel also places source-less errors — never the shown helper.
+        expect(vi.mocked(crossFile.resolveErrorLocations)).toHaveBeenLastCalledWith(
+            expect.objectContaining({ primaryUri }),
+        );
+        // The owning-file label stays relative to the SHOWN file.
+        const validation = currentValidationPayload(panel);
+        expect(validation.issues[0].file).toBe('bundle.mthds');
+        panel.dispose();
+    });
+
+    it("an older save's slower static rebuild cannot overwrite a newer one", async () => {
+        const bundleGather = await import('../validation/bundleGather');
+        const bundleWith = (code: string) => [
+            'domain = "demo"',
+            `main_pipe = "${code}"`,
+            '',
+            `[pipe.${code}]`,
+            'type = "PipeLLM"',
+            'description = "x"',
+            'output = "Text"',
+            'prompt = "p"',
+            '',
+        ].join('\n');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri);
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+
+        // Two rapid saves: the FIRST rebuild's file reads resolve LAST.
+        let resolveOld!: (v: any) => void;
+        let resolveNew!: (v: any) => void;
+        vi.mocked(bundleGather.gatherBundleFiles)
+            .mockImplementationOnce(() => new Promise(r => { resolveOld = r; }))
+            .mockImplementationOnce(() => new Promise(r => { resolveNew = r; }));
+        mockState.onSaveHandler!({ uri });
+        mockState.onSaveHandler!({ uri });
+
+        resolveNew([{ uri, name: 'main.mthds', content: bundleWith('new_pipe') }]);
+        await new Promise(r => setTimeout(r, 10));
+        resolveOld([{ uri, name: 'main.mthds', content: bundleWith('old_pipe') }]);
+        await new Promise(r => setTimeout(r, 10));
+
+        // Last graph on screen is the newer save's — the superseded rebuild bailed.
+        const lastSetData = mockState.mockWebview.postMessage.mock.calls
+            .map(c => c[0])
+            .filter((m: any) => m?.type === 'setData')
+            .pop();
+        expect(JSON.stringify(lastSetData.graphspec)).toContain('new_pipe');
+        expect(JSON.stringify(lastSetData.graphspec)).not.toContain('old_pipe');
         panel.dispose();
     });
 
@@ -1435,7 +1562,7 @@ describe('MethodGraphPanel', () => {
         mockState.errorLocations = [
             { error: { category: 'pipe_validation', message: 'helper broke', pipe_code: 'helper' }, uri: siblingUri, range },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis());
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
 
         vi.mocked(vscode.workspace.openTextDocument).mockClear();
         const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
@@ -1463,7 +1590,7 @@ describe('MethodGraphPanel', () => {
         mockState.errorLocations = [
             { error: { category: 'x', message: 'only one' }, uri, range },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis());
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
 
         vi.mocked(vscode.workspace.openTextDocument).mockClear();
         const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];

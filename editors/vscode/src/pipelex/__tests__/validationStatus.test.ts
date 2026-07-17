@@ -81,6 +81,10 @@ describe('parseStaticIssueContext', () => {
         expect(parseStaticIssueContext('concept.Foo')).toEqual({ kind: 'concept', code: 'Foo' });
     });
 
+    it('does not truncate a hyphenated code (invalid MTHDS, but present in the file)', () => {
+        expect(parseStaticIssueContext('pipe.my-pipe.output')).toEqual({ kind: 'pipe', code: 'my-pipe' });
+    });
+
     it('returns undefined for paths that name no declaration', () => {
         expect(parseStaticIssueContext(undefined)).toBeUndefined();
         expect(parseStaticIssueContext('domain')).toBeUndefined();

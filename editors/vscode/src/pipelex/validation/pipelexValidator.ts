@@ -161,7 +161,7 @@ export class PipelexValidator implements vscode.Disposable {
             if (panelShowing) {
                 // Fire-and-forget: the widget update (incl. the async invalid
                 // branch) is independent of publishing diagnostics for this save.
-                void this.graphSink?.applyAnalysis(document.uri, analysis);
+                void this.graphSink?.applyAnalysis(document.uri, analysis, analysisPrimaryUri);
             }
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;

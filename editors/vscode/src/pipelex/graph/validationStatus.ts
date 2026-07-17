@@ -78,7 +78,7 @@ export function parseStaticIssueContext(
     context: string | undefined,
 ): { kind: 'pipe' | 'concept'; code: string } | undefined {
     if (!context) return undefined;
-    const match = /^(pipe|concept)\.([A-Za-z0-9_]+)/.exec(context);
+    const match = /^(pipe|concept)\.([A-Za-z0-9_-]+)/.exec(context);
     if (!match) return undefined;
     return { kind: match[1] as 'pipe' | 'concept', code: match[2] };
 }

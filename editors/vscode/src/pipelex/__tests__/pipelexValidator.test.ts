@@ -243,9 +243,13 @@ describe('PipelexValidator — per-directory generation gate', () => {
         expect(capturedOptions.withGraph).toBe(false);
         expect(capturedRequest.primaryUri.fsPath).toBe('/proj/bundle.mthds');
         expect(capturedRequest.files.map((file: any) => file.name)).toEqual(['bundle.mthds', 'helper.mthds']);
-        expect(graphSink.applyAnalysis).toHaveBeenCalledWith(helper.uri, expect.objectContaining({
-            validation: { ok: true, errors: [] },
-        }));
+        // The sink receives BOTH the shown file (staleness + labels) and the
+        // analysis anchor (fallback owner for unattributed errors).
+        expect(graphSink.applyAnalysis).toHaveBeenCalledWith(
+            helper.uri,
+            expect.objectContaining({ validation: { ok: true, errors: [] } }),
+            expect.objectContaining({ fsPath: '/proj/bundle.mthds' }),
+        );
 
         validator.dispose();
     });

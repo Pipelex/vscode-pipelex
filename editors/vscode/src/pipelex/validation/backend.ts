@@ -87,8 +87,13 @@ export interface GraphAnalysisSink {
      * resolve asynchronously (the invalid branch reads sibling files to place
      * each issue on its owning file for click-to-navigate); callers that only
      * need the diagnostics published can fire-and-forget it.
+     *
+     * `uri` is the shown/saved file; `analysisPrimaryUri` is the bundle file the
+     * analysis anchored on (the graph primary — a sibling when `uri` is a
+     * helper). Errors that resolve to no owning file fall back to the primary,
+     * matching where the Problems panel places them.
      */
-    applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): void | Promise<void>;
+    applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis, analysisPrimaryUri: vscode.Uri): void | Promise<void>;
     /**
      * The on-save analysis threw (backend / transport error). The widget flips
      * to its `error` state; the static graph stays on screen. A no-op when the

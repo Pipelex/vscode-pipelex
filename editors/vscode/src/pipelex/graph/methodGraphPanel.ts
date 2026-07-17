@@ -88,6 +88,21 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * updates it, so a rebuild can never resurrect a stale verdict.
      */
     private currentValidation: GraphValidationPayload | undefined;
+    /**
+     * The lead issue of the current `error` state (backend failure or skip
+     * reason). Retained separately from {@link currentValidation} so a static
+     * rebuild finishing after the verdict can re-compose `[lead, ...fresh
+     * static issues]` instead of keeping the previous render's static tail.
+     */
+    private errorLead: GraphValidationIssue | undefined;
+    /**
+     * Monotonic token claimed by each graph-producing render (static rebuild or
+     * graphspec-json refresh). Re-checked after every await so a superseded
+     * render — e.g. an older save's slower file reads — can never post its
+     * graph or issue state over a newer one for the same URI (the existing
+     * `currentUri` checks only catch file switches).
+     */
+    private renderSequence = 0;
     /** Last backend-failure toast shown from the panel's own refresh, deduped until the next verdict. */
     private lastNotifiedMessage: string | undefined;
     /**
@@ -437,7 +452,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             // discard this result so it doesn't overwrite the new file's status.
             if (this.currentUri?.toString() !== uri.toString()) return;
 
-            await this.applyAnalysis(uri, analysis);
+            await this.applyAnalysis(uri, analysis, graphPrimary.primaryUri);
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
@@ -462,6 +477,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      */
     private async renderStaticGraph(uri: vscode.Uri): Promise<GraphPrimaryBundle | undefined> {
         if (!this.panel) return undefined;
+        const seq = ++this.renderSequence;
 
         let graphPrimary: GraphPrimaryBundle;
         try {
@@ -469,6 +485,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         } catch (err: any) {
             if (!this.panel) return undefined;
             if (this.currentUri?.toString() !== uri.toString()) return undefined;
+            if (seq !== this.renderSequence) return undefined;
             this.clearNavigationState();
             this.setHtml(messageHtml(
                 'Read Error',
@@ -479,25 +496,45 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
         if (!this.panel) return undefined;
         if (this.currentUri?.toString() !== uri.toString()) return undefined;
+        if (seq !== this.renderSequence) return undefined;
 
         const { spec, diagnostics } = buildStaticGraphSpecFromToml(graphPrimary.files.map(f => f.content));
         this.staticIssues = staticDiagnosticsToValidationIssues(diagnostics);
         this.staticTargets = this.resolveStaticIssueTargets(this.staticIssues, graphPrimary.files);
 
-        // While the verdict is pending, the widget lists the static issues; a
-        // verdict that already landed (the validator racing ahead of these file
-        // reads) is authoritative and keeps its own issue list.
-        if (!this.currentValidation || this.currentValidation.state === 'validating') {
+        // Fold the fresh static issues into the widget state. While the verdict
+        // is pending they ARE the list; a verdict that already landed (the
+        // validator racing ahead of these file reads — e.g. an immediate skip)
+        // keeps its state, but any static portion of its issue list is rebuilt
+        // here so it can never retain the previous render's issues or targets.
+        const current = this.currentValidation;
+        if (!current || current.state === 'validating') {
             this.currentValidation = { state: 'validating', issues: this.staticIssues };
             this.errorTargets = this.staticTargets;
+        } else if (current.state === 'valid') {
+            const kept = this.keptStaticWarnings();
+            this.currentValidation = { state: 'valid', issues: kept.issues };
+            this.errorTargets = kept.targets;
+        } else if (current.state === 'error' && this.errorLead) {
+            this.currentValidation = { state: 'error', issues: [this.errorLead, ...this.staticIssues] };
+            this.errorTargets = [undefined, ...this.staticTargets];
         }
+        // `invalid` keeps the validator's own list — it has no static component.
 
         const config = vscode.workspace.getConfiguration('pipelex', uri);
         const direction = config.get<string>('graph.direction', 'top_down');
         const showControllers = config.get<boolean>('graph.showControllers', true);
         const foldMode = config.get<string>('graph.foldMode', 'folded');
-        await this.sendGraphspecToWebview(uri, spec, direction, showControllers, foldMode);
+        await this.sendGraphspecToWebview(uri, spec, direction, showControllers, foldMode, seq);
         return graphPrimary;
+    }
+
+    /** The static warnings (+ aligned targets) the `valid` state keeps visible. */
+    private keptStaticWarnings(): { issues: GraphValidationIssue[]; targets: (ErrorTarget | undefined)[] } {
+        const kept = this.staticIssues
+            .map((issue, index) => ({ issue, target: this.staticTargets[index] }))
+            .filter(entry => entry.issue.severity === 'warning');
+        return { issues: kept.map(entry => entry.issue), targets: kept.map(entry => entry.target) };
     }
 
     /**
@@ -553,21 +590,27 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * Async because the invalid branch resolves each error to its owning file +
      * range (a few sibling-file reads) so the issue rows can be clickable;
      * callers may fire-and-forget — a gather failure never rejects.
+     *
+     * `uri` is the SHOWN file (staleness checks + owning-file labels are
+     * relative to it); `analysisPrimaryUri` is the bundle file the analysis
+     * anchored on (`resolveGraphPrimaryBundle` — a sibling `bundle.mthds` when
+     * the shown file is a helper). An error that resolves to no owning file
+     * falls back to that primary, matching the Problems-panel placement, so a
+     * bundle-level error never lands on the helper the user happens to view.
      */
-    async applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): Promise<void> {
+    async applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis, analysisPrimaryUri: vscode.Uri): Promise<void> {
         if (!this.panel) return;
         if (this.sourceKind !== 'mthds') return;
         if (this.currentUri?.toString() !== uri.toString()) return;
 
         const validation = analysis.validation;
+        this.errorLead = undefined;
         if (validation.ok) {
             this.lastNotifiedMessage = undefined;
-            const kept = this.staticIssues
-                .map((issue, index) => ({ issue, target: this.staticTargets[index] }))
-                .filter(entry => entry.issue.severity === 'warning');
+            const kept = this.keptStaticWarnings();
             this.postValidationStatus(
-                { state: 'valid', issues: kept.map(entry => entry.issue) },
-                kept.map(entry => entry.target),
+                { state: 'valid', issues: kept.issues },
+                kept.targets,
             );
             return;
         }
@@ -592,9 +635,14 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         if (this.currentUri?.toString() !== uri.toString()) return;
 
         const primaryDocument = vscode.workspace.textDocuments.find(
-            d => d.uri.toString() === uri.toString(),
+            d => d.uri.toString() === analysisPrimaryUri.toString(),
         );
-        const locations = resolveErrorLocations({ errors: validation.errors, files, primaryUri: uri, primaryDocument });
+        const locations = resolveErrorLocations({
+            errors: validation.errors,
+            files,
+            primaryUri: analysisPrimaryUri,
+            primaryDocument,
+        });
         const issues = validationErrorsToIssues(
             validation.errors,
             // Name the owning file only when it differs from the shown one, so a
@@ -628,11 +676,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         if (!this.panel) return;
         if (this.sourceKind !== 'mthds') return;
         if (this.currentUri?.toString() !== uri.toString()) return;
+        this.errorLead = { severity: 'error', message, origin: 'validator' };
         this.postValidationStatus(
-            {
-                state: 'error',
-                issues: [{ severity: 'error', message, origin: 'validator' }, ...this.staticIssues],
-            },
+            { state: 'error', issues: [this.errorLead, ...this.staticIssues] },
             [undefined, ...this.staticTargets],
         );
     }
@@ -670,8 +716,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 `pipelex graph error: ${err instanceof Error ? err.message : String(err)}`,
             );
         }
+        this.errorLead = describeBackendErrorIssue(err);
         this.postValidationStatus(
-            { state: 'error', issues: [describeBackendErrorIssue(err), ...this.staticIssues] },
+            { state: 'error', issues: [this.errorLead, ...this.staticIssues] },
             [undefined, ...this.staticTargets],
         );
     }
@@ -720,6 +767,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
     private async refreshJson(uri: vscode.Uri) {
         if (!this.panel) return;
+        const seq = ++this.renderSequence;
 
         // Show loading screen only on first load, same as the .mthds path.
         // This covers the initial ReactFlow layout pass so the user doesn't
@@ -739,6 +787,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 content = await fs.promises.readFile(uri.fsPath, 'utf-8');
             } catch (err: any) {
                 if (this.currentUri?.toString() !== uri.toString()) return;
+                if (seq !== this.renderSequence) return;
                 this.clearNavigationState();
                 this.setHtml(messageHtml('Read Error', `Could not read file: ${escapeHtml(err.message ?? String(err))}`, { retry: true }));
                 return;
@@ -746,6 +795,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
 
         if (this.currentUri?.toString() !== uri.toString()) return;
+        if (seq !== this.renderSequence) return;
 
         const graphspec = parseGraphspecFile(content);
         if (!graphspec) {
@@ -762,7 +812,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const showControllers = pipelexConfig.get<boolean>('graph.showControllers', true);
         const foldMode = pipelexConfig.get<string>('graph.foldMode', 'folded');
 
-        await this.sendGraphspecToWebview(uri, graphspec, direction, showControllers, foldMode);
+        await this.sendGraphspecToWebview(uri, graphspec, direction, showControllers, foldMode, seq);
     }
 
     private async sendGraphspecToWebview(
@@ -771,6 +821,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         direction: string,
         showControllers: boolean,
         foldMode: string,
+        seq: number,
     ) {
         if (!this.panel) return;
 
@@ -788,6 +839,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const graphConfig = await resolveGraphConfig();
 
         if (this.currentUri?.toString() !== uri.toString()) return;
+        if (seq !== this.renderSequence) return;
 
         // Retain the graphspec so a pipe-node click can recover its declaring
         // domain + registry `source` (see navigateToPipe). Set alongside the send
@@ -845,6 +897,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         this.staticIssues = [];
         this.staticTargets = [];
         this.currentValidation = undefined;
+        this.errorLead = undefined;
     }
 
     private buildWebviewHtml(): string | undefined {

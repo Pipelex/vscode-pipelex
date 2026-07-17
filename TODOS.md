@@ -25,7 +25,8 @@ Renderer (sibling repo `mthds-ui`, released as `@pipelex/mthds-ui` 0.14.0, consu
 
 ## Review pointers (what to scrutinize)
 
-- **Staleness discipline.** Every async boundary in `methodGraphPanel.ts` re-checks `this.panel` and `this.currentUri` after awaits (file reads, gathers, config resolution). A missed re-check shows up as a verdict or graph applied to the wrong file.
+- **Staleness discipline.** Every async boundary in `methodGraphPanel.ts` re-checks `this.panel` and `this.currentUri` after awaits (file reads, gathers, config resolution). A missed re-check shows up as a verdict or graph applied to the wrong file. Same-URI ordering is guarded separately by a monotonic `renderSequence` (an older save's slower rebuild must not post over a newer one), and a rebuild finishing *after* the verdict re-composes the static portion of the widget state (fresh warnings under `valid`, fresh static tail under `error`) rather than keeping the previous render's issues.
+- **Helper vs primary anchoring.** `applyAnalysis(uri, analysis, analysisPrimaryUri)` carries both the shown file (staleness checks, owning-file labels) and the bundle the analysis anchored on (fallback owner for unattributed errors, matching the Problems panel). Passing the shown helper as the anchor is the bug shape to watch for.
 - **Issue-list ↔ target alignment.** `errorTargets` is positional and sparse; every `postValidationStatus` call must pass targets index-aligned with its issues (note the `[undefined, ...staticTargets]` pattern when a lead issue is prepended).
 - **Race: fast verdict vs static rebuild.** On save, the panel flips to `validating` *synchronously* before its async static rebuild so a fast validator verdict can't be overwritten (`renderStaticGraph` only claims the widget when the state is still `validating`).
 - **Security posture unchanged.** The webview navigates by index only (never a path); `setHtml` nonce/CSP handling is untouched apart from flowing through.
