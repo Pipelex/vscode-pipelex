@@ -35,7 +35,7 @@ Renderer (sibling repo `mthds-ui`, released as `@pipelex/mthds-ui` 0.14.0, consu
 
 - `editors/vscode`: `yarn typecheck && yarn test` (vitest) — panel behavior (`methodGraphPanel.test.ts`, `pipelexValidator.test.ts`) and the pure helpers (`validationStatus.test.ts`). `make check` runs the full repo gate.
 - Renderer-side logic (decoration mapping, fold roll-up, interactions) is tested in mthds-ui: unit tests + headless-Chromium Storybook play tests.
-- Manual/e2e asset: `../pipelex-demos/mthds-wip/bad_static/` — a deliberately broken bundle whose README maps every planted mistake to the static diagnostic it triggers.
+- Manual/e2e asset: `../pipelex-demos/mthds-wip/bad_static/` — a deliberately broken bundle whose README maps every planted mistake to the static diagnostic it triggers. The full data path (bundle → static spec + diagnostics → auto-targeted issues → decoration map → per-issue navigation targets, plus the folded roll-up) was exercised end-to-end against this bundle with the released `@pipelex/mthds-ui` 0.14.0: targeted issues decorate rendered nodes, skipped-node diagnostics stay panel-only, and the webview bundle built by `make ext` carries the decoration code and styles.
 
 ## Out of scope / deferred (v2 candidates)
 
