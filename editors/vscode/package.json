@@ -826,7 +826,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "npm:0.12.0",
+    "@pipelex/mthds-ui": "npm:0.13.0",
     "@pipelex/sdk": "0.1.5",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
@@ -834,7 +834,7 @@
     "node-fetch": "^3.3.2",
     "react": "^19",
     "react-dom": "^19",
-    "smol-toml": "^1.6.0",
+    "smol-toml": "^1.7.0",
     "vscode-languageclient": "^9.0.1",
     "which": "^5.0.0"
   },
