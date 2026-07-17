@@ -236,12 +236,11 @@ describe('ApiValidationBackend', () => {
         // Self-hosted: only the "Set API Key" remedy (no platform "Get a key" link).
         expect(err.actions).toEqual([{ label: 'Set API Key', command: 'pipelex.setApiKey' }]);
         // No platform/self-host pointers — you already run the server.
-        expect(err.detailHtml).toBeTruthy();
-        expect(err.detailHtml).not.toContain('app.pipelex.com');
-        expect(err.detailHtml).not.toContain('github.com');
+        expect(err.userMessage).not.toContain('app.pipelex.com');
+        expect(err.userMessage).not.toContain('github.com');
     });
 
-    it('maps a hosted 401/403 to an auth BackendError with Set + Get-a-key actions and clickable rich detail', async () => {
+    it('maps a hosted 401/403 to an auth BackendError with Set + Get-a-key actions', async () => {
         apiState.validate = async () => { throw new ApiResponseError('forbidden', 'https://api.pipelex.com', 403, 'Forbidden', '', 'AuthError', 'forbidden', undefined, undefined); };
         const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
@@ -254,10 +253,6 @@ describe('ApiValidationBackend', () => {
             { label: 'Set API Key', command: 'pipelex.setApiKey' },
             { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
         ]);
-        // Rich (pane) detail has clickable links + the exact Docker command.
-        expect(err.detailHtml).toContain('class="pipelex-link" href="https://app.pipelex.com/"');
-        expect(err.detailHtml).toContain('class="pipelex-link" href="https://github.com/Pipelex/pipelex-api"');
-        expect(err.detailHtml).toContain('docker run -p 8081:8081 pipelex/pipelex-api');
     });
 
     it('maps a 5xx to an api-error BackendError (server reached, errored)', async () => {

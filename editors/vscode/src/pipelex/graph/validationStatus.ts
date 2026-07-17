@@ -58,12 +58,16 @@ export function validationErrorsToIssues(
 ): GraphValidationIssue[] {
     return errors.map((error, index) => ({
         severity: 'error' as const,
-        message: error.message,
+        // Coerced at the trust boundary: these strings cross into the React
+        // webview as render children, where a non-string from a malformed
+        // backend response would throw inside GraphViewer (blank webview, no
+        // error boundary). The types say string; the wire doesn't promise it.
+        message: String(error.message),
         context: errorContext(error),
         file: ownerFiles?.[index],
-        suggestedFix: error.suggested_fix?.description ?? undefined,
+        suggestedFix: error.suggested_fix?.description != null ? String(error.suggested_fix.description) : undefined,
         origin: 'validator' as const,
-        pipeCode: error.pipe_code ?? undefined,
+        pipeCode: error.pipe_code != null ? String(error.pipe_code) : undefined,
     }));
 }
 

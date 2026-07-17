@@ -1463,6 +1463,144 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it('a static rebuild finishing after a fast invalid verdict keeps the validator issue list', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri);
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [
+            { error: { category: 'pipe_validation', message: 'real validator error', pipe_code: 'greet' }, uri, range },
+        ];
+        // The user saves (validating + async rebuild), and the invalid verdict
+        // lands BEFORE the rebuild's file reads complete.
+        mockState.onSaveHandler!({ uri });
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
+        expect(currentValidationPayload(panel).state).toBe('invalid');
+
+        await new Promise(r => setTimeout(r, 30));
+
+        // The late rebuild must leave the verdict untouched: the invalid list has
+        // no static component, and the navigation targets still match it.
+        const validation = (panel as any).pendingData?.validation ?? currentValidationPayload(panel);
+        expect(validation.state).toBe('invalid');
+        expect(validation.issues).toEqual([
+            expect.objectContaining({ message: 'real validator error' }),
+        ]);
+        expect((panel as any).errorTargets).toHaveLength(1);
+        expect((panel as any).errorTargets[0]).toEqual(expect.objectContaining({ uri }));
+        panel.dispose();
+    });
+
+    it('a newer save drops a stale verdict whose issue-resolution reads are still in flight', async () => {
+        const bundleGather = await import('../validation/bundleGather');
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri);
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+
+        // An old save's invalid verdict enters applyAnalysis, whose invalid
+        // branch awaits a bundle gather — defer it so it outlives the next save.
+        let releaseGather!: (v: any) => void;
+        vi.mocked(bundleGather.gatherBundleFiles).mockImplementationOnce(
+            () => new Promise(resolve => { releaseGather = resolve; }),
+        );
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [
+            { error: { category: 'pipe_validation', message: 'stale invalid verdict' }, uri, range },
+        ];
+        const stale = panel.applyAnalysis(uri, invalidAnalysis(), uri);
+
+        // A newer save claims the panel (validating + fresh render sequence)…
+        mockState.onSaveHandler!({ uri });
+        // …then the old verdict's gather finally resolves.
+        releaseGather(mockState.bundleFiles);
+        await stale;
+        await new Promise(r => setTimeout(r, 30));
+
+        // The superseded verdict must NOT post its stale invalid list over the
+        // newer save's validating state.
+        const validation = (panel as any).pendingData?.validation ?? currentValidationPayload(panel);
+        expect(validation.state).toBe('validating');
+        expect(validation.issues).not.toEqual(
+            expect.arrayContaining([expect.objectContaining({ message: 'stale invalid verdict' })]),
+        );
+        panel.dispose();
+    });
+
+    it('a static-builder throw falls back to the Graph Error view instead of an unhandled rejection', async () => {
+        const output = mockOutput();
+        const panel = new MethodGraphPanel(output, makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        // Valid TOML that crashes the current builder: a `domain` named after an
+        // Object.prototype member (observed mthds-ui 0.14.0 bug — plain-object
+        // domain map). The wrap must catch ANY builder throw, whatever the bug.
+        seedBundle(uri, VALID_BUNDLE.replace('domain = "demo"', 'domain = "constructor"'));
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+
+        expect(mockState.mockWebview.html).toContain('Graph Error');
+        expect(mockState.mockWebview.html).toContain('Could not build the method graph');
+        expect(output.appendLine).toHaveBeenCalledWith(
+            expect.stringContaining('static graph build failed'),
+        );
+        panel.dispose();
+    });
+
+    it('validation disabled: renders the static graph with no analyze run and the widget hidden', async () => {
+        const processUtils = await import('../validation/processUtils');
+        mockState.configOverrides['validation.enabled'] = false;
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri);
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+
+        // The graph rendered (setData buffered for the webview)…
+        expect((panel as any).pendingData?.type).toBe('setData');
+        expect((panel as any).pendingData?.graphspec).toBeTruthy();
+        // …but no backend ran and the widget stays hidden (no validation payload).
+        expect(vi.mocked(processUtils.spawnCli)).not.toHaveBeenCalled();
+        expect((panel as any).pendingData?.validation).toBeUndefined();
+        expect(currentValidationPayload(panel)).toBeUndefined();
+
+        // A save in the disabled state rebuilds the graph and still runs nothing.
+        mockState.onSaveHandler!({ uri });
+        await new Promise(r => setTimeout(r, 30));
+        expect(vi.mocked(processUtils.spawnCli)).not.toHaveBeenCalled();
+        expect((panel as any).pendingData?.validation).toBeUndefined();
+        panel.dispose();
+    });
+
+    it('a valid verdict keeps the kept warnings aligned with their navigation targets', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        const warningTarget = { uri: makeUri('/project/methods/other.mthds'), range: { start: { line: 7, character: 0 }, end: { line: 7, character: 5 } } };
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // Static error first (with its own target), warning second: dropping the
+        // error must also drop its target so index 0 navigates to the WARNING's.
+        (panel as any).staticIssues = [
+            { severity: 'error', message: 'dropped by the verdict', origin: 'static' },
+            { severity: 'warning', message: 'kept warning', origin: 'static' },
+        ];
+        (panel as any).staticTargets = [
+            { uri, range: { start: { line: 1, character: 0 }, end: { line: 1, character: 5 } } },
+            warningTarget,
+        ];
+
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any, uri);
+
+        const validation = currentValidationPayload(panel);
+        expect(validation.issues).toEqual([expect.objectContaining({ message: 'kept warning' })]);
+        expect((panel as any).errorTargets).toEqual([warningTarget]);
+        panel.dispose();
+    });
+
     it('anchors unattributed errors on the analysis primary, not the shown helper', async () => {
         const crossFile = await import('../validation/crossFileDiagnostics');
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());

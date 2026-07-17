@@ -73,6 +73,22 @@ describe('validationErrorsToIssues', () => {
         ]);
         expect(issues.map(issue => issue.pipeCode)).toEqual(['my_pipe', undefined, undefined]);
     });
+
+    it('coerces boundary fields to strings so a malformed response cannot crash the React renderer', () => {
+        // The wire types promise strings but the wire itself doesn't — a
+        // non-string rendered as a React child throws inside GraphViewer.
+        const issues = validationErrorsToIssues([
+            {
+                category: 'x',
+                message: { unexpected: 'object' },
+                pipe_code: 42,
+                suggested_fix: { fix_code: 'f', description: ['not', 'a', 'string'] },
+            } as any,
+        ]);
+        expect(typeof issues[0].message).toBe('string');
+        expect(typeof issues[0].pipeCode).toBe('string');
+        expect(typeof issues[0].suggestedFix).toBe('string');
+    });
 });
 
 describe('parseStaticIssueContext', () => {
@@ -118,6 +134,12 @@ describe('describeBackendErrorIssue', () => {
             userMessage: 'Pipelex API error (HTTP 503).',
         }));
         expect(issue.message).toBe('Pipelex API error (HTTP 503).');
+    });
+
+    it('explains a declined remote send', () => {
+        const issue = describeBackendErrorIssue(new BackendError({ kind: 'declined', logMessage: 'x' }));
+        expect(issue.severity).toBe('error');
+        expect(issue.message).toContain('declined');
     });
 
     it('falls back to the plain error message for non-backend failures', () => {
