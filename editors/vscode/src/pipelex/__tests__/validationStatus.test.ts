@@ -16,6 +16,7 @@ describe('errorContext', () => {
     it('prefers the pipe chip, then the concept chip, then nothing', () => {
         expect(errorContext({ category: 'x', message: 'm', pipe_code: 'my_pipe' })).toBe('pipe.my_pipe');
         expect(errorContext({ category: 'x', message: 'm', concept_code: 'Foo' })).toBe('concept.Foo');
+        expect(errorContext({ category: 'x', message: 'm', pipe_code: 'my_pipe', concept_code: 'Foo' })).toBe('pipe.my_pipe');
         expect(errorContext({ category: 'x', message: 'm' })).toBeUndefined();
     });
 });

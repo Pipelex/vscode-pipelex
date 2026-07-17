@@ -22,6 +22,14 @@ A save with the panel open reads the bundle directory 2–3×: the panel rebuild
 
 Every save re-posts the full graphspec and re-runs the webview's elkjs layout + the 200 ms viewport save/restore even when the rebuilt spec is identical (comment-only edits; autoSave firing during typing pauses). Fix sketch: deep-compare (or hash) the freshly built spec against the last-sent one for the same URI and post only the validation update when unchanged. Needs care with `pendingData`, first render, and webview reload — a wrong skip is a stale graph, the exact bug class this branch fights, so do it with tests or not at all.
 
+## Validator errors without `pipe_code` never decorate a node
+
+`validationErrorsToIssues` targets nodes only from the structured `pipe_code`, so an error variant that names its pipe only in the message prose gets a row but no ring/badge. `findErrorLine` has a message-scraping fallback (`extractCodeFromMessage`) for *line placement*, where a wrong guess is harmless — reusing it for node targeting was considered and rejected: decoration is an authoritative visual claim, and an error *mentioning* a pipe (e.g. "pipe 'x' references unknown pipe 'y'") is not necessarily *about* that pipe, so prose inference can mark the wrong node. The right fix is upstream: broaden `pipe_code` attribution in the validator's error model (pipelex repo) so more variants carry their owning pipe structurally; the extension then targets them for free.
+
+## API validation request is not genuinely cancellable
+
+`runWithAbort` in `apiValidationBackend` races the client promise against the abort signal — cancelling stops *awaiting*, but the HTTP request (the bundle upload) runs to completion server-side. Harmless for correctness (the result is discarded; staleness checks drop late verdicts) but wasteful, and it means panel-close doesn't stop an upload already in flight. A real fix needs the `mthds` client to accept an `AbortSignal` and thread it into `fetch` — a cross-repo change (`mthds-js`). The changelog wording already states the limitation.
+
 ## Multi-domain bundles: same-code pipes are ambiguous targets
 
 Static-issue navigation reconstructs targets from `pipe.<code>` contexts without domain/file identity, and node decorations target by bare `pipeCode` — in a bundle where several domains declare the same pipe code, clicking an issue can open the first matching declaration and badges mark every same-code node. Inherited from the validator's own error model (`pipe_code` is bare too). A fix needs domain-qualified codes through the whole chain (validator wire format → extension mappers → mthds-ui targeting). Uncommon today; revisit when multi-domain bundles are.

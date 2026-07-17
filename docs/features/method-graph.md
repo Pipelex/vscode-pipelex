@@ -55,4 +55,4 @@ Two additions to the host ↔ webview protocol:
 
 ## Backends
 
-Both validation backends (`cli` / `api`, see `validation-backends.md`) feed the widget identically: a produced verdict maps to `valid`/`invalid`, a `BackendError` to the `error` state (with its per-kind wording as the lead issue). Toast notifications stay rate-limited: the panel toasts only for its own open-time analyze failures (one-time CLI-install hint; actionable API auth errors with the Set API Key button), while on-save failures keep being notified by the validator.
+Both validation backends (`cli` / `api`, see `validation-backends.md`) feed the widget identically: a produced verdict maps to `valid`/`invalid`, a `BackendError` to the `error` state (with its per-kind wording as the lead issue). Toast notifications stay rate-limited: the panel toasts only for its own analyze failures — the open-time run and the debounced external-change refreshes (one-time CLI-install hint; actionable API auth errors with the Set API Key button) — while on-save failures keep being notified by the validator.

@@ -5,7 +5,7 @@ const mockState = vi.hoisted(() => {
     const mockWebview = {
         html: '',
         asWebviewUri: vi.fn((uri: any) => ({ toString: () => `https://webview-asset/${uri.fsPath || uri}` })),
-        onDidReceiveMessage: vi.fn(),
+        onDidReceiveMessage: vi.fn((_listener: (message: any) => void) => ({ dispose: vi.fn() })),
         postMessage: vi.fn(),
     };
     const mockPanel = {
@@ -214,6 +214,13 @@ vi.mock('../validation/bundleGather', () => ({
 vi.mock('../validation/crossFileDiagnostics', () => ({
     resolveErrorLocations: vi.fn(() => mockState.errorLocations),
 }));
+
+// Pass-through wrapper: real behavior by default, deferrable per-test (the
+// send-superseded staleness test wedges the graph send open on this await).
+vi.mock('../graph/graphConfig', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../graph/graphConfig')>();
+    return { ...actual, resolveGraphConfig: vi.fn(actual.resolveGraphConfig) };
+});
 
 // ---------- Import SUT after mocks ----------
 import { MethodGraphPanel } from '../graph/methodGraphPanel';
@@ -992,6 +999,37 @@ describe('MethodGraphPanel', () => {
             expect.stringContaining('Could not find [pipe.process_batch]'),
         );
         panel.dispose();
+    });
+
+    it('skips the verdict run when the panel is disposed during the graph send', async () => {
+        const processUtils = await import('../validation/processUtils');
+        const graphConfig = await import('../graph/graphConfig');
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/bundle.mthds');
+        seedBundle(uri);
+
+        // Wedge the send open on its resolveGraphConfig await.
+        let releaseConfig: ((cfg: any) => void) | undefined;
+        vi.mocked(graphConfig.resolveGraphConfig).mockImplementationOnce(
+            () => new Promise(resolve => { releaseConfig = resolve; }),
+        );
+
+        panel.show(uri);
+        await vi.waitFor(() => {
+            expect(releaseConfig).toBeDefined();
+        });
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
+
+        // Close the panel the way VS Code does: the mock panel's dispose() is
+        // inert, so fire the onDidDispose handler wirePanel registered.
+        mockState.mockPanel.onDidDispose.mock.calls[0][0]();
+        releaseConfig!({ edgeType: 'default', theme: 'system', toolbarPosition: 'top-right' });
+        await new Promise(r => setTimeout(r, 20));
+
+        // The send found the panel gone, so renderStaticGraph reported "nothing
+        // rendered" and refresh() never launched the analyze.
+        expect(processUtils.spawnCli).not.toHaveBeenCalled();
     });
 
     // --- CLI flags ---

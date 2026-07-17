@@ -508,8 +508,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * while `validating` and folded into later verdict states).
      *
      * Returns the resolved bundle (for the follow-up analyze call), or undefined
-     * when nothing was rendered (stale URI, panel closed, or unreadable files —
-     * the latter falls back to the message view).
+     * when nothing was rendered (stale URI, panel closed, a send superseded by a
+     * newer render, or unreadable files — the latter falls back to the message
+     * view).
      *
      * `verdict: false` renders with validation off entirely: no widget (the
      * `setData` payload carries no validation state) and no verdict channel to
@@ -595,8 +596,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const direction = config.get<string>('graph.direction', 'top_down');
         const showControllers = config.get<boolean>('graph.showControllers', true);
         const foldMode = config.get<string>('graph.foldMode', 'folded');
-        await this.sendGraphspecToWebview(uri, spec, direction, showControllers, foldMode, seq);
-        return graphPrimary;
+        // The send is itself an async boundary: it can find the render superseded
+        // (panel closed, URI switched, newer sequence) or fail on missing assets.
+        // Report that as "nothing rendered" so refresh() doesn't launch an analyze
+        // for a graph that never reached the webview.
+        const sent = await this.sendGraphspecToWebview(uri, spec, direction, showControllers, foldMode, seq);
+        return sent ? graphPrimary : undefined;
     }
 
     /**
@@ -922,8 +927,8 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         showControllers: boolean,
         foldMode: string,
         seq: number,
-    ) {
-        if (!this.panel) return;
+    ): Promise<boolean> {
+        if (!this.panel) return false;
 
         const webviewHtml = this.buildWebviewHtml();
         if (!webviewHtml) {
@@ -932,14 +937,15 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 'Could not load graph webview assets.',
                 { retry: true }
             ));
-            return;
+            return false;
         }
 
         const dagreDirection = direction === 'left_to_right' ? 'LR' : 'TB';
         const graphConfig = await resolveGraphConfig();
 
-        if (this.currentUri?.toString() !== uri.toString()) return;
-        if (seq !== this.renderSequence) return;
+        if (!this.panel) return false;
+        if (this.currentUri?.toString() !== uri.toString()) return false;
+        if (seq !== this.renderSequence) return false;
 
         // Retain the graphspec so a pipe-node click can recover its declaring
         // domain + registry `source` (see navigateToPipe). Set alongside the send
@@ -989,6 +995,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             this.pendingData = setDataPayload;
             this.setHtml(webviewHtml);
         }
+        return true;
     }
 
     /**
