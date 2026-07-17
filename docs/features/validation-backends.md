@@ -5,7 +5,7 @@ The extension validates `.mthds` bundles on save through a **backend**, selected
 - **`cli`** (default, zero-config) — spawns the local `pipelex-agent` Python CLI, exactly as before. Nothing to configure: if `pipelex-agent` is on `PATH` or in a workspace `.venv`, it just works.
 - **`api`** (opt-in) — calls a Pipelex API server over HTTP via the `mthds` client. Use this when you run a [`pipelex-api`](https://github.com/Pipelex/pipelex-api) server (self-hosted or the hosted endpoint) and want validation without a local Python install.
 
-Both backends produce the same structured diagnostics, so the editor experience is identical. The graph webview, the Problems panel, and the on-save flow do not know which backend ran.
+Both backends produce the same structured diagnostics, so for any **produced verdict** (valid or invalid) the editor experience is identical — the graph webview, the Problems panel, and the on-save flow do not know which backend ran. Only *failures to produce a verdict* differ by backend (install/upgrade guidance for the CLI, reachability/auth remedies for the API — see "When a backend can't produce a verdict").
 
 ## Choosing a backend
 
@@ -53,14 +53,13 @@ For a saved `.mthds` file, the extension gathers every `.mthds` file in the **sa
 
 ## The method graph panel on an invalid bundle
 
-When a `.mthds` bundle fails validation it produces **no** method graph, so the graph panel shows the validation errors instead of an empty pane. The list is built from the **same structured errors and the same owner/range resolver** as the Problems-panel diagnostics, so the panel and the Problems panel can never disagree about where an error lives:
+Since the static-first flow (see `method-graph.md`) an invalid verdict never replaces the graph — the statically-built graph stays on screen and the toolbar's validation widget flips to `invalid`. Its dropdown lists the errors, built from the **same structured errors and the same owner/range resolver** as the Problems-panel diagnostics, so the widget and the Problems panel can never disagree about where an error lives:
 
-- A header counts the errors and reminds you to **fix and save to regenerate the graph**.
-- Each row shows the error message, its `pipe.<code>` / `concept.<code>` context when the error names one, and — for an error that lives in a **sibling** file — that file's name, so a cross-file failure is attributed to the right place (single-file bundles, and errors on the file you saved, stay clean with no file label).
+- Each row shows the error message, its `pipe.<code>` / `concept.<code>` locator chip when the error names one, the runtime's suggested fix when the fix planner derived one, and — for an error that lives in a **sibling** file — that file's name, so a cross-file failure is attributed to the right place (single-file bundles, and errors on the file you saved, stay clean with no file label).
 - Each row is **clickable**: it opens the owning file (which may be a sibling) at the error's line, in the editor column beside the panel — the same owner resolver and open-and-reveal the graph's pipe nodes use for [cross-file pipe navigation](./graph-pipe-navigation.md).
-- A **Retry** button re-runs the analysis, matching the panel's other error states.
+- Errors that name a pipe also **decorate the graph nodes** (severity ring + count badge, row-click pans/flashes the node — see `method-graph.md`, "Node decorations").
 
-Fix the reported errors and save: the panel regenerates the graph. (This applies to `.mthds` sources only — a run-graph GraphSpec JSON never yields validation errors.)
+Fix the reported errors and save: the static graph rebuilds immediately and the widget tracks the new verdict. (This applies to `.mthds` sources only — a run-graph GraphSpec JSON never yields validation errors.)
 
 ## When a backend can't produce a verdict
 
@@ -76,7 +75,7 @@ A backend failure is distinct from "the bundle is invalid":
 
 In every failure case stale diagnostics are cleared, so the Problems panel never shows a wrong-but-leftover verdict.
 
-When the **method graph view** can't render because the backend failed (CLI missing or too old, API unreachable, API key required, an API error, send declined, or an unexpected error), it shows the reason with a **Retry** button — plus, for the API-key case, **Set API Key** / **Get an API Key** buttons — that re-run the analysis for the open file, so a transient failure (server still starting, a network blip, a just-installed CLI, a key just set) recovers without reopening the panel.
+A backend failure never blanks the **method graph view** either: the static graph stays on screen and the toolbar widget flips to `error` with the failure as its lead issue (CLI missing or too old, API unreachable, API key required, an API error, send declined, or an unexpected error). Actionable failures still raise the toasts described above — including **Set API Key** / **Get an API Key** for the auth case — and the next save (or the message views' **Retry**, for pre-graph failures like unreadable bundle files) re-runs the analysis, so a transient failure (server still starting, a network blip, a just-installed CLI, a key just set) recovers without reopening the panel.
 
 ## Version expectations
 

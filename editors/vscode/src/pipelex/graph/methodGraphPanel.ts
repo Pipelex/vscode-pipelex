@@ -138,9 +138,19 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                     .getConfiguration('pipelex', doc.uri)
                     .get<boolean>('validation.enabled', true);
                 if (validationEnabled) {
+                    // The on-save validator owns this save's verdict — cancel any
+                    // analyze the panel itself still has in flight (open-time or
+                    // external-change), so its pre-save verdict can never land
+                    // after, and overwrite, the validator's.
+                    cancelAllInflight(this.inflight);
                     // Flip to "validating" synchronously so a fast verdict from the
-                    // validator can never be overwritten by this rebuild's async reads.
-                    this.currentValidation = { state: 'validating', issues: this.staticIssues };
+                    // validator can never be overwritten by this rebuild's async
+                    // reads — and POST it, so a live widget spins honestly while
+                    // the rebuild is still reading files.
+                    this.postValidationStatus(
+                        { state: 'validating', issues: this.staticIssues },
+                        this.staticTargets,
+                    );
                     void this.renderStaticGraph(doc.uri);
                 } else {
                     void this.refresh(doc.uri);
@@ -412,8 +422,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         this.inflight.set(uriKey, controller);
 
         // Verdict pending — the static graph below renders immediately with the
-        // widget spinning; the analyze result flips it.
-        this.currentValidation = { state: 'validating', issues: this.staticIssues };
+        // widget spinning; the analyze result flips it. Posted (not just
+        // retained) so a live webview's widget spins during the rebuild too.
+        this.postValidationStatus(
+            { state: 'validating', issues: this.staticIssues },
+            this.staticTargets,
+        );
 
         // Show loading screen only on first load; keep the current graph visible
         // during subsequent refreshes so the viewport position is preserved.

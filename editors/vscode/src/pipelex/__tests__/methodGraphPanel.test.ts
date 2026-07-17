@@ -1488,6 +1488,31 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it("a save cancels the panel's in-flight analyze and posts validating immediately", async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri);
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+
+        mockState.cancelAllInflightSpy.mockClear();
+        mockState.mockWebview.postMessage.mockClear();
+        mockState.onSaveHandler!({ uri });
+
+        // Synchronously — before the rebuild's file reads: the panel's own
+        // analyze is aborted (the on-save validator owns this save's verdict,
+        // so a pre-save verdict can never land after it), and the live widget
+        // flips to a spinner instead of freezing on the previous verdict.
+        expect(mockState.cancelAllInflightSpy).toHaveBeenCalled();
+        const posted = mockState.mockWebview.postMessage.mock.calls
+            .map(c => c[0])
+            .find((m: any) => m?.type === 'setValidationStatus');
+        expect(posted?.state).toBe('validating');
+        panel.dispose();
+    });
+
     it("an older save's slower static rebuild cannot overwrite a newer one", async () => {
         const bundleGather = await import('../validation/bundleGather');
         const bundleWith = (code: string) => [

@@ -20,7 +20,7 @@ The graph toolbar's first section is a validation status widget (rendered by `Gr
 | State | Meaning |
 | --- | --- |
 | spinner | Verdict pending (`validating`) |
-| green check | `pipelex-agent validate` accepted the bundle (`valid`) |
+| green check | The configured validation backend (CLI or API) accepted the bundle (`valid`) |
 | red cross + count badge | The bundle is invalid; the badge counts the issues |
 | warning triangle | No verdict could be produced (`error`): CLI not found or too old, timeout, API auth failure, or the save was skipped because another tool reported errors |
 
@@ -35,7 +35,7 @@ The issue list is composed host-side (`methodGraphPanel` + the pure helpers in `
 - `valid` → static warnings only; a static *error* contradicted by the authoritative verdict is dropped.
 - `error` → the failure description first, then the static diagnostics.
 
-Two ordering rules keep this composition honest under races. Each static rebuild claims a monotonic render sequence and re-checks it after every await, so an older save's slower file reads can never post their graph or issue state over a newer one. And when the verdict lands *before* the save-triggered rebuild finishes (a fast validator, or an immediate skip), the rebuild re-composes the static portion of the current state — fresh warnings under `valid`, a fresh static tail behind the retained lead issue under `error` — instead of letting the widget keep the previous render's issues and targets.
+Three ordering rules keep this composition honest under races. Each static rebuild claims a monotonic render sequence and re-checks it after every await, so an older save's slower file reads can never post their graph or issue state over a newer one. Verdicts are ordered by cancellation: the on-save validator aborts its previous in-flight run for the same file, and the save handler aborts any analyze the panel itself still has in flight (open-time or external-change), so a pre-save verdict can never land after — and overwrite — the save's. And when the verdict lands *before* the save-triggered rebuild finishes (a fast validator, or an immediate skip), the rebuild re-composes the static portion of the current state — fresh warnings under `valid`, a fresh static tail behind the retained lead issue under `error` — instead of letting the widget keep the previous render's issues and targets.
 
 When the shown file is a helper (no top-level `main_pipe`), both the graph and the verdict anchor on the directory's graph primary (`resolveGraphPrimaryBundle`, e.g. a sibling `bundle.mthds`). `applyAnalysis` receives that anchor alongside the shown file: errors that resolve to no owning file fall back to the *primary* — matching where the Problems panel places them — while owning-file labels stay relative to the shown file.
 
