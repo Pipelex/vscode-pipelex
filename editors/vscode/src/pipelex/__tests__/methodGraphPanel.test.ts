@@ -1421,6 +1421,119 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    /**
+     * Two-file, two-domain fixture with a colliding pipe code: both files
+     * declare `[pipe.analyze]`, under different domains. The sibling's copy is
+     * broken (missing output), and the primary comes first in gather order —
+     * so an unconstrained first-match scan would land the issue on the wrong
+     * file. Shared by the domain-targeting tests below.
+     */
+    function seedCollidingBundle(uri: any, helpersUri: any) {
+        mockState.bundleFiles = [
+            {
+                uri,
+                name: 'screening.mthds',
+                content: [
+                    'domain = "screening"',
+                    'main_pipe = "main"',
+                    '',
+                    '[pipe.main]',
+                    'type = "PipeSequence"',
+                    'description = "seq"',
+                    'output = "Text"',
+                    'steps = [ { pipe = "analyze", result = "a" } ]',
+                    '',
+                    '[pipe.analyze]',
+                    'type = "PipeLLM"',
+                    'description = "fine"',
+                    'output = "Text"',
+                    'prompt = "p"',
+                    '',
+                ].join('\n'),
+            },
+            {
+                uri: helpersUri,
+                name: 'helpers.mthds',
+                content: [
+                    'domain = "helpers"',
+                    '',
+                    '[pipe.analyze]',
+                    'type = "PipeLLM"',
+                    'description = "broken: no output"',
+                    'prompt = "p"',
+                    '',
+                ].join('\n'),
+            },
+        ];
+    }
+
+    it('static issues carry qualified pipeRefs and jump targets constrained to the declaring domain', async () => {
+        const vscode = await import('vscode');
+        const uri = makeUri('/project/methods/screening.mthds');
+        const helpersUri = makeUri('/project/methods/helpers.mthds');
+        seedCollidingBundle(uri, helpersUri);
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        // The sibling's missing-output diagnostic: the mthds-ui mapper stamped
+        // its declaring domain, so the issue targets `helpers.analyze` — never
+        // the primary's same-code pipe.
+        const validation = (panel as any).currentValidation;
+        const index = validation.issues.findIndex((issue: any) => issue.context === 'pipe.analyze.output');
+        expect(index).toBeGreaterThanOrEqual(0);
+        expect(validation.issues[index].pipeRef).toBe('helpers.analyze');
+
+        // The jump target resolved within that domain: the sibling, not the
+        // primary that also declares [pipe.analyze] and comes first in gather order.
+        const target = (panel as any).errorTargets[index];
+        expect(target?.uri.toString()).toBe(helpersUri.toString());
+
+        // Row click: the index-based navigation opens the sibling.
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        vi.mocked(vscode.workspace.openTextDocument).mockClear();
+        messageHandler({ type: 'navigateToError', index });
+        await new Promise(r => setTimeout(r, 20));
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(target.uri);
+        panel.dispose();
+    });
+
+    it('applyAnalysis infers a bare pipe_code through the static registry, never guessing on collisions', async () => {
+        const uri = makeUri('/project/methods/screening.mthds');
+        const helpersUri = makeUri('/project/methods/helpers.mthds');
+        seedCollidingBundle(uri, helpersUri);
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [
+            // `main` exists in exactly one domain → inferred `screening.main`.
+            { error: { category: 'pipe_validation', message: 'root broke', pipe_code: 'main' }, uri, range },
+            // `analyze` exists in two domains → stays untargeted.
+            { error: { category: 'pipe_validation', message: 'which one?', pipe_code: 'analyze' }, uri, range },
+            // The wire's domain_code wins outright, and the chip qualifies
+            // because the error lives outside the shown file's domain.
+            { error: { category: 'pipe_validation', message: 'sibling broke', pipe_code: 'analyze', domain_code: 'helpers' }, uri, range },
+        ];
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
+
+        const validation = currentValidationPayload(panel);
+        expect(validation.issues.map((issue: any) => issue.pipeRef)).toEqual([
+            'screening.main',
+            undefined,
+            'helpers.analyze',
+        ]);
+        expect(validation.issues.map((issue: any) => issue.context)).toEqual([
+            'pipe.main',
+            'pipe.analyze',
+            'pipe.helpers.analyze',
+        ]);
+        panel.dispose();
+    });
+
     it('a valid verdict keeps only the static analyzer warnings', async () => {
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/methods/main.mthds');

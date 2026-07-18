@@ -1,13 +1,13 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import { buildStaticGraphSpecFromToml, staticDiagnosticsToValidationIssues } from '@pipelex/mthds-ui/static-graph';
+import { buildStaticGraphSpecFromToml, parsePipeRef, staticDiagnosticsToValidationIssues } from '@pipelex/mthds-ui/static-graph';
 import { cancelAllInflight } from '../validation/processUtils';
 import { gatherBundleFiles } from '../validation/bundleGather';
 import { resolveGraphPrimaryBundle } from '../validation/graphPrimary';
 import type { GraphPrimaryBundle } from '../validation/graphPrimary';
 import { resolveErrorLocations } from '../validation/crossFileDiagnostics';
-import { resolveDeclaringFile } from '../validation/bundleResolution';
+import { fileDeclaredDomain, resolveDeclaringFile } from '../validation/bundleResolution';
 import { AnalyzeAbortError, BackendError } from '../validation/backend';
 import type { BundleAnalysis, BundleFile, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
 import { CliValidationBackend } from '../validation/cliValidationBackend';
@@ -639,8 +639,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     /**
      * Best-effort jump targets for static issues: when a diagnostic's TOML path
      * names a `[pipe.<code>]` / `[concept.<code>]` declaration, point the row at
-     * that table header in its declaring file. Rows that resolve nowhere stay
-     * undefined (non-navigable) rather than jumping somewhere wrong.
+     * that table header in its declaring file. Pipe rows carry a qualified
+     * `pipeRef` (the mthds-ui mapper stamps the declaring domain), so the
+     * declaring-file resolution is domain-constrained — in a bundle where two
+     * domains declare the same pipe code, the row opens the right file. Rows
+     * that resolve nowhere stay undefined (non-navigable) rather than jumping
+     * somewhere wrong.
      */
     private resolveStaticIssueTargets(
         issues: GraphValidationIssue[],
@@ -659,7 +663,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         return issues.map(issue => {
             const ref = parseStaticIssueContext(issue.context);
             if (!ref) return undefined;
-            const owner = resolveDeclaringFile({ kind: ref.kind, code: ref.code, files, getLines });
+            const domainCode = ref.kind === 'pipe' && issue.pipeRef
+                ? parsePipeRef(issue.pipeRef)?.domainPath ?? undefined
+                : undefined;
+            const owner = resolveDeclaringFile({ kind: ref.kind, code: ref.code, domainCode, files, getLines });
             if (!owner) return undefined;
             const lines = getLines(owner);
             const line = findTableHeaderInLines(lines, ref.kind, ref.code);
@@ -752,12 +759,20 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             primaryUri: analysisPrimaryUri,
             primaryDocument,
         });
-        const issues = validationErrorsToIssues(
-            validation.errors,
+        const shownFile = files.find(f => f.uri.toString() === uri.toString());
+        const issues = validationErrorsToIssues(validation.errors, {
             // Name the owning file only when it differs from the shown one, so a
             // single-file bundle (or an error on the file you saved) stays clean.
-            locations.map(loc => loc.uri.toString() !== uri.toString() ? basename(loc.uri.fsPath) : undefined),
-        );
+            ownerFiles: locations.map(loc => loc.uri.toString() !== uri.toString() ? basename(loc.uri.fsPath) : undefined),
+            // The static graphspec's registry keys are the inference pool for
+            // errors that arrive with a bare `pipe_code` and no `domain_code`.
+            pipeRegistryRefs: this.currentPipeRegistryRefs(),
+            // The shown file's domain drives the chip policy: a pipe chip is
+            // domain-qualified only when the error lives in another domain.
+            shownDomain: shownFile
+                ? fileDeclaredDomain(shownFile.content.split(/\r\n|\r|\n/))
+                : undefined,
+        });
         this.postValidationStatus(
             { state: 'invalid', issues },
             locations.map(loc => ({ uri: loc.uri, range: loc.range })),
@@ -1181,6 +1196,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const domainCode = clickedDomainCode ?? node?.domain_code;
         const source = this.lookupPipeRegistrySource(pipeCode, domainCode);
         return { domainCode, source };
+    }
+
+    /** Qualified refs keying the retained graphspec's `pipe_registry`, for bare-code inference. */
+    private currentPipeRegistryRefs(): string[] | undefined {
+        const registry = (this.currentGraphspec as GraphspecForNav | undefined)?.pipe_registry;
+        return registry ? Object.keys(registry) : undefined;
     }
 
     private lookupPipeRegistrySource(pipeCode: string, domainCode?: string): string | undefined {

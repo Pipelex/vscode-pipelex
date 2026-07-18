@@ -33,6 +33,9 @@ export interface ErrorLocation {
  *    basename. This is the populated-whenever-possible path.
  * 2. Declaration scan — for errors with no `source` (e.g. `pipe_factory`), find
  *    the file that declares the referenced `[pipe.<code>]` / `[concept.<code>]`.
+ *    When the error carries a `domain_code`, a declaration-header collision is
+ *    resolved only within files declaring that domain — no domain match means
+ *    no owner (fall through to the primary) rather than a guessed file.
  * 3. Fallback — the saved (primary) file, so an unresolved error is never lost.
  *
  * Ranges within a file come from the same `sourceLocator` logic as the
