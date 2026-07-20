@@ -64,6 +64,10 @@ Like `format_mthds`, it **never raises on bad content**: even a validator failur
 
 > Note: the builtin **URL** matters. Loading the same schema *file* via a `file://` path resolves its internal `$ref`s under a different base URI, which collapses an MTHDS pipe's `oneOf` branch errors into a single "does not match any of the allowed schemas". The library (and the extension/hook in production) always validate against the builtin `pipelex://mthds.schema.json`.
 
+#### Discriminator-first error selection
+
+Schema errors on pipes go through the engine's MTHDS-aware selection (`validate_mthds_pipes` in `taplo-common`): each pipe is validated against the specific blueprint its `type` names, so the diagnostics describe *that* blueprint's violations rather than the generic `oneOf` branch-ranking fallout. When the `type` names **no** known pipe type, the engine reports the discriminator mistake itself — `"X" is not one of [...]`, listing the valid pipe types and locating the offending `type` key — instead of letting the best-branch heuristic blame the pipe's legitimate fields as additional properties. This selection behavior is part of the specced surface, pinned by the workspace conformance suite (`conformance/tests/pipelex_tools/test_lint.py`).
+
 ### `Diagnostic` shape
 
 Both functions return diagnostics with this stable shape (`location` and `range` are always present, `null` when absent):

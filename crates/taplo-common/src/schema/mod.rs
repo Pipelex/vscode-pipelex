@@ -143,6 +143,42 @@ fn build_definition_sub_schema(schema: &Value, definition_name: &str) -> Option<
 
 const PIPE_SIGNATURE_DEFINITION: &str = "PipeSignatureBlueprint";
 
+/// Collect every pipe `type` value the MTHDS schema knows about — i.e. each
+/// `definitions.*.properties.type.enum` entry — sorted and deduplicated.
+fn mthds_known_pipe_types(schema: &Value) -> Vec<Value> {
+    let Some(definitions) = schema.get("definitions").and_then(Value::as_object) else {
+        return Vec::new();
+    };
+    let mut types: Vec<Value> = definitions
+        .values()
+        .filter_map(|def| def.get("properties")?.get("type")?.get("enum")?.as_array())
+        .flatten()
+        .cloned()
+        .collect();
+    types.sort_unstable_by(|a, b| {
+        a.as_str()
+            .unwrap_or_default()
+            .cmp(b.as_str().unwrap_or_default())
+    });
+    types.dedup();
+    types
+}
+
+/// A minimal schema validating only the `type` discriminator against the known
+/// pipe types. Used when a pipe's `type` maps to no blueprint definition, so the
+/// diagnostic names the actual mistake ("X is not one of [...]") instead of the
+/// generic oneOf fallout. `None` when the schema exposes no type enums.
+fn mthds_pipe_type_enum_schema(schema: &Value) -> Option<Value> {
+    let known_types = mthds_known_pipe_types(schema);
+    if known_types.is_empty() {
+        return None;
+    }
+    Some(serde_json::json!({
+        "type": "object",
+        "properties": { "type": { "enum": known_types } }
+    }))
+}
+
 fn mthds_pipe_definition_name(pipe_dom_node: &dom::Node) -> Option<String> {
     let pipe_dom_table = pipe_dom_node.as_table()?;
     match pipe_dom_table.get("type") {
@@ -226,7 +262,21 @@ impl<E: Environment> Schemas<E> {
                 None => {
                     let Some(sub_schema) = build_definition_sub_schema(&schema, &definition_name)
                     else {
-                        continue; // Unknown type — let generic validator handle it
+                        // Unknown `type` — report the discriminator mistake itself
+                        // ("X is not one of [...]"). Falling through to the generic
+                        // oneOf branch-ranking instead would blame the pipe's
+                        // legitimate fields as additional properties of whichever
+                        // branch happens to fail least (the typeless signature form).
+                        if let Some(errors) = self.validate_unknown_pipe_type(
+                            &schema,
+                            &pipe_table_key,
+                            dom_key,
+                            pipe_dom_node,
+                            pipe_value,
+                        ) {
+                            all_errors.extend(errors);
+                        }
+                        continue;
                     };
                     match self.create_validator(&sub_schema) {
                         Ok(v) => {
@@ -257,6 +307,35 @@ impl<E: Environment> Schemas<E> {
         }
 
         Some(all_errors)
+    }
+
+    /// Report an unknown pipe `type` as a discriminator error against the known
+    /// pipe types, by validating the pipe against a minimal `{type: {enum: [...]}}`
+    /// schema. Returns `None` when the schema exposes no type enums or the
+    /// synthetic validator fails to compile — the generic path handles it then.
+    fn validate_unknown_pipe_type(
+        &self,
+        schema: &Value,
+        pipe_table_key: &Key,
+        pipe_dom_key: &Key,
+        pipe_dom_node: &dom::Node,
+        pipe_value: &Value,
+    ) -> Option<Vec<NodeValidationError>> {
+        let enum_schema = mthds_pipe_type_enum_schema(schema)?;
+        let validator = match self.create_validator(&enum_schema) {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(%err, "failed to compile pipe-type enum validator");
+                return None;
+            }
+        };
+        Some(Self::validate_single_pipe(
+            pipe_table_key,
+            pipe_dom_key,
+            pipe_dom_node,
+            pipe_value,
+            &validator,
+        ))
     }
 
     /// Validate a single pipe instance against its pre-compiled blueprint validator.
@@ -1858,6 +1937,56 @@ aspect_ratio = "not_an_aspect_ratio"
         assert!(
             messages.iter().any(|m| m.contains("aspect_ratio")),
             "Should keep typed pipe errors alongside the typeless signature error — got: {messages:?}",
+        );
+    }
+
+    #[tokio::test]
+    async fn mthds_unknown_pipe_type_reports_discriminator_error() {
+        let env = MockEnv {
+            files: std::collections::HashMap::new(),
+        };
+        let schemas = super::Schemas::new(env, None);
+
+        let mthds_content = r#"
+domain = "rec"
+
+[pipe.bad_pipe]
+type = "UnknownPipeType"
+description = "This pipe has an invalid type"
+output = "Text"
+model = "$default"
+"#;
+
+        let parsed = taplo::parser::parse(mthds_content);
+        let dom = parsed.into_dom();
+
+        let schema_url: Url = super::builtins::MTHDS_SCHEMA_URL.parse().unwrap();
+        let mthds_schema = super::builtins::mthds_schema();
+        schemas.add_schema(&schema_url, mthds_schema).await;
+
+        let errors = schemas.validate_root(&schema_url, &dom).await.unwrap();
+        let messages: Vec<String> = errors
+            .iter()
+            .map(super::NodeValidationError::display_message)
+            .collect();
+        let locations: Vec<Option<String>> = errors
+            .iter()
+            .map(super::NodeValidationError::instance_location)
+            .collect();
+
+        assert!(
+            messages
+                .iter()
+                .any(|m| m.contains(r#""UnknownPipeType" is not one of"#) && m.contains("\"PipeLLM\"")),
+            "Should name the unknown type and list the valid ones — got: {messages:?}",
+        );
+        assert!(
+            !messages.iter().any(|m| m.contains("Additional properties")),
+            "Should NOT blame the pipe's legitimate fields as additional properties — got: {messages:?}",
+        );
+        assert!(
+            locations.contains(&Some("pipe.bad_pipe.type".to_string())),
+            "Should locate the discriminator error at the offending `type` key — got: {locations:?}",
         );
     }
 }
