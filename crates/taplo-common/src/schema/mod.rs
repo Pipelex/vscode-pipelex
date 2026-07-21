@@ -1977,7 +1977,8 @@ model = "$default"
         assert!(
             messages
                 .iter()
-                .any(|m| m.contains(r#""UnknownPipeType" is not one of"#) && m.contains("\"PipeLLM\"")),
+                .any(|m| m.contains(r#""UnknownPipeType" is not one of"#)
+                    && m.contains("\"PipeLLM\"")),
             "Should name the unknown type and list the valid ones — got: {messages:?}",
         );
         assert!(
