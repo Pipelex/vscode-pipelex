@@ -173,8 +173,17 @@ describe('findDeclaringFileByScan — domain-disambiguated collision', () => {
         expect(owner?.uri.toString()).toBe(fileA.uri.toString());
     });
 
-    it('falls back to the first match when no file declares the named domain', () => {
+    it('refuses to guess when no colliding file declares the named domain', () => {
+        // The domain is a constraint, not a preference: a collision that cannot
+        // be narrowed to the named domain resolves to nothing (callers fall back
+        // to the primary file) rather than a wrong file.
         const owner = findDeclaringFileByScan('pipe', 'process', [fileA, fileB], 'gamma', getLines);
+        expect(owner).toBeUndefined();
+    });
+
+    it('still resolves a unique match even under a non-matching domain', () => {
+        // One single file declares the header: not a guess, whatever its domain.
+        const owner = findDeclaringFileByScan('pipe', 'process', [fileA], 'gamma', getLines);
         expect(owner?.uri.toString()).toBe(fileA.uri.toString());
     });
 
@@ -184,16 +193,16 @@ describe('findDeclaringFileByScan — domain-disambiguated collision', () => {
         const nested = makeFile(`${DIR}/c.mthds`, 'c.mthds',
             '[pipe.process]\ntype = "PipeLLM"\ndomain = "beta"\n');
         const owner = findDeclaringFileByScan('pipe', 'process', [fileA, nested], 'beta', getLines);
-        // `nested` has no top-level domain, so the real top-level `beta` (none here)
-        // isn't found → first match (fileA) wins.
-        expect(owner?.uri.toString()).toBe(fileA.uri.toString());
+        // `nested` has no top-level domain, so no colliding file declares `beta`
+        // → the constrained scan resolves nothing instead of guessing.
+        expect(owner).toBeUndefined();
     });
 
     it('does not accept mismatched quotes in a top-level domain declaration', () => {
         const malformed = makeFile(`${DIR}/malformed.mthds`, 'malformed.mthds',
             'domain = "beta\'\n[pipe.process]\ntype = "PipeLLM"\n');
         const owner = findDeclaringFileByScan('pipe', 'process', [fileA, malformed], 'beta', getLines);
-        expect(owner?.uri.toString()).toBe(fileA.uri.toString());
+        expect(owner).toBeUndefined();
     });
 });
 

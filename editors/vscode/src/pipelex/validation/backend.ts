@@ -73,29 +73,38 @@ export interface ValidationBackend {
 }
 
 /**
- * The method-graph panel, as seen by the on-save orchestrator. When the panel is
- * showing the just-saved `.mthds`, the save handler runs ONE `analyze(withGraph)`
- * and hands the result here — so save-with-panel-open is a single backend call
- * serving both diagnostics and graph, never two.
+ * The method-graph panel, as seen by the on-save orchestrator. The panel renders
+ * the STATIC graph itself (no backend involved); what it needs from the
+ * validator is the verdict for its toolbar validation widget. When the panel is
+ * showing the just-saved `.mthds`, the save handler runs its ONE `analyze()` and
+ * hands the outcome here — so save-with-panel-open is a single backend call
+ * serving both diagnostics and widget, never two.
  */
 export interface GraphAnalysisSink {
     isShowingMthds(uri: vscode.Uri): boolean;
     /**
-     * Render the analysis. May resolve asynchronously (the invalid-bundle branch
-     * reads sibling files to build a clickable, owner-attributed error list);
-     * callers that only need the diagnostics published can fire-and-forget it.
+     * Apply the verdict to the validation widget (the graph is untouched). May
+     * resolve asynchronously (the invalid branch reads sibling files to place
+     * each issue on its owning file for click-to-navigate); callers that only
+     * need the diagnostics published can fire-and-forget it.
+     *
+     * `uri` is the shown/saved file; `analysisPrimaryUri` is the bundle file the
+     * analysis anchored on (the graph primary — a sibling when `uri` is a
+     * helper). Errors that resolve to no owning file fall back to the primary,
+     * matching where the Problems panel places them.
      */
-    applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis): void | Promise<void>;
+    applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis, analysisPrimaryUri: vscode.Uri): void | Promise<void>;
     /**
-     * The on-save analysis threw (backend / transport error). The panel renders
-     * the failure instead of keeping the previous (now stale) graph. A no-op when
-     * the panel is not currently showing `uri`.
+     * The on-save analysis threw (backend / transport error). The widget flips
+     * to its `error` state; the static graph stays on screen. A no-op when the
+     * panel is not currently showing `uri`.
      */
     applyBackendError(uri: vscode.Uri, err: unknown): void;
     /**
      * The on-save validation was skipped for `uri` (another tool reported errors,
-     * so the validator deferred). The panel shows a short notice rather than keep a
-     * stale graph. A no-op when the panel is not currently showing `uri`.
+     * so the validator deferred). The widget flips to `error` with the skip
+     * reason; the static graph stays on screen. A no-op when the panel is not
+     * currently showing `uri`.
      */
     applySkipped(uri: vscode.Uri, message: string): void;
 }
@@ -118,9 +127,9 @@ export type BackendErrorKind =
     | 'declined';
 
 /**
- * A one-click remedy a consumer can surface as a button (method pane) or a
- * notification action (toast). Either runs a VS Code command or opens an
- * external URL — nothing else, so both surfaces can dispatch it safely.
+ * A one-click remedy a consumer can surface as a notification action (toast).
+ * Either runs a VS Code command or opens an external URL — nothing else, so
+ * consumers can dispatch it safely.
  */
 export type BackendErrorAction =
     | { label: string; command: string }
@@ -141,14 +150,8 @@ export class BackendError extends Error {
     /** Populated for `too-old` so a consumer can render an upgrade hint. */
     readonly installedVersion?: string;
     readonly minVersion?: string;
-    /** One-click remedies, rendered as pane buttons / toast actions when present. */
+    /** One-click remedies, rendered as toast actions when present. */
     readonly actions?: BackendErrorAction[];
-    /**
-     * Optional pre-rendered, safe HTML body for the rich method-pane view (links,
-     * code snippets). Plain-text surfaces (the toast) ignore it and use
-     * {@link userMessage}. Producers MUST escape any dynamic value they interpolate.
-     */
-    readonly detailHtml?: string;
 
     constructor(args: {
         kind: BackendErrorKind;
@@ -157,7 +160,6 @@ export class BackendError extends Error {
         installedVersion?: string;
         minVersion?: string;
         actions?: BackendErrorAction[];
-        detailHtml?: string;
     }) {
         super(args.userMessage ?? args.logMessage);
         this.name = 'BackendError';
@@ -167,7 +169,6 @@ export class BackendError extends Error {
         this.installedVersion = args.installedVersion;
         this.minVersion = args.minVersion;
         this.actions = args.actions;
-        this.detailHtml = args.detailHtml;
     }
 }
 

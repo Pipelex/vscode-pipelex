@@ -237,12 +237,19 @@ describe('PipelexValidator — per-directory generation gate', () => {
 
         await mockState.onSaveHandler!(helper);
 
-        expect(capturedOptions.withGraph).toBe(true);
+        // The panel renders the STATIC graph itself, so the analyze call never
+        // requests one — but it still anchors on the directory's main bundle so
+        // the verdict handed to the widget matches the graph.
+        expect(capturedOptions.withGraph).toBe(false);
         expect(capturedRequest.primaryUri.fsPath).toBe('/proj/bundle.mthds');
         expect(capturedRequest.files.map((file: any) => file.name)).toEqual(['bundle.mthds', 'helper.mthds']);
-        expect(graphSink.applyAnalysis).toHaveBeenCalledWith(helper.uri, expect.objectContaining({
-            graph: { nodes: [], edges: [] },
-        }));
+        // The sink receives BOTH the shown file (staleness + labels) and the
+        // analysis anchor (fallback owner for unattributed errors).
+        expect(graphSink.applyAnalysis).toHaveBeenCalledWith(
+            helper.uri,
+            expect.objectContaining({ validation: { ok: true, errors: [] } }),
+            expect.objectContaining({ fsPath: '/proj/bundle.mthds' }),
+        );
 
         validator.dispose();
     });
@@ -284,6 +291,45 @@ describe('PipelexValidator — per-directory generation gate', () => {
             primaryDocument: undefined,
         }));
 
+        validator.dispose();
+    });
+
+    it('defers the skip verdict past the save dispatch so the panel save listener cannot clobber it', async () => {
+        // The validator's save listener registers before the panel's, and the skip
+        // path has no await — a SYNCHRONOUS applySkipped would be posted first and
+        // then overwritten by the panel's own `validating` flip, with no verdict
+        // ever following. The skip verdict must therefore land in a microtask,
+        // after every save listener's synchronous section.
+        const vscode = await import('vscode');
+        vi.mocked(vscode.languages.getDiagnostics).mockReturnValue([
+            { severity: 0, source: 'mthds-lsp', message: 'syntax error' },
+        ] as any);
+
+        const backend = { kind: 'cli', analyze: vi.fn() };
+        const factory = { getBackend: () => backend } as any;
+        const graphSink = {
+            isShowingMthds: vi.fn(() => true),
+            applyAnalysis: vi.fn(),
+            applyBackendError: vi.fn(),
+            applySkipped: vi.fn(),
+        };
+        const validator = new PipelexValidator({ appendLine: vi.fn() } as any, factory);
+        validator.setGraphSink(graphSink as any);
+
+        const doc = mkDoc('/proj/broken.mthds');
+        void mockState.onSaveHandler!(doc);
+
+        // Synchronous section of the save dispatch: no skip verdict yet (a panel
+        // listener running after us would post `validating` here).
+        expect(graphSink.applySkipped).not.toHaveBeenCalled();
+
+        await Promise.resolve();
+
+        // Microtask after the dispatch: the skip verdict lands last and sticks.
+        expect(graphSink.applySkipped).toHaveBeenCalledWith(doc.uri, expect.stringContaining('another extension'));
+        expect(backend.analyze).not.toHaveBeenCalled();
+
+        vi.mocked(vscode.languages.getDiagnostics).mockReturnValue([]);
         validator.dispose();
     });
 });

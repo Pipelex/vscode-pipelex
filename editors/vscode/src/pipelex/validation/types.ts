@@ -26,6 +26,22 @@ export interface ValidationErrorItem {
     variable_names?: string[] | null;
     missing_concept_code?: string | null;
     declared_concepts?: string[] | null;
+    suggested_fix?: SuggestedFix | null;
+}
+
+/**
+ * A deterministic fix the runtime's fix planner derived for one validation
+ * error (mirrors `pipelex.suggested_fix.SuggestedFix`). The extension consumes
+ * only `description` (shown in the graph panel's validation widget); the ops
+ * are for style-preserving appliers and stay opaque here. Optional and
+ * additive on the wire — older CLIs simply omit the field.
+ */
+export interface SuggestedFix {
+    fix_code: string;
+    description: string;
+    safety?: string;
+    source?: string | null;
+    ops?: unknown[];
 }
 
 /** Top-level JSON envelope when `pipelex-agent validate` exits with code 1 */
