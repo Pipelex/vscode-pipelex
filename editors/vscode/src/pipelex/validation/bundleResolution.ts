@@ -88,9 +88,11 @@ export function matchSourceFile(source: string, files: BundleFile[]): BundleFile
 /**
  * Find the gathered file that declares `[kind.code]`. When the same pipe header
  * appears in more than one file, prefer a concrete pipe over a `PipeSignature`
- * stub so click-to-code lands on the implementation. If `domainCode` is known,
- * apply that preference within the matching domain. Otherwise the first match
- * wins (gather order: primary first, then siblings sorted by name).
+ * stub so click-to-code lands on the implementation. A known `domainCode` is a
+ * *constraint* on collisions, not a preference: only files declaring that
+ * domain are considered, and when none does the resolution fails (undefined)
+ * — never guess a file among several. Without a domain, the first match wins
+ * (gather order: primary first, then siblings sorted by name).
  */
 export function findDeclaringFileByScan(
     kind: DeclarationKind,
@@ -103,15 +105,18 @@ export function findDeclaringFileByScan(
     if (matches.length <= 1) {
         return matches[0];
     }
-    const domainMatches = domainCode
-        ? matches.filter(f => fileDeclaresDomain(getLines(f), domainCode))
-        : [];
-    const preferredMatches = domainMatches.length > 0 ? domainMatches : matches;
-    if (kind === 'pipe') {
-        return preferredMatches.find(f => !pipeDeclarationIsSignature(getLines(f), code))
-            ?? preferredMatches[0];
+    let candidates = matches;
+    if (domainCode) {
+        candidates = matches.filter(f => fileDeclaresDomain(getLines(f), domainCode));
+        if (candidates.length === 0) {
+            return undefined;
+        }
     }
-    return preferredMatches[0];
+    if (kind === 'pipe') {
+        return candidates.find(f => !pipeDeclarationIsSignature(getLines(f), code))
+            ?? candidates[0];
+    }
+    return candidates[0];
 }
 
 /** Whether a file's lines declare a top-level `domain = "<domainCode>"`. */
@@ -119,7 +124,8 @@ function fileDeclaresDomain(lines: string[], domainCode: string): boolean {
     return fileDeclaredDomain(lines) === domainCode;
 }
 
-function fileDeclaredDomain(lines: string[]): string | undefined {
+/** The file's top-level `domain = "…"` value, or undefined when none is declared. */
+export function fileDeclaredDomain(lines: string[]): string | undefined {
     for (const line of lines) {
         const match = /^\s*domain\s*=\s*(["'])(.*?)\1\s*(?:#.*)?$/.exec(line);
         if (match) {

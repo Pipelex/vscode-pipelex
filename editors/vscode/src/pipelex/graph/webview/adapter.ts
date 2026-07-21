@@ -1,6 +1,13 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import type { GraphSpec, GraphConfig, GraphTheme, GraphThemeMode } from '@pipelex/mthds-ui';
+import type {
+    GraphSpec,
+    GraphConfig,
+    GraphTheme,
+    GraphThemeMode,
+    ValidationIssue,
+    ValidationState,
+} from '@pipelex/mthds-ui';
 import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
 
 // VS Code webview API
@@ -36,6 +43,12 @@ let currentSystemTheme: GraphTheme | undefined;
 // Only a genuine mode change — the user cycling the in-graph theme button —
 // gets forwarded so the host can persist it (see onThemeChange).
 let lastReportedMode: GraphThemeMode | undefined;
+
+// The toolbar validation widget's state. Seeded from each setData payload and
+// updated by lightweight setValidationStatus messages (the setSystemTheme
+// pattern — no re-layout, no viewport reset). Null keeps the widget hidden
+// (graphspec-json views, hosts without validation).
+let currentValidation: { state: ValidationState; issues: ValidationIssue[] } | null = null;
 
 // Held so we can preserve the viewport across same-file refreshes.
 let reactFlowInstance: any = null;
@@ -95,6 +108,13 @@ function onOpenExternally(url: string, filename?: string) {
     vscode.postMessage({ type: 'openExternally', url, filename });
 }
 
+// A validation issue row was clicked. The host resolves the index against its
+// retained per-issue jump targets (never a path from the webview) and opens the
+// owning file — the same index-based mechanism as always.
+function onValidationIssueClick(index: number) {
+    vscode.postMessage({ type: 'navigateToError', index });
+}
+
 // --- Message handling ---
 
 function handleMessage(event: { data: any }) {
@@ -113,6 +133,14 @@ function handleMessage(event: { data: any }) {
         // `config.toolbarPosition` reactively, so the toolbar moves without
         // re-running analysis or resetting the viewport.
         currentConfig = { ...currentConfig, toolbarPosition: message.toolbarPosition };
+        if (renderApp) renderApp();
+        return;
+    }
+    if (message.type === 'setValidationStatus') {
+        // The host's validator progressed (validating → valid | invalid |
+        // error). Update only the widget state and re-render — the graph,
+        // layout, and viewport are untouched.
+        currentValidation = { state: message.state, issues: message.issues ?? [] };
         if (renderApp) renderApp();
         return;
     }
@@ -142,6 +170,7 @@ function handleMessage(event: { data: any }) {
 
         currentGraphspec = message.graphspec || null;
         currentConfig = message.config || {};
+        currentValidation = message.validation ?? null;
         if (message.config?.systemTheme) {
             currentSystemTheme = message.config.systemTheme;
         }
@@ -206,6 +235,11 @@ function App() {
         onReactFlowInit,
         canEmbedPdf: false,
         onOpenExternally,
+        // The toolbar validation widget: hidden while currentValidation is null
+        // (GraphViewer treats an undefined validationState as "feature off").
+        validationState: currentValidation?.state,
+        validationIssues: currentValidation?.issues,
+        onValidationIssueClick,
     });
 }
 

@@ -505,13 +505,14 @@ __metadata:
   languageName: node
   linkType: soft
 
-"@pipelex/mthds-ui@npm:0.12.0":
-  version: 0.12.0
-  resolution: "@pipelex/mthds-ui@npm:0.12.0"
+"@pipelex/mthds-ui@npm:0.15.0":
+  version: 0.15.0
+  resolution: "@pipelex/mthds-ui@npm:0.15.0"
   dependencies:
     "@xyflow/react": "npm:^12"
     dompurify: "npm:^3.3.3"
     elkjs: "npm:^0.11.1"
+    smol-toml: "npm:^1.7.0"
   peerDependencies:
     react: ^19
     react-dom: ^19
@@ -523,7 +524,7 @@ __metadata:
       optional: true
     shiki:
       optional: true
-  checksum: 2c0a4a088a4cf997ed0436d9d9815141af1b260f3fa3094f7b6e735c4bc7c8ad76dbfd0bad814207aff37d2cf4b5362bf43821d23b504f9a32a40762c2607c65
+  checksum: 4090d3f10d20d2d7e389bc920c45bd3efeb310c8d1d64ad62b503bf806d180bb8049b3b329ca1f40bd982f232ce6b6ffe0d048fd0bdf05c9cffb37c7bdc68203
   languageName: node
   linkType: hard
 
@@ -3784,7 +3785,7 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
-    "@pipelex/mthds-ui": "npm:0.12.0"
+    "@pipelex/mthds-ui": "npm:0.15.0"
     "@pipelex/sdk": "npm:0.1.5"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
@@ -3805,7 +3806,7 @@ __metadata:
     react-dom: "npm:^19"
     rollup: "npm:^4.9.6"
     rollup-plugin-esbuild: "npm:^6.1.1"
-    smol-toml: "npm:^1.6.0"
+    smol-toml: "npm:^1.7.0"
     ts-node: "npm:^10.9.2"
     typescript: "npm:^5.3.3"
     vitest: "npm:^4.0.18"
@@ -4432,6 +4433,13 @@ __metadata:
   version: 1.6.0
   resolution: "smol-toml@npm:1.6.0"
   checksum: baf33bb6cd914d481329e31998a12829cd126541458ba400791212c80f1245d5b27dac04a56a52c02b287d2a494f1628c05fc19643286b258b2e0bb9fe67747c
+  languageName: node
+  linkType: hard
+
+"smol-toml@npm:^1.7.0":
+  version: 1.7.0
+  resolution: "smol-toml@npm:1.7.0"
+  checksum: 8eef246b9b96f278a181f6dd2a90c754304cb4cf92ccdfe1d2f714fb980fb3f539ba00283609e8fd2fbcf7c0d48a4ae76b36bc0de556ed286b2c865827a778e8
   languageName: node
   linkType: hard
 
