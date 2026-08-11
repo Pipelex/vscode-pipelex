@@ -338,6 +338,7 @@ fn test_native_concept_registry_matches_current_language_surface() {
         "Number",
         "YesNo",
         "Date",
+        "Time",
         "Image",
         "Document",
         "Html",

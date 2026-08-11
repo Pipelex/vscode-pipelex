@@ -64,6 +64,11 @@ static NATIVE_CONCEPTS: &[NativeConcept] = &[
         fields: &[("date", "date"), ("time", "time?")],
     },
     NativeConcept {
+        name: "Time",
+        description: "A time of day, optionally with a UTC offset.",
+        fields: &[("time", "time")],
+    },
+    NativeConcept {
         name: "Image",
         description: "An image with URL and optional metadata.",
         fields: &[
