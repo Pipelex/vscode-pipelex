@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Time` is now a known native concept in the LSP.** `native.Time` has been part of the MTHDS pinned native set since it was added to the standard, but the LSP's hand-written `NATIVE_CONCEPTS` registry never learned it: hovering a `Time` reference showed nothing at all. It now hovers like every other native, with its `time` field. The registry is still hand-maintained here — a machine-readable `native_concepts.json` will replace it (and make the descriptions the standard's verbatim wording), so this patch stays minimal.
+
 ### Changed
 
 - **Updated the bundled MTHDS JSON Schema to pipelex v0.41.0.** The schema is generated from the pipelex blueprint models and gitignored there, so drift never shows up in a PR — this copy had fallen behind. Concept structure field types gain `datetime` and `time`: a `.mthds` declaring either was **valid at runtime but rejected by this copy**, which is the user-visible half of the drift. The schema is `include_str!`-embedded into `plxt`, the VS Code LSP and `pipelex-tools-py`, so editor validation and the CLI both stop flagging those types once rebuilt. Copied from the released `pipelex` v0.41.0 tree rather than fetched via `make update-schema`, because the release chain it pulls from (S3 `mthds_schema_latest.json` → `mthds.ai`) is still serving **v0.27.0** — the refresh target would have pulled a schema fourteen releases older than what was already committed here. Republishing that object is a separate manual, outward-facing step and is not done here.
