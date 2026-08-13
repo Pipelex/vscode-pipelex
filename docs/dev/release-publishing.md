@@ -137,6 +137,8 @@ Simple actions (`nick-fields/retry`, `lewagon/wait-on-check-action`, `docker/log
 
 The publish step queries the registry first and exits green if the version is already on npm — npm has no `--skip-existing`, and republishing is a hard 403 that would otherwise turn a harmless re-run red.
 
+**The npm job is the one job in `releases.yaml` that does not run on pull requests**, and that is deliberate. It is also the only job that holds `id-token: write` *while executing repository code* (`yarn install`, `yarn build`, `yarn test`) — the two PyPI publish jobs hold the OIDC identity but run nothing but `download-artifact` + `gh-action-pypi-publish`. On a PR that code is attacker-controlled, and the `github.event_name == 'push'` guard on the publish step is no defense: any build step can read `$ACTIONS_ID_TOKEN_REQUEST_URL` and mint the token itself, then publish out of band. So the job is gated to tag pushes and `workflow_dispatch` only, and the publish identity never exists in a PR run. Little coverage is lost — `test-all.yml` already builds `@pipelex/tools-wasm` and runs its vitest suite on every PR (via `make test` → `test-tools-wasm-js`, debug profile), and `make check` cargo-checks the crate for `wasm32`. What moves to the dry run below is the `RELEASE=true` profile rehearsal.
+
 **This repo tags, then publishes; the sibling JS repos publish straight off `main`.** `mthds-ui` / `mthds-js` / `pipelex-sdk-js` each ship a single npm package, so "merged to main" *is* the release signal and their workflow creates the tag afterwards. This repo ships four artifacts on independent versions, so the tag is what selects *which* one is being released — `auto_tag` creates it and `releases.yaml` reacts. The npm authentication is identical; only the trigger differs.
 
 ### Several at once
@@ -148,6 +150,8 @@ You can bump any combination of versions in the same PR. The `auto_tag` job crea
 ## Dry run
 
 Manually trigger the workflow via **Actions → Releases → Run workflow** (`workflow_dispatch`). All build/test jobs will run but publish steps are guarded by `github.event_name == 'push'`, so nothing gets published.
+
+For `@pipelex/tools-wasm` this is the **only** pre-merge rehearsal, since that job no longer runs on pull requests (see above). Dispatch is safe to grant the publish identity: triggering a `workflow_dispatch` requires write access, so the code it builds is already trusted. Use it after changing anything in `js/tools-wasm/`, the `npm_publish_tools_wasm` job, or the toolchain versions it pins — a break there would otherwise surface for the first time on the tag push.
 
 ---
 
