@@ -43,6 +43,10 @@ jobs:
           CLI_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-cli/Cargo.toml)
           EXT_VERSION=$(jq -r '.version' editors/vscode/package.json)
           LIB_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-py/Cargo.toml)
+          # @pipelex/tools-wasm's published version is the npm one. The crate
+          # behind it (crates/pipelex-tools-wasm) is `publish = false` and its
+          # version is inert — reading it here would tag the wrong number.
+          TOOLS_WASM_VERSION=$(jq -r '.version' js/tools-wasm/package.json)
 
           CREATED=0
 
@@ -61,6 +65,12 @@ jobs:
           if [ -n "$LIB_VERSION" ] && ! git rev-parse "pipelex-tools-py/v${LIB_VERSION}" >/dev/null 2>&1; then
             git tag "pipelex-tools-py/v${LIB_VERSION}"
             echo "Created tag pipelex-tools-py/v${LIB_VERSION}"
+            CREATED=1
+          fi
+
+          if [ -n "$TOOLS_WASM_VERSION" ] && [ "$TOOLS_WASM_VERSION" != "null" ] && ! git rev-parse "pipelex-tools-wasm/v${TOOLS_WASM_VERSION}" >/dev/null 2>&1; then
+            git tag "pipelex-tools-wasm/v${TOOLS_WASM_VERSION}"
+            echo "Created tag pipelex-tools-wasm/v${TOOLS_WASM_VERSION}"
             CREATED=1
           fi
 

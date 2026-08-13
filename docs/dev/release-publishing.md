@@ -6,11 +6,19 @@ Automated publishing for Pipelex-specific artifacts via `.github/workflows/relea
 |----------|----------|-------------|---------|
 | `pipelex-tools` CLI (`plxt`) | PyPI | `plxt-cli/v{version}` | Version bump in `crates/pipelex-cli/Cargo.toml` |
 | `pipelex-tools-py` library (`import pipelex_tools`) | PyPI | `pipelex-tools-py/v{version}` | Version bump in `crates/pipelex-py/Cargo.toml` |
+| `@pipelex/tools-wasm` WASM bindings | npm | `pipelex-tools-wasm/v{version}` | Version bump in `js/tools-wasm/package.json` |
 | Pipelex VS Code extension | VS Code Marketplace + Open VSX | `pipelex-vscode-ext/v{version}` | Version bump in `editors/vscode/package.json` |
 
 Inline shell in `ci.yaml` reads version fields on each push to `main` and creates the corresponding tag if it doesn't already exist (requires `WORKFLOW_PAT` secret).
 
 The CLI (`pipelex-tools`) and the library (`pipelex-tools-py`) are **two separate PyPI packages** built from this one repo — maturin cannot pack a native binary and a pyo3 extension module into the same wheel. The CLI ships the real `plxt` executable (`bindings = "bin"`, root `pyproject.toml`); the library ships the importable `pipelex_tools` module (`bindings = "pyo3"`, `crates/pipelex-py/pyproject.toml`). Their release paths are fully independent — separate tags, versions, and build/test/publish jobs. See [`pipelex-tools-python-bindings.md`](pipelex-tools-python-bindings.md) for the library surface.
+
+`@pipelex/tools-wasm` is the third binding over that **same** shared lint/format engine (`pipelex_common::tools`), compiled to WASM for Node consumers — see [`mthds-engine-bindings.md`](mthds-engine-bindings.md). Two things about it differ from every other artifact here and are worth stating plainly:
+
+- **Its version lives in `js/tools-wasm/package.json`, not in a `Cargo.toml`.** The crate behind it (`crates/pipelex-tools-wasm`) is `publish = false` and its version is inert — the npm package is the published receipt. Same split as `crates/pipelex-wasm` vs `js/lsp`. Both the `auto_tag` step and the `/release` skill read the `package.json`.
+- **It is not bundled into the extension.** Unlike `js/lsp`, nothing in `editors/vscode/` depends on it, so it neither rides along on an extension release nor forces one.
+
+Because the MTHDS JSON Schema is `include_str!`-embedded into all three engine bindings, **a schema refresh must ship all three** (`plxt`, `pipelex-tools-py`, `@pipelex/tools-wasm`) or the ones left behind keep serving the stale schema.
 
 ---
 
@@ -33,6 +41,26 @@ OIDC trusted publishing lets GitHub Actions publish to PyPI without storing an A
    - Go to **Project → Settings → Publishing → Add Trusted Publisher**
    - Same values as above
 4. Repeat steps 2–3 for the **`pipelex-tools-py`** project (the importable library). It is a distinct PyPI project published from the same repo and `releases.yaml` workflow — set PyPI project name `pipelex-tools-py`, everything else identical.
+
+### npm — Trusted Publishing (no API token needed)
+
+Same credential-free OIDC model as PyPI above, and the same one `mthds-ui`, `mthds-js` and `pipelex-sdk-js` already use — **there is no `NPM_TOKEN` secret in this repo and there should not be one.**
+
+1. Log in to [npmjs.com](https://www.npmjs.com) as an account with admin rights on the **`@pipelex`** scope
+2. Go to the **`@pipelex/tools-wasm`** package → **Settings → Trusted Publisher → GitHub Actions**
+3. Fill in:
+   - Organization or user: `Pipelex`
+   - Repository: `vscode-pipelex`
+   - Workflow filename: `releases.yaml`
+   - Environment: *(leave blank)*
+4. Nothing to add to GitHub secrets — the job requests an OIDC token via `permissions: id-token: write`
+
+The workflow filename is part of the trust relationship: **renaming `releases.yaml` breaks the npm publish** (and the PyPI publishes, which name it in their trusted-publisher config too). If you rename it, update all four publisher registrations.
+
+Two details this depends on:
+
+- **`npm install -g npm@latest` runs before publishing.** Trusted publishing needs npm ≥ 11.5.1 and the runner image ships older; without the upgrade the publish falls back to looking for a token and fails with `ENEEDAUTH`.
+- **`--provenance` requires a public repo.** `Pipelex/vscode-pipelex` is public, so this works. It would fail on a private repo.
 
 ### VS Code Marketplace
 
@@ -100,9 +128,20 @@ Simple actions (`nick-fields/retry`, `lewagon/wait-on-check-action`, `docker/log
 3. The `auto_tag` job creates `pipelex-vscode-ext/v{version}`
 4. `releases.yaml` runs: build extension → publish to VS Code Marketplace + Open VSX
 
-### Both at once
+### @pipelex/tools-wasm
 
-You can bump both versions in the same PR. The `auto_tag` job creates both tags, and the release workflow triggers separately for each.
+1. Bump `version` in `js/tools-wasm/package.json` (**not** `crates/pipelex-tools-wasm/Cargo.toml`)
+2. Merge to `main`
+3. The `auto_tag` job creates `pipelex-tools-wasm/v{version}`
+4. `releases.yaml` runs: build the release bundle (`RELEASE=true`) → run its vitest suite against that bundle → publish to npm via OIDC with `--provenance`
+
+The publish step queries the registry first and exits green if the version is already on npm — npm has no `--skip-existing`, and republishing is a hard 403 that would otherwise turn a harmless re-run red.
+
+**This repo tags, then publishes; the sibling JS repos publish straight off `main`.** `mthds-ui` / `mthds-js` / `pipelex-sdk-js` each ship a single npm package, so "merged to main" *is* the release signal and their workflow creates the tag afterwards. This repo ships four artifacts on independent versions, so the tag is what selects *which* one is being released — `auto_tag` creates it and `releases.yaml` reacts. The npm authentication is identical; only the trigger differs.
+
+### Several at once
+
+You can bump any combination of versions in the same PR. The `auto_tag` job creates every missing tag, and the release workflow triggers separately for each.
 
 ---
 
@@ -118,5 +157,7 @@ Manually trigger the workflow via **Actions → Releases → Run workflow** (`wo
 |------------|---------|---------|
 | `pipelex-vscode-ext/v` | VS Code extension | `pipelex-vscode-ext/v0.4.0` |
 | `plxt-cli/v` | pipelex-tools CLI | `plxt-cli/v0.2.0` |
+| `pipelex-tools-py/v` | pipelex-tools-py library | `pipelex-tools-py/v0.2.0` |
+| `pipelex-tools-wasm/v` | @pipelex/tools-wasm npm package | `pipelex-tools-wasm/v0.2.0` |
 
-The two prefixes are unambiguous — each artifact has its own distinct tag namespace.
+The prefixes are unambiguous — each artifact has its own distinct tag namespace. Note that `pipelex-tools-py/v` and `pipelex-tools-wasm/v` share a prefix up to `pipelex-tools-`, so the `startsWith` guards in `releases.yaml` must always include the trailing `py/v` / `wasm/v` — never match on `pipelex-tools/` alone.
