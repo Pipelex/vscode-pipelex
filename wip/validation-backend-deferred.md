@@ -26,7 +26,7 @@ Still-open, consciously-deferred items from the CLI/API validation-backend work 
 
 - **`gatherBundleFiles` runs on every save, including the valid path.** `pipelexValidator.onSave`. The contents are only consumed by `buildBundleDiagnostics` on failure; the default CLI backend then re-reads siblings via `--library-dir`. Fix: defer the gather into the failure branch, or gate on backend kind as the graph panel already does.
 - **Dead method `BackendFactory.backendKind()`** — public, never called, duplicates `getBackend`'s decision. Fix: remove it, or wire the intended "messaging" caller.
-- **Three duplicated URL-host helpers.** `isLocalhost` (`apiValidationBackend.ts`), `isHostedPipelexApi` (`apiVersionGate.ts`), and `hostOf` (`backendFactory.ts`) each re-implement parse-URL-and-extract-host with their own try/catch and host rules — and that duplication is why the loopback bugs live in only one of them. Fix: extract one shared host util (parse + bracket-strip + classify loopback/hosted) and route all three through it; closes the loopback item above at the root.
+- **Three duplicated URL-host helpers.** `isLocalhost` (`apiValidationBackend.ts`), `isHostedPipelexApi` (`apiCapabilityGate.ts`), and `hostOf` (`backendFactory.ts`) each re-implement parse-URL-and-extract-host with their own try/catch and host rules — and that duplication is why the loopback bugs live in only one of them. Fix: extract one shared host util (parse + bracket-strip + classify loopback/hosted) and route all three through it; closes the loopback item above at the root.
 
 ## Won't-fix (recorded so they aren't re-litigated)
 
