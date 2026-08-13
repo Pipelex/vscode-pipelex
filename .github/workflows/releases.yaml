@@ -317,7 +317,12 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 20
+          # 22, not 20, and not `lts/*` like the extension job above: the npm
+          # upgrade below pulls npm@latest, which is npm 12 and declares
+          # `engines.node: ^22.22.2 || ^24.15.0 || >=26.0.0`. On Node 20 that
+          # install dies with EBADENGINE before anything is built. 22 is also
+          # what mthds-ui / mthds-js / pipelex-sdk-js pin for the same publish.
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
       - name: Update npm to support trusted publishing
         # The runner's bundled npm predates OIDC trusted publishing (needs
