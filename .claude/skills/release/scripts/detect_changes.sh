@@ -25,22 +25,32 @@ LSP_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-lsp/Cargo.tom
 WASM_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-wasm/Cargo.toml 2>/dev/null || echo "unknown")
 JS_LSP_VERSION=$(jq -r '.version' js/lsp/package.json 2>/dev/null || echo "unknown")
 LIB_VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' crates/pipelex-py/Cargo.toml 2>/dev/null || echo "unknown")
+# The npm package version is the published receipt for @pipelex/tools-wasm. The
+# crate behind it (crates/pipelex-tools-wasm) is `publish = false` and its
+# version is inert — same split as pipelex-wasm vs @pipelex/lsp.
+TOOLS_WASM_VERSION=$(jq -r '.version' js/tools-wasm/package.json 2>/dev/null || echo "unknown")
 
 # --- Find latest tags ---
 EXT_TAG=$(git tag -l 'pipelex-vscode-ext/v*' --sort=-version:refname | head -1)
 CLI_TAG=$(git tag -l 'plxt-cli/v*' --sort=-version:refname | head -1)
 LIB_TAG=$(git tag -l 'pipelex-tools-py/v*' --sort=-version:refname | head -1)
+TOOLS_WASM_TAG=$(git tag -l 'pipelex-tools-wasm/v*' --sort=-version:refname | head -1)
 
 # Fall back to first commit if no tags exist
 FALLBACK_REF=$(git rev-list --max-parents=0 HEAD | head -1)
 EXT_BASE="${BASE_REF:-${EXT_TAG:-$FALLBACK_REF}}"
 CLI_BASE="${BASE_REF:-${CLI_TAG:-$FALLBACK_REF}}"
 LIB_BASE="${BASE_REF:-${LIB_TAG:-$FALLBACK_REF}}"
+TOOLS_WASM_BASE="${BASE_REF:-${TOOLS_WASM_TAG:-$FALLBACK_REF}}"
 
 # --- Categorize changed files ---
 categorize() {
   local file="$1"
   case "$file" in
+    # MUST precede the `js/*` and `crates/*` arms below: @pipelex/tools-wasm is a
+    # standalone npm artifact, NOT bundled into the extension (unlike js/lsp,
+    # js/core, js/cli, js/lib), and its crate is not part of the `common` engine.
+    js/tools-wasm/*|crates/pipelex-tools-wasm/*) echo "tools_wasm" ;;
     editors/vscode/*|js/*) echo "extension" ;;
     crates/pipelex-cli/*|crates/taplo-cli/*) echo "cli" ;;
     crates/pipelex-py/*) echo "lib" ;;
@@ -83,6 +93,15 @@ LIB_COMMON_FILES=$(count_category "$LIB_BASE" "common")
 LIB_CIDOCS_FILES=$(count_category "$LIB_BASE" "ci_docs")
 LIB_OTHER_FILES=$(count_category "$LIB_BASE" "other")
 
+# @pipelex/tools-wasm is wasm-bindgen glue over the SAME pipelex-common
+# lint/format engine, with the MTHDS schema `include_str!`-embedded through it —
+# so a `common` change ships in its bundle exactly as it ships in the CLI binary
+# and the library wheel.
+TW_TW_FILES=$(count_category "$TOOLS_WASM_BASE" "tools_wasm")
+TW_COMMON_FILES=$(count_category "$TOOLS_WASM_BASE" "common")
+TW_CIDOCS_FILES=$(count_category "$TOOLS_WASM_BASE" "ci_docs")
+TW_OTHER_FILES=$(count_category "$TOOLS_WASM_BASE" "other")
+
 # --- Determine affected components ---
 # Use the most recent tag as the unified base for file listing
 if [[ -n "$BASE_REF" ]]; then
@@ -105,12 +124,14 @@ fi
 EXT_AFFECTED="false"
 CLI_AFFECTED="false"
 LIB_AFFECTED="false"
+TOOLS_WASM_AFFECTED="false"
 COMMON_AFFECTED="false"
 CI_DOCS_ONLY="true"
 
 (( EXT_EXT_FILES + EXT_COMMON_FILES > 0 )) && EXT_AFFECTED="true" && CI_DOCS_ONLY="false"
 (( CLI_CLI_FILES + CLI_COMMON_FILES > 0 )) && CLI_AFFECTED="true" && CI_DOCS_ONLY="false"
 (( LIB_LIB_FILES + LIB_COMMON_FILES > 0 )) && LIB_AFFECTED="true" && CI_DOCS_ONLY="false"
+(( TW_TW_FILES + TW_COMMON_FILES > 0 )) && TOOLS_WASM_AFFECTED="true" && CI_DOCS_ONLY="false"
 (( EXT_COMMON_FILES + CLI_COMMON_FILES + LIB_COMMON_FILES > 0 )) && COMMON_AFFECTED="true"
 (( EXT_OTHER_FILES + CLI_OTHER_FILES + EXT_TEST_FILES + CLI_TEST_FILES > 0 )) && CI_DOCS_ONLY="false"
 
@@ -147,6 +168,7 @@ DATE: $(date +%Y-%m-%d)
 extension: $EXT_VERSION
 cli: $CLI_VERSION
 pipelex-tools-py: $LIB_VERSION
+tools-wasm: $TOOLS_WASM_VERSION
 pipelex-common: $COMMON_VERSION
 pipelex-lsp: $LSP_VERSION
 pipelex-wasm: $WASM_VERSION
@@ -156,6 +178,7 @@ pipelex-lsp-js: $JS_LSP_VERSION
 extension: ${EXT_TAG:-<none>}
 cli: ${CLI_TAG:-<none>}
 pipelex-tools-py: ${LIB_TAG:-<none>}
+tools-wasm: ${TOOLS_WASM_TAG:-<none>}
 
 --- CHANGES SINCE LAST EXTENSION RELEASE (${EXT_BASE}) ---
 extension_files: $EXT_EXT_FILES
@@ -179,10 +202,17 @@ common_files: $LIB_COMMON_FILES
 ci_docs_files: $LIB_CIDOCS_FILES
 other_files: $LIB_OTHER_FILES
 
+--- CHANGES SINCE LAST TOOLS-WASM RELEASE (${TOOLS_WASM_BASE}) ---
+tools_wasm_files: $TW_TW_FILES
+common_files: $TW_COMMON_FILES
+ci_docs_files: $TW_CIDOCS_FILES
+other_files: $TW_OTHER_FILES
+
 --- AFFECTED COMPONENTS ---
 extension: $EXT_AFFECTED
 cli: $CLI_AFFECTED
 lib: $LIB_AFFECTED
+tools_wasm: $TOOLS_WASM_AFFECTED
 common: $COMMON_AFFECTED
 ci_docs_only: $CI_DOCS_ONLY
 

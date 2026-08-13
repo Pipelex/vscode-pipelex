@@ -4,7 +4,7 @@ import type { PipelexInvalidReport, PipelexValidationReport, PipelexValidationRe
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
 import type { ValidationErrorItem } from './types';
-import { isHostedPipelexApi, type ApiVersionGate } from './apiVersionGate';
+import { isHostedPipelexApi, type ApiCapabilityGate } from './apiCapabilityGate';
 import { PIPELEX_PLATFORM_URL, SET_API_KEY_COMMAND } from './apiKey';
 
 export interface ApiBackendDeps {
@@ -13,7 +13,7 @@ export interface ApiBackendDeps {
     /** Resolve the bearer token (SecretStorage → env). */
     getToken: () => Promise<string | undefined>;
     /** Warn-once capability gate, shared across analyses. */
-    versionGate: ApiVersionGate;
+    capabilityGate: ApiCapabilityGate;
     /**
      * One-time confirmation before sending bundle contents to a non-localhost host.
      * Returns `true` to proceed. Only consulted for remote base URLs.
@@ -65,13 +65,13 @@ export class ApiValidationBackend implements ValidationBackend {
             }
         }
 
-        // Best-effort, warn-once version gate (never blocks, never throws). Fire it
+        // Best-effort, warn-once capability gate (never blocks, never throws). Fire it
         // CONCURRENTLY with validate() instead of awaiting it first: serialized, a hung
         // /version would add a full timeout on TOP of validate()'s own, so one save could
         // take up to 2× `pipelex.validation.timeout`. Running them together caps the wait
         // at a single timeout. The probe still carries the same signal/timeout (a
         // superseded save abandons it) and `ensureCapable` swallows every fault internally.
-        void this.deps.versionGate.ensureCapable(client, baseUrl, signal, request.timeout);
+        void this.deps.capabilityGate.ensureCapable(client, baseUrl, signal, request.timeout);
         // Abort BEFORE initiating validate(): the consent modal / token resolution above
         // were awaited, so the save may have been superseded meanwhile. `client.validate()`
         // is evaluated eagerly (it initiates the request) before `runWithAbort` wraps it,

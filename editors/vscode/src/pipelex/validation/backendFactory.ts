@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { ValidationBackend } from './backend';
 import { CliValidationBackend } from './cliValidationBackend';
 import { ApiValidationBackend } from './apiValidationBackend';
-import { ApiVersionGate } from './apiVersionGate';
+import { ApiCapabilityGate } from './apiCapabilityGate';
 import { resolveApiToken } from './apiKey';
 
 const DEFAULT_API_BASE_URL = 'https://api.pipelex.com';
@@ -12,17 +12,17 @@ const DEFAULT_API_BASE_URL = 'https://api.pipelex.com';
  *
  * Settings are read per call (resource scope) so a `pipelex.backend` /
  * `pipelex.api.baseUrl` change takes effect on the next save without reloading.
- * A single {@link ApiVersionGate} and the per-host remote-consent state are held
+ * A single {@link ApiCapabilityGate} and the per-host remote-consent state are held
  * here and shared across the cheap, per-call backend instances.
  */
 export class BackendFactory {
-    private readonly versionGate: ApiVersionGate;
+    private readonly capabilityGate: ApiCapabilityGate;
 
     constructor(
         private readonly context: vscode.ExtensionContext,
         private readonly output: vscode.OutputChannel,
     ) {
-        this.versionGate = new ApiVersionGate(output);
+        this.capabilityGate = new ApiCapabilityGate(output);
     }
 
     /** Which backend a document would use, without constructing it (for messaging). */
@@ -38,7 +38,7 @@ export class BackendFactory {
             return new ApiValidationBackend({
                 baseUrl,
                 getToken: () => resolveApiToken(this.context.secrets),
-                versionGate: this.versionGate,
+                capabilityGate: this.capabilityGate,
                 confirmRemote: url => this.confirmRemote(url),
                 output: this.output,
             });

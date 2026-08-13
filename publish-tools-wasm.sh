@@ -1,25 +1,41 @@
 #!/bin/bash
 
-# Script to publish @pipelex/tools-wasm from anywhere in the repo
-# Usage: ./publish-tools-wasm.sh [patch|minor|major|none]
-# ("none" publishes the version currently in package.json without bumping —
-#  useful for a first publish of a freshly added version.)
+# MANUAL ESCAPE HATCH — normally you do NOT run this.
+#
+# @pipelex/tools-wasm is published by CI: `/release` bumps the version in
+# js/tools-wasm/package.json, the `auto_tag` job in ci.yaml tags
+# pipelex-tools-wasm/v{version} on push to main, and the npm_publish_tools_wasm
+# job in releases.yaml builds, tests and publishes it. Use this script only when
+# CI cannot run.
+#
+# Usage: ./publish-tools-wasm.sh [none|patch|minor|major]
+#
+# The default is "none" — publish the version already committed in package.json.
+# The bump belongs to `/release` and to the changelog; bumping here instead
+# creates a version that no tag, no changelog entry, and no commit accounts for.
+# The patch/minor/major modes are kept for genuine emergencies only, and you must
+# still commit the resulting package.json change.
 
 # Get the directory where this script is located (repo root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JS_DIR="$SCRIPT_DIR/js"
 
-# Default to patch if no argument provided
-VERSION_TYPE="${1:-patch}"
+# Default to "none": publish what is committed, bump nothing.
+VERSION_TYPE="${1:-none}"
 
 # Validate version type
 if [[ ! "$VERSION_TYPE" =~ ^(patch|minor|major|none)$ ]]; then
-    echo "❌ Error: Version type must be 'patch', 'minor', 'major', or 'none'"
-    echo "Usage: $0 [patch|minor|major|none]"
+    echo "❌ Error: Version type must be 'none', 'patch', 'minor', or 'major'"
+    echo "Usage: $0 [none|patch|minor|major]"
     exit 1
 fi
 
-echo "🚀 Publishing @pipelex/tools-wasm with $VERSION_TYPE version bump..."
+echo "⚠️  Manual publish — CI (releases.yaml) normally does this on a pipelex-tools-wasm/v* tag."
+if [[ "$VERSION_TYPE" == "none" ]]; then
+    echo "🚀 Publishing @pipelex/tools-wasm at its committed version (no bump)..."
+else
+    echo "🚀 Publishing @pipelex/tools-wasm with a $VERSION_TYPE version bump..."
+fi
 
 # Navigate to JS workspace root
 cd "$JS_DIR" || {

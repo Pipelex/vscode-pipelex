@@ -96,7 +96,7 @@ describe('CliValidationBackend', () => {
         // list for a content verdict. If it somehow does, surface it as infra rather
         // than synthesizing a stand-in `blueprint_validation` item.
         cliState.version = [0, 34, 0];
-        cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'PipelexInterpreterError', error_domain: 'input', message: 'Missing required fields', validation_errors: [] }) };
+        cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'MthdsParserError', error_domain: 'input', message: 'Missing required fields', validation_errors: [] }) };
         const err = await analyze().catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('infra');

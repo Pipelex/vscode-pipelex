@@ -80,4 +80,23 @@ A backend failure never blanks the **method graph view** either: the static grap
 ## Version expectations
 
 - **CLI** — the `pipelex-agent` floor is enforced at runtime by probing `--version`; an older CLI is reported as too old.
-- **API** — on first use against a base URL, the extension probes `GET /v1/version` and warns once if the server's `implementation_version` is a clean release below the expected minimum. Prerelease / dev / non-semver versions are treated as capable (no hard block). The probe is **best-effort**: it is bounded by the same abort signal and per-save timeout as the validation request, so a hung or slow `/version` never delays a save past the configured timeout, and a superseded save abandons it immediately — a probe that aborts, times out, or fails simply skips the gate and lets the real `validate()` call surface any genuine fault. The remedy in the warning depends on the host: against a self-hosted server it asks you to upgrade pipelex-api (or its pipelex pin); against the hosted `api.pipelex.com` — which you don't operate — it instead suggests switching `pipelex.backend` to `cli` (or pointing at a self-hosted server) until the capability has rolled out.
+- **API** — on first use against a base URL, the extension probes `GET /v1/version` and asks a **capability** question ("does this server do X?"), never a bare version question ("how new is this server?"). See below.
+
+### How the API capability gate decides
+
+Several implementations answer `GET /v1/version`, each on its own release line: a bare open-source runner reports `implementation: "pipelex-api"`, the hosted plane reports `"pipelex-hosted"` (the platform front door, which proxies `/validate` to a runner whose version it never reports), and the local runtime reports `"pipelex"`. Their numbers are unrelated, so a minimum version is only meaningful together with the identity it applies to.
+
+Every floor is therefore keyed on `(implementation, version)`, and the gate resolves in this order:
+
+1. the requirement names an `extensions` token and the server advertises it → **capable** (a server asserting what it does beats us inferring it);
+2. the implementation is unrecognized, or unreported, or we hold no floor for that particular implementation → **capable**;
+3. the reported version is not a clean release (prerelease / dev / non-semver) → **capable**;
+4. otherwise compare against that implementation's floor.
+
+Everything the gate does not understand passes. A false alarm against a healthy server is worse than a missed warning, because a missed warning is caught downstream anyway: the real guarantee is that an `is_valid: false` verdict arriving without `validation_errors[]` is rejected with its own remedy, from the response itself. The gate is only the earlier, friendlier signal.
+
+Floors are deliberately sparse. `structured validation diagnostics` carries one for `pipelex-api` (≥ 0.4.0, where the 200-diagnostic `/validate` and `source`-carrying errors landed) and **none for `pipelex-hosted`** — its version describes the front door, not the runner behind the internal proxy, so any floor written there would compare a number from the wrong service. Gating the hosted plane needs an `extensions` token instead.
+
+Every verdict, pass or fail, is logged to the Pipelex output channel with the reason that produced it (`no-floor-for-implementation`, `below-floor`, …), so "why did/didn't I get this warning?" is answerable without a debug build.
+
+The probe is **best-effort**: it is bounded by the same abort signal and per-save timeout as the validation request, so a hung or slow `/version` never delays a save past the configured timeout, and a superseded save abandons it immediately — a probe that aborts, times out, or fails simply skips the gate and lets the real `validate()` call surface any genuine fault. The warning names the implementation alongside its version, and its remedy depends on the host: against a self-hosted server it asks you to upgrade (or move its pipelex pin); against a managed `*.pipelex.com` host — production, dev or staging, none of which you operate — it suggests switching `pipelex.backend` to `cli` until the capability has rolled out.

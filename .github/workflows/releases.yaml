@@ -6,6 +6,7 @@ on:
       - plxt-cli/v*
       - pipelex-vscode-ext/v*
       - pipelex-tools-py/v*
+      - pipelex-tools-wasm/v*
   pull_request:
     branches:
       - main
@@ -287,3 +288,107 @@ jobs:
         uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
         with:
           skip-existing: true
+
+  # ── @pipelex/tools-wasm npm publishing ──────────────────────────────────────
+  # The standalone WASM lint/format bindings for Node consumers (plugin hooks).
+  # Not bundled into the extension — its own npm package, its own version in
+  # js/tools-wasm/package.json, gated on its own `pipelex-tools-wasm/v*` tag.
+  # Single job (no build/test/publish split): the artifact is one small platform-
+  # independent bundle, so there is no wheel matrix to fan out and nothing to
+  # hand between jobs — and, since the job never runs in an untrusted context
+  # (see the `if:` below), there is no privilege boundary to split across either.
+
+  npm_publish_tools_wasm:
+    name: npm publish @pipelex/tools-wasm
+    # Push/dispatch only — deliberately NOT on pull_request. This job holds the
+    # OIDC publish identity while running `yarn install`/`build`/`test`, i.e.
+    # repository-controlled code. On a PR that code is untrusted, and the
+    # `github.event_name == 'push'` gate on the publish step below is no defense:
+    # anything running in a build step can read $ACTIONS_ID_TOKEN_REQUEST_URL and
+    # mint the token itself. So the identity must never exist in a PR run at all.
+    # Cost is small: test-all.yml already builds this package and runs its vitest
+    # suite on every PR (debug profile); only the RELEASE=true rehearsal moves to
+    # the workflow_dispatch dry run.
+    if: startsWith(github.ref, 'refs/tags/pipelex-tools-wasm/v') || github.event_name == 'workflow_dispatch'
+    needs: ["wait_for_ci"]
+    runs-on: ubuntu-latest
+    permissions:
+      # Naming ANY scope sets every unnamed one to `none`, so checkout below has
+      # to be granted this explicitly. It only works without it because the repo
+      # is public (a token lacking `contents` still clones a public repo at the
+      # anonymous-read level); the day this repo goes private, checkout 403s.
+      contents: read
+      # OIDC trusted publishing — the same credential-free model mthds-ui,
+      # mthds-js and pipelex-sdk-js use. No NPM_TOKEN secret anywhere.
+      id-token: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install latest Rust toolchain
+        # wasm32 is the only target this crate ever builds for.
+        run: |
+          rustup update --no-self-update
+          rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Install Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          # 22, not 20, and not `lts/*` like the extension job above: the npm
+          # upgrade below pulls npm@latest, which is npm 12 and declares
+          # `engines.node: ^22.22.2 || ^24.15.0 || >=26.0.0`. On Node 20 that
+          # install dies with EBADENGINE before anything is built. 22 is also
+          # what mthds-ui / mthds-js / pipelex-sdk-js pin for the same publish.
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+      - name: Update npm to support trusted publishing
+        # The runner's bundled npm predates OIDC trusted publishing (needs
+        # >= 11.5.1); without this the publish falls back to looking for a token
+        # and fails with ENEEDAUTH.
+        run: npm install -g npm@latest
+      - name: Enable latest yarn
+        run: corepack enable
+      - name: Guard tag against package.json version
+        # auto_tag derives the tag FROM package.json, so these agree by
+        # construction — this only catches a hand-pushed or mistyped tag, which
+        # would otherwise publish a version nobody asked for.
+        if: startsWith(github.ref, 'refs/tags/pipelex-tools-wasm/v')
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/pipelex-tools-wasm/v}"
+          PKG_VERSION=$(jq -r '.version' js/tools-wasm/package.json)
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag says v${TAG_VERSION} but js/tools-wasm/package.json says ${PKG_VERSION}"
+            exit 1
+          fi
+          echo "Publishing @pipelex/tools-wasm ${PKG_VERSION}"
+      - name: Check if version is already published
+        id: check_published
+        run: |
+          PKG_VERSION=$(jq -r '.version' js/tools-wasm/package.json)
+          if npm view "@pipelex/tools-wasm@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "@pipelex/tools-wasm@${PKG_VERSION} is already on npm"
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "@pipelex/tools-wasm@${PKG_VERSION} is not yet published"
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build release bundle
+        # RELEASE=true is what makes rollup-plugin-rust build the release profile
+        # instead of debug. The package's `prepublish` script does this too, but
+        # npm 7+ NO LONGER RUNS `prepublish` on publish (deprecated in favour of
+        # prepare/prepublishOnly), so relying on it would ship a debug bundle —
+        # or a stale one. Build explicitly.
+        run: yarn install && RELEASE=true yarn build
+        working-directory: js/tools-wasm
+      - name: Test the release bundle
+        # Same bundle that is about to be published, not a fresh debug build.
+        run: yarn test
+        working-directory: js/tools-wasm
+      - name: Publish to npm
+        # npm has no `--skip-existing`, and republishing an existing version is a
+        # hard 403 — so the check above turns that into a green no-op, mirroring
+        # `skip-existing: true` on the PyPI publishes and the sibling JS repos.
+        if: github.event_name == 'push' && steps.check_published.outputs.already_published == 'false'
+        # --ignore-scripts so publish-time lifecycle hooks cannot rebuild over
+        # the bundle the test step just validated; provenance is produced by npm
+        # itself, not by a user script, so it is unaffected.
+        run: npm publish --access public --provenance --ignore-scripts
+        working-directory: js/tools-wasm
