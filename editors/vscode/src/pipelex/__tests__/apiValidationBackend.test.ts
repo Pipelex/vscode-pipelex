@@ -8,7 +8,7 @@ const apiState = vi.hoisted(() => ({
     lastConstructorOptions: null as any,
 }));
 
-// ---------- vscode mock (ApiVersionGate uses window.showWarningMessage) ----------
+// ---------- vscode mock (ApiCapabilityGate uses window.showWarningMessage) ----------
 vi.mock('vscode', () => ({
     window: { showWarningMessage: vi.fn() },
 }));
@@ -95,7 +95,7 @@ type _ClientOptions = Required<Pick<PipelexApiClientOptions, 'baseUrl' | 'apiTok
 type _ResponseErrorFields = Pick<RealApiResponseError, 'status' | 'statusText' | 'serverMessage' | 'code'>;
 type _UnreachableErrorFields = Pick<RealApiUnreachableError, 'code'>;
 
-import { ApiVersionGate } from '../validation/apiVersionGate';
+import { ApiCapabilityGate } from '../validation/apiCapabilityGate';
 import { BackendError } from '../validation/backend';
 
 function mockOutput() {
@@ -107,7 +107,7 @@ function makeBackend(opts?: { baseUrl?: string; confirmRemote?: () => Promise<bo
     return new ApiValidationBackend({
         baseUrl: opts?.baseUrl ?? 'http://localhost:8081',
         getToken: async () => 'secret-token',
-        versionGate: new ApiVersionGate(output),
+        capabilityGate: new ApiCapabilityGate(output),
         confirmRemote: opts?.confirmRemote ?? (async () => true),
         output,
     });
@@ -325,7 +325,7 @@ describe('ApiValidationBackend', () => {
         const backend = new ApiValidationBackend({
             baseUrl: 'http://localhost:8081',
             getToken: async () => { throw new Error('keychain locked'); },
-            versionGate: new ApiVersionGate(output),
+            capabilityGate: new ApiCapabilityGate(output),
             confirmRemote: async () => true,
             output,
         });
