@@ -145,6 +145,16 @@ The publish step queries the registry first and exits green if the version is al
 
 You can bump any combination of versions in the same PR. The `auto_tag` job creates every missing tag, and the release workflow triggers separately for each.
 
+**`auto_tag` pushes one tag per `git push`, and it must stay that way.** GitHub creates no ref event *at all* when more than three tags move in a single push, and `releases.yaml` is triggered exclusively by `push: tags:` — so a batched `git push --tags` publishes nothing while `auto_tag` still reports success. This is not hypothetical: it is how v0.16.0 shipped nothing. That release was the first to carry a fourth tag (`pipelex-tools-wasm`, added in v0.16.0 itself); all four tags landed on the merge commit, zero `Releases` runs fired, and every artifact silently stayed on its previous version. Every release before it bumped at most three components and so never crossed the limit. Pushing the tags individually keeps each push at one tag, so the ceiling cannot be reached however many components this repo grows to ship.
+
+**Recovering from a release that tagged but never published.** Re-pushing an existing tag is a no-op and creates no event, so the tag has to be deleted and recreated — one at a time, from a real user account (a push made with the default `GITHUB_TOKEN` never triggers a workflow; `auto_tag` uses `WORKFLOW_PAT` for exactly this reason):
+
+```bash
+git push origin :refs/tags/plxt-cli/v0.8.0 && git push origin plxt-cli/v0.8.0
+```
+
+Nothing else needs redoing: the tag still points at the same merge commit, `releases.yaml`'s `wait_for_ci` finds the `Test on Rust stable` check that already passed there, and the tag-vs-`package.json` guard still agrees.
+
 ---
 
 ## Dry run
