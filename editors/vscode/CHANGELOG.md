@@ -3,6 +3,16 @@
 
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.16.1] - 2026-08-14
+
+### Fixed
+
+- **Release tags are pushed one at a time, so releases actually trigger.** `auto_tag` ended with a single `git push --tags`, and GitHub creates no ref event at all when more than three tags move in one push — while `releases.yaml` is triggered exclusively by `push: tags:`. The batched push therefore published nothing, and the job still reported success. v0.16.0 is where that landed: it was the first release to carry a fourth tag (`pipelex-tools-wasm`, added in v0.16.0 itself), all four tags were created on the merge commit, zero Releases runs fired, and **every artifact stayed on its previous version**. Earlier releases bumped at most three components, so the ceiling was never reached. The tags are now collected and pushed individually, which keeps every push at a single tag however many components this repo grows to ship. The v0.16.0 tags were recovered by hand; `docs/dev/release-publishing.md` records both the constraint and the recovery procedure.
+
+### Changed
+
+- **Bumped `@pipelex/mthds-ui` to 0.17.0.** That release is chiefly about run-graph usage and cost attribution — a per-node cost line and a `Model` row naming the model that actually served each call — which this extension's static-first flow does not exercise: it builds its GraphSpec from the bundle text, so there is no `usage` to render. What does reach us is the boundary hardening that came with it: `validateGraphSpec` now normalizes an absent `usage.by_model` to `[]` (so specs generated before per-model attribution still load) while rejecting a malformed one, which tightens the `Pipelex: Show GraphSpec JSON` path where the spec is user-supplied rather than built here. The bundled MTHDS JSON Schema on the mthds-ui side also moved to pipelex v0.43.1, though the authoring surface the static builder parses is byte-identical to 0.41.0.
+
 ## [0.16.0] - 2026-08-13
 
 ### Added

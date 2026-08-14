@@ -1,6 +1,10 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
-## [Unreleased]
+## [0.16.1] - 2026-08-14
+
+### Fixed
+
+- **Release tags are pushed one at a time, so releases actually trigger.** `auto_tag` ended with a single `git push --tags`, and GitHub creates no ref event at all when more than three tags move in one push — while `releases.yaml` is triggered exclusively by `push: tags:`. The batched push therefore published nothing, and the job still reported success. v0.16.0 is where that landed: it was the first release to carry a fourth tag (`pipelex-tools-wasm`, added in v0.16.0 itself), all four tags were created on the merge commit, zero Releases runs fired, and **every artifact stayed on its previous version**. Earlier releases bumped at most three components, so the ceiling was never reached. The tags are now collected and pushed individually, which keeps every push at a single tag however many components this repo grows to ship. The v0.16.0 tags were recovered by hand; `docs/dev/release-publishing.md` records both the constraint and the recovery procedure.
 
 ### Changed
 
