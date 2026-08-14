@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Bumped `@pipelex/mthds-ui` to 0.17.0.** That release is chiefly about run-graph usage and cost attribution — a per-node cost line and a `Model` row naming the model that actually served each call — which this extension's static-first flow does not exercise: it builds its GraphSpec from the bundle text, so there is no `usage` to render. What does reach us is the boundary hardening that came with it: `validateGraphSpec` now normalizes an absent `usage.by_model` to `[]` (so specs generated before per-model attribution still load) while rejecting a malformed one, which tightens the `Pipelex: Show GraphSpec JSON` path where the spec is user-supplied rather than built here. The bundled MTHDS JSON Schema on the mthds-ui side also moved to pipelex v0.43.1, though the authoring surface the static builder parses is byte-identical to 0.41.0.
+
 ## [0.16.0] - 2026-08-13
 
 ### Added
