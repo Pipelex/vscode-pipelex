@@ -26,7 +26,7 @@ Both job names — `make check` and `make test-all` — are the **required statu
 
 `ci.yaml` holds the coverage the make gates don't:
 
-- **`auto_tag`** — on push to `main` (and `workflow_dispatch`), creates the per-component release tags. Not a PR check.
+- **`auto_tag`** — on push to `main` (and `workflow_dispatch`), creates the per-component release tags. Not a PR check. It pushes each tag in its own `git push`, because GitHub creates no ref event when more than three tags move at once — batching them makes `releases.yaml` skip a release entirely while this job still reports success. See [`release-publishing.md`](release-publishing.md#several-at-once).
 - **`test-python-bindings`** — the **e2e-against-the-shipped-artifact** guard: builds the real `pipelex-tools-py` wheel with `maturin build --release --locked`, `pip install`s it, and imports `pipelex_tools`. This is deliberately kept distinct from `make test-all`'s smoke, which uses `maturin develop` (dev mode); only the build-and-install path catches a `[lib] name` / `#[pymodule]` / `PyInit_` symbol mismatch that produces a valid wheel that fails at import.
 - **`toml_test`** — BurntSushi `toml-test` conformance against `taplo`.
 - **`test-msrv-{lib,bin,wasm}`** — builds against the MSRV (Rust 1.74).

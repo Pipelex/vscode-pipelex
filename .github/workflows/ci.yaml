@@ -48,37 +48,49 @@ jobs:
           # version is inert — reading it here would tag the wrong number.
           TOOLS_WASM_VERSION=$(jq -r '.version' js/tools-wasm/package.json)
 
-          CREATED=0
+          CREATED=()
 
           if [ -n "$CLI_VERSION" ] && ! git rev-parse "plxt-cli/v${CLI_VERSION}" >/dev/null 2>&1; then
             git tag "plxt-cli/v${CLI_VERSION}"
             echo "Created tag plxt-cli/v${CLI_VERSION}"
-            CREATED=1
+            CREATED+=("plxt-cli/v${CLI_VERSION}")
           fi
 
           if [ -n "$EXT_VERSION" ] && ! git rev-parse "pipelex-vscode-ext/v${EXT_VERSION}" >/dev/null 2>&1; then
             git tag "pipelex-vscode-ext/v${EXT_VERSION}"
             echo "Created tag pipelex-vscode-ext/v${EXT_VERSION}"
-            CREATED=1
+            CREATED+=("pipelex-vscode-ext/v${EXT_VERSION}")
           fi
 
           if [ -n "$LIB_VERSION" ] && ! git rev-parse "pipelex-tools-py/v${LIB_VERSION}" >/dev/null 2>&1; then
             git tag "pipelex-tools-py/v${LIB_VERSION}"
             echo "Created tag pipelex-tools-py/v${LIB_VERSION}"
-            CREATED=1
+            CREATED+=("pipelex-tools-py/v${LIB_VERSION}")
           fi
 
           if [ -n "$TOOLS_WASM_VERSION" ] && [ "$TOOLS_WASM_VERSION" != "null" ] && ! git rev-parse "pipelex-tools-wasm/v${TOOLS_WASM_VERSION}" >/dev/null 2>&1; then
             git tag "pipelex-tools-wasm/v${TOOLS_WASM_VERSION}"
             echo "Created tag pipelex-tools-wasm/v${TOOLS_WASM_VERSION}"
-            CREATED=1
+            CREATED+=("pipelex-tools-wasm/v${TOOLS_WASM_VERSION}")
           fi
 
-          if [ "$CREATED" -eq 1 ]; then
-            git push --tags
-          else
+          if [ "${#CREATED[@]}" -eq 0 ]; then
             echo "No new version tags to create"
+            exit 0
           fi
+
+          # One `git push` per tag, NOT `git push --tags`. GitHub creates no ref
+          # event at all when more than three tags move in a single push, and
+          # `releases.yaml` is triggered exclusively by `push: tags:` — so a
+          # batched push silently publishes nothing while this job still reports
+          # success. That is exactly what happened on v0.16.0, the first release
+          # to carry a fourth tag (`pipelex-tools-wasm`): all four tags landed,
+          # zero Releases runs fired, and every artifact stayed on its previous
+          # version. Pushing them one at a time keeps each push at one tag, so
+          # the limit can never be reached however many components we add.
+          for TAG in "${CREATED[@]}"; do
+            git push origin "$TAG"
+          done
 
   test-python-bindings:
     name: Test on Rust stable
