@@ -41,13 +41,9 @@ use pipelex_tools::format::format_mthds_impl;
 use pipelex_tools::lint::lint_mthds_impl;
 use taplo_common::schema::builtins::MTHDS_SCHEMA_URL;
 
-/// Repo root, resolved from this crate's manifest dir (`<root>/crates/pipelex-cli`).
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("repo root should resolve")
-}
+mod common;
+
+use common::{collect_mthds_fixtures, corpus_dir, mthds_dir, repo_root};
 
 /// Every `.mthds` fixture this suite checks: the repo's own under
 /// `test-data/mthds/`, plus the vendored MTHDS Test Corpus under
@@ -66,22 +62,10 @@ fn repo_root() -> PathBuf {
 /// nothing to point at content that moves.
 fn mthds_fixtures() -> Vec<PathBuf> {
     let mut files = Vec::new();
-    collect_mthds_fixtures(&repo_root().join("test-data/mthds"), &mut files);
-    collect_mthds_fixtures(&repo_root().join("test-data/mthds-corpus"), &mut files);
+    collect_mthds_fixtures(&mthds_dir(), &mut files);
+    collect_mthds_fixtures(&corpus_dir(), &mut files);
     files.sort();
     files
-}
-
-/// Recursively collect every `.mthds` file under `dir` into `files`.
-fn collect_mthds_fixtures(dir: &Path, files: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(dir).expect("fixture dir should be readable") {
-        let path = entry.expect("dir entry").path();
-        if path.is_dir() {
-            collect_mthds_fixtures(&path, files);
-        } else if path.extension().and_then(|ext| ext.to_str()) == Some("mthds") {
-            files.push(path);
-        }
-    }
 }
 
 /// Spawn `plxt` with `args` (optionally in `current_dir`), feed it `content` on

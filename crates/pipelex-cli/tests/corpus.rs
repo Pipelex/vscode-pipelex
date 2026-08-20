@@ -17,12 +17,12 @@
 //! corpus. Requiring the corpus to lint clean turns that into a red build in the
 //! same commit that syncs it.
 //!
-//! **What this does not prove.** `plxt lint` is TOML syntax plus JSON Schema
-//! validation, so this checks that every entry is *structurally acceptable* MTHDS.
-//! It does not resolve concept or pipe references — a bundle whose `output` names
-//! a concept that exists nowhere lints clean — and it says nothing about whether
-//! an entry produces the verdict the corpus declares for it. That second half
-//! needs the `pipelex` runtime rather than this toolchain; see
+//! **What this does not prove.** `plxt lint` is TOML syntax, then DOM validation,
+//! then JSON Schema — so this checks that every entry is *structurally acceptable*
+//! MTHDS. It does not resolve concept or pipe references — a bundle whose `output`
+//! names a concept that exists nowhere lints clean — and it says nothing about
+//! whether an entry produces the verdict the corpus declares for it. That second
+//! half needs the `pipelex` runtime rather than this toolchain; see
 //! `wip/corpus-conformance-gap.md`.
 //!
 //! **Why the library and not the binary.** `parity.rs` already pins the two
@@ -30,17 +30,11 @@
 //! that at the cost of a process per file. `lint_mthds_impl` validates against the
 //! same embedded MTHDS schema the CLI is pointed at there.
 
-use std::path::{Path, PathBuf};
+mod common;
 
+use common::{collect_mthds_fixtures, corpus_dir, corpus_entry_dirs};
 use pipelex_tools::lint::lint_mthds_impl;
-
-/// Repo root, resolved from this crate's manifest dir (`<root>/crates/pipelex-cli`).
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("repo root should resolve")
-}
+use std::path::PathBuf;
 
 /// Every `.mthds` file in the vendored corpus, discovered by recursing the tree
 /// rather than from a list, so a newly synced entry is swept with no wiring here.
@@ -51,21 +45,9 @@ fn repo_root() -> PathBuf {
 /// is for.
 fn corpus_fixtures() -> Vec<PathBuf> {
     let mut files = Vec::new();
-    collect_mthds_fixtures(&repo_root().join("test-data/mthds-corpus"), &mut files);
+    collect_mthds_fixtures(&corpus_dir(), &mut files);
     files.sort();
     files
-}
-
-/// Recursively collect every `.mthds` file under `dir` into `files`.
-fn collect_mthds_fixtures(dir: &Path, files: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(dir).expect("corpus dir should be readable") {
-        let path = entry.expect("dir entry").path();
-        if path.is_dir() {
-            collect_mthds_fixtures(&path, files);
-        } else if path.extension().and_then(|ext| ext.to_str()) == Some("mthds") {
-            files.push(path);
-        }
-    }
 }
 
 #[test]
@@ -82,14 +64,50 @@ fn every_corpus_bundle_lints_clean() {
     for fixture in fixtures {
         let content = std::fs::read_to_string(&fixture).expect("read corpus fixture");
         let diagnostics = lint_mthds_impl(&content).expect("binding lint should not raise");
-        // Every vendored entry declares `validity = "valid"` today. When the
-        // corpus grows curated invalid entries, this must read the entry's
-        // `entry.toml` and require a diagnostic for those instead of none.
+        // Every entry vendored today is structurally clean, so cleanliness is
+        // asserted unconditionally. Do NOT "fix" a future failure here by branching
+        // on the entry's `validity`: that field is a *semantic* declaration (does the
+        // `pipelex` runtime validate this bundle?) and this gate is *structural*
+        // (TOML → DOM → JSON Schema, references never resolved). The two axes cross,
+        // and the correct partition is not expressible from `entry.toml` today —
+        // `wip/corpus-conformance-gap.md` records the measurement and what a real fix
+        // would need.
         assert!(
             diagnostics.is_empty(),
-            "corpus entry {} no longer lints clean — the vendored mthds.schema.json \
-             has most likely gone stale against the corpus: {diagnostics:?}",
-            fixture.display()
+            "corpus entry {} no longer lints clean ({} diagnostic(s), first kind \
+             {:?}). Two causes are worth separating before assuming either: the \
+             vendored mthds.schema.json (or the parser) has gone stale against the \
+             synced corpus, or the corpus now carries entries whose declared fault is \
+             structural rather than semantic — see wip/corpus-conformance-gap.md. \
+             Diagnostics: {diagnostics:?}",
+            fixture.display(),
+            diagnostics.len(),
+            diagnostics[0].kind,
+        );
+    }
+}
+
+/// A sync that drops an entry's bundle but keeps its manifest leaves a directory
+/// that looks like an entry and exercises nothing. Unlike "is the copy still what
+/// the corpus says?" — which needs the canonical tree and is the workspace sync
+/// sweep's job — this invariant is answerable from the vendored tree alone.
+#[test]
+fn every_corpus_entry_has_a_bundle() {
+    let entry_dirs = corpus_entry_dirs();
+    assert!(
+        !entry_dirs.is_empty(),
+        "no entry.toml found under test-data/mthds-corpus — the vendored corpus is \
+         missing or empty, so this gate would pass without checking anything"
+    );
+
+    for dir in entry_dirs {
+        let mut files = Vec::new();
+        collect_mthds_fixtures(&dir, &mut files);
+        assert!(
+            !files.is_empty(),
+            "corpus entry {} carries an entry.toml but no .mthds file — the sync that \
+             wrote it was partial, so this entry is vendored without being exercised",
+            dir.display()
         );
     }
 }
