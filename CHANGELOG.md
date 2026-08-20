@@ -1,5 +1,12 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Added
+
+- **The MTHDS Test Corpus is vendored here, and the parity suite runs over it.** `test-data/mthds-corpus/` holds a byte-identical copy of the one canonical, tagged set of `.mthds` methods the whole workspace draws its language-level fixtures from. It is owned by `pipelex`, where the corpus gates run, and it arrives through the workspace's `mthds-corpus-sync` skill — a copy rather than a dependency because a Rust toolchain cannot read the Python wheel the corpus ships in. **Nothing here edits it:** an entry is fixed upstream and re-synced, because a copy that gets edited is a fork. `parity.rs` now recurses both trees, so every corpus bundle is formatted and linted through the in-process library and the shipped `plxt` binary and the two must agree. Running this toolchain — a second, independent implementation of MTHDS — over the canonical corpus is the cross-language conformance the corpus was built to give, and it passes on every entry with no divergence.
+- The corpus sits **beside** `test-data/mthds/` rather than inside it, and that placement is the substance of the change rather than a detail. The wasm suite sweeps `test-data/mthds/` recursively too and snapshot-pins lint and format output per fixture, so a copy inside it would have echoed every entry into a committed snapshot and made each upstream corpus edit a snapshot regeneration here — for signal parity already covers. Parity stores no expectations, so it is the suite that can safely point at content another repo owns.
+
 ## [0.16.1] - 2026-08-14
 
 ### Fixed

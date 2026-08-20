@@ -49,13 +49,25 @@ fn repo_root() -> PathBuf {
         .expect("repo root should resolve")
 }
 
-/// Every `.mthds` fixture under `test-data/mthds/`, discovered by recursing the
-/// whole tree (not a hardcoded dir list) so a fixture added in any current or
-/// future subdirectory — `lint/`, `hover/`, `goto-definition/`, … — is
-/// parity-checked automatically.
+/// Every `.mthds` fixture this suite checks: the repo's own under
+/// `test-data/mthds/`, plus the vendored MTHDS Test Corpus under
+/// `test-data/mthds-corpus/`. Both are discovered by recursing the whole tree
+/// (not a hardcoded dir list) so a fixture added in any current or future
+/// subdirectory — `lint/`, `hover/`, a new corpus entry — is parity-checked
+/// automatically.
+///
+/// **Why the corpus is a sibling directory and not one inside `test-data/mthds/`.**
+/// That tree is swept recursively by the wasm suite too (`js/tools-wasm/tests/`),
+/// which snapshot-pins lint and format output per fixture. The corpus is owned by
+/// `pipelex` and re-synced whenever it changes upstream, so putting it there would
+/// have echoed every entry into a committed snapshot and turned every upstream edit
+/// into a snapshot regeneration in this repo. Parity has no stored expectations —
+/// it compares the library against the binary on the same input — so it costs
+/// nothing to point at content that moves.
 fn mthds_fixtures() -> Vec<PathBuf> {
     let mut files = Vec::new();
     collect_mthds_fixtures(&repo_root().join("test-data/mthds"), &mut files);
+    collect_mthds_fixtures(&repo_root().join("test-data/mthds-corpus"), &mut files);
     files.sort();
     files
 }

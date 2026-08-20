@@ -51,9 +51,9 @@ The JS package (`js/tools-wasm`, npm `@pipelex/tools-wasm`) exposes module-level
 ## Parity enforcement
 
 - **Rust unit** — `cargo test -p pipelex-common --features tools`: every reachable diagnostic path of the shared impls, plus the offline-vs-native lint equivalence test.
-- **Rust parity corpus** — `crates/pipelex-cli/tests/parity.rs`: the in-process library output must match the shipped `plxt` binary on the whole `test-data/mthds` corpus.
+- **Rust parity corpus** — `crates/pipelex-cli/tests/parity.rs`: the in-process library output must match the shipped `plxt` binary over two trees, `test-data/mthds/` and `test-data/mthds-corpus/`. The second is a vendored copy of the MTHDS Test Corpus — the canonical, tagged set of `.mthds` methods the workspace shares, owned by `pipelex` and re-synced when it changes upstream. Parity is the right suite to point at content that moves: it stores no expectations, it compares the library against the binary on the same input, so an upstream corpus edit costs nothing here.
 - **Python e2e** — `crates/pipelex-py/tests/test_smoke.py` against the built wheel (`make test-pipelex-lib`).
-- **JS corpus snapshots** — `js/tools-wasm/tests/` run vitest **against the built bundle** (what a Node consumer actually gets), with committed snapshots of lint diagnostics and formatted output over the same `test-data/mthds` corpus, plus wire-shape guards (`null` vs dropped fields, option stringification, never-throws-on-malformed-content).
+- **JS corpus snapshots** — `js/tools-wasm/tests/` run vitest **against the built bundle** (what a Node consumer actually gets), with committed snapshots of lint diagnostics and formatted output over `test-data/mthds` — and **not** over the vendored corpus, deliberately: committed snapshots echo each fixture's formatted text, so sweeping content owned by another repo would turn every upstream corpus edit into a snapshot regeneration here for signal parity already covers. That is why the corpus is a sibling directory rather than one inside `test-data/mthds/`, which this suite discovers recursively — plus wire-shape guards (`null` vs dropped fields, option stringification, never-throws-on-malformed-content).
 
 ## Build, test, publish
 
