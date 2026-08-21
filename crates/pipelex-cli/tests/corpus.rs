@@ -15,11 +15,13 @@
 //! **The failure this closes, in both directions.** `pipelex` adds a pipe kind or
 //! a field, the `mthds.schema.json` vendored here goes stale, a corpus re-sync
 //! lands, and CI stays green while the toolchain has silently stopped accepting
-//! the canonical corpus. That is the permissive-to-strict direction. The other one
-//! matters just as much and nothing else here covers it: a schema that quietly
-//! stopped *rejecting* an unknown pipe type, or a key it does not allow, would
-//! leave every valid entry green. Holding the schema-fault entries to a diagnostic
-//! is what closes it.
+//! the canonical corpus. That is the schema drifting permissive-to-strict — the
+//! direction names say where the *schema* moved to, so this is the one where it
+//! stops accepting content the corpus says is valid. The other one is the schema
+//! drifting strict-to-permissive, and it matters just as much while nothing else
+//! here covers it: a schema that quietly stopped *rejecting* an unknown pipe type,
+//! or a key it does not allow, would leave every valid entry green. Holding the
+//! schema-fault entries to a diagnostic is what closes it.
 //!
 //! **How the two populations are told apart — read from the corpus, never guessed.**
 //! An entry declares which vocabulary tags it `covers`, and since `pipelex` v0.51.0
