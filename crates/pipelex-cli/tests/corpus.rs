@@ -91,7 +91,18 @@ fn schema_fault_tags() -> BTreeSet<String> {
         let Some(fails_at) = entry.get("fails_at") else {
             // An excluded tag carries no `fails_at`, by contract: a code is excluded
             // precisely when no bundle produces it, so there is nothing to measure on
-            // and no entry can cover it. Nothing to classify, nothing to refuse.
+            // and no entry can cover it. But the exclusion has to be *stated*. A tag
+            // carrying neither key is a vocabulary this sweep cannot read, and reading
+            // it as excluded is the one lenient default that would retire a probe in
+            // silence — the tag might be a schema fault whose layer went missing.
+            assert!(
+                entry.get("excluded").is_some(),
+                "vocabulary tag error.{code} declares neither `fails_at` nor `excluded`. Upstream \
+                 requires every tag that is owed an entry to name the layer it fails at, so this \
+                 copy is partial or hand-edited — re-sync it. Treating the tag as excluded here \
+                 would drop it from the classification and could quietly retire a rejecting-\
+                 direction probe."
+            );
             continue;
         };
         let fails_at = fails_at.as_str().unwrap_or_else(|| {
@@ -151,17 +162,21 @@ fn covers_of(entry_dir: &Path) -> Vec<String> {
     }
 }
 
-/// Whether this entry's declared fault is one a structural check can see.
+/// Which of this entry's declared faults are ones a structural check can see.
+///
+/// Returned as the set rather than as a bare "does it expect a diagnostic?", so the
+/// sweep can afterwards check that every schema fault the vocabulary declares was
+/// actually probed by some entry — not merely that some entry probed something.
 ///
 /// An `error.*` tag that the vendored vocabulary does not classify is refused rather
 /// than assumed clean: it means the copy is partial or the contract moved, and the
 /// lenient reading would silently retire a probe.
-fn expects_diagnostic(
+fn schema_faults_covered_by(
     entry_dir: &Path,
     schema_faults: &BTreeSet<String>,
     all_error_tags: &BTreeSet<String>,
-) -> bool {
-    let mut expects = false;
+) -> BTreeSet<String> {
+    let mut covered = BTreeSet::new();
     for tag in covers_of(entry_dir) {
         if !tag.starts_with("error.") {
             continue;
@@ -173,10 +188,10 @@ fn expects_diagnostic(
             entry_dir.display()
         );
         if schema_faults.contains(&tag) {
-            expects = true;
+            covered.insert(tag);
         }
     }
-    expects
+    covered
 }
 
 /// Every `error.*` tag the vendored vocabulary declares *and* classifies.
@@ -231,10 +246,11 @@ fn every_corpus_entry_lints_as_its_declared_layer_says() {
          be re-thought rather than left green."
     );
 
-    let mut schema_fault_entries = 0usize;
+    let mut probed_schema_faults: BTreeSet<String> = BTreeSet::new();
     for entry_dir in entry_dirs {
         let fixtures = entry_fixtures(&entry_dir);
-        let expects = expects_diagnostic(&entry_dir, &schema_faults, &classified);
+        let covered = schema_faults_covered_by(&entry_dir, &schema_faults, &classified);
+        let expects = !covered.is_empty();
 
         let mut entry_diagnostics = Vec::new();
         for fixture in &fixtures {
@@ -259,7 +275,7 @@ fn every_corpus_entry_lints_as_its_declared_layer_says() {
         }
 
         if expects {
-            schema_fault_entries += 1;
+            probed_schema_faults.extend(covered);
             // Asserted per entry rather than per file: a multi-file entry carries its
             // fault in one of its files, and the others are library fragments that are
             // supposed to lint clean on their own.
@@ -277,15 +293,23 @@ fn every_corpus_entry_lints_as_its_declared_layer_says() {
         }
     }
 
-    // Belt and braces on the loop above: the population must not be silently empty
-    // even when the vocabulary classifies faults, which happens if the slice stops
-    // carrying the entries that cover them.
+    // Every schema fault, not merely one of them. Counting probes would let the faults
+    // that already have entries hold the number above zero while a newly declared one
+    // arrives with no entry to exercise it — the rejecting direction would then be
+    // unchecked for exactly the fault that just changed. Upstream's exhaustivity gate
+    // owes every non-excluded tag a focused entry, and this consumer vendors the whole
+    // corpus, so any gap here is a partial sync rather than a corpus that lacks the entry.
+    let unprobed: Vec<&str> = schema_faults
+        .difference(&probed_schema_faults)
+        .map(String::as_str)
+        .collect();
     assert!(
-        schema_fault_entries > 0,
-        "the vocabulary classifies {} fault(s) as `fails_at = \"schema\"` but no vendored entry \
-         covers any of them, so nothing exercised the rejecting direction. The slice is out of \
-         step with the vocabulary it ships beside — re-sync it.",
-        schema_faults.len(),
+        unprobed.is_empty(),
+        "the vendored vocabulary marks {unprobed:?} as `fails_at = \"schema\"`, but no vendored \
+         entry covers them — so nothing exercised the rejecting direction for those faults, and \
+         a schema that stopped rejecting them would leave this suite green. The slice is out of \
+         step with the vocabulary it ships beside; re-sync the copy rather than narrowing this \
+         expectation."
     );
 }
 
