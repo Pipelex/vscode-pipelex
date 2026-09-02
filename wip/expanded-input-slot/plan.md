@@ -109,22 +109,24 @@ One commit per site, each carrying its own tests.
 
 ### Phase 2 — semantic tokens (TypeScript)
 
-- [ ] Replace `insideMultiLineInputs` and `analyzeInputEntries` with the depth-tracking scanner.
-- [ ] Add the expanded-slot tests; keep every existing test green with its offsets.
-- [ ] `make test-ext`.
+- [x] Replace `insideMultiLineInputs` and `analyzeInputEntries` with the depth-tracking scanner.
+- [x] Add the expanded-slot tests; keep every existing test green with its offsets.
+- [x] `make test-ext`.
 
-One commit.
+Two commits, not one: `96da712` is the scanner, and `1568778` adds the recovery the scanner turned out to need. Depth alone regressed the unclosed-block case — with one brace missing the depth never returns to 0, so every line below loses its colouring, where the code being replaced recovered at the next `}` anywhere. A line starting with `[` while a block is open now abandons the block, a table header being impossible inside an inline table.
 
 ### Phase 3 — docs, changelog, PR
 
-- [ ] `docs/features/goto-definition.md` is already stale — it says "pipe refs only, concept references are not handled" — so refresh it to describe concept references, both slot forms, the chain rule and the hint false positive it refuses, and hover's reuse of the same classifier.
-- [ ] Add a short `docs/features/semantic-tokens.md` describing the provider and the scanner's depth semantics; there is no document for the semantic-token provider today.
-- [ ] One line in this repo's `CLAUDE.md` under "LSP Handler Architecture" naming the two slot shapes.
-- [ ] `CHANGELOG.md` under `## [Unreleased]`, a `### Fixed` entry, next to #83's `### Changed` paragraph that this completes.
-- [ ] Manual Extension Host pass (see Tests) and `make check`.
+- [x] `docs/features/goto-definition.md` is already stale — it says "pipe refs only, concept references are not handled" — so refresh it to describe concept references, both slot forms, the chain rule and the hint false positive it refuses, and hover's reuse of the same classifier.
+- [x] Add a short `docs/features/semantic-tokens.md` describing the provider and the scanner's depth semantics; there is no document for the semantic-token provider today.
+- [x] One line in this repo's `CLAUDE.md` under "LSP Handler Architecture" naming the two slot shapes.
+- [x] `CHANGELOG.md` under `## [Unreleased]`, a `### Fixed` entry, next to #83's `### Changed` paragraph that this completes.
+- [x] `make check` — green. **Manual Extension Host pass: outstanding, and it is a human's to run.** The extension is built and installed into Cursor (`editors/vscode/pipelex.vsix`, installed 2026-09-02). Note `make vsix` fails on a machine without a global `vsce`: the Makefile calls the binary directly and it is not a devDependency, while `releases.yaml` installs it itself, so this is a local-dev gap only and was not repaired from inside this campaign. The packaging step was run as `npx --yes @vscode/vsce package`.
 - [ ] Open the PR against `chore/Sync-mthds-schema-and-corpus` with `Closes L-260902-74677a` in the body; once #83 merges into `dev`, retarget it to `dev`. The PR description must name the upstream-crate edits — `taplo-lsp`'s `mthds_resolution.rs` and `hover.rs` are MTHDS additions living inside an upstream crate, and this repo's rule is to say so whenever an upstream crate changes.
 
 **Checkpoint 2.** At PR open: record the PR number, what the review rounds changed, and any deferral with where it was recorded.
+
+*Not reached.* Everything before the PR is done and `make check` is green, but the plan makes the manual Extension Host pass the gate before the PR opens, and that pass needs a person at the IDE. The branch is committed and unpushed, waiting on it. The things to look at on the corpus bundle `test-data/mthds-corpus/entries/feature_intent_hints_reading_circle/bundle.mthds`: Cmd+click and hover on `"Text"` inside the expanded slot (should reach the native-concept card), hover on `"write_card"` in `main_pipe` (should list `` `title`: BookTitle, `notes`: Text `` with no hints), the colouring of the `inputs` line (`title`, `BookTitle`, `notes`, `Text` coloured; `concept`, `hints`, `intent`, `prose` not), and that hovering `"prose"` offers nothing.
 
 ## Decisions
 
