@@ -643,3 +643,141 @@ prompt = "hello"
         "specific count only should not classify as a valid reference"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Expanded input slots: `notes = { concept = "Text", hints = { … } }`
+// ---------------------------------------------------------------------------
+
+macro_rules! corpus {
+    ($name:literal) => {
+        include_str!(concat!(
+            "../../../../../test-data/mthds-corpus/entries/",
+            $name
+        ))
+    };
+}
+
+#[test]
+fn test_hover_pipe_lists_expanded_and_string_slots_alike() {
+    let src = fixture!("pipe_hover_expanded.mthds");
+    let offset = offset_inside_string(src, r#"main_pipe   = "write_card""#);
+
+    let (dom, query) = parse_and_query(src, offset);
+    let resolved = resolve_reference(&dom, &query).expect("should resolve pipe reference");
+    let content = build_mthds_hover_content(&resolved);
+
+    assert!(
+        content.contains("`title`: BookTitle"),
+        "should list the string-form slot, got: {content}"
+    );
+    assert!(
+        content.contains("`notes`: Text"),
+        "should read the concept out of the expanded slot, got: {content}"
+    );
+    assert!(
+        !content.contains("prose"),
+        "hints are presentation intent and do not belong in a pipe hover, got: {content}"
+    );
+}
+
+#[test]
+fn test_hover_slot_table_without_concept_renders_question_mark() {
+    let src = r#"
+domain = "test"
+main_pipe = "my_pipe"
+
+[pipe.my_pipe]
+type = "PipeLLM"
+description = "A slot table missing its concept key"
+inputs = { notes = { hints = { intent = "prose" } } }
+output = "Text"
+prompt = "hello"
+"#;
+    let offset = offset_inside_string(src, r#"main_pipe = "my_pipe""#);
+
+    let (dom, query) = parse_and_query(src, offset);
+    let resolved = resolve_reference(&dom, &query).expect("should resolve pipe reference");
+    let content = build_mthds_hover_content(&resolved);
+
+    assert!(
+        content.contains("`notes`: ?"),
+        "a slot table with no `concept` is schema-invalid, and `?` is the honest reading, got: {content}"
+    );
+}
+
+#[test]
+fn test_hover_on_expanded_slot_concept_resolves_dom_concept() {
+    let src = fixture!("pipe_hover_expanded.mthds");
+    let offset =
+        offset_inside_string_after(src, "[pipe.restate_title]", r#"concept = "BookTitle""#);
+
+    let (dom, query) = parse_and_query(src, offset);
+    let resolved = resolve_reference(&dom, &query).expect("should resolve the slot's concept");
+    let content = build_mthds_hover_content(&resolved);
+
+    assert!(
+        content.contains("**BookTitle**"),
+        "header should show the concept name, got: {content}"
+    );
+    assert!(
+        content.contains("The title of the book under discussion"),
+        "should contain the concept description, got: {content}"
+    );
+}
+
+#[test]
+fn test_hover_on_expanded_slot_concept_resolves_native_concept() {
+    let src = fixture!("pipe_hover_expanded.mthds");
+    let offset = offset_inside_string(src, r#"concept = "Text""#);
+
+    let (dom, query) = parse_and_query(src, offset);
+    assert!(
+        resolve_reference(&dom, &query).is_none(),
+        "no concept.Text is declared in this file"
+    );
+
+    let classified = classify_reference(&query).expect("should classify as a concept reference");
+    assert!(matches!(classified.kind, ReferenceKind::Concept));
+    assert_eq!(classified.ref_name, "Text");
+
+    let native = find_native_concept(&classified.ref_name).expect("Text is a native concept");
+    let content = build_native_concept_hover(native);
+
+    assert!(content.contains("**Text** *(native)*"), "got: {content}");
+}
+
+#[test]
+fn test_hover_model_field_not_on_expanded_slot_named_model() {
+    let src = r#"
+domain = "test"
+
+[pipe.my_pipe]
+type = "PipeLLM"
+model = "$gpt-4o"
+output = "Text"
+inputs = { model = { concept = "CustomConcept" } }
+prompt = "hello"
+"#;
+    let offset = offset_inside_string(src, r#"concept = "CustomConcept""#);
+
+    let (_dom, query) = parse_and_query(src, offset);
+    assert!(
+        !is_model_field(&query),
+        "a slot named `model` in the expanded form is a concept reference, not a model field"
+    );
+}
+
+#[test]
+fn test_hover_corpus_pipe_lists_both_slot_forms() {
+    let src = corpus!("feature_intent_hints_reading_circle/bundle.mthds");
+    let offset = offset_inside_string(src, r#"main_pipe   = "write_card""#);
+
+    let (dom, query) = parse_and_query(src, offset);
+    let resolved = resolve_reference(&dom, &query).expect("should resolve main_pipe");
+    let content = build_mthds_hover_content(&resolved);
+
+    assert!(
+        content.contains("**Inputs:** `title`: BookTitle, `notes`: Text"),
+        "got: {content}"
+    );
+}
