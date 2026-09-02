@@ -19,6 +19,7 @@ In scope, one site each:
 
 Out of scope, and deliberately so:
 
+- **A multi-line `inputs` inline table.** Found while testing, not anticipated here: taplo's error recovery flattens it, so goto-definition and hover fail on it in *both* slot forms. It is the parser's limit, it predates the expanded form, and repairing it means changing `crates/taplo/`'s recovery for every TOML document. Filed as L-260902-73ef53; Phase 3's scanner is textual and handles the shape regardless.
 - **The standard-table form `[pipe.x.inputs]` and dotted keys `inputs.x = …`.** Neither is recognised today for the string form either — `classify_reference` reaches `ReferenceKind::Concept` only through the `output`/`refines` keys or an inline-table ancestry, and the semantic provider only enters an inputs block on an `inputs = {` line (the TextMate grammar's catch-all rule does colour the value there). That is a pre-existing gap of its own, on both forms, and it is filed as L-260902-e9268f rather than widened into this one.
 - **Presence markers (`Text?`, `Text!`).** The `concept` string carries the same grammar as the string form, markers included, and neither `strip_concept_qualifiers` nor the semantic provider's value regex knows them today — in either form. That is L-260826-aad93c. This plan keeps the value grammar in one place per site so that fix touches one spot, and its tests use unmarked references.
 - **The TextMate grammar.** Rule 11 in `editors/vscode/src/syntax/mthds/entry.ts` (`conceptValueEntry`) already colours `concept = "Text"` as a concept-valued entry and leaves `intent = "prose"` alone, since the value is not PascalCase. Nothing to change.
@@ -91,14 +92,20 @@ Every site gets unit tests against hand-written fixtures and a test against the 
 
 ### Phase 1 — resolution and hover (Rust)
 
-- [ ] Replace `is_inside_inputs_inline_table` with the chain-reading predicate; update both call sites and the doc comments.
-- [ ] Add the `concept`-table fallback in `build_mthds_hover_content`.
-- [ ] Add the goto-definition and hover fixtures and tests, including the corpus-driven ones.
-- [ ] `make test-taplo-lsp`; `make test-pipelex-cli` for parity over the new fixtures; `make test-tools-wasm-js` and commit the new snapshot entries.
+- [x] Replace `is_inside_inputs_inline_table` with the chain-reading predicate; update both call sites and the doc comments.
+- [x] Add the `concept`-table fallback in `build_mthds_hover_content`.
+- [x] Add the goto-definition and hover fixtures and tests, including the corpus-driven ones.
+- [x] `make test-taplo-lsp`; `make test-pipelex-cli` for parity over the new fixtures; `make test-tools-wasm-js` and commit the new snapshot entries.
 
 One commit per site, each carrying its own tests.
 
-**Checkpoint 1.** The Rust half is a coherent unit and the next phase opens a different toolchain. Record here: the SHAs of the two commits, anything the chain-reading predicate had to do that the design above did not anticipate (the syntax tree's exact node nesting around `VALUE`, in particular), and any test that had to be shaped differently from the list above.
+**Checkpoint 1 — done.** The Rust half landed in two commits, `081a6a2` (resolution) and `2374d88` (hover), each carrying its own tests and a regenerated `js/tools-wasm` snapshot so either stands alone. `make test-taplo-lsp`, `make test-pipelex-cli` and `make test-tools-wasm-js` are green; `cargo fmt --check` and `cargo clippy -p taplo-lsp --all-targets -- -D warnings` are clean.
+
+*The node nesting was exactly as designed.* Dumping the tree for `inputs = { title = "BookTitle", notes = { concept = "Text", hints = { intent = "prose" } } }` gives `STRING → VALUE → ENTRY → INLINE_TABLE → VALUE → ENTRY → …`, repeating one pair per level, with the outermost `ENTRY`'s parent a `TABLE` rather than an `INLINE_TABLE` — so `inline_entry_chain` steps `VALUE → INLINE_TABLE → VALUE → ENTRY` strictly and stops on its own when the chain breaks. The array case falls out of the same strictness: in `xs = ["Foo"]` the string's `VALUE` has an `ARRAY` parent, not an `ENTRY`, so the chain is empty before the first step. The predicate is `is_input_slot_concept`, with `inline_entry_chain` and `entry_key_text` as private helpers beside it.
+
+*One test had to change shape, and it found a real limit.* The plan asked goto-definition to resolve an expanded slot "single-line and multi-line". It cannot, and not because of the classifier: a newline inside an inline table is invalid TOML, and taplo's recovery abandons the nesting at the newline, emitting every following `key = value` as a sibling `ENTRY` of `ROOT`. There is no `inputs` ancestor left to walk to — in the **string form** just as much as in the expanded form, so this is a pre-existing parser limit rather than anything this change introduced. `test_slot_spread_over_lines_does_not_resolve_in_either_form` pins both forms to say so, and the gap is filed as L-260902-73ef53 (owner `vscode-pipelex`, discovered from this item), which proposes keeping an unterminated `INLINE_TABLE` open across newlines in `crates/taplo/`'s recovery — an upstream-crate change, deliberately not taken here. Phase 2 is unaffected: the semantic-token scanner is textual and never consults the parser, so it will colour a multi-line block correctly. That divergence — colouring works, navigation does not — is the reason the item is worth keeping open.
+
+*The negative shapes live in the test module, not in the fixture.* `options = { concept = "Foo" }`, a `description` key inside a slot table, and an array inside `inputs` are all schema-invalid, and the `js/tools-wasm` suite snapshot-pins a lint result for every `.mthds` file under `test-data/mthds/`. Putting them in the committed fixture would have pinned a pile of schema diagnostics unrelated to what is being tested, so the fixtures hold only the canonical valid shapes and the negatives are inline sources, as several existing hover tests already are. Both new fixtures lint clean and format to themselves (`"changed": false`) — note that the wasm formatter's defaults align entries whereas `plxt fmt --no-auto-config` does not, so the fixture text must match the *wasm* output, not what a local `plxt fmt` produces.
 
 ### Phase 2 — semantic tokens (TypeScript)
 
