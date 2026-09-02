@@ -24,6 +24,12 @@ const DECLARATION_FLAG = 1 << TOKEN_MODIFIERS.declaration;
  */
 const INPUTS_BLOCK_START = /^(\s*inputs\s*=\s*\{)/;
 
+/**
+ * A table header. Valid TOML never puts one inside an inline table, so meeting one
+ * while a block is open means the block was left unclosed rather than continued.
+ */
+const TABLE_HEADER_LINE = /^\s*\[/;
+
 /** A bare key, anchored — the slot names and schema keys inside an inputs block. */
 const IDENTIFIER = /[A-Za-z0-9_-]+/y;
 
@@ -67,11 +73,15 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
         for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
             const line = document.lineAt(lineIndex).text;
 
-            // A block left open on an earlier line owns this whole line.
-            if (inputsDepth > 0) {
+            // A block left open on an earlier line owns this whole line — unless the line
+            // is a table header, which cannot occur inside an inline table. Treating that
+            // as an abandoned block is what stops one unclosed brace from swallowing the
+            // colouring of every line below it while the user is still typing.
+            if (inputsDepth > 0 && !TABLE_HEADER_LINE.test(line)) {
                 inputsDepth = this.scanInputsBlock(line, 0, lineIndex, inputsDepth, tokensBuilder);
                 continue;
             }
+            inputsDepth = 0;
 
             // Table headers — add declaration modifier
             this.analyzeTableHeaders(line, lineIndex, tokensBuilder);

@@ -42,6 +42,8 @@ Two details keep the depth honest. Braces are counted **outside strings only**, 
 
 The single-line block, the multi-line block, the empty `inputs = {}` and the block with a trailing comment are not special cases: they all fall out of that one rule.
 
+One escape hatch keeps a typo cheap. A table header cannot appear inside an inline table, so a line starting with `[` while a block is open means the block was left unclosed rather than continued: the scanner abandons it and the line is processed normally. Without that, one missing brace would take the semantic colouring of every line below it — for as long as the user is mid-edit.
+
 ### Why a scanner rather than another regex
 
 The previous implementation was two regexes and an `insideMultiLineInputs` boolean, and the expanded form broke both at once. The entry regex matched `key = "Concept"` anywhere in the content, so inside a slot table it coloured the keyword `concept` as if it were the slot name and left the real slot name bare. And the block ended on the first `}` on a line — which in the expanded form is the hints table's — so every slot written after an expanded one went uncoloured. The two bugs interact across lines (a slot table spanning lines, a hints table on its own line), which is why a third regex would not have settled it.

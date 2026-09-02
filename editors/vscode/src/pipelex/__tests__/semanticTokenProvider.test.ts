@@ -791,3 +791,32 @@ describe('Expanded input slots', () => {
     ]);
   });
 });
+
+describe('Recovery from an unclosed inputs block', () => {
+  it('abandons the block at a table header so the rest of the file is still colored', async () => {
+    const tokens = await getTokens([
+      '[pipe.first]',
+      'inputs = {',
+      '    notes = "Text"',
+      // the closing brace never arrives — the user is still typing
+      '[pipe.second]',
+      'inputs = { extra = "Other" }',
+      'output = "Result"',
+    ]);
+
+    expect(tokens).toEqual([
+      // [pipe.first]
+      { line: 0, char: 1, length: 4, tokenType: TOKEN.mthdsPipeSection, tokenModifiers: DECLARATION_FLAG },
+      { line: 0, char: 6, length: 5, tokenType: TOKEN.mthdsPipeName, tokenModifiers: DECLARATION_FLAG },
+      // the one slot that did get written
+      { line: 2, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 2, char: 13, length: 4, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      // [pipe.second] — reached because the header closed the abandoned block
+      { line: 3, char: 1, length: 4, tokenType: TOKEN.mthdsPipeSection, tokenModifiers: DECLARATION_FLAG },
+      { line: 3, char: 6, length: 6, tokenType: TOKEN.mthdsPipeName, tokenModifiers: DECLARATION_FLAG },
+      { line: 4, char: 11, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 4, char: 20, length: 5, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      { line: 5, char: 10, length: 6, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+    ]);
+  });
+});
