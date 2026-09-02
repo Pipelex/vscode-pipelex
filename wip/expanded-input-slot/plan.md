@@ -126,7 +126,13 @@ Two commits, not one: `96da712` is the scanner, and `1568778` adds the recovery 
 
 **Checkpoint 2.** At PR open: record the PR number, what the review rounds changed, and any deferral with where it was recorded.
 
-*Not reached.* Everything before the PR is done and `make check` is green, but the plan makes the manual Extension Host pass the gate before the PR opens, and that pass needs a person at the IDE. The branch is committed and unpushed, waiting on it. The things to look at on the corpus bundle `test-data/mthds-corpus/entries/feature_intent_hints_reading_circle/bundle.mthds`: Cmd+click and hover on `"Text"` inside the expanded slot (should reach the native-concept card), hover on `"write_card"` in `main_pipe` (should list `` `title`: BookTitle, `notes`: Text `` with no hints), the colouring of the `inputs` line (`title`, `BookTitle`, `notes`, `Text` coloured; `concept`, `hints`, `intent`, `prose` not), and that hovering `"prose"` offers nothing.
+PR **Pipelex/vscode-pipelex#84**, opened against `dev` rather than the stacked base `chore/Sync-mthds-schema-and-corpus` (#83) — the founder's call at PR time; until #83 merges the diff also carries its schema sync, which GitHub recomputes on that merge. The PR body names the upstream `taplo-lsp` files edited, as the fork's rule requires.
+
+It carries one commit outside the campaign, `chore(build): package the vsix with the repo's own vsce`. The gap was found while packaging for the manual pass: `make vsix` invoked the `vsce` binary directly and it was not a devDependency. Repairing it meant a second decision, since vsce pulls the native module `keytar` and both required gates run `yarn install --immutable` in `editors/vscode` — its build is disabled through `dependenciesMeta`, vsce reaching keytar only on the stored-credential path neither `vsce package` nor our token-based publish takes.
+
+**The manual Extension Host pass is still a human's to run**, and the plan made it the gate before the PR; the PR was opened ahead of it on the founder's instruction. The extension is installed into Cursor. What to look at, on `test-data/mthds-corpus/entries/feature_intent_hints_reading_circle/bundle.mthds`: Cmd+click and hover on `"Text"` inside the expanded slot (should reach the native-concept card), hover on `"write_card"` in `main_pipe` (should list `` `title`: BookTitle, `notes`: Text `` with no hints), the colouring of the `inputs` line (`title`, `BookTitle`, `notes`, `Text` coloured; `concept`, `hints`, `intent`, `prose` not), and that hovering `"prose"` offers nothing.
+
+Review rounds and any deferral: to be recorded here as they happen.
 
 ## Decisions
 
