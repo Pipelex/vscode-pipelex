@@ -66,6 +66,36 @@ hex_val = 0xFF
 }
 `;
 
+exports[`corpus snapshots (committed expected outputs) > format goto-definition/concept_inputs_expanded.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "test_concept_inputs_expanded"
+description = "Test fixture for concept references in expanded input slots"
+
+[concept.BookTitle]
+description = "The title of the book under discussion"
+
+[concept.HostNotes]
+description = "The notes the host brings to the circle"
+
+[pipe.write_card]
+type        = "PipeLLM"
+description = "A string-form slot beside an expanded one"
+inputs      = { title = "BookTitle", notes = { concept = "HostNotes", hints = { intent = "prose" } } }
+output      = "BookTitle"
+model       = "$default"
+
+[pipe.slot_named_concept]
+type        = "PipeLLM"
+description = "A string-form slot that happens to be named concept"
+inputs      = { concept = "HostNotes" }
+output      = "BookTitle"
+model       = "$default"
+",
+}
+`;
+
 exports[`corpus snapshots (committed expected outputs) > format goto-definition/concept_inputs_inline.mthds 1`] = `
 {
   "changed": false,
@@ -317,6 +347,44 @@ Analyze the document and answer the query.
 @doc
 @query
 """
+",
+}
+`;
+
+exports[`corpus snapshots (committed expected outputs) > format hover/pipe_hover_expanded.mthds 1`] = `
+{
+  "changed": false,
+  "diagnostics": [],
+  "formatted": "domain      = "hover_expanded"
+description = "Test fixture for pipe hover over expanded input slots"
+main_pipe   = "write_card"
+
+[concept.BookTitle]
+description = "The title of the book under discussion"
+
+[concept.CircleCard]
+description = "The card pinned up for the month's reading circle"
+
+[pipe.write_card]
+type = "PipeLLM"
+description = "Writes the circle card from the title and the host's notes"
+inputs = { title = "BookTitle", notes = { concept = "Text", hints = { intent = "prose" } } }
+output = "CircleCard"
+model = "$default"
+prompt = """
+Write the card.
+
+@title
+@notes
+"""
+
+[pipe.restate_title]
+type        = "PipeLLM"
+description = "An expanded slot whose concept is declared in this file"
+inputs      = { source = { concept = "BookTitle", hints = { intent = "label" } } }
+output      = "BookTitle"
+model       = "$default"
+prompt      = "Restate @source."
 ",
 }
 `;
@@ -598,6 +666,8 @@ exports[`corpus snapshots (committed expected outputs) > lint false-positives.mt
 ]
 `;
 
+exports[`corpus snapshots (committed expected outputs) > lint goto-definition/concept_inputs_expanded.mthds 1`] = `[]`;
+
 exports[`corpus snapshots (committed expected outputs) > lint goto-definition/concept_inputs_inline.mthds 1`] = `
 [
   {
@@ -828,6 +898,8 @@ exports[`corpus snapshots (committed expected outputs) > lint hover/pipe_hover.m
   },
 ]
 `;
+
+exports[`corpus snapshots (committed expected outputs) > lint hover/pipe_hover_expanded.mthds 1`] = `[]`;
 
 exports[`corpus snapshots (committed expected outputs) > lint jinja-templates.mthds 1`] = `
 [

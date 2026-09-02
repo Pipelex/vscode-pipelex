@@ -1,0 +1,22 @@
+domain      = "test_concept_inputs_expanded"
+description = "Test fixture for concept references in expanded input slots"
+
+[concept.BookTitle]
+description = "The title of the book under discussion"
+
+[concept.HostNotes]
+description = "The notes the host brings to the circle"
+
+[pipe.write_card]
+type        = "PipeLLM"
+description = "A string-form slot beside an expanded one"
+inputs      = { title = "BookTitle", notes = { concept = "HostNotes", hints = { intent = "prose" } } }
+output      = "BookTitle"
+model       = "$default"
+
+[pipe.slot_named_concept]
+type        = "PipeLLM"
+description = "A string-form slot that happens to be named concept"
+inputs      = { concept = "HostNotes" }
+output      = "BookTitle"
+model       = "$default"

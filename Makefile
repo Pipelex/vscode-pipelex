@@ -73,7 +73,7 @@ ext: ext-deps ## Build the VS Code extension
 	cd $(EXT_DIR) && yarn install && yarn build
 
 vsix: ext ## Package the extension into a .vsix file
-	cd $(EXT_DIR) && vsce package -o pipelex.vsix --no-dependencies
+	cd $(EXT_DIR) && yarn vsce package -o pipelex.vsix --no-dependencies
 	@echo "VSIX: $(VSIX)"
 
 # ── Install / Uninstall ─────────────────────────────────────────────────────

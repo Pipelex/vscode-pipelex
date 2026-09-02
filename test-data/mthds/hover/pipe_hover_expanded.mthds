@@ -1,0 +1,30 @@
+domain      = "hover_expanded"
+description = "Test fixture for pipe hover over expanded input slots"
+main_pipe   = "write_card"
+
+[concept.BookTitle]
+description = "The title of the book under discussion"
+
+[concept.CircleCard]
+description = "The card pinned up for the month's reading circle"
+
+[pipe.write_card]
+type = "PipeLLM"
+description = "Writes the circle card from the title and the host's notes"
+inputs = { title = "BookTitle", notes = { concept = "Text", hints = { intent = "prose" } } }
+output = "CircleCard"
+model = "$default"
+prompt = """
+Write the card.
+
+@title
+@notes
+"""
+
+[pipe.restate_title]
+type        = "PipeLLM"
+description = "An expanded slot whose concept is declared in this file"
+inputs      = { source = { concept = "BookTitle", hints = { intent = "label" } } }
+output      = "BookTitle"
+model       = "$default"
+prompt      = "Restate @source."
