@@ -48,6 +48,33 @@ Issues that target a pipe also decorate the graph nodes themselves (rendered by 
 
 The same domain rigor applies to **navigation and chips**. Static-issue rows resolve their jump target domain-first: the row's `pipeRef` domain constrains the declaring-file scan (`resolveDeclaringFile`), so a colliding `[pipe.<code>]` header in another domain's file is never opened; the same constraint applies in `crossFileDiagnostics`' declaration-scan fallback when a validator error carries `domain_code` (no domain match on a collision → the error falls back to the primary file rather than a guessed sibling). The issue chip mirrors the owning-file-label policy: `pipe.<code>` when the error lives in the shown file's domain (or when either domain is unknown), `pipe.<domain>.<code>` when it lives in another domain.
 
+## Data nodes and the detail panel
+
+Clicking a data node opens `GraphViewer`'s detail panel, and since `@pipelex/mthds-ui` v0.20.0 that panel shows **the concept's structure table and no data tab**. That is the renderer's documented floor, not a bug here: the panel renders a payload only when the host hands it both `contracts` (the `pipe_io_contracts` view) and `outputForm` (the `output_form` view), because a descriptor without its schema — or a schema without its descriptor — would leave the panel guessing what the value *is*, which is the failure `output_form` exists to end. This extension builds its GraphSpec statically from the bundle text and never asks the validator for a view, so it has neither artifact and passes neither.
+
+For a `.mthds` editor that costs nothing — a static graph has no run data to show, so the floor is the right rendering rather than a missing feature. For `Pipelex: Show GraphSpec JSON` it is a genuine gap: a graphspec dumped from a real run carries its stuff payloads, the deleted `StuffViewer` used to render them, and the panel now shows a structure table where it used to show the value.
+
+Wiring the data tab later is two things: ask the backend for the `pipe_io_contracts` and `output_form` views, and forward both on the `setData` `config`. It used to be three — the third being to hand-copy the form kernel's stylesheet into the webview — and that step is gone now that esbuild bundles the renderer's CSS from the import graph (see below).
+
+## Webview assets
+
+The panel serves four files out of `dist/pipelex/graph/webview/`, and only two of them are copied:
+
+| File | Where it comes from |
+|---|---|
+| `graph.js` | esbuild bundles `webview/adapter.ts` — React, `@xyflow/react`, elkjs and `@pipelex/mthds-ui` included — as one minified IIFE |
+| `graph.css` | esbuild emits it beside `graph.js` from the **same import graph**: `@pipelex/mthds-ui/graph/react` imports its own sheets, so whatever it ships arrives here with every `@import` resolved |
+| `shell.css` | the webview's own sheet — the page around the graph: `body`, `#app-container`, `#root`, and the three theme tokens those rules read. Copied, and linked *after* `graph.css` so it wins any tie |
+| `graph.html` | copied, with three `{{…}}` placeholders the panel substitutes with `asWebviewUri` values |
+
+Two details are load-bearing. **The extension's own sheet is called `shell.css`, not `graph.css`**, because esbuild names the emitted stylesheet after the JS bundle: while the two shared a basename the build worked around the collision by switching CSS bundling off (`loader: { ".css": "empty" }`) and hand-copying each of mthds-ui's sheets instead — an arrangement in which a sheet added upstream went silently missing and a sheet deleted upstream broke the build outright, which is exactly what the removal of `StuffViewer.css` did. And **the bundle is minified**, because elkjs ships pre-minified GWT output that esbuild otherwise re-prints at more than twice its size; `minify: true` takes the webview bundle from 5353 KB to 2190 KB.
+
+`shell.css` deliberately defines **only** the tokens its own rules read (`--color-bg`, `--color-text`, `--font-sans`, per VS Code theme class). It is not the graph's palette and cannot be: `GraphViewer` applies the full light/dark token set as inline styles on its own `.react-flow-container`, and mthds-ui's `graph-core.css` defines the same custom-property names on that container as well. The container is an ancestor of every node, edge and panel, so a definition made on `:root` or `body` out here is shadowed for everything inside it. A host-side palette therefore does nothing — which is the same reason the host must never send `config.paletteColors` — and the ~40-token map this file used to carry was inert in every one of its four theme blocks.
+
+The pre-graph message views (loading, Graph Error) do not use this sheet at all: each is a standalone HTML document with its own inline `<style>` reading `--vscode-*` variables directly.
+
+The remaining silent failure — esbuild emitting no stylesheet at all, leaving the webview unstyled with nothing thrown — is asserted against at the end of `scripts/build.mjs`, and the substitution of every `graph.html` placeholder is asserted in `methodGraphPanel.test.ts`.
+
 ## Message protocol
 
 Two additions to the host ↔ webview protocol:

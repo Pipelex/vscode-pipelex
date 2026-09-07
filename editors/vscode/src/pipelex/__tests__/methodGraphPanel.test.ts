@@ -23,7 +23,10 @@ const mockState = vi.hoisted(() => {
         spawnCliResult: { stdout: '', stderr: '' },
         spawnCliResolve: null as ((v: any) => void) | null,
         spawnCliReject: null as ((e: any) => void) | null,
-        readFileSyncResult: '<!DOCTYPE html><html><head></head><body>PIPELEX_CSP_NONCE<div id="root"></div><script src="{{GRAPH_JS_URI}}"></script></body></html>',
+        // Mirrors the real graph.html: every placeholder the panel substitutes,
+        // so a placeholder that stops being filled in shows up as an unresolved
+        // `{{…}}` in the rendered html rather than as an unstyled webview.
+        readFileSyncResult: '<!DOCTYPE html><html><head><link rel="stylesheet" href="{{GRAPH_CSS_URI}}"><link rel="stylesheet" href="{{SHELL_CSS_URI}}"></head><body>PIPELEX_CSP_NONCE<div id="root"></div><script src="{{GRAPH_JS_URI}}"></script></body></html>',
         showWarningMessage: vi.fn(),
         executeCommand: vi.fn(),
         cancelAllInflightSpy: vi.fn(),
@@ -222,7 +225,18 @@ vi.mock('../graph/graphConfig', async (importOriginal) => {
     return { ...actual, resolveGraphConfig: vi.fn(actual.resolveGraphConfig) };
 });
 
+// Pass-through wrapper: the real static-graph builder by default, so every test
+// but one exercises the genuine article. The error-path test wedges a throw in
+// here rather than feeding the builder a payload known to crash it — an input
+// that crashes one mthds-ui release gets fixed in the next, and the test would
+// then silently stop covering the catch it exists for.
+vi.mock('@pipelex/mthds-ui/static-graph', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@pipelex/mthds-ui/static-graph')>();
+    return { ...actual, buildStaticGraphSpecFromToml: vi.fn(actual.buildStaticGraphSpecFromToml) };
+});
+
 // ---------- Import SUT after mocks ----------
+import { buildStaticGraphSpecFromToml } from '@pipelex/mthds-ui/static-graph';
 import { MethodGraphPanel } from '../graph/methodGraphPanel';
 import { BackendError } from '../validation/backend';
 
@@ -1682,14 +1696,42 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it('the webview html resolves every asset placeholder', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri, VALID_BUNDLE);
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+
+        const html = mockState.mockWebview.html;
+        // The renderer's bundled sheet and the webview's own shell, in that
+        // order — the shell's theme tokens and page chrome win any tie.
+        expect(html).toContain('/dist/pipelex/graph/webview/graph.css');
+        expect(html).toContain('/dist/pipelex/graph/webview/shell.css');
+        expect(html).toContain('/dist/pipelex/graph/webview/graph.js');
+        expect(html.indexOf('graph.css')).toBeLessThan(html.indexOf('shell.css'));
+        // An unsubstituted placeholder is a dead <link>: the webview renders
+        // unstyled and nothing throws, which is why it is asserted rather than
+        // left to be noticed by eye.
+        expect(html).not.toMatch(/\{\{[A-Z_]+\}\}/);
+        panel.dispose();
+    });
+
     it('a static-builder throw falls back to the Graph Error view instead of an unhandled rejection', async () => {
         const output = mockOutput();
         const panel = new MethodGraphPanel(output, makeExtensionUri());
         const uri = makeUri('/project/methods/main.mthds');
-        // Valid TOML that crashes the current builder: a `domain` named after an
-        // Object.prototype member (observed mthds-ui 0.14.0 bug — plain-object
-        // domain map). The wrap must catch ANY builder throw, whatever the bug.
-        seedBundle(uri, VALID_BUNDLE.replace('domain = "demo"', 'domain = "constructor"'));
+        // The builder is documented never-throwing on content, so the throw is
+        // injected rather than provoked. It used to be provoked, with a `domain`
+        // named after an Object.prototype member (the mthds-ui 0.14.0 plain-object
+        // domain map) — and mthds-ui's move to null-prototype records fixed that
+        // input, leaving this test green against a builder that no longer threw.
+        // What the wrap owes is catching ANY builder throw, so that is what is
+        // asserted; a builder bug is mthds-ui's to cover, not ours to reproduce.
+        vi.mocked(buildStaticGraphSpecFromToml).mockImplementationOnce(() => {
+            throw new Error('builder exploded');
+        });
+        seedBundle(uri, VALID_BUNDLE);
         panel.show(uri);
         await new Promise(r => setTimeout(r, 30));
 
@@ -2196,113 +2238,5 @@ describe('MethodGraphPanel', () => {
 
         const uri = makeUri('/project/file.mthds');
         expect(() => mockState.onDocChangeHandler!({ document: { uri, isDirty: false } })).not.toThrow();
-    });
-
-    // --- openExternally message handling ---
-
-    it('openExternally opens https URLs via vscode.env.openExternal', async () => {
-        const vscode = await import('vscode');
-        const output = mockOutput();
-        const panel = new MethodGraphPanel(output, makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 50));
-
-        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
-        messageHandler({ type: 'openExternally', url: 'https://example.com/foo.pdf' });
-        await new Promise(r => setTimeout(r, 10));
-
-        expect(vscode.env.openExternal).toHaveBeenCalledTimes(1);
-        const calledWith = vi.mocked(vscode.env.openExternal).mock.calls[0][0] as any;
-        expect(calledWith.scheme).toBe('https');
-        panel.dispose();
-    });
-
-    it('openExternally opens http URLs', async () => {
-        const vscode = await import('vscode');
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 50));
-
-        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
-        messageHandler({ type: 'openExternally', url: 'http://example.com/foo.pdf' });
-        await new Promise(r => setTimeout(r, 10));
-
-        expect(vscode.env.openExternal).toHaveBeenCalledTimes(1);
-        panel.dispose();
-    });
-
-    it('openExternally refuses non-http(s) schemes (file:)', async () => {
-        const vscode = await import('vscode');
-        const output = mockOutput();
-        const panel = new MethodGraphPanel(output, makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 50));
-
-        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
-        messageHandler({ type: 'openExternally', url: 'file:///etc/passwd' });
-        await new Promise(r => setTimeout(r, 10));
-
-        expect(vscode.env.openExternal).not.toHaveBeenCalled();
-        expect(output.appendLine).toHaveBeenCalledWith(
-            expect.stringContaining('refused')
-        );
-        panel.dispose();
-    });
-
-    it('openExternally refuses vscode: scheme', async () => {
-        const vscode = await import('vscode');
-        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 50));
-
-        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
-        messageHandler({ type: 'openExternally', url: 'vscode://settings' });
-        await new Promise(r => setTimeout(r, 10));
-
-        expect(vscode.env.openExternal).not.toHaveBeenCalled();
-        panel.dispose();
-    });
-
-    it('openExternally logs when openExternal returns false', async () => {
-        const vscode = await import('vscode');
-        vi.mocked(vscode.env.openExternal).mockResolvedValueOnce(false as any);
-
-        const output = mockOutput();
-        const panel = new MethodGraphPanel(output, makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 50));
-
-        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
-        messageHandler({ type: 'openExternally', url: 'https://example.com/x.pdf' });
-        await new Promise(r => setTimeout(r, 10));
-
-        expect(output.appendLine).toHaveBeenCalledWith(
-            expect.stringContaining('OS declined')
-        );
-        panel.dispose();
-    });
-
-    it('openExternally logs and skips when URL is unparseable', async () => {
-        const vscode = await import('vscode');
-        const output = mockOutput();
-        const panel = new MethodGraphPanel(output, makeExtensionUri());
-        const uri = makeUri('/project/file.mthds');
-        panel.show(uri);
-        await new Promise(r => setTimeout(r, 50));
-
-        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
-        messageHandler({ type: 'openExternally', url: 'not a url' });
-        await new Promise(r => setTimeout(r, 10));
-
-        expect(vscode.env.openExternal).not.toHaveBeenCalled();
-        expect(output.appendLine).toHaveBeenCalledWith(
-            expect.stringContaining('invalid URL')
-        );
-        panel.dispose();
     });
 });

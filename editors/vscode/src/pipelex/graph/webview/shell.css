@@ -1,0 +1,61 @@
+/* The webview's shell: the page around the graph, and the VS Code theme
+   detection that colours it.
+
+   It used to carry a ~40-token palette (surfaces, borders, pipe/stuff/batch
+   hues, radii, shadows) in each of the four theme blocks below. None of it
+   reached the graph. `GraphViewer` owns its palette: it applies the full light
+   or dark token set as inline styles on its own `.react-flow-container`, and
+   mthds-ui's `graph-core.css` defines the same custom-property names on that
+   container too — an ancestor of every node, edge and panel — so a definition
+   made out here on `:root` or `body` is shadowed for everything inside. The
+   only tokens that ever resolved are the three this file's own rules read. */
+
+/* Dark theme (default / vscode-dark) */
+:root, body.vscode-dark {
+    --color-bg: #1e1e1e;
+    --color-text: #f1f5f9;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Light theme (vscode-light) */
+body.vscode-light {
+    --color-bg: #f8fafc;
+    --color-text: #1e293b;
+}
+
+/* High contrast */
+body.vscode-high-contrast {
+    --color-bg: #000000;
+    --color-text: #ffffff;
+}
+
+/* High contrast light */
+body.vscode-high-contrast-light {
+    --color-bg: #ffffff;
+    --color-text: #000000;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100vw;
+}
+body {
+    font-family: var(--font-sans);
+    height: 100vh;
+    overflow: hidden;
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+#app-container {
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+}
+#root {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}

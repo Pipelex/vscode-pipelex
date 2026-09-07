@@ -100,14 +100,6 @@ function onThemeChange(mode: GraphThemeMode) {
     vscode.postMessage({ type: 'themeModeChanged', mode });
 }
 
-// VS Code webviews run in Electron, which ships without Chromium's PDFium
-// plugin (electron/electron#12337). `<embed type="application/pdf">` and
-// `window.open` therefore don't work — route through the extension host
-// (vscode.env.openExternal) via postMessage instead.
-function onOpenExternally(url: string, filename?: string) {
-    vscode.postMessage({ type: 'openExternally', url, filename });
-}
-
 // A validation issue row was clicked. The host resolves the index against its
 // retained per-issue jump targets (never a path from the webview) and opens the
 // owning file — the same index-based mechanism as always.
@@ -233,8 +225,6 @@ function App() {
         onNavigateToPipe,
         onNodeSelect,
         onReactFlowInit,
-        canEmbedPdf: false,
-        onOpenExternally,
         // The toolbar validation widget: hidden while currentValidation is null
         // (GraphViewer treats an undefined validationState as "feature off").
         validationState: currentValidation?.state,
