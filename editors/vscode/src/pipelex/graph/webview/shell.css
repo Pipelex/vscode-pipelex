@@ -8,7 +8,12 @@
    mthds-ui's `graph-core.css` defines the same custom-property names on that
    container too — an ancestor of every node, edge and panel — so a definition
    made out here on `:root` or `body` is shadowed for everything inside. The
-   only tokens that ever resolved are the three this file's own rules read. */
+   only tokens that ever resolved out here are the three this file's own rules
+   read.
+
+   The form kernel's tokens are the one set this file does define for the
+   renderer, and they are declared ON `.react-flow-container` for exactly the
+   reason above — see the block further down. */
 
 /* Dark theme (default / vscode-dark) */
 :root, body.vscode-dark {
@@ -33,6 +38,74 @@ body.vscode-high-contrast {
 body.vscode-high-contrast-light {
     --color-bg: #ffffff;
     --color-text: #000000;
+}
+
+/* ─── The form kernel's token map ────────────────────────────────────────── */
+/* The detail panel renders a data node's value through `@pipelex/mthds-form`'s
+   controls, which are Tailwind classes over shadcn semantic tokens. mthds-ui
+   bundles the kernel's stylesheet (wrapped in `@layer mthds-form`) but
+   deliberately NOT its `theme.css`, because that file defines the very tokens a
+   shadcn host already owns and importing it would let the kernel repaint the
+   host's palette. Supplying them is therefore the host's lane, and this is the
+   host.
+
+   Nothing here is cosmetic tidying. Since kernel 0.8.0 the sheet is a Tailwind
+   4 build holding whole colours — `background-color: var(--primary)`, with no
+   fallback — so an undefined token does not degrade, it makes the declaration
+   INVALID and the browser discards it. That is the quietest failure CSS has:
+   green build, token inspectable, control silently falling back to transparent
+   or to the initial `canvastext`.
+
+   Defined on `.react-flow-container` rather than on `:root` or `body`, and from
+   the GRAPH's palette rather than from VS Code's theme colours, because that is
+   what makes the panel follow the in-graph light/dark toggle. GraphViewer
+   applies its resolved palette (`getPaletteForTheme`) as inline styles on that
+   exact element and the detail panel is a child of it, so each `var()` below
+   re-resolves the instant the toggle flips — which VS Code's `body.vscode-*`
+   classes cannot see, since they only track the editor's own theme. The
+   container is also an ancestor of everything the kernel renders here: the
+   controls use no Radix portals on the result path, so nothing escapes to
+   `body` and loses these definitions.
+
+   `src/pipelex/__tests__/formKernelTokens.test.ts` reads the kernel's shipped
+   stylesheet and holds this block to every token it actually reads, so a kernel
+   upgrade that reaches for a new one fails loudly here instead of quietly
+   dropping a rule in the panel. */
+.react-flow-container {
+    /* Surfaces and the text on them. */
+    --background: var(--surface-panel);
+    --foreground: var(--text-default);
+    --card: var(--surface-elevated);
+    --muted: var(--surface-sunken);
+    --muted-foreground: var(--text-muted);
+
+    /* A popover is a dropdown laid over content, so it takes the opaque panel
+       surface rather than `--surface-overlay`, which is deliberately
+       translucent and would let the graph show through a menu. */
+    --popover: var(--surface-panel);
+    --popover-foreground: var(--text-default);
+
+    /* shadcn's `--accent` pair is the hover/highlight surface for a row or a
+       menu item, not the brand colour — hence the elevated hover surface. */
+    --accent: var(--surface-elevated-hover);
+    --accent-foreground: var(--text-primary);
+
+    /* `--primary` carries the kernel's active/selected state; `--destructive`
+       is only ever a text, border or ring colour in this sheet, never a fill,
+       so the palette's error hue reads correctly at both themes. */
+    --primary: var(--color-accent-strong);
+    --destructive: var(--color-error);
+
+    /* Lines. `--input` is read as BOTH a border and a faint field fill, so it
+       takes the same value as `--border`: legible as a hairline in either
+       theme, and an unobtrusive box when it is a background. */
+    --border: var(--border-default);
+    --input: var(--border-default);
+    --ring: var(--focus-ring);
+
+    /* A length, not a colour. The graph's own cards sit at 6-8px; 6px keeps the
+       kernel's controls from looking rounder than the panel holding them. */
+    --radius: 6px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }

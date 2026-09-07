@@ -46,6 +46,12 @@ const mockState = vi.hoisted(() => {
         // Per-fsPath file contents for the URI-aware openTextDocument mock, so a
         // resolved sibling opens with real text the faithful findTableHeader can scan.
         docContents: {} as Record<string, string>,
+        // The `/validate` artifacts readRunArtifacts finds beside a graphspec.
+        // The reader has its own suite (runArtifacts.test.ts) against real files;
+        // here only what the panel does with its result is under test.
+        runArtifacts: undefined as any,
+        // Every graphspec path readRunArtifacts was asked about.
+        runArtifactsCalls: [] as string[],
         // Event handler captures
         onSaveHandler: null as ((doc: any) => void) | null,
         onEditorChangeHandler: null as ((editor: any) => void) | null,
@@ -176,6 +182,13 @@ vi.mock('../validation/processUtils', () => ({
         return Promise.resolve(mockState.spawnCliResult);
     }),
     cancelAllInflight: (...args: any[]) => mockState.cancelAllInflightSpy(...args),
+}));
+
+vi.mock('../graph/runArtifacts', () => ({
+    readRunArtifacts: vi.fn(async (fsPath: string) => {
+        mockState.runArtifactsCalls.push(fsPath);
+        return mockState.runArtifacts;
+    }),
 }));
 
 vi.mock('fs', () => ({
@@ -309,6 +322,8 @@ describe('MethodGraphPanel', () => {
         mockState.openTextDocuments = [];
         mockState.docContents = {};
         mockState.activeColorThemeKind = 2; // ColorThemeKind.Dark
+        mockState.runArtifacts = undefined;
+        mockState.runArtifactsCalls = [];
     });
 
     // --- Bug B: Filename extraction ---
@@ -2021,6 +2036,63 @@ describe('MethodGraphPanel', () => {
         expect(pending.type).toBe('setData');
         expect(pending.sourceKind).toBe('graphspec-json');
         expect(pending.validation).toBeUndefined();
+        panel.dispose();
+    });
+
+    // --- The data view: the /validate artifacts a run writes beside its graphspec ---
+
+    it('setData carries the artifacts found beside the graphspec', async () => {
+        const uri = makeUri('/project/run/graphspec.json');
+        mockState.openTextDocuments = [{
+            uri,
+            getText: () => JSON.stringify({ meta: { format: 'mthds' }, nodes: [], edges: [] }),
+        }];
+        mockState.runArtifacts = {
+            contracts: { 'domain.pipe_a': { inputs: {}, output: {} } },
+            outputForm: { 'domain.pipe_a': { field: {} } },
+            inputForm: { 'domain.pipe_a': { fields: [] } },
+        };
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.showGraphspecJson(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const pending = (panel as any).pendingData;
+        expect(pending.type).toBe('setData');
+        expect(pending.artifacts).toEqual(mockState.runArtifacts);
+        // The reader is asked about the graphspec itself; it derives the
+        // directory, so the panel must never pre-resolve one for it.
+        expect(mockState.runArtifactsCalls).toEqual(['/project/run/graphspec.json']);
+        panel.dispose();
+    });
+
+    // GraphViewer renders a value only when BOTH contracts and outputForm
+    // arrive, so an absent pair must reach it as a plain undefined rather than
+    // as an empty object that would read as artifacts with no pipes in them.
+    it('setData carries no artifacts when the graphspec has none beside it', async () => {
+        const uri = makeUri('/project/run/graphspec.json');
+        mockState.openTextDocuments = [{
+            uri,
+            getText: () => JSON.stringify({ meta: { format: 'mthds' }, nodes: [], edges: [] }),
+        }];
+        mockState.runArtifacts = undefined;
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.showGraphspecJson(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        expect((panel as any).pendingData.artifacts).toBeUndefined();
+        panel.dispose();
+    });
+
+    // A .mthds view builds its graph statically from bundle text: there is no
+    // run data to show, so the reader is never even consulted for one.
+    it('the .mthds path never looks for run artifacts', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/bundle.mthds'));
+        await new Promise(r => setTimeout(r, 30));
+
+        expect(mockState.runArtifactsCalls).toEqual([]);
         panel.dispose();
     });
 

@@ -14,6 +14,8 @@ import { CliValidationBackend } from '../validation/cliValidationBackend';
 import { findTableHeader, findTableHeaderInLines } from '../validation/sourceLocator';
 import { resolveGraphConfig, activeEditorGraphTheme } from './graphConfig';
 import { parseGraphspecFile } from './graphspecDetector';
+import { readRunArtifacts } from './runArtifacts';
+import type { RunArtifacts } from './runArtifacts';
 import { escapeHtml } from '../htmlEscape';
 import { describeBackendErrorIssue, parseStaticIssueContext, validationErrorsToIssues } from './validationStatus';
 import type { GraphValidationIssue, GraphValidationPayload } from './validationStatus';
@@ -932,7 +934,18 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const showControllers = pipelexConfig.get<boolean>('graph.showControllers', true);
         const foldMode = pipelexConfig.get<string>('graph.foldMode', 'folded');
 
-        await this.sendGraphspecToWebview(uri, graphspec, direction, showControllers, foldMode, seq);
+        // The artifacts that let the detail panel show a data node's VALUE, read
+        // from the graphspec's own directory. Only this path looks for them: a
+        // `.mthds` view's graph is built statically from bundle text and has no
+        // run data to render (see runArtifacts.ts).
+        const artifacts = await readRunArtifacts(uri.fsPath, msg => this.output.appendLine(msg));
+
+        // Re-check after the await, exactly as the read above does: a newer
+        // render or a file switch while the artifacts loaded must win.
+        if (this.currentUri?.toString() !== uri.toString()) return;
+        if (seq !== this.renderSequence) return;
+
+        await this.sendGraphspecToWebview(uri, graphspec, direction, showControllers, foldMode, seq, artifacts);
     }
 
     private async sendGraphspecToWebview(
@@ -942,6 +955,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         showControllers: boolean,
         foldMode: string,
         seq: number,
+        artifacts?: RunArtifacts,
     ): Promise<boolean> {
         if (!this.panel) return false;
 
@@ -978,6 +992,14 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             // paints it without waiting for a follow-up message; graphspec-json
             // views never validate, so the widget stays hidden there.
             validation: this.sourceKind === 'mthds' ? this.currentValidation : undefined,
+            // The `/validate` artifacts that let the detail panel render a data
+            // node's value. Deliberately top-level rather than inside `config`:
+            // `config` is the render config the adapter forwards wholesale as
+            // GraphViewer's `config` prop, while these are three separate props
+            // of their own (`contracts`, `outputForm`, `inputForm`). Undefined
+            // whenever the pair is not on disk, which is GraphViewer's
+            // documented no-data-view floor rather than an error.
+            artifacts,
             config: {
                 direction: dagreDirection,
                 showControllers,
