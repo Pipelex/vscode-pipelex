@@ -14,6 +14,8 @@ import { CliValidationBackend } from '../validation/cliValidationBackend';
 import { findTableHeader, findTableHeaderInLines } from '../validation/sourceLocator';
 import { resolveGraphConfig, activeEditorGraphTheme } from './graphConfig';
 import { parseGraphspecFile } from './graphspecDetector';
+import { readRunArtifacts } from './runArtifacts';
+import type { RunArtifacts } from './runArtifacts';
 import { escapeHtml } from '../htmlEscape';
 import { describeBackendErrorIssue, parseStaticIssueContext, validationErrorsToIssues } from './validationStatus';
 import type { GraphValidationIssue, GraphValidationPayload } from './validationStatus';
@@ -932,7 +934,18 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const showControllers = pipelexConfig.get<boolean>('graph.showControllers', true);
         const foldMode = pipelexConfig.get<string>('graph.foldMode', 'folded');
 
-        await this.sendGraphspecToWebview(uri, graphspec, direction, showControllers, foldMode, seq);
+        // The artifacts that let the detail panel show a data node's VALUE, read
+        // from the graphspec's own directory. Only this path looks for them: a
+        // `.mthds` view's graph is built statically from bundle text and has no
+        // run data to render (see runArtifacts.ts).
+        const artifacts = await readRunArtifacts(uri.fsPath, msg => this.output.appendLine(msg));
+
+        // Re-check after the await, exactly as the read above does: a newer
+        // render or a file switch while the artifacts loaded must win.
+        if (this.currentUri?.toString() !== uri.toString()) return;
+        if (seq !== this.renderSequence) return;
+
+        await this.sendGraphspecToWebview(uri, graphspec, direction, showControllers, foldMode, seq, artifacts);
     }
 
     private async sendGraphspecToWebview(
@@ -942,6 +955,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         showControllers: boolean,
         foldMode: string,
         seq: number,
+        artifacts?: RunArtifacts,
     ): Promise<boolean> {
         if (!this.panel) return false;
 
@@ -978,6 +992,14 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             // paints it without waiting for a follow-up message; graphspec-json
             // views never validate, so the widget stays hidden there.
             validation: this.sourceKind === 'mthds' ? this.currentValidation : undefined,
+            // The `/validate` artifacts that let the detail panel render a data
+            // node's value. Deliberately top-level rather than inside `config`:
+            // `config` is the render config the adapter forwards wholesale as
+            // GraphViewer's `config` prop, while these are three separate props
+            // of their own (`contracts`, `outputForm`, `inputForm`). Undefined
+            // whenever the pair is not on disk, which is GraphViewer's
+            // documented no-data-view floor rather than an error.
+            artifacts,
             config: {
                 direction: dagreDirection,
                 showControllers,
@@ -1041,20 +1063,14 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             return undefined;
         }
 
-        const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph.css'));
+        // Two sheets: the renderer's, which esbuild bundles out of graph.js's
+        // import graph, and the webview's own shell.
+        const graphCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph.css'));
+        const shellCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'shell.css'));
         const jsUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph.js'));
-        const xyflowCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'xyflow.css'));
-        const graphCoreCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph-core.css'));
-        const graphToolbarCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'graph-toolbar.css'));
-        const stuffViewerCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'stuff-viewer.css'));
-        const detailPanelCssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, 'detail-panel.css'));
 
-        html = html.replace('{{XYFLOW_CSS_URI}}', xyflowCssUri.toString());
-        html = html.replace('{{GRAPH_CORE_CSS_URI}}', graphCoreCssUri.toString());
-        html = html.replace('{{GRAPH_TOOLBAR_CSS_URI}}', graphToolbarCssUri.toString());
-        html = html.replace('{{GRAPH_CSS_URI}}', cssUri.toString());
-        html = html.replace('{{STUFF_VIEWER_CSS_URI}}', stuffViewerCssUri.toString());
-        html = html.replace('{{DETAIL_PANEL_CSS_URI}}', detailPanelCssUri.toString());
+        html = html.replace('{{GRAPH_CSS_URI}}', graphCssUri.toString());
+        html = html.replace('{{SHELL_CSS_URI}}', shellCssUri.toString());
         html = html.replace('{{GRAPH_JS_URI}}', jsUri.toString());
 
         return html;
@@ -1149,32 +1165,6 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             if (this.sourceKind === 'graphspec-json') return;
             void this.navigateToError(message.index);
             return;
-        }
-        if (message.type === 'openExternally' && typeof message.url === 'string') {
-            // Webviews can't `window.open` or render <embed type="application/pdf">,
-            // so the StuffViewer routes both through here. Hand off to the OS via
-            // VS Code so the user gets their default browser/PDF viewer.
-            this.openExternally(message.url);
-        }
-    }
-
-    private async openExternally(url: string) {
-        let uri: vscode.Uri;
-        try {
-            uri = vscode.Uri.parse(url, true);
-        } catch (err: any) {
-            this.output.appendLine(`openExternally: invalid URL "${url}" — ${err.message ?? err}`);
-            return;
-        }
-        // Only http(s) — refuse file:, vscode:, and other registered-handler schemes
-        // that could be triggered by a malicious or accidental GraphSpec payload.
-        if (uri.scheme !== 'http' && uri.scheme !== 'https') {
-            this.output.appendLine(`openExternally: refused non-http(s) URL "${url}" (scheme: ${uri.scheme})`);
-            return;
-        }
-        const opened = await vscode.env.openExternal(uri);
-        if (!opened) {
-            this.output.appendLine(`openExternally: OS declined to open "${url}"`);
         }
     }
 

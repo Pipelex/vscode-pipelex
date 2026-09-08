@@ -9,6 +9,12 @@ import type {
     ValidationState,
 } from '@pipelex/mthds-ui';
 import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
+// The form kernel's types, reached THROUGH mthds-ui rather than from
+// `@pipelex/mthds-form` directly. The kernel carries React context, so a host
+// that declares its own dependency on it can end up with two copies and two
+// context identities; mthds-ui re-exports the kernel from `./form` precisely so
+// a consumer never has to name it. Type-only here, so nothing is emitted.
+import type { PipeIOContracts, OutputForm, InputForm } from '@pipelex/mthds-ui/form';
 
 // VS Code webview API
 const vscode = acquireVsCodeApi();
@@ -49,6 +55,22 @@ let lastReportedMode: GraphThemeMode | undefined;
 // pattern — no re-layout, no viewport reset). Null keeps the widget hidden
 // (graphspec-json views, hosts without validation).
 let currentValidation: { state: ValidationState; issues: ValidationIssue[] } | null = null;
+
+// The `/validate` artifacts the host read from beside a run's graphspec, and
+// what the detail panel needs before it can show a data node's VALUE rather
+// than only the concept's structure table. `contracts` names the payload's
+// shape, `outputForm` says what the result IS, and the optional `inputForm`
+// covers the method's own inputs, which no pipe produced.
+//
+// Null on every view whose artifacts the host does not hold — a `.mthds` static
+// graph, or a run written before the runtime emitted them. That is mthds-ui's
+// documented floor, not a degraded mode: a data tab opening onto an empty pane
+// would read as data that failed to load.
+let currentArtifacts: {
+    contracts?: PipeIOContracts;
+    outputForm?: OutputForm;
+    inputForm?: InputForm;
+} | null = null;
 
 // Held so we can preserve the viewport across same-file refreshes.
 let reactFlowInstance: any = null;
@@ -98,14 +120,6 @@ function onThemeChange(mode: GraphThemeMode) {
     if (mode === lastReportedMode) return;
     lastReportedMode = mode;
     vscode.postMessage({ type: 'themeModeChanged', mode });
-}
-
-// VS Code webviews run in Electron, which ships without Chromium's PDFium
-// plugin (electron/electron#12337). `<embed type="application/pdf">` and
-// `window.open` therefore don't work — route through the extension host
-// (vscode.env.openExternal) via postMessage instead.
-function onOpenExternally(url: string, filename?: string) {
-    vscode.postMessage({ type: 'openExternally', url, filename });
 }
 
 // A validation issue row was clicked. The host resolves the index against its
@@ -171,6 +185,10 @@ function handleMessage(event: { data: any }) {
         currentGraphspec = message.graphspec || null;
         currentConfig = message.config || {};
         currentValidation = message.validation ?? null;
+        // Reset on every setData, so switching from a run that has artifacts to
+        // one that has none drops back to the structure table instead of
+        // rendering the new graph's payloads against the old method's contracts.
+        currentArtifacts = message.artifacts ?? null;
         if (message.config?.systemTheme) {
             currentSystemTheme = message.config.systemTheme;
         }
@@ -233,13 +251,17 @@ function App() {
         onNavigateToPipe,
         onNodeSelect,
         onReactFlowInit,
-        canEmbedPdf: false,
-        onOpenExternally,
         // The toolbar validation widget: hidden while currentValidation is null
         // (GraphViewer treats an undefined validationState as "feature off").
         validationState: currentValidation?.state,
         validationIssues: currentValidation?.issues,
         onValidationIssueClick,
+        // The data view. GraphViewer renders a value only when BOTH `contracts`
+        // and `outputForm` arrive, so passing them separately is safe: the host
+        // sends the pair or nothing (see runArtifacts.ts).
+        contracts: currentArtifacts?.contracts,
+        outputForm: currentArtifacts?.outputForm,
+        inputForm: currentArtifacts?.inputForm,
     });
 }
 

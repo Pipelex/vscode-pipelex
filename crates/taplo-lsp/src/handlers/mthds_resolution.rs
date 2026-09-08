@@ -161,13 +161,14 @@ pub(crate) fn extract_string_value(position_info: &PositionInfo) -> String {
 
 /// Check whether the cursor is on a `model` or `model_to_structure` string value.
 ///
-/// Returns `false` if the token is inside an `inputs = { … }` inline table,
-/// since an input parameter named `model` is a concept reference, not a model field.
+/// Returns `false` if the token is the concept of an input slot, since an input slot
+/// named `model` is a concept reference, not a model field — in either slot form,
+/// `inputs = { model = "X" }` and `inputs = { model = { concept = "X" } }`.
 pub(crate) fn is_model_field(query: &Query) -> bool {
     let Some(position_info) = find_string_position_info(query) else {
         return false;
     };
-    if is_inside_inputs_inline_table(&position_info.syntax) {
+    if is_input_slot_concept(&position_info.syntax) {
         return false;
     }
     let Some(entry_key_node) = query.entry_key() else {
@@ -209,7 +210,7 @@ pub(crate) fn classify_reference(query: &Query) -> Option<ClassifiedReference> {
         ReferenceKind::Pipe
     } else if matches!(key_text.as_str(), "output" | "refines") {
         ReferenceKind::Concept
-    } else if is_inside_inputs_inline_table(&position_info.syntax) {
+    } else if is_input_slot_concept(&position_info.syntax) {
         ReferenceKind::Concept
     } else {
         return None;
@@ -238,9 +239,10 @@ pub(crate) fn classify_reference(query: &Query) -> Option<ClassifiedReference> {
 /// Resolve a reference at the cursor position in the DOM.
 ///
 /// Checks if the cursor is on a STRING token inside a reference field
-/// (`pipe`, `main_pipe`, `default_pipe_code`, `output`, `refines`, or an
-/// `inputs = { ... }` inline table value), extracts the reference name,
-/// and looks up the corresponding `pipe.<name>` or `concept.<name>` in the DOM.
+/// (`pipe`, `main_pipe`, `default_pipe_code`, `output`, `refines`, or the concept
+/// of an `inputs = { ... }` slot in either form — see [`is_input_slot_concept`]),
+/// extracts the reference name, and looks up the corresponding `pipe.<name>` or
+/// `concept.<name>` in the DOM.
 pub(crate) fn resolve_reference(dom: &Node, query: &Query) -> Option<ResolvedReference> {
     let classified = classify_reference(query)?;
 
@@ -285,39 +287,79 @@ fn strip_concept_qualifiers(name: &str) -> String {
     without_domain.to_string()
 }
 
-/// Check whether a syntax token sits inside an `inputs = { … }` inline table.
+/// Check whether a syntax token is the concept of a pipe input slot.
 ///
-/// Expected ancestry: STRING → VALUE → ENTRY (inner) → INLINE_TABLE → VALUE → ENTRY (outer)
-/// where the outer ENTRY's KEY is `inputs`.
-pub(crate) fn is_inside_inputs_inline_table(token: &taplo::syntax::SyntaxToken) -> bool {
-    let inner_entry = token
-        .parent_ancestors()
-        .find(|n| n.kind() == SyntaxKind::ENTRY);
-    let Some(inner_entry) = inner_entry else {
-        return false;
-    };
+/// MTHDS gives a slot declaration two equivalent forms (`mthds-format.md`,
+/// "Input slot declarations"):
+///
+/// - the string form, `notes = "Text"`, where the slot's value *is* the concept;
+/// - the expanded form, `notes = { concept = "Text", hints = { intent = "prose" } }`,
+///   where the concept sits under the slot table's `concept` key.
+///
+/// A string is a concept reference in exactly those two positions, so this reads the
+/// chain of inline-table entry keys containing the token — innermost first, via
+/// [`inline_entry_chain`] — and accepts only two shapes:
+///
+/// - `[<slot>, inputs]` — the string form;
+/// - `[concept, <slot>, inputs]` — the expanded form.
+///
+/// Depth decides, not the key name. `inputs = { concept = "Text" }` is the string form
+/// of a slot that happens to be called `concept`, and still resolves; a `concept` key
+/// one level deeper never does. The narrowness is deliberate: a walk that merely looked
+/// for an `inputs` ancestor would also reach `inputs` from `hints = { intent = "prose" }`
+/// and offer goto-definition on a presentation hint, and it would misread whatever
+/// per-slot key the standard adds next the same way.
+pub(crate) fn is_input_slot_concept(token: &taplo::syntax::SyntaxToken) -> bool {
+    match inline_entry_chain(token).as_slice() {
+        [_slot, inputs] => inputs == "inputs",
+        [concept, _slot, inputs] => concept == "concept" && inputs == "inputs",
+        _ => false,
+    }
+}
 
-    let inline_table = inner_entry
-        .ancestors()
-        .find(|n| n.kind() == SyntaxKind::INLINE_TABLE);
-    let Some(inline_table) = inline_table else {
-        return false;
-    };
+/// Collect the keys of the `ENTRY` nodes containing `token`, innermost first,
+/// following only `VALUE → INLINE_TABLE → VALUE → ENTRY` steps.
+///
+/// The walk is strict on purpose: an `ARRAY` between the token and its entry, as in
+/// `xs = ["Foo"]`, breaks the chain, because an array is not a slot declaration form.
+/// The chain ends at the first entry that is not itself inside an inline table.
+fn inline_entry_chain(token: &taplo::syntax::SyntaxToken) -> Vec<String> {
+    let mut chain = Vec::new();
 
-    let outer_entry = inline_table
-        .ancestors()
-        .find(|n| n.kind() == SyntaxKind::ENTRY);
-    let Some(outer_entry) = outer_entry else {
-        return false;
-    };
+    let mut entry = token
+        .parent()
+        .filter(|n| n.kind() == SyntaxKind::VALUE)
+        .and_then(|value| value.parent())
+        .filter(|n| n.kind() == SyntaxKind::ENTRY);
 
-    outer_entry
+    while let Some(node) = entry {
+        chain.push(entry_key_text(&node));
+        entry = node
+            .parent()
+            .filter(|n| n.kind() == SyntaxKind::INLINE_TABLE)
+            .and_then(|table| table.parent())
+            .filter(|n| n.kind() == SyntaxKind::VALUE)
+            .and_then(|value| value.parent())
+            .filter(|n| n.kind() == SyntaxKind::ENTRY);
+    }
+
+    chain
+}
+
+/// The dotted key text of an `ENTRY` node, e.g. `"inputs"` or `"a.b"`.
+///
+/// Only `IDENT` tokens are read, so a quoted key yields an empty string.
+fn entry_key_text(entry: &taplo::syntax::SyntaxNode) -> String {
+    entry
         .children()
         .find(|n| n.kind() == SyntaxKind::KEY)
         .into_iter()
         .flat_map(|key| key.descendants_with_tokens())
         .filter_map(|t| t.into_token())
-        .any(|t| t.kind() == SyntaxKind::IDENT && t.text() == "inputs")
+        .filter(|t| t.kind() == IDENT)
+        .map(|t| t.text().to_string())
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 #[cfg(test)]

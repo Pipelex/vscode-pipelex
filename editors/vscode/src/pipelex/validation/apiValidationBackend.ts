@@ -52,7 +52,7 @@ export class ApiValidationBackend implements ValidationBackend {
         let client: PipelexApiClient;
         try {
             const token = await this.deps.getToken();
-            client = new PipelexApiClient({ baseUrl, apiToken: token });
+            client = new PipelexApiClient({ baseUrl, apiKey: token });
         } catch (err: unknown) {
             throw setupError(err, baseUrl);
         }
