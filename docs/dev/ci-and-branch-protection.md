@@ -31,7 +31,7 @@ Both job names — `make check` and `make test-all` — are the **required statu
 - **`toml_test`** — BurntSushi `toml-test` conformance against `taplo`.
 - **`test-msrv-{lib,bin,wasm}`** — builds against the MSRV (Rust 1.74).
 
-These run on push to `main` and on PRs **into `main` only** — they are kept off the `dev` PR path on purpose (the e2e wheel + MSRV + toml-test gate at the `dev`→`main` boundary, not on every feature PR). They are **not** required status checks. To require any of them, add its job name to the `required_status_checks` rule of the `dev` and `main` rulesets described below.
+These run on push to `main` and on PRs **into `main` only** — they are kept off the `dev` PR path on purpose (the e2e wheel + MSRV + toml-test gate at the `dev`→`main` boundary, not on every feature PR). They are **not** required status checks. To require any of them, add its job name to the `required_status_checks` rule of the **`main`** ruleset — `main` only, because `ci.yaml` never runs on a `dev` PR. Requiring one on `dev` too means widening `ci.yaml`'s `branches:` filter in the same move, or every feature PR hangs on a check that never reports.
 
 ## Rulesets on `dev`, `main` and `release/v*`
 
