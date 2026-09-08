@@ -747,9 +747,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pipelex/mthds-ui@npm:0.23.0":
-  version: 0.23.0
-  resolution: "@pipelex/mthds-ui@npm:0.23.0"
+"@pipelex/mthds-ui@npm:0.24.0":
+  version: 0.24.0
+  resolution: "@pipelex/mthds-ui@npm:0.24.0"
   dependencies:
     "@pipelex/mthds-form": "npm:^0.8.0"
     "@xyflow/react": "npm:^12"
@@ -766,16 +766,17 @@ __metadata:
       optional: true
     shiki:
       optional: true
-  checksum: 14322248c40af14d6ef3aa7cdc5b4f9a9d5650763a6c569220cd3c61411d25f1c08be6fed1a19aa2d1f6901f2ac37f8e046fc20e4536e675adcddcbb8cee30c8
+  checksum: 207c5555921e1e829a35fa61a29d621d7a4a5e4d52cf3f9213c57284c46e562a27a36c315309817551f15dd9e750a81bf09574ff205fcab5fb7e18bfa7915679
   languageName: node
   linkType: hard
 
-"@pipelex/sdk@npm:0.1.5":
-  version: 0.1.5
-  resolution: "@pipelex/sdk@npm:0.1.5"
+"@pipelex/sdk@npm:0.17.0":
+  version: 0.17.0
+  resolution: "@pipelex/sdk@npm:0.17.0"
   dependencies:
-    mthds: "npm:^0.15.0"
-  checksum: 0a0844b233c358b3d456c4bd6bece2583b1e591998020bbed6bf8a84c45f9af5880e8328efb22f04f79b56d85339acdfb128e98aceb115af18d872438c443f52
+    mthds: "npm:^0.25.0"
+    smol-toml: "npm:^1.6.0"
+  checksum: ae1058146bfd1a3e3be6da2670b7b882d12cbb45d5a49448773f679a3bb99a4613fec6e5b4d513f7d2422a0859045d5a437abc93aacde1d05eb93f856d5844ae
   languageName: node
   linkType: hard
 
@@ -5530,25 +5531,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mthds@npm:^0.15.0":
-  version: 0.15.0
-  resolution: "mthds@npm:0.15.0"
-  dependencies:
-    "@clack/prompts": "npm:^1.0.0"
-    chalk: "npm:^5.4.1"
-    commander: "npm:^13.1.0"
-    ora: "npm:^8.2.0"
-    posthog-node: "npm:^4.4.0"
-    semver: "npm:^7.7.4"
-    smol-toml: "npm:^1.6.0"
-    zod: "npm:^4.3.6"
-  bin:
-    mthds: dist/cli.js
-    mthds-agent: dist/agent-cli.js
-  checksum: e9437d1f2528cec407053fe91a072b7cbc3b2fc244a439aaad32a346c9e47a1dce60b0be94c4239d9a7a56cbb472b977c736a0971a66cc4e0eec7a79952a814b
-  languageName: node
-  linkType: hard
-
 "mthds@npm:^0.25.0":
   version: 0.25.0
   resolution: "mthds@npm:0.25.0"
@@ -6022,8 +6004,8 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
-    "@pipelex/mthds-ui": "npm:0.23.0"
-    "@pipelex/sdk": "npm:0.1.5"
+    "@pipelex/mthds-ui": "npm:0.24.0"
+    "@pipelex/sdk": "npm:0.17.0"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
     "@rollup/plugin-replace": "npm:^5.0.5"

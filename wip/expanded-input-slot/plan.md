@@ -134,6 +134,20 @@ It carries one commit outside the campaign, `chore(build): package the vsix with
 
 Review rounds and any deferral: to be recorded here as they happen.
 
+### Phase 4 — pick up the renderer's half
+
+- [x] `make use-npm VERSION=0.24.0` — the mthds-ui release carrying the static-graph builder's expanded input-slot support (mthds-ui #79), which this plan listed as out of scope pending the release.
+- [x] `@pipelex/sdk` moved from 0.1.5 to 0.17.0 in the same pass, at the founder's request.
+- [x] `make ext` and `make check` — green.
+
+**Checkpoint 3.** The renderer's half is in. The plan deferred it as "`@pipelex/mthds-ui`'s half of the same gap, L-260902-954fb6 … This repo picks it up when it bumps the package", and the pin was sitting at 0.23.0, which does **not** carry the fix — the release that does is 0.24.0. Measured against the same one-pipe bundle with an expanded slot: 0.23.0 returns `pipe_registry["demo.summarize"].inputs == {}` and one `invalid-concept-ref` warning ("has an uninterpretable concept ref — skipped"); 0.24.0 returns the slot resolved to its concept with an empty diagnostics list. So the editor half of this campaign and the graph half now agree on the same authoring, which is what closes the feature.
+
+The SDK bump that rode along carried exactly one break reaching this repo — v0.2.0's `apiToken` → `apiKey` constructor-option rename, fixed at `apiValidationBackend.ts:55` and at the two mock sites. It was caught by the compile-time conformance bindings rather than found by reading: restoring `'apiToken'` in that block fails `yarn typecheck` with `TS2344`, which is a useful thing to know actually works. The three categories those bindings cannot cover were checked by hand against the real v0.17.0 sources — the error classes' constructor order is unchanged across the whole span, the client constructor still throws `PipelineRequestError` on a non-host-only base URL, and `validate`'s first parameter only widened while `views` landed at the fifth position, after the three arguments the backend passes.
+
+One follow-up was filed rather than taken: the validate report now carries `output_form` beside `pipe_io_contracts` and `input_form`, which is the pair the graph's data viewer gates on, so an `api`-backend save could light the data tab up through the `views` opt-in without a run directory. That is L-260908-e88eb0.
+
+**Still outstanding, and still a human's to run: the manual Extension Host pass.** It now has a second half — the method graph itself. On the same corpus bundle, the graph should draw `notes` as an input with its edge present, where before the bump the slot and its edge were simply absent from the rendered graph.
+
 ## Decisions
 
 - **Recognise the slot shape; do not widen the ancestor search.** The false positive on hint values is the reason; see Design, site 1.
