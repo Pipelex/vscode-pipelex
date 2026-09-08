@@ -90,7 +90,7 @@ import type {
 // Methods the backend invokes on the client must exist on the real client.
 type _ClientSurface = Pick<RealPipelexApiClient, 'validate' | 'version'>;
 // Constructor option keys the backend passes must be the real option keys.
-type _ClientOptions = Required<Pick<PipelexApiClientOptions, 'baseUrl' | 'apiToken'>>;
+type _ClientOptions = Required<Pick<PipelexApiClientOptions, 'baseUrl' | 'apiKey'>>;
 // Error fields the backend reads off these classes must exist on the real classes.
 type _ResponseErrorFields = Pick<RealApiResponseError, 'status' | 'statusText' | 'serverMessage' | 'code'>;
 type _UnreachableErrorFields = Pick<RealApiUnreachableError, 'code'>;
@@ -144,7 +144,7 @@ describe('ApiValidationBackend', () => {
     it('passes the resolved token to the client constructor (SecretStorage precedence)', async () => {
         apiState.validate = async () => ({ is_valid: true });
         await analyze(makeBackend());
-        expect(apiState.lastConstructorOptions).toEqual({ baseUrl: 'http://localhost:8081', apiToken: 'secret-token' });
+        expect(apiState.lastConstructorOptions).toEqual({ baseUrl: 'http://localhost:8081', apiKey: 'secret-token' });
     });
 
     it('maps a 200 invalid verdict (is_valid:false) to a not-ok outcome with the structured errors', async () => {

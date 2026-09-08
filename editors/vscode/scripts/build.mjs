@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import esbuild from "esbuild";
@@ -16,44 +16,34 @@ unlink("./dist");
 exec("yarn", ["build:syntax"]);
 exec("yarn", ["build:node"]);
 
-// Copy webview static assets (HTML + CSS only — JS is bundled below)
+// Copy the webview's own static assets. The renderer's stylesheets are NOT
+// copied — esbuild bundles them from the import graph below.
 mkdirSync("./dist/pipelex/graph/webview", { recursive: true });
 cpSync(
   "./src/pipelex/graph/webview/graph.html",
   "./dist/pipelex/graph/webview/graph.html",
 );
 cpSync(
-  "./src/pipelex/graph/webview/graph.css",
-  "./dist/pipelex/graph/webview/graph.css",
-);
-cpSync(
-  "./node_modules/@xyflow/react/dist/style.css",
-  "./dist/pipelex/graph/webview/xyflow.css",
-);
-// Strip bare-module @import that can't resolve in the webview context
-// (xyflow styles are already loaded via a separate <link> tag)
-writeFileSync(
-  "./dist/pipelex/graph/webview/graph-core.css",
-  readFileSync(
-    "./node_modules/@pipelex/mthds-ui/dist/graph/react/graph-core.css",
-    "utf-8",
-  ).replace(/@import\s+["'][^"']*["'];?\s*\n?/g, ""),
-);
-cpSync(
-  "./node_modules/@pipelex/mthds-ui/dist/graph/react/stuff/StuffViewer.css",
-  "./dist/pipelex/graph/webview/stuff-viewer.css",
-);
-cpSync(
-  "./node_modules/@pipelex/mthds-ui/dist/graph/react/detail/DetailPanel.css",
-  "./dist/pipelex/graph/webview/detail-panel.css",
-);
-cpSync(
-  "./node_modules/@pipelex/mthds-ui/dist/graph/react/viewer/GraphToolbar.css",
-  "./dist/pipelex/graph/webview/graph-toolbar.css",
+  "./src/pipelex/graph/webview/shell.css",
+  "./dist/pipelex/graph/webview/shell.css",
 );
 
-// Bundle webview TypeScript → single IIFE script
-// React, ReactDOM, @xyflow/react v12, dagre, and mthds-ui are all bundled.
+// Bundle webview TypeScript → single IIFE script, plus the one stylesheet
+// esbuild derives from the same import graph. React, ReactDOM, @xyflow/react
+// v12, elkjs and mthds-ui are all bundled.
+//
+// The CSS comes out as `graph.css` beside `graph.js`, with every `@import`
+// resolved — including the two that cannot be linked as written: @xyflow's base
+// sheet, which `graph-core.css` pulls in by bare specifier, and the form
+// kernel's, which mthds-ui wraps in `@layer mthds-form`. The webview's own
+// sheet is `shell.css` precisely so it does not collide with that output; when
+// it was called `graph.css` the collision was worked around by switching CSS
+// bundling off entirely and hand-copying each of mthds-ui's sheets, which meant
+// a sheet added upstream went silently missing and a sheet deleted upstream
+// broke this build.
+//
+// Minified because elkjs ships pre-minified GWT output that esbuild otherwise
+// re-prints at more than twice the size: 5353 KB → 2190 KB for the bundle.
 esbuild.buildSync({
   entryPoints: ["./src/pipelex/graph/webview/adapter.ts"],
   outfile: "./dist/pipelex/graph/webview/graph.js",
@@ -61,10 +51,7 @@ esbuild.buildSync({
   format: "iife",
   target: "es2020",
   jsx: "automatic",
-  // Treat CSS imports as no-ops — CSS is loaded via <link> tags in graph.html,
-  // not bundled. Without this, esbuild emits a graph.css that overwrites the
-  // manually-copied extension CSS (toolbar styles, theme vars, layout).
-  loader: { ".css": "empty" },
+  minify: true,
   alias: {
     "react": reactDir,
     "react-dom": reactDomDir,
@@ -74,6 +61,17 @@ esbuild.buildSync({
     "process.env.NODE_ENV": '"production"',
   },
 });
+
+// The renderer's stylesheet is emitted, never copied, so nothing fails loudly
+// if it stops being emitted — the webview would simply render unstyled. Assert
+// it landed: that is the one silent failure this arrangement can still have.
+if (!existsSync("./dist/pipelex/graph/webview/graph.css")) {
+  throw new Error(
+    "esbuild emitted no graph.css for the webview. The renderer's styles reach " +
+      "the bundle through graph.js's import graph — check that no CSS loader " +
+      "override was reintroduced and that @pipelex/mthds-ui still imports its sheets.",
+  );
+}
 
 exec("yarn", ["build:browser-extension"]);
 exec("yarn", ["build:browser-server"]);

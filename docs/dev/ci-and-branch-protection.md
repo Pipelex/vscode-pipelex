@@ -20,7 +20,7 @@ Both job names — `make check` and `make test-all` — are the **required statu
 - **VS Code extension `node_modules`** — `make test` → `test-ext` type-checks and runs vitest inside `editors/vscode` but does not `yarn install` there (the `js/lsp` deps it *does* install via the `lsp-types` prerequisite). Each workflow runs `corepack enable && yarn install --immutable` in `editors/vscode` first.
 - **`maturin` in the venv** — `make test-all` → `test-pipelex-lib` → `pipelex-lib` → `env` creates `./.venv` via `uv` but does not install `maturin`. `test-all.yml` pre-creates the venv and `uv pip install maturin` so `make env` is a no-op and `maturin develop` resolves.
 - **`uv` install** — the enterprise actions allowlist permits only `actions/*` and four third-party actions (see `release-publishing.md`), so `uv` is installed via its official `curl` script, not `astral-sh/setup-uv`.
-- **`file:` dependency guard** — `check.yml` fails fast if `editors/vscode/package.json` carries a `file:`/portal dep (left over from `make use-local`); run `make un` to switch back to the npm spec before pushing.
+- **`file:` dependency guard** — `check.yml` fails fast if `editors/vscode/package.json` carries a `file:`/portal dep (left over from `make use-local`); run `make use-npm VERSION=X.Y.Z` to pin the released version before pushing. Name the version: bare `make use-npm` (`make un`) installs `latest` and writes the literal spec `npm:latest`, which satisfies every guard while recording nothing — the manifest then states no version and `yarn.lock` is the only place the answer lives. The `bump-mthds-ui` skill walks the whole move, changelog included.
 
 ## Auxiliary CI (`ci.yaml`) — runs but not required
 

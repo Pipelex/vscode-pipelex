@@ -32,6 +32,7 @@ Publishes two PyPI packages from separate `pyproject.toml` files:
 - `site/` - Documentation site (VitePress + Tailwind)
 - `test-data/` - Test fixtures for TOML/MTHDS parsing
 - `test-data/mthds/` - MTHDS grammar test fixtures
+- `test-data/mthds-corpus/` - vendored copy of the MTHDS Test Corpus, owned by `pipelex` and synced by the workspace's `mthds-corpus-sync` skill. **Never edit it here** — fix the entry upstream and re-sync. Deliberately outside `test-data/mthds/`, which the wasm suite snapshot-pins
 
 ## Makefile Targets
 - `make ext` - **Full extension rebuild**: compiles Rust → WASM → JS bundle (`ext-deps`), then builds the VS Code extension. Run this after any Rust LSP change to test in the Extension Host.
@@ -80,6 +81,7 @@ Publishes two PyPI packages from separate `pyproject.toml` files:
 - **Reference resolution:** `handlers/mthds_resolution.rs` is the shared module for resolving pipe/concept references from cursor position. Used by both `goto_definition.rs` and `hover.rs`. Contains `resolve_reference()`, `ReferenceKind`, `ResolvedReference`, and helpers.
 - **Handler tests:** `handlers/tests/` — tests call resolution functions directly (not full LSP roundtrips). Shared helpers (`parse_and_query`, `offset_inside_string`, `offset_inside_string_after`) live in `tests/mod.rs`. Test fixtures live in `test-data/mthds/<feature>/`.
 - **MTHDS hover:** For `.mthds` files, hover on reference fields shows rich content (type, description, inputs, output for pipes; description, refines, fields for concepts). Falls through to schema-based hover for non-reference strings.
+- **Input slots have two forms, and depth tells them apart.** MTHDS declares a slot as either `notes = "Text"` (string form) or `notes = { concept = "Text", hints = { intent = "prose" } }` (expanded form), and the concept is a reference in both. `is_input_slot_concept` reads the chain of inline-table entry keys containing the token and accepts exactly `[<slot>, inputs]` and `[concept, <slot>, inputs]` — never a wider ancestor search, which would also reach `inputs` from a `hints` value and offer goto-definition on a presentation hint. Depth decides and not the key name, so `inputs = { concept = "Text" }` stays a slot called `concept`. The semantic-token provider recognises the same two forms textually, by brace depth. See `docs/features/goto-definition.md` and `docs/features/semantic-tokens.md`.
 
 ## Graph Rendering (ReactFlow)
 
