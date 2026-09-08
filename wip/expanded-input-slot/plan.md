@@ -1,5 +1,5 @@
 ---
-status: draft
+status: landed
 item: L-260902-74677a
 ---
 
@@ -122,7 +122,7 @@ Two commits, not one: `96da712` is the scanner, and `1568778` adds the recovery 
 - [x] One line in this repo's `CLAUDE.md` under "LSP Handler Architecture" naming the two slot shapes.
 - [x] `CHANGELOG.md` under `## [Unreleased]`, a `### Fixed` entry, next to #83's `### Changed` paragraph that this completes.
 - [x] `make check` — green. **Manual Extension Host pass: outstanding, and it is a human's to run.** The extension is built and installed into Cursor (`editors/vscode/pipelex.vsix`, installed 2026-09-02). The packaging step had to be run as `npx --yes @vscode/vsce package`, because `make vsix` called the `vsce` binary directly and it was not a devDependency. That gap has since been closed on this branch: `@vscode/vsce` is a devDependency and the target runs `yarn vsce package`.
-- [ ] Open the PR against `chore/Sync-mthds-schema-and-corpus` with `Closes L-260902-74677a` in the body; once #83 merges into `dev`, retarget it to `dev`. The PR description must name the upstream-crate edits — `taplo-lsp`'s `mthds_resolution.rs` and `hover.rs` are MTHDS additions living inside an upstream crate, and this repo's rule is to say so whenever an upstream crate changes.
+- [x] Open the PR against `chore/Sync-mthds-schema-and-corpus` with `Closes L-260902-74677a` in the body; once #83 merges into `dev`, retarget it to `dev`. The PR description must name the upstream-crate edits — `taplo-lsp`'s `mthds_resolution.rs` and `hover.rs` are MTHDS additions living inside an upstream crate, and this repo's rule is to say so whenever an upstream crate changes.
 
 **Checkpoint 2.** At PR open: record the PR number, what the review rounds changed, and any deferral with where it was recorded.
 
@@ -132,7 +132,7 @@ It carries one commit outside the campaign, `chore(build): package the vsix with
 
 **The manual Extension Host pass is still a human's to run**, and the plan made it the gate before the PR; the PR was opened ahead of it on the founder's instruction. The extension is installed into Cursor. What to look at, on `test-data/mthds-corpus/entries/feature_intent_hints_reading_circle/bundle.mthds`: Cmd+click and hover on `"Text"` inside the expanded slot (should reach the native-concept card), hover on `"write_card"` in `main_pipe` (should list `` `title`: BookTitle, `notes`: Text `` with no hints), the colouring of the `inputs` line (`title`, `BookTitle`, `notes`, `Text` coloured; `concept`, `hints`, `intent`, `prose` not), and that hovering `"prose"` offers nothing.
 
-Review rounds and any deferral: to be recorded here as they happen.
+Review rounds and any deferral: no `/rev` pass was ever recorded on this branch. The pull request carried a cubic bot summary, which the workspace does not count as a round, so the campaign reached `dev` on its automated gates alone — `make check` and `make test-all`, both green.
 
 ### Phase 4 — pick up the renderer's half
 
@@ -147,6 +147,14 @@ The SDK bump that rode along carried exactly one break reaching this repo — v0
 One follow-up was filed rather than taken: the validate report now carries `output_form` beside `pipe_io_contracts` and `input_form`, which is the pair the graph's data viewer gates on, so an `api`-backend save could light the data tab up through the `views` opt-in without a run directory. That is L-260908-e88eb0.
 
 **Still outstanding, and still a human's to run: the manual Extension Host pass.** It now has a second half — the method graph itself. On the same corpus bundle, the graph should draw `notes` as an input with its edge present, where before the bump the slot and its edge were simply absent from the rendered graph.
+
+**Checkpoint 4 — landed.** PR **Pipelex/vscode-pipelex#84** merged into `dev` as `6456a90`, a squash of the branch's history, with `make check` and `make test-all` both green on the merge. `L-260902-74677a` is closed `fixed`, and so is the ride-along `L-260906-e9ab24` — the PR carried both halves of its suggested fix (a `runArtifacts` module reading `pipe_io_contracts.json` and `output_form.json` beside a run's `graphspec.json`, and `adapter.ts` forwarding `contracts` and `outputForm` to `GraphViewer`), which its own blocker `L-260907-817d80` had unblocked by shipping the artifacts in `pipelex`.
+
+The merge has not reached `main`, so nothing here is published yet: the extension, `plxt` and the two Python packages all carry this only from the next release of the repo, and no release item exists for it to ride.
+
+Three things the campaign filed stay open and are nobody's surprise: `L-260902-73ef53`, the multi-line inline table that navigates in neither slot form because taplo's recovery flattens the nesting; `L-260908-e88eb0`, lighting the graph's data tab from an `api`-backend save through the validate report's `views` opt-in; and `L-260902-e9268f`, the standard-table and dotted-key input forms, which this close released and which is the ranked next step.
+
+**The manual Extension Host pass never ran, and it is still a human's to run.** The plan made it the gate before the PR and the PR was opened ahead of it on the founder's instruction; the merge did not change that. Both halves are still outstanding — the editor half (Cmd+click and hover on the expanded slot's concept, the pipe hover listing the slots with no hints, the colouring of the `inputs` line, and `"prose"` offering nothing) and the graph half (`notes` drawn as an input with its edge present). What to open is `test-data/mthds-corpus/entries/feature_intent_hints_reading_circle/bundle.mthds`.
 
 ## Decisions
 
