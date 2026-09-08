@@ -747,7 +747,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pipelex/mthds-ui@npm:latest":
+"@pipelex/mthds-ui@npm:0.23.0":
   version: 0.23.0
   resolution: "@pipelex/mthds-ui@npm:0.23.0"
   dependencies:
@@ -6022,7 +6022,7 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
-    "@pipelex/mthds-ui": "npm:latest"
+    "@pipelex/mthds-ui": "npm:0.23.0"
     "@pipelex/sdk": "npm:0.1.5"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
