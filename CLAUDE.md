@@ -117,12 +117,13 @@ When modifying graph rendering, always consult `../pipelex/pipelex/graph/graphsp
 - `node_modules/` and `target/` - Build artifacts
 
 ## CI/CD
-- **Branching:** feature branches PR into `dev`; `dev` (via `release/*`) feeds `main`. Both `dev` and `main` are protected.
+- **Branching:** feature branches PR into `dev`; `dev` (via `release/*`) feeds `main`. Both `dev` and `main` carry a ruleset (classic branch protection is gone — `branches/{dev,main}/protection` answering `Branch not protected` is expected).
   - **PR base by branch type:** a `release/*` branch targets **`main`** (that merge is what triggers auto-tagging + publishing). Every other branch targets **`dev`**. Don't open a release PR into `dev` — it lands the version bump without publishing.
+  - **The base decides the merge method, and the ruleset enforces it:** `dev` accepts **only a squash**, `main` **only a merge commit**. Rebase merging is off. GitHub refuses the wrong method rather than honouring it, so don't pass `--squash` to a release PR.
 - **PR quality gate (required, Makefile-driven so CI = local gate):**
   - `check.yml` → runs `make check` (fmt + clippy + crate/extension tests + locked compile checks, incl. both WASM crates)
   - `test-all.yml` → runs `make test-all` (every fast suite + the Python library smoke test)
-  - Both trigger on PRs into `main`+`dev` and are **required status checks** on both branches (branch protection: PR required, force-push/delete blocked, conversation resolution required, `enforce_admins` off). The workflows' `branches:` filter must track the protected-branch set. See `docs/dev/ci-and-branch-protection.md`.
+  - Both trigger on PRs into `main`+`dev` and are the **required status checks** named by the `dev` and `main` rulesets — pinned to the GitHub Actions app, non-strict on `dev`, **strict on `main`** (a release PR must be up to date with `main`). Both rulesets require a PR with **0 approvals**, require thread resolution, and block force-push/deletion; `pipelex-staff` bypasses them (that's how the post-release `main`→`dev` push lands). `release/v*` blocks force-push only. The workflows' `branches:` filter must track the ruleset'd branches. **The check names live only in the ruleset** — the workspace policy carries every other field but reads these off GitHub, so renaming a gate job means renaming the required check in the same move. See `docs/dev/ci-and-branch-protection.md`.
 - `ci.yaml` — what the make gates don't cover: release auto-tagging (push to `main`), the e2e `pipelex-tools-py` wheel build/install, `toml-test` conformance, and MSRV (1.74) builds. Triggers on push/PR to `main` **only** (gates the `dev`→`main` boundary, not every feature PR). Not required checks.
 - Releases: `releases.yaml` — PyPI, VS Code Marketplace, Open VSX
 - Auto-tagging via inline shell in `ci.yaml`
