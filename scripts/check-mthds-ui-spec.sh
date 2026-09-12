@@ -21,8 +21,12 @@ if [ ! -f "$manifest" ]; then
 fi
 
 # Every entry is judged, not merely the first: an admitted spelling in `dependencies` must not
-# vouch for a `portal:` link standing in `resolutions`.
-specs=$(sed -nE 's/.*"@pipelex\/mthds-ui"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$manifest")
+# vouch for a `portal:` link standing in `resolutions`. A key names the package bare, with a range
+# (`@pipelex/mthds-ui@npm:0.24.0`, how yarn keys a resolution) or under a parent path
+# (`foo/@pipelex/mthds-ui`), and several pairs can share one line, so each pair is extracted on
+# its own rather than one match per line.
+specs=$(grep -oE '"([^"]*/)?@pipelex/mthds-ui(@[^"]*)?"[[:space:]]*:[[:space:]]*"[^"]*"' "$manifest" |
+    sed -E 's/.*"[[:space:]]*:[[:space:]]*"([^"]*)"$/\1/' || true)
 if [ -z "$specs" ]; then
     echo "ERROR: $manifest declares no $package dependency."
     exit 1
