@@ -25,7 +25,7 @@ description: >
 
 What makes this bump different from `/bump-sdk` in this repo, and what every step below is shaped by:
 
-- **The version is set through `make use-npm`, not by editing `package.json`.** Three separate guards refuse a non-`npm:` spec, because this repo supports developing against a portal-linked sibling checkout. Step 1.
+- **The version is set through `make use-npm`, not by editing `package.json`.** Three separate guards refuse a local link, because this repo supports developing against a portal-linked sibling checkout, and two of them admit nothing but `npm:` or a sprint pin at a full commit SHA. Step 1.
 - **The library is consumed from both sides of the extension.** The **host** (Node) calls the static-graph builder; the **webview** (browser, esbuild IIFE) mounts `GraphViewer`. A release can break one and not the other, and they fail in completely different ways — a host break is a stack trace in the Output channel, a webview break is a blank or unstyled panel with nothing thrown.
 - **Two suites reach into `node_modules/@pipelex/mthds-ui/dist/` by literal path.** `formKernelTokens.test.ts` reads three stylesheets and the form kernel's own. A sheet renamed or deleted upstream fails there with an `ENOENT` naming the path — which is the good case, and deliberately so.
 - **Nothing in this repo renders a `GraphViewer`.** `make check` proves the extension still compiles and that the token map still covers the kernel. It cannot prove the graph draws. The verification for this bump is a human looking at a real graph in an Extension Host — Step 6 is not optional here.
@@ -43,11 +43,13 @@ npm view @pipelex/mthds-ui version                                             #
 
 **If the spec is `portal:` or `file:`, someone is mid-`make use-local`.** That is a supported workflow — `make use-local` (`make ul`) portal-links `../mthds-ui` so renderer changes can be tried here before they are released — but it must never merge, and three guards say so:
 
-- `make check-no-local-deps`, a prerequisite of `make check`, requires the spec to start with `npm:`.
-- `.githooks/pre-commit` refuses the commit (active once `make setup-hooks` has run, which `use-local` does for you).
+- `make check-no-local-deps`, a prerequisite of `make check`, runs `scripts/check-mthds-ui-spec.sh`, which admits a spec starting with `npm:` or a `github:<owner>/<repo>#<40-hex sha>` sprint pin and refuses everything else.
+- `.githooks/pre-commit` runs the same script and refuses the commit (active once `make setup-hooks` has run, which `use-local` does for you).
 - `check.yml` greps `package.json` for `"file:` before it installs — a wider net for any local dep, though it is `check-no-local-deps` inside `make check` that actually catches a `portal:` mthds-ui.
 
 So when you arrive on a portal link, the job is exactly this skill: the released version exists now, and the pin has to be set. Do not hand-edit the spec back — `make use-npm VERSION=…` in Step 4 is what writes both `package.json` and the lockfile consistently.
+
+**If the spec is `github:Pipelex/mthds-ui#<sha>`, the branch is on a sprint pin**, written by the workspace's `wt pin` so this repo can build against an unreleased `mthds-ui` commit. It is not this skill's to undo: the workspace's `wt unpin <worktree> mthds-ui --to X.Y.Z` collapses it onto the release, putting back the `npm:` spelling and regenerating `yarn.lock` in one commit, and it has to happen before that branch merges. A `github:` source naming a branch, a tag or an abbreviated SHA is refused by both guards, because it moves under the lockfile.
 
 If the user named a target, confirm it exists: `npm view @pipelex/mthds-ui@X.Y.Z version`. **This skill only moves to published versions.** If the renderer fix they want is not released, say so and stop — the fix is to cut the release in `../mthds-ui` first, and `make use-local` is the bridge until then, not a thing to commit.
 

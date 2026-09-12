@@ -171,9 +171,8 @@ test-pipelex-lib: pipelex-lib ## Build the library wheel (dev) and run its Pytho
 
 pipelex-lib-smoke: test-pipelex-lib ## Alias for test-pipelex-lib (build wheel + Python smoke test)
 
-check-no-local-deps: ## Fail if mthds-ui is not the npm spec
-	@grep -qE '"@pipelex/mthds-ui":[[:space:]]*"npm:' $(EXT_DIR)/package.json || \
-		{ echo "ERROR: @pipelex/mthds-ui in $(EXT_DIR)/package.json is not the npm spec. Run 'make use-npm' first."; exit 1; }
+check-no-local-deps: ## Fail if mthds-ui is neither the npm spec nor a full-SHA sprint pin
+	@scripts/check-mthds-ui-spec.sh $(EXT_DIR)/package.json
 
 setup-hooks: ## Configure git to use .githooks/ for hooks
 	@git config core.hooksPath .githooks
