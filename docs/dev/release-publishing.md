@@ -155,6 +155,14 @@ git push origin :refs/tags/plxt-cli/v0.8.0 && git push origin plxt-cli/v0.8.0
 
 Nothing else needs redoing: the tag still points at the same merge commit, `releases.yaml`'s `wait_for_ci` finds the `Test on Rust stable` check that already passed there, and the tag-vs-`package.json` guard still agrees.
 
+### The CI gate before any publish
+
+Every `releases.yaml` run on a tag push starts with `wait_for_ci`, which polls for the `Test on Rust stable` check (the `test-python-bindings` job of `ci.yaml`) on the tagged commit for up to 30 minutes, and nothing publishes until it passes. It asks the check-runs endpoint for that check **by name** (`?check_name=Test%20on%20Rust%20stable`) and takes the newest of the copies it gets back: `ci.yaml` runs once for the push to `main` and again for each tag push, and each run carries its own copy.
+
+The name filter is load-bearing. A release commit collects dozens of check runs — every `ci.yaml` and `releases.yaml` job of every tag — and the endpoint returns them 30 per page, newest first. The Rust check is created early, so it falls off the first page while the later tags are still building, and an unfiltered query reads an empty status until it times out on a commit whose check is green. That is how `@pipelex/tools-wasm` 0.3.0 failed to publish on the v0.17.0 release: the last of the four tag runs polled after the check had left page 1.
+
+A tag's run uses the workflow file at the tagged commit, so a tag cut before the name filter landed keeps the unfiltered query when it is re-run. While `main` still points at the tagged commit, it can be rescued: dispatch `ci.yaml` on `main` (`gh workflow run ci.yaml --ref main`; its `auto_tag` finds every tag already present and creates none), which puts a fresh `Test on Rust stable` check at the top of page 1, then re-run the failed `Releases` run with `gh run rerun <run-id> --failed`.
+
 ---
 
 ## Dry run

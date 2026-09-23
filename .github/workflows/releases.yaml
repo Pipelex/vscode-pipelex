@@ -23,9 +23,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Waiting for 'Test on Rust stable' check on ${{ github.sha }}..."
+          # Ask for the check by name: a release commit collects dozens of check
+          # runs, the endpoint pages them 30 at a time, and the Rust check is
+          # among the oldest, so an unfiltered query loses it off page 1 and
+          # times out on a green commit. Each ci.yaml run on the commit (the main
+          # push, each tag push) carries one; the newest is the verdict. A failed
+          # query counts as "not there yet" rather than ending the step.
           for i in $(seq 1 180); do
-            result=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs \
-              --jq 'first(.check_runs[] | select(.name == "Test on Rust stable"))')
+            result=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=Test%20on%20Rust%20stable&per_page=100" \
+              --jq '.check_runs | max_by(.id) // empty') || result=""
             status=$(echo "$result" | jq -r '.status')
             conclusion=$(echo "$result" | jq -r '.conclusion')
             if [ "$status" = "completed" ]; then
