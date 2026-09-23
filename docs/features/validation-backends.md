@@ -2,10 +2,10 @@
 
 The extension validates `.mthds` bundles on save through a **backend**, selected by the `pipelex.backend` setting. (The method graph itself is no longer a backend product — it is built statically in the extension, see `method-graph.md`; the backend supplies the validation verdict shown in the graph's toolbar widget.) `pipelex.validation.enabled: false` disables the backend everywhere — on-save diagnostics *and* the graph panel's verdict: no subprocess or API call runs, and the widget stays hidden.
 
-- **`cli`** (default, zero-config) — spawns the local `pipelex-agent` Python CLI, exactly as before. Nothing to configure: if `pipelex-agent` is on `PATH` or in a workspace `.venv`, it just works.
-- **`api`** (opt-in) — calls a Pipelex API server over HTTP via the `mthds` client. Use this when you run a [`pipelex-api`](https://github.com/Pipelex/pipelex-api) server (self-hosted or the hosted endpoint) and want validation without a local Python install.
+- **`api`** (default) — calls a Pipelex API server over HTTP through `@pipelex/sdk`. Out of the box that server is the hosted Pipelex API at `https://api.pipelex.com`, so validation needs no local Python install: storing an API key is the only setup step (see "Hosted endpoint and API keys"). Point `pipelex.api.baseUrl` at a self-hosted [`pipelex-api`](https://github.com/Pipelex/pipelex-api) to validate against your own server instead.
+- **`cli`** (opt-in) — spawns a local `pipelex-agent` Python CLI. Once selected there is nothing else to configure: if `pipelex-agent` is on `PATH` or in a workspace `.venv`, it just works. This is the backend to pick when `.mthds` contents must never leave the machine.
 
-Both backends produce the same structured diagnostics, so for any **produced verdict** (valid or invalid) the editor experience is identical — the graph webview, the Problems panel, and the on-save flow do not know which backend ran. Only *failures to produce a verdict* differ by backend (install/upgrade guidance for the CLI, reachability/auth remedies for the API — see "When a backend can't produce a verdict").
+Both backends produce the same structured diagnostics, so for any **produced verdict** (valid or invalid) the editor experience is identical — the graph webview, the Problems panel, and the on-save flow do not know which backend ran. Only *failures to produce a verdict* differ by backend (key, reachability and auth remedies for the API, install/upgrade guidance for the CLI — see "When a backend can't produce a verdict").
 
 ## Choosing a backend
 
@@ -13,23 +13,27 @@ Set it in Settings (UI or `settings.json`):
 
 ```jsonc
 {
-  // "cli" (default) or "api"
+  // "api" (default) or "cli"
   "pipelex.backend": "api",
   // Host only, no version path. Defaults to the hosted Pipelex API.
   "pipelex.api.baseUrl": "https://api.pipelex.com"
 }
 ```
 
-`pipelex.backend` and `pipelex.api.baseUrl` are resource-scoped, so a multi-root workspace can mix backends per folder.
+`pipelex.backend` and `pipelex.api.baseUrl` are resource-scoped, so a multi-root workspace can mix backends per folder. Only the exact value `cli` selects the CLI: any other `pipelex.backend` value, including a malformed one, is the default `api` backend.
 
 ## Hosted endpoint and API keys
 
-The `api` backend's default `baseUrl` is the hosted Pipelex API (`https://api.pipelex.com`). To use it, store a key:
+The `api` backend's default `baseUrl` is the hosted Pipelex API (`https://api.pipelex.com`), which requires a key. Getting one and storing it is the whole setup:
 
-- Run **`Pipelex: Set Hosted API Key`** from the Command Palette — the key is saved in VS Code **SecretStorage**, never in plaintext settings.
-- **`Pipelex: Clear Hosted API Key`** removes it.
+1. Get a key at [app.pipelex.com](https://app.pipelex.com/). Hosted keys start with `plx_sk_`.
+2. Run **`Pipelex: Set Hosted API Key`** from the Command Palette and paste it. The key is saved in VS Code **SecretStorage**, never in plaintext settings.
 
-Token resolution is **SecretStorage → `PIPELEX_API_KEY` environment variable**: a stored key wins; with none stored, the client falls back to the env var.
+**`Pipelex: Clear Hosted API Key`** removes it.
+
+Token resolution is **SecretStorage → `PIPELEX_API_KEY` environment variable**: a stored key wins; with none stored, the env var is used.
+
+**No key yet.** With neither source holding a key, a save against a hosted Pipelex API stops before sending anything and before the privacy prompt, since the request could only come back `401`. The extension shows a toast saying that validation needs a key, with a **Set API Key** button (runs the command above) and a **Get an API Key** button (opens app.pipelex.com); the graph's validation widget shows the same message. The toast appears once per streak of failures, not on every save, and the next save after storing a key validates normally. A self-hosted server is not held to this: it may run without auth, so it receives the request and answers for itself.
 
 ## Running a local `pipelex-api`
 
@@ -43,7 +47,12 @@ Then point `pipelex.api.baseUrl` at wherever your server listens — e.g. `http:
 
 ## Privacy
 
-The `api` backend sends file contents to `baseUrl` on each save. The default `baseUrl` is the hosted endpoint, so before the **first** request to a **non-localhost** host, the extension asks for confirmation once, and states clearly that it sends the **whole directory's `.mthds` contents** (not just the active file) — mirroring how the CLI resolves a bundle via `--library-dir`. Point `baseUrl` at a localhost runner and contents never leave your machine (no confirmation prompt).
+The `api` backend sends file contents to `baseUrl` on each save. Since it is the default and its default `baseUrl` is the hosted endpoint, a new user meets this without having chosen it, so before the **first** request to a **non-localhost** host the extension asks for confirmation in a modal. The prompt asks whether to validate `.mthds` files on the Pipelex API at that host, states that each save sends the **whole directory's `.mthds` contents** (not just the active file) to `baseUrl` — mirroring how the CLI resolves a bundle via `--library-dir` — and names `pipelex.backend: cli` as the way to keep files on the machine.
+
+- **Send to API** is remembered per host across sessions, so the prompt does not return for that host.
+- **Cancel** is remembered for the session only: saves stop validating without asking again, and the graph widget says that the send was declined, that reloading the window asks again, and that `cli` validates locally. A reload asks once more, so a decline is never a permanent lock-out.
+
+Point `baseUrl` at a localhost runner and contents never leave your machine (no confirmation prompt).
 
 ## Multi-file bundles and cross-file diagnostics
 
@@ -66,16 +75,17 @@ Fix the reported errors and save: the static graph rebuilds immediately and the 
 A backend failure is distinct from "the bundle is invalid":
 
 - **CLI** — if `pipelex-agent` can't be found you get a one-time warning; if it is too old (below the required minimum) you get a targeted upgrade message; setup/infrastructure errors are logged to the Pipelex output channel.
-- **API** — any failure to produce a verdict shows an actionable notification, clears any stale diagnostics, and does **not** silently fall back to the CLI. The wording distinguishes three cases by what actually happened:
+- **API** — any failure to produce a verdict shows an actionable notification (except a declined send, which stays silent), clears any stale diagnostics, and does **not** silently fall back to the CLI. The wording distinguishes these cases by what actually happened:
+    - **No key** — the base URL is a hosted Pipelex API and no key is stored or in `PIPELEX_API_KEY`, so nothing was sent (see "Hosted endpoint and API keys"). The toast names app.pipelex.com and the `Pipelex: Set Hosted API Key` command, and carries the **Set API Key** and **Get an API Key** buttons.
     - **Unreachable** — the extension never got an answer (network error, timeout, or an unparseable/non-`problem+json` body): "Pipelex API unreachable at …".
-    - **Authentication required** (HTTP 401/403) — the server answered but rejected the request for auth. This is its own case with one-click remedies on the toast: a **Set API Key** button (runs `Pipelex: Set Hosted API Key`) and, against the hosted endpoint, a **Get an API Key** button that opens [app.pipelex.com](https://app.pipelex.com/). The message spells out the paths: get a key at app.pipelex.com, self-host the open-source [pipelex-api](https://github.com/Pipelex/pipelex-api) and point `pipelex.api.baseUrl` at it, or switch `pipelex.backend` to `cli` to validate locally without a key. (Against a self-hosted server the platform/self-host options are omitted — you configure auth on the server you run.)
+    - **Authentication rejected** (HTTP 401/403) — the server answered but rejected the request for auth. This is its own case with one-click remedies on the toast: a **Set API Key** button (runs `Pipelex: Set Hosted API Key`) and, against the hosted endpoint, a **Get an API Key** button that opens [app.pipelex.com](https://app.pipelex.com/). Against the hosted endpoint a key was always sent (with none, the no-key case stops first), so the message says the key was rejected and spells out the paths: store a valid key, self-host the open-source [pipelex-api](https://github.com/Pipelex/pipelex-api) and point `pipelex.api.baseUrl` at it, or switch `pipelex.backend` to `cli` to validate locally without a key. (Against a self-hosted server the platform/self-host options are omitted — you configure auth on the server you run.)
     - **API error** (other 4xx / 5xx, including a request-shape 422) — the server answered with a non-validation error: "Pipelex API error at … (HTTP 5xx) …". Not "unreachable", since the server was reached.
 
     `/validate` is a **200-diagnostic** endpoint: a produced verdict — valid *or invalid* — rides a 200 whose body is discriminated on `is_valid`, and only that invalid verdict (`is_valid: false`, with its structured `validation_errors[]`) becomes diagnostics. A non-2xx never means "your bundle is bad" — it means no verdict could be produced (a malformed request, auth, a server fault), which is why it surfaces as a backend error rather than a diagnostic. An `is_valid: false` body that arrives **without** its structured `validation_errors[]` (an empty or missing list) is a contract violation, not an empty invalid verdict — it is surfaced as an API error (so stale diagnostics are cleared) rather than silently publishing zero diagnostics. This mirrors the CLI path, where an exit-1 envelope with an empty error list is likewise treated as an infrastructure error.
 
 In every failure case stale diagnostics are cleared, so the Problems panel never shows a wrong-but-leftover verdict.
 
-A backend failure never blanks the **method graph view** either: the static graph stays on screen and the toolbar widget flips to `error` with the failure as its lead issue (CLI missing or too old, API unreachable, API key required, an API error, send declined, or an unexpected error). Actionable failures still raise the toasts described above — including **Set API Key** / **Get an API Key** for the auth case — and the next save (or the message views' **Retry**, for pre-graph failures like unreadable bundle files) re-runs the analysis, so a transient failure (server still starting, a network blip, a just-installed CLI, a key just set) recovers without reopening the panel.
+A backend failure never blanks the **method graph view** either: the static graph stays on screen and the toolbar widget flips to `error` with the failure as its lead issue (CLI missing or too old, no API key, API unreachable, API key rejected, an API error, send declined, or an unexpected error). Actionable failures still raise the toasts described above — including **Set API Key** / **Get an API Key** for the no-key and auth cases — and the next save (or the message views' **Retry**, for pre-graph failures like unreadable bundle files) re-runs the analysis, so a transient failure (server still starting, a network blip, a just-installed CLI, a key just set) recovers without reopening the panel.
 
 ## Version expectations
 

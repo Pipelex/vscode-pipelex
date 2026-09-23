@@ -2,7 +2,7 @@
   "name": "pipelex",
   "displayName": "Pipelex",
   "description": "Pipelex extension for the MTHDS language",
-  "version": "0.16.1",
+  "version": "0.17.0",
   "repository": {
     "url": "https://github.com/Pipelex/vscode-pipelex"
   },
@@ -551,21 +551,21 @@
           "default": true
         },
         "pipelex.backend": {
-          "description": "Which backend validates MTHDS bundles and renders method graphs. `cli` spawns the local `pipelex-agent` CLI (zero-config default). `api` calls a Pipelex API server over HTTP — set `pipelex.api.baseUrl` and, for a hosted endpoint, store a key via the `Pipelex: Set Hosted API Key` command.",
+          "description": "Which backend validates MTHDS bundles on save and gives the method graph its verdict. `api` (the default) calls the Pipelex API at `pipelex.api.baseUrl` over HTTP; the hosted API needs a key, stored with the `Pipelex: Set Hosted API Key` command. `cli` spawns a local `pipelex-agent` instead, and keeps your files on this machine.",
           "type": "string",
           "enum": [
-            "cli",
-            "api"
+            "api",
+            "cli"
           ],
           "enumDescriptions": [
-            "Spawn the local pipelex-agent CLI (default, zero-config).",
-            "Call a Pipelex API server (self-hosted or hosted) via HTTP."
+            "Call a Pipelex API server over HTTP (default): the hosted Pipelex API, or a self-hosted pipelex-api.",
+            "Spawn a local pipelex-agent CLI; nothing leaves this machine."
           ],
           "scope": "resource",
-          "default": "cli"
+          "default": "api"
         },
         "pipelex.api.baseUrl": {
-          "description": "Base URL of the Pipelex API server used when `pipelex.backend` is `api`. Host only, no version path. Defaults to the hosted Pipelex API (`https://api.pipelex.com`) — store a key via `Pipelex: Set Hosted API Key`. For a locally self-hosted pipelex-api, set this to e.g. `http://localhost:8081`.",
+          "description": "Base URL of the Pipelex API server used when `pipelex.backend` is `api`. Host only, no version path. Defaults to the hosted Pipelex API (`https://api.pipelex.com`), which needs a key: get one at https://app.pipelex.com and store it with `Pipelex: Set Hosted API Key`. For a locally self-hosted pipelex-api, set this to e.g. `http://localhost:8081`.",
           "type": "string",
           "scope": "resource",
           "default": "https://api.pipelex.com"
@@ -586,7 +586,7 @@
           "default": null
         },
         "pipelex.validation.timeout": {
-          "description": "Timeout in milliseconds for pipelex-agent validation.",
+          "description": "Timeout in milliseconds for one validation: a Pipelex API request or a pipelex-agent run.",
           "type": "integer",
           "minimum": 1000,
           "scope": "resource",
@@ -826,8 +826,8 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "npm:0.17.0",
-    "@pipelex/sdk": "0.1.5",
+    "@pipelex/mthds-ui": "npm:0.24.0",
+    "@pipelex/sdk": "0.17.0",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
     "fast-glob": "^3.3.2",
@@ -849,6 +849,7 @@
     "@types/vscode": "^1.90.0",
     "@types/which": "^3.0.3",
     "@vscode/test-web": "^0.0.51",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.20.0",
     "rollup": "^4.9.6",
     "rollup-plugin-esbuild": "^6.1.1",
@@ -857,6 +858,11 @@
     "vitest": "^4.0.18",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2"
+  },
+  "dependenciesMeta": {
+    "keytar": {
+      "built": false
+    }
   },
   "packageManager": "yarn@4.0.2"
 }

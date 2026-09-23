@@ -15,15 +15,23 @@ const PIPELEX_API_KEY_PREFIX = 'plx_sk_';
 /**
  * Resolve the API token with SecretStorage → environment precedence.
  *
- * A stored secret (set via `Pipelex: Set Hosted API Key`) wins. When none is
- * stored we return `undefined`, letting `PipelexApiClient` fall back to its native
- * `PIPELEX_API_KEY` env read — so the wrapper overrides the env when a key is
- * stored, and defers to it otherwise. The token is never read from settings
- * (plaintext), by design.
+ * A stored secret (set via `Pipelex: Set Hosted API Key`) wins; with none stored,
+ * the `PIPELEX_API_KEY` environment variable is used. `undefined` means no key is
+ * available at all. The env read is done here rather than left to
+ * `PipelexApiClient`'s own fallback, so the API backend can tell that case apart
+ * and say where to get a key before sending anything to a hosted API that would
+ * only answer 401. The token is never read from settings (plaintext), by design.
  */
-export async function resolveApiToken(secrets: vscode.SecretStorage): Promise<string | undefined> {
+export async function resolveApiToken(
+    secrets: vscode.SecretStorage,
+    env: Record<string, string | undefined> | undefined = typeof process === 'undefined' ? undefined : process.env,
+): Promise<string | undefined> {
     const stored = await secrets.get(SECRET_KEY);
-    return stored && stored.length > 0 ? stored : undefined;
+    if (stored && stored.length > 0) {
+        return stored;
+    }
+    const fromEnv = env?.PIPELEX_API_KEY?.trim();
+    return fromEnv ? fromEnv : undefined;
 }
 
 /** Register the Set / Clear hosted API key commands. */

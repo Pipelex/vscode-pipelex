@@ -650,3 +650,173 @@ describe('getSemanticTokensLegend', () => {
     expect(legend.tokenModifiers).toEqual(['declaration']);
   });
 });
+
+describe('Expanded input slots', () => {
+  // MTHDS gives a slot two equivalent forms: `notes = "Text"` and
+  // `notes = { concept = "Text", hints = { intent = "prose" } }`. In the expanded form
+  // the slot name is still the thing to colour — `concept` is a schema keyword the
+  // TextMate grammar already paints as a property name — and the hints are presentation
+  // intent, which the semantic layer must leave alone entirely.
+
+  it('colors the corpus line: slot names and concepts only, never the schema keywords', async () => {
+    // The `inputs` line of test-data/mthds-corpus/entries/
+    // feature_intent_hints_reading_circle/bundle.mthds, verbatim.
+    const tokens = await getTokens([
+      'inputs = { title = "BookTitle", notes = { concept = "Text", hints = { intent = "prose" } } }',
+    ]);
+
+    expect(tokens).toEqual([
+      // string form: slot name + concept
+      { line: 0, char: 11, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 0, char: 20, length: 9, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      // expanded form: the slot name, then the concept out of the slot table.
+      // Nothing on `concept`, `hints`, `intent` or `prose`.
+      { line: 0, char: 32, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 0, char: 53, length: 4, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+    ]);
+  });
+
+  it('keeps the block open past an expanded slot so later slots are still colored', async () => {
+    // The shape from the ledger item: before the scanner, the hints table's `}` ended
+    // the block and `extra` went uncolored.
+    const tokens = await getTokens([
+      'inputs = {',
+      '    notes = { concept = "Text", hints = { intent = "prose" } },',
+      '    extra = "Other"',
+      '}',
+      'output = "Result"',
+    ]);
+
+    expect(tokens).toEqual([
+      { line: 1, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 1, char: 25, length: 4, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      { line: 2, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 2, char: 13, length: 5, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      { line: 4, char: 10, length: 6, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+    ]);
+  });
+
+  it('follows a slot table spread over several lines', async () => {
+    const tokens = await getTokens([
+      'inputs = {',
+      '    notes = {',
+      '        concept = "Text",',
+      '        hints = { intent = "prose" }',
+      '    },',
+      '    extra = "Other"',
+      '}',
+    ]);
+
+    expect(tokens).toEqual([
+      // the slot name, on the line that opens its table
+      { line: 1, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      // the concept, a line later, with no token on the `concept` keyword
+      { line: 2, char: 19, length: 4, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      { line: 5, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 5, char: 13, length: 5, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+    ]);
+  });
+
+  it('emits nothing for a hints table on its own line', async () => {
+    const tokens = await getTokens([
+      'inputs = {',
+      '    notes = {',
+      '        hints = { intent = "prose", widget = "Textarea" }',
+      '    }',
+      '}',
+      'output = "Result"',
+    ]);
+
+    // `Textarea` is PascalCase, so a depth-blind scan would have colored it as a
+    // concept. At depth 3 nothing is emitted, and the slot name is the only token.
+    expect(tokens).toEqual([
+      { line: 1, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 5, char: 10, length: 6, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+    ]);
+  });
+
+  it('ignores a closing brace inside a quoted value', async () => {
+    const tokens = await getTokens([
+      'inputs = {',
+      '    notes = { concept = "Text", hints = { intent = "a } b" } },',
+      '    extra = "Other"',
+      '}',
+      'output = "Result"',
+    ]);
+
+    expect(tokens).toEqual([
+      { line: 1, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 1, char: 25, length: 4, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      { line: 2, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 2, char: 13, length: 5, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      { line: 4, char: 10, length: 6, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+    ]);
+  });
+
+  it('ignores a closing brace in a trailing comment', async () => {
+    const tokens = await getTokens([
+      'inputs = {',
+      '    notes = "Text", # the } here must not close the block',
+      '    extra = "Other"',
+      '}',
+      'output = "Result"',
+    ]);
+
+    expect(tokens).toEqual([
+      { line: 1, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 1, char: 13, length: 4, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      { line: 2, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 2, char: 13, length: 5, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      { line: 4, char: 10, length: 6, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+    ]);
+  });
+
+  it('colors a domain-prefixed concept inside an expanded slot', async () => {
+    const tokens = await getTokens(['inputs = { photo = { concept = "native.Image" } }']);
+
+    expect(tokens).toEqual([
+      { line: 0, char: 11, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      // "Image" only — the domain is the grammar's job, as in the string form
+      { line: 0, char: 39, length: 5, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+    ]);
+  });
+
+  it('emits no concept token for a slot table key that is not `concept`', async () => {
+    const tokens = await getTokens(['inputs = { notes = { description = "Text" } }']);
+
+    // The slot name is still colored — it is a slot — but `description` carries no
+    // concept reference, so no concept token follows.
+    expect(tokens).toEqual([
+      { line: 0, char: 11, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+    ]);
+  });
+});
+
+describe('Recovery from an unclosed inputs block', () => {
+  it('abandons the block at a table header so the rest of the file is still colored', async () => {
+    const tokens = await getTokens([
+      '[pipe.first]',
+      'inputs = {',
+      '    notes = "Text"',
+      // the closing brace never arrives — the user is still typing
+      '[pipe.second]',
+      'inputs = { extra = "Other" }',
+      'output = "Result"',
+    ]);
+
+    expect(tokens).toEqual([
+      // [pipe.first]
+      { line: 0, char: 1, length: 4, tokenType: TOKEN.mthdsPipeSection, tokenModifiers: DECLARATION_FLAG },
+      { line: 0, char: 6, length: 5, tokenType: TOKEN.mthdsPipeName, tokenModifiers: DECLARATION_FLAG },
+      // the one slot that did get written
+      { line: 2, char: 4, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 2, char: 13, length: 4, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      // [pipe.second] — reached because the header closed the abandoned block
+      { line: 3, char: 1, length: 4, tokenType: TOKEN.mthdsPipeSection, tokenModifiers: DECLARATION_FLAG },
+      { line: 3, char: 6, length: 6, tokenType: TOKEN.mthdsPipeName, tokenModifiers: DECLARATION_FLAG },
+      { line: 4, char: 11, length: 5, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 4, char: 20, length: 5, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+      { line: 5, char: 10, length: 6, tokenType: TOKEN.mthdsConcept, tokenModifiers: 0 },
+    ]);
+  });
+});

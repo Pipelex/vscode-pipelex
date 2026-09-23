@@ -41,35 +41,31 @@ use pipelex_tools::format::format_mthds_impl;
 use pipelex_tools::lint::lint_mthds_impl;
 use taplo_common::schema::builtins::MTHDS_SCHEMA_URL;
 
-/// Repo root, resolved from this crate's manifest dir (`<root>/crates/pipelex-cli`).
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("repo root should resolve")
-}
+mod common;
 
-/// Every `.mthds` fixture under `test-data/mthds/`, discovered by recursing the
-/// whole tree (not a hardcoded dir list) so a fixture added in any current or
-/// future subdirectory — `lint/`, `hover/`, `goto-definition/`, … — is
-/// parity-checked automatically.
+use common::{collect_mthds_fixtures, corpus_dir, mthds_dir, repo_root};
+
+/// Every `.mthds` fixture this suite checks: the repo's own under
+/// `test-data/mthds/`, plus the vendored MTHDS Test Corpus under
+/// `test-data/mthds-corpus/`. Both are discovered by recursing the whole tree
+/// (not a hardcoded dir list) so a fixture added in any current or future
+/// subdirectory — `lint/`, `hover/`, a new corpus entry — is parity-checked
+/// automatically.
+///
+/// **Why the corpus is a sibling directory and not one inside `test-data/mthds/`.**
+/// That tree is swept recursively by the wasm suite too (`js/tools-wasm/tests/`),
+/// which snapshot-pins lint and format output per fixture. The corpus is owned by
+/// `pipelex` and re-synced whenever it changes upstream, so putting it there would
+/// have echoed every entry into a committed snapshot and turned every upstream edit
+/// into a snapshot regeneration in this repo. Parity has no stored expectations —
+/// it compares the library against the binary on the same input — so it costs
+/// nothing to point at content that moves.
 fn mthds_fixtures() -> Vec<PathBuf> {
     let mut files = Vec::new();
-    collect_mthds_fixtures(&repo_root().join("test-data/mthds"), &mut files);
+    collect_mthds_fixtures(&mthds_dir(), &mut files);
+    collect_mthds_fixtures(&corpus_dir(), &mut files);
     files.sort();
     files
-}
-
-/// Recursively collect every `.mthds` file under `dir` into `files`.
-fn collect_mthds_fixtures(dir: &Path, files: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(dir).expect("fixture dir should be readable") {
-        let path = entry.expect("dir entry").path();
-        if path.is_dir() {
-            collect_mthds_fixtures(&path, files);
-        } else if path.extension().and_then(|ext| ext.to_str()) == Some("mthds") {
-            files.push(path);
-        }
-    }
 }
 
 /// Spawn `plxt` with `args` (optionally in `current_dir`), feed it `content` on

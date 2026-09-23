@@ -1,5 +1,28 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.17.0] - 2026-09-23
+
+### Added
+
+- **MTHDS Test Corpus integration**: Vendored the canonical MTHDS Test Corpus (`test-data/mthds-corpus/`) and added the `corpus.rs` suite, which holds every entry to the layer the corpus declares for it (valid entries lint clean, entries carrying a schema fault are rejected); `parity.rs` now also runs over the corpus, so the in-process library stays in parity with the shipped `plxt` binary on it.
+
+### Changed
+
+- **Default validation backend is now `api` (Breaking)**: Validation defaults to the hosted Pipelex API (`https://api.pipelex.com`) instead of a local `pipelex-agent` install, so an API key from app.pipelex.com, stored with `Pipelex: Set Hosted API Key` or set in `PIPELEX_API_KEY`, is the only setup step. With no key, a save sends nothing and shows a toast with **Set API Key** and **Get an API Key** buttons; the one-time consent prompt before `.mthds` files leave the machine is reworded for users who never chose the API, and a decline now lasts until the window reloads instead of returning on every save. Set `pipelex.backend` to `cli` to keep validating locally.
+- **Bundled MTHDS JSON Schema (Breaking)**: The bundled schema moves to `pipelex` v0.55.0, so linting accepts the expanded input-slot form and `hints` tables, and rejects `LLMSetting.prompting_target`, which the language dropped. (plxt 0.9.0, pipelex-tools-py 0.3.0, @pipelex/tools-wasm 0.3.0)
+- **Webview CSS bundling**: The method graph webview now bundles its CSS with `esbuild` and ships minified, halving the bundle size (~5.3MB → ~2.1MB), resolving `@import` statements natively, and removing the fragile manual CSS copy steps in `scripts/build.mjs`.
+- **Dependency updates**: Bumped `@pipelex/mthds-ui` `0.17.0` → `0.24.0` and `@pipelex/sdk` `0.1.5` → `0.17.0`.
+- **Extension packaging**: `make vsix` now uses the local `@vscode/vsce` devDependency (`yarn vsce package`) instead of a global binary for consistent packaging across environments.
+
+### Fixed
+
+- **GraphSpec data node values**: `Pipelex: Show GraphSpec JSON` now renders data node payloads by reading `pipe_io_contracts.json`, `output_form.json`, and optionally `input_form.json` from the graphspec's directory, and a shadcn semantic token map in `shell.css` (scoped to `.react-flow-container`) keeps the panel's form controls painted and following the graph's light/dark toggle.
+- **Expanded input-slot form support**: The editor now understands the MTHDS expanded input-slot form (e.g. `notes = { concept = "Text", hints = { intent = "prose" } }`). Go-to-definition and hover resolve the `concept` string while ignoring presentation hints, and the semantic token scanner was rewritten to track brace depth so slot names highlight correctly across multi-line tables and trailing comments. (plxt 0.9.0)
+
+### Removed
+
+- **StuffViewer & external URL handling**: Removed the `StuffViewer` CSS and the `openExternally` message handling between the graph webview and the extension, following the component's removal in the `@pipelex/mthds-ui` v0.20.0 upstream bump.
+
 ## [0.16.1] - 2026-08-14
 
 ### Fixed

@@ -387,9 +387,22 @@ pub(crate) fn build_mthds_hover_content(resolved: &ResolvedReference) -> String 
                     let input_strs: Vec<String> = entries
                         .iter()
                         .map(|(k, v)| {
+                            // A slot is either the concept string itself (`notes = "Text"`)
+                            // or a table carrying it under `concept`
+                            // (`notes = { concept = "Text", hints = { … } }`). Both render
+                            // the same, as the runtime collapses a hint-free expanded slot
+                            // to its string; the hints are presentation intent for forms,
+                            // and a pipe hover is about what the pipe takes. A slot table
+                            // with no `concept` is schema-invalid, and `?` is honest.
                             let concept = v
                                 .as_str()
                                 .map(|s| s.value().to_string())
+                                .or_else(|| {
+                                    v.as_table()?
+                                        .get("concept")?
+                                        .as_str()
+                                        .map(|s| s.value().to_string())
+                                })
                                 .unwrap_or_else(|| "?".to_string());
                             format!("`{}`: {}", k.value(), concept)
                         })

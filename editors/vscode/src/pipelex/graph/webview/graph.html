@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Method Graph</title>
-<link rel="stylesheet" href="{{XYFLOW_CSS_URI}}">
-<link rel="stylesheet" href="{{GRAPH_CORE_CSS_URI}}">
-<link rel="stylesheet" href="{{GRAPH_TOOLBAR_CSS_URI}}">
+<!-- The renderer's styles, bundled by esbuild from graph.js's import graph.
+     One file, whatever mthds-ui ships: adding or removing a sheet upstream
+     needs no change here. The webview's own shell comes after, so its theme
+     tokens and page chrome win any tie. -->
 <link rel="stylesheet" href="{{GRAPH_CSS_URI}}">
-<link rel="stylesheet" href="{{STUFF_VIEWER_CSS_URI}}">
-<link rel="stylesheet" href="{{DETAIL_PANEL_CSS_URI}}">
+<link rel="stylesheet" href="{{SHELL_CSS_URI}}">
 </head>
 <body>
 <div id="app-container">

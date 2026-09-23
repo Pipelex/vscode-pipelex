@@ -7,7 +7,6 @@ How to build and install the Pipelex extension and CLI from source for local tes
 - Rust toolchain (1.74+) with `wasm32-unknown-unknown` target
 - Node.js 20+
 - Yarn 4 (via corepack: `corepack enable`)
-- `vsce` (`npm install -g @vscode/vsce`)
 - A VS Code-compatible IDE (VS Code, Cursor, Windsurf, etc.)
 
 Install the WASM target if you haven't already:
@@ -42,6 +41,8 @@ Run `make help` to see all targets. Here are the key ones:
 | `make test-all` | `make test` plus `test-pipelex-lib` (Python smoke test — needs `uv` + a `maturin` build, so it's excluded from plain `make test`) |
 | `make check` | Full quality gate: format + lint + all tests (incl. extension type-check) + compilation checks (CLI + WASM) |
 | `make clean` | Remove all build artifacts |
+
+`make vsix` runs the `@vscode/vsce` in the extension's own devDependencies (`yarn vsce package`), so packaging needs no global install and every machine packages with the same pinned version. One of vsce's dependencies, `keytar`, is a native module it loads only to read a stored publisher token; its build is disabled through `dependenciesMeta` in `editors/vscode/package.json` so a cold `yarn install` never compiles it. Nothing we run needs it — `vsce package` does not touch the credential store, and CI publishes with an explicit token.
 
 ## Step-by-Step Guide
 
