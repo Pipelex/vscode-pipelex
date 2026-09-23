@@ -5,9 +5,6 @@
 ### Added
 
 - **MTHDS Test Corpus integration**: Vendored the canonical MTHDS Test Corpus (`test-data/mthds-corpus/`) and added the `corpus.rs` suite, which holds every entry to the layer the corpus declares for it (valid entries lint clean, entries carrying a schema fault are rejected); `parity.rs` now also runs over the corpus, so the in-process library stays in parity with the shipped `plxt` binary on it.
-- **Claude AI skills**: Added skill definitions (`.claude/skills/`) for automating dependency bumps (`bump-mthds-ui`, `bump-sdk`) and standardizing the release process (`release`).
-- **Dependency guard**: Added `scripts/check-mthds-ui-spec.sh` to enforce valid `@pipelex/mthds-ui` specs (only `npm:` specs or full-SHA sprint pins), wired into the `.githooks/pre-commit` hook and `make check-no-local-deps`.
-- **Documentation**: Added `docs/features/semantic-tokens.md` describing the semantic token provider's architecture and depth semantics.
 
 ### Changed
 
@@ -16,7 +13,6 @@
 - **Webview CSS bundling**: The method graph webview now bundles its CSS with `esbuild` and ships minified, halving the bundle size (~5.3MB → ~2.1MB), resolving `@import` statements natively, and removing the fragile manual CSS copy steps in `scripts/build.mjs`.
 - **Dependency updates**: Bumped `@pipelex/mthds-ui` `0.17.0` → `0.24.0` and `@pipelex/sdk` `0.1.5` → `0.17.0`.
 - **Extension packaging**: `make vsix` now uses the local `@vscode/vsce` devDependency (`yarn vsce package`) instead of a global binary for consistent packaging across environments.
-- **CI/CD & branch protection docs**: The CI docs now describe the GitHub Rulesets that replaced classic branch protection on the `dev` and `main` branches.
 
 ### Fixed
 
