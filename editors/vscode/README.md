@@ -54,11 +54,20 @@ Beyond MTHDS, this extension replaces your TOML extension with complete language
 
 The extension looks for a settings file at **`.pipelex/plxt.toml`** (preferred) or **`plxt.toml`** in your project root. The format is the same as a standard [Taplo configuration file](https://taplo.tamasfe.dev/configuration/file.html) — use it to configure formatting rules, schema associations, and linting options for both `.mthds` and `.toml` files.
 
+### Method validation
+
+On every save, the extension validates your method on the hosted Pipelex API at `https://api.pipelex.com`, and reports the errors in the Problems panel and in the method graph. There is nothing to install and no setting to change: an API key is the only setup step (see Installation below). Before the first validation, the extension asks once for your consent to send the `.mthds` files in the saved file's directory.
+
+- **Use your own server:** point `pipelex.api.baseUrl` at a self-hosted [pipelex-api](https://github.com/Pipelex/pipelex-api), such as `http://localhost:8081`.
+- **Validate locally:** set `pipelex.backend` to `cli` to validate with a local `pipelex-agent`, so nothing leaves your machine.
+
 ## 📦 Installation
 
 1. **Extensions marketplace** — Search for "Pipelex" in the Extensions view
 2. **Command line** — `code --install-extension Pipelex.pipelex` or `cursor --install-extension Pipelex.pipelex`
 3. **Manual** — Download `.vsix` from [releases](https://github.com/Pipelex/vscode-pipelex/releases)
+
+Then, to validate your methods, get an API key at [app.pipelex.com](https://app.pipelex.com/) and store it with the **Pipelex: Set Hosted API Key** command. The key is kept in VS Code's secret storage. When no key is stored, the extension uses the `PIPELEX_API_KEY` environment variable if it is set.
 
 ---
 

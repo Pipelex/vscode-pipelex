@@ -1,6 +1,6 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
-## [0.17.0] - 2026-09-08
+## [0.17.0] - 2026-09-23
 
 ### Fixed
 
@@ -21,6 +21,8 @@
   One limit is now pinned rather than papered over: an `inputs` inline table **spread over several lines** still navigates in neither slot form. A newline inside an inline table is invalid TOML and taplo's error recovery flattens the nesting, so there is no `inputs` ancestor left to walk to — the parser's limit, predating the expanded form, and repairing it means changing recovery for every TOML document. The semantic provider is textual and colours that shape correctly, so colour without navigation is the visible consequence. Upstream crate touched: `taplo-lsp` (`handlers/mthds_resolution.rs`, `handlers/hover.rs`), both MTHDS additions inside an upstream crate; no upstream TOML behaviour changes. See `docs/features/goto-definition.md` and the new `docs/features/semantic-tokens.md`. (plxt 0.9.0)
 
 ### Changed
+
+- **Validation defaults to the hosted Pipelex API (Breaking)**: `pipelex.backend` now defaults to `api`, whose base URL defaults to the production API at `https://api.pipelex.com`, so validation needs no local `pipelex-agent`, only an API key from app.pipelex.com stored with `Pipelex: Set Hosted API Key` (or `PIPELEX_API_KEY`). With no key, a save stops before sending anything and shows a toast with **Set API Key** and **Get an API Key** buttons. The one-time consent prompt is reworded for users who never chose the API, and a decline now lasts until the window reloads instead of reappearing on every save. To keep validating with a local `pipelex-agent`, set `pipelex.backend` to `cli`.
 
 - **esbuild bundles the webview's CSS, which deletes the hand-copying — and minifying it halves the bundle.** The method-graph webview used to switch CSS bundling off (`loader: { ".css": "empty" }`) and transcribe mthds-ui's stylesheets by hand instead: a `cpSync` per sheet in `scripts/build.mjs`, a regex stripping the bare `@import` out of `graph-core.css` because a webview cannot resolve a package specifier, a `<link>` placeholder per sheet in `graph.html`, and an `asWebviewUri` plus an `html.replace` per sheet in `methodGraphPanel`. The comment beside the loader gave the reason, and it was not a missing capability: esbuild names the emitted stylesheet after the JS bundle, so its `graph.css` overwrote the extension's own hand-copied `graph.css`. A filename collision had cost the build its stylesheet resolution.
 

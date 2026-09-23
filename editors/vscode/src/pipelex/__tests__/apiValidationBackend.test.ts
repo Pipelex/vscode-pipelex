@@ -102,11 +102,12 @@ function mockOutput() {
     return { appendLine: vi.fn() } as any;
 }
 
-function makeBackend(opts?: { baseUrl?: string; confirmRemote?: () => Promise<boolean> }) {
+function makeBackend(opts?: { baseUrl?: string; confirmRemote?: () => Promise<boolean>; token?: string }) {
     const output = mockOutput();
+    const token = opts && 'token' in opts ? opts.token : 'secret-token';
     return new ApiValidationBackend({
         baseUrl: opts?.baseUrl ?? 'http://localhost:8081',
-        getToken: async () => 'secret-token',
+        getToken: async () => token,
         capabilityGate: new ApiCapabilityGate(output),
         confirmRemote: opts?.confirmRemote ?? (async () => true),
         output,
@@ -249,11 +250,48 @@ describe('ApiValidationBackend', () => {
         expect(err.userMessage).toMatch(/HTTP 403/);
         expect(err.userMessage).toMatch(/app\.pipelex\.com/);
         expect(err.userMessage).toMatch(/`cli`/);
+        // A hosted request always carried a key (none → `no-key` before sending),
+        // so the message is about the key being refused, not missing.
+        expect(err.userMessage).toMatch(/rejected your API key/);
         expect(err.actions).toEqual([
             { label: 'Set API Key', command: 'pipelex.setApiKey' },
             { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
         ]);
     });
+
+    it.each(['https://api-dev.pipelex.com', 'https://api.pipelex.com'])(
+        'stops with a no-key BackendError for the hosted API at %s when no key is available, before prompting or sending',
+        async baseUrl => {
+            apiState.validate = async () => ({ is_valid: true });
+            const confirmRemote = vi.fn(async () => true);
+            const err = await analyze(makeBackend({ baseUrl, confirmRemote, token: undefined })).catch(e => e);
+            expect(err).toBeInstanceOf(BackendError);
+            expect(err.kind).toBe('no-key');
+            // Where to get a key, and the command that stores it.
+            expect(err.userMessage).toContain('https://app.pipelex.com/');
+            expect(err.userMessage).toContain('"Pipelex: Set Hosted API Key"');
+            expect(err.userMessage).toContain(baseUrl);
+            expect(err.userMessage).toMatch(/`cli`/);
+            expect(err.actions).toEqual([
+                { label: 'Set API Key', command: 'pipelex.setApiKey' },
+                { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
+            ]);
+            // Nothing to consent to and nothing sent: the request could only be a 401.
+            expect(confirmRemote).not.toHaveBeenCalled();
+            expect(apiState.lastValidateArgs).toBeNull();
+        },
+    );
+
+    it.each(['http://localhost:8081', 'https://pipelex.internal.example'])(
+        'sends without a key to a self-hosted server at %s, which may run without auth',
+        async baseUrl => {
+            apiState.validate = async () => ({ is_valid: true });
+            const analysis = await analyze(makeBackend({ baseUrl, token: undefined }));
+            expect(analysis.validation.ok).toBe(true);
+            expect(apiState.lastConstructorOptions).toEqual({ baseUrl, apiKey: undefined });
+            expect(apiState.lastValidateArgs).not.toBeNull();
+        },
+    );
 
     it('maps a 5xx to an api-error BackendError (server reached, errored)', async () => {
         apiState.validate = async () => { throw new ApiResponseError('service unavailable', 'https://api.pipelex.com', 503, 'Service Unavailable', '', undefined, 'service unavailable', undefined, undefined); };
