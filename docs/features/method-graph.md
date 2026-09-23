@@ -8,7 +8,7 @@ The graph is built **statically inside the extension host** by `@pipelex/mthds-u
 
 - **No pipelex round-trip for the graph.** Opening the panel no longer blocks on `pipelex-agent validate --view`; the analyze call still runs, but only for the verdict (`--view` is never passed anymore).
 - **Invalid methods still render.** The static builder is lenient by design — half-written bundles, unresolved refs, and cycles all produce a best-effort graph plus diagnostics, never an error page.
-- **Works without pipelex.** If `pipelex-agent` isn't installed, the graph still renders; only the validation verdict is unavailable (widget `error` state + a one-time install hint).
+- **Works without pipelex.** The graph never needs a validator. With the default `api` backend no local install is involved at all, and until an API key is stored the graph still renders while the widget shows the `error` state with the key remedies (see `validation-backends.md`). With the `cli` backend and no `pipelex-agent` installed, the graph likewise renders and the widget shows the `error` state, with a one-time install hint.
 - **Saves are instant.** On save the panel rebuilds the static graph immediately (same-file refresh preserves the viewport) and flips the widget to `validating`; the on-save validator's single analyze call then delivers the verdict.
 - **`pipelex.validation.enabled: false` turns the verdict off entirely.** Since the graph no longer needs the backend, disabling validation means the panel runs no analyze at all — no CLI subprocess, no API upload, no failure toasts on a pipelex-less machine — and renders static-only with the widget hidden.
 
@@ -109,4 +109,4 @@ Two additions to the host ↔ webview protocol:
 
 ## Backends
 
-Both validation backends (`cli` / `api`, see `validation-backends.md`) feed the widget identically: a produced verdict maps to `valid`/`invalid`, a `BackendError` to the `error` state (with its per-kind wording as the lead issue). Toast notifications stay rate-limited: the panel toasts only for its own analyze failures — the open-time run and the debounced external-change refreshes (one-time CLI-install hint; actionable API auth errors with the Set API Key button) — while on-save failures keep being notified by the validator.
+Both validation backends (`api`, the default, and `cli`; see `validation-backends.md`) feed the widget identically: a produced verdict maps to `valid`/`invalid`, a `BackendError` to the `error` state (with its per-kind wording as the lead issue). Toast notifications stay rate-limited: the panel toasts only for its own analyze failures — the open-time run and the debounced external-change refreshes (one-time CLI-install hint; actionable API no-key and auth errors with the Set API Key button) — while on-save failures keep being notified by the validator.

@@ -161,7 +161,9 @@ export function describeBackendErrorIssue(err: unknown): GraphValidationIssue {
                     `≥ ${err.minVersion ?? '?'}. Upgrade pipelex and save again.`;
                 break;
             case 'declined':
-                message = 'Sending bundle contents to the remote Pipelex API was declined.';
+                message =
+                    'Sending your .mthds files to the Pipelex API was declined, so validation is off until you ' +
+                    'reload the window and are asked again. To validate locally instead, set pipelex.backend to cli.';
                 break;
             default:
                 message = err.userMessage ?? err.logMessage;

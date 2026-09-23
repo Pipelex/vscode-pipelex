@@ -1306,11 +1306,13 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it("the panel's own analyze failure (auth) toasts with the backend's remedy actions", async () => {
+    // `auth` is a key the server refused; `no-key` is the default backend's first
+    // run, with no key stored at all. Both carry the same remedies.
+    it.each(['auth', 'no-key'] as const)("the panel's own analyze failure (%s) toasts with the backend's remedy actions", async kind => {
         const uri = makeUri('/project/file.mthds');
         seedBundle(uri);
         const authError = new BackendError({
-            kind: 'auth',
+            kind,
             logMessage: 'Pipelex API 401 at https://api.pipelex.com: unauthorized',
             userMessage: 'The hosted Pipelex API needs an API key.',
             actions: [

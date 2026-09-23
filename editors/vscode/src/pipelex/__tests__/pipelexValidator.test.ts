@@ -57,6 +57,7 @@ vi.mock('../validation/crossFileDiagnostics', () => ({
 }));
 
 import { PipelexValidator } from '../validation/pipelexValidator';
+import { BackendError } from '../validation/backend';
 import { buildBundleDiagnostics } from '../validation/crossFileDiagnostics';
 
 function makeDeferred<T>() {
@@ -330,6 +331,50 @@ describe('PipelexValidator — per-directory generation gate', () => {
         expect(backend.analyze).not.toHaveBeenCalled();
 
         vi.mocked(vscode.languages.getDiagnostics).mockReturnValue([]);
+        validator.dispose();
+    });
+});
+
+describe('PipelexValidator — backend failure notifications', () => {
+    beforeEach(() => {
+        mockState.onSaveHandler = null;
+        mockState.diagStore.clear();
+        mockState.setCalls.length = 0;
+        mockState.configEnabled = true;
+        mockState.bundleFiles = [];
+    });
+
+    // The default backend's first save when no key is stored: one toast naming the
+    // remedies as buttons, not one per save, and the stale diagnostics cleared.
+    it('a no-key failure toasts once with the key remedies, and not again on the next save', async () => {
+        const vscode = await import('vscode');
+        const showWarningMessage = vi.mocked(vscode.window.showWarningMessage);
+        showWarningMessage.mockReset();
+        showWarningMessage.mockResolvedValue(undefined as any);
+
+        const noKey = new BackendError({
+            kind: 'no-key',
+            logMessage: 'no API key',
+            userMessage: 'Validating .mthds files on the Pipelex API needs an API key.',
+            actions: [
+                { label: 'Set API Key', command: 'pipelex.setApiKey' },
+                { label: 'Get an API Key', externalUrl: 'https://app.pipelex.com/' },
+            ],
+        });
+        const backend = { kind: 'api', analyze: vi.fn(() => Promise.reject(noKey)) };
+        const factory = { getBackend: () => backend } as any;
+        const output = { appendLine: vi.fn() } as any;
+        const validator = new PipelexValidator(output, factory);
+
+        await mockState.onSaveHandler!(mkDoc('/proj/a.mthds'));
+        await mockState.onSaveHandler!(mkDoc('/proj/a.mthds'));
+
+        expect(backend.analyze).toHaveBeenCalledTimes(2);
+        expect(showWarningMessage).toHaveBeenCalledTimes(1);
+        expect(showWarningMessage).toHaveBeenCalledWith(noKey.userMessage, 'Set API Key', 'Get an API Key');
+        expect(output.appendLine).toHaveBeenCalledWith('pipelex: no API key');
+
+        showWarningMessage.mockReset();
         validator.dispose();
     });
 });

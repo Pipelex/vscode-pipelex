@@ -50,11 +50,27 @@ export class ApiValidationBackend implements ValidationBackend {
         // inside a try, turns a misconfiguration into an actionable BackendError instead
         // of a throw that escapes `handleError` — and fails fast, before the privacy modal.
         let client: PipelexApiClient;
+        let token: string | undefined;
         try {
-            const token = await this.deps.getToken();
+            token = await this.deps.getToken();
             client = new PipelexApiClient({ baseUrl, apiKey: token });
         } catch (err: unknown) {
             throw setupError(err, baseUrl);
+        }
+
+        // A hosted Pipelex API always requires a key, and this backend is the
+        // extension's default, so a user who has not stored one yet lands here on
+        // their first save. Say where to get a key and how to store it — before the
+        // privacy modal (there is nothing to consent to yet) and before any request
+        // (which could only come back 401). A self-hosted server may run without
+        // auth, so it gets the request and its own answer.
+        if (!token && isHostedPipelexApi(baseUrl)) {
+            throw new BackendError({
+                kind: 'no-key',
+                logMessage: `no API key stored or in PIPELEX_API_KEY for the hosted Pipelex API at ${baseUrl}`,
+                userMessage: missingKeyMessage(baseUrl),
+                actions: authActions(baseUrl),
+            });
         }
 
         // Privacy gate — fire BEFORE the first remote request, not after a send.
@@ -307,17 +323,32 @@ function apiMalformedBodyMessage(baseUrl: string): string {
 }
 
 /**
+ * Plain-text guidance for a hosted API with no key available, shown by the
+ * notification toast (with the {@link authActions} remedies) and as the widget's
+ * lead issue. This is the first thing a new user of the default backend sees, so
+ * it names where a key comes from and the command that stores it.
+ */
+function missingKeyMessage(baseUrl: string): string {
+    return `Validating .mthds files on the Pipelex API (${baseUrl}) needs an API key. Get one at ` +
+        `${PIPELEX_PLATFORM_URL}, then store it with the "Pipelex: Set Hosted API Key" command. ` +
+        `To validate locally with pipelex-agent instead, set \`pipelex.backend\` to \`cli\`.`;
+}
+
+/**
  * Plain-text guidance for a 401/403, shown by the notification toast (which
  * carries the one-click remedies from {@link authActions}) and as the widget's
  * lead issue. The remedies differ by host: a hosted-API user gets a key from
  * the platform or self-hosts the open-source runner, whereas a self-hosted
- * operator configures auth on the server they run.
+ * operator configures auth on the server they run. A hosted request always
+ * carried a key — with none, `analyze` stops before sending — so the hosted
+ * wording is about the key being refused, not missing.
  */
 function authMessage(baseUrl: string, status: number): string {
     if (isHostedPipelexApi(baseUrl)) {
-        return `The hosted Pipelex API at ${baseUrl} rejected the request (HTTP ${status}) — the \`api\` backend ` +
-            `needs an API key. Set one, get a key at ${PIPELEX_PLATFORM_URL}, run the open-source pipelex-api ` +
-            `locally with Docker, or switch \`pipelex.backend\` to \`cli\` to validate without a key.`;
+        return `The hosted Pipelex API at ${baseUrl} rejected your API key (HTTP ${status}). Store a valid one ` +
+            `with the "Pipelex: Set Hosted API Key" command (get a key at ${PIPELEX_PLATFORM_URL}), run the ` +
+            `open-source pipelex-api locally with Docker, or switch \`pipelex.backend\` to \`cli\` to validate ` +
+            `without a key.`;
     }
     return `The Pipelex API at ${baseUrl} rejected the request (HTTP ${status}) — it requires authentication. ` +
         `Set a key with the "Pipelex: Set Hosted API Key" command (or set the PIPELEX_API_KEY environment variable). ` +

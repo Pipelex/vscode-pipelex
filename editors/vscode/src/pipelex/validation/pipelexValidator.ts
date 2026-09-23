@@ -240,6 +240,7 @@ export class PipelexValidator implements vscode.Disposable {
                 );
                 return;
             case 'auth':
+            case 'no-key':
                 if (err.userMessage) {
                     this.notifyOnce(err.userMessage, err.actions ?? []);
                 }
