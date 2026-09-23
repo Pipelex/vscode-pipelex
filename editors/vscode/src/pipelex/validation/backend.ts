@@ -121,6 +121,8 @@ export type BackendErrorKind =
     | 'api-error'
     /** The API server WAS reached but rejected the request for authentication/authorization (401/403). */
     | 'auth'
+    /** No API key is available for a hosted Pipelex API, which always requires one. Nothing was sent. */
+    | 'no-key'
     /** The backend ran but failed for an infrastructural reason (setup error, spawn failure, unparseable output). */
     | 'infra'
     /** The user declined to send bundle contents to a remote API. */

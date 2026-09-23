@@ -201,19 +201,21 @@ describe('describeBackendErrorIssue', () => {
         expect(issue.message).toContain('0.34.0');
     });
 
-    it('prefers the userMessage for API-side failures', () => {
+    it.each(['api-error', 'no-key'] as const)('prefers the userMessage for API-side failures (%s)', kind => {
         const issue = describeBackendErrorIssue(new BackendError({
-            kind: 'api-error',
+            kind,
             logMessage: 'raw log',
             userMessage: 'Pipelex API error (HTTP 503).',
         }));
         expect(issue.message).toBe('Pipelex API error (HTTP 503).');
     });
 
-    it('explains a declined remote send', () => {
+    it('explains a declined remote send, and how to get validation back', () => {
         const issue = describeBackendErrorIssue(new BackendError({ kind: 'declined', logMessage: 'x' }));
         expect(issue.severity).toBe('error');
         expect(issue.message).toContain('declined');
+        expect(issue.message).toContain('reload the window');
+        expect(issue.message).toContain('pipelex.backend to cli');
     });
 
     it('falls back to the plain error message for non-backend failures', () => {
