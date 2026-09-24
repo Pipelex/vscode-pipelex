@@ -20,6 +20,8 @@ The CLI (`pipelex-tools`) and the library (`pipelex-tools-py`) are **two separat
 
 Because the MTHDS JSON Schema is `include_str!`-embedded into all three engine bindings, **a schema refresh must ship all three** (`plxt`, `pipelex-tools-py`, `@pipelex/tools-wasm`) or the ones left behind keep serving the stale schema.
 
+For `@pipelex/tools-wasm` the publish is not the end of the chain. The Pipelex plugin's post-edit hook embeds it: `pipelex-sdk-js` pins it to an exact version and builds the hook bundle (`npm run build:hook`), and `pipelex-plugins` vendors that bundle (`make vendor-hook`) and ships it in a plugin release. A new engine, and the schema inside it, reaches builders only once both repos have moved, so a release that publishes `@pipelex/tools-wasm` files those two follow-ups in the ledger; the `/release` skill's **Particulars** carry the commands.
+
 ---
 
 ## One-time setup
