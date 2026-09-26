@@ -1,5 +1,12 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The method graph says "Not validated" when nothing validated the method**: with `pipelex.validation.enabled` off, the graph's validation widget now reads "Not validated" and lists what the static graph builder found, where it used to be hidden and those findings were shown nowhere. Declining to send the files to the API, and a save whose validation is skipped because another extension reports errors, now land in the same state instead of the `error` warning triangle, which is kept for a validator that was asked and failed.
+- **Bumped `@pipelex/mthds-ui` `0.24.0` → `0.25.0`**: its form kernel moves to `0.11.0`, so in the graph's detail panel a result table shows five columns and moves the rest into the row's detail, an image inside a prose value renders as a link, and an `image/svg+xml` data URL is named rather than painted. The renderer stopped loading the kernel's stylesheet itself, so the webview now imports it and maps the kernel's new theme tokens, keeping the panel's controls styled and following the graph's light/dark toggle. Which `.mthds` file of a method leads the graph is now decided by the library's shared rule rather than a private copy of it.
+
 ## [0.17.0] - 2026-09-23
 
 ### Added

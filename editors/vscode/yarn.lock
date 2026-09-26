@@ -638,6 +638,28 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@json-render/core@npm:0.20.0, @json-render/core@npm:^0.20.0":
+  version: 0.20.0
+  resolution: "@json-render/core@npm:0.20.0"
+  dependencies:
+    zod: "npm:^4.3.6"
+  peerDependencies:
+    zod: ^4.0.0
+  checksum: e6c86b25263ccad5aee65b47c54e792975a5c3b1936453fbe92f83dd6ac769479602e105b63ddadac06da9ef81b3e15c26f2b0eb99f61000723efc29403f5363
+  languageName: node
+  linkType: hard
+
+"@json-render/react@npm:^0.20.0":
+  version: 0.20.0
+  resolution: "@json-render/react@npm:0.20.0"
+  dependencies:
+    "@json-render/core": "npm:0.20.0"
+  peerDependencies:
+    react: ^19.2.3
+  checksum: 81b07a869fc77fa5580c946e050fa2a1fd4994ebafd7cb235cc570c7660b40199e83c619d4858e828c1a791eb5ec2022bdfb5adad2629b8314bcc25983b0b8b7
+  languageName: node
+  linkType: hard
+
 "@koa/cors@npm:^5.0.0":
   version: 5.0.0
   resolution: "@koa/cors@npm:5.0.0"
@@ -717,12 +739,15 @@ __metadata:
   languageName: node
   linkType: soft
 
-"@pipelex/mthds-form@npm:^0.8.0":
-  version: 0.8.0
-  resolution: "@pipelex/mthds-form@npm:0.8.0"
+"@pipelex/mthds-form@npm:^0.11.0":
+  version: 0.11.0
+  resolution: "@pipelex/mthds-form@npm:0.11.0"
   dependencies:
+    "@json-render/core": "npm:^0.20.0"
+    "@json-render/react": "npm:^0.20.0"
     "@radix-ui/react-select": "npm:^2.3.7"
     "@radix-ui/react-switch": "npm:^1.3.1"
+    "@radix-ui/react-tabs": "npm:^1.1.14"
     "@radix-ui/react-toggle": "npm:^1.1.12"
     "@radix-ui/react-toggle-group": "npm:^1.1.13"
     "@radix-ui/react-tooltip": "npm:^1.2.16"
@@ -735,6 +760,7 @@ __metadata:
     mthds: "npm:^0.25.0"
     react-dropzone: "npm:^14.3.8"
     tailwind-merge: "npm:^3.6.0"
+    zod: "npm:^4.5.4"
   peerDependencies:
     react: ^19
     react-dom: ^19
@@ -743,21 +769,21 @@ __metadata:
       optional: true
     react-dom:
       optional: true
-  checksum: 45185df438f74242e79c391d13e1d6403cf0badf440bab11c0ce9bef551fb789cae23dc4fc3f329583184a991775d7cd437329545d3af8b0abd84df5ef709639
+  checksum: c13116fd56499da825145c021f90a7dbe9545f004c748690e9f164138750f420b366d7a1b6d11f442e3a07503de6120aff02a5285ea630cee17018f7df5be966
   languageName: node
   linkType: hard
 
-"@pipelex/mthds-ui@npm:0.24.0":
-  version: 0.24.0
-  resolution: "@pipelex/mthds-ui@npm:0.24.0"
+"@pipelex/mthds-ui@npm:0.25.0":
+  version: 0.25.0
+  resolution: "@pipelex/mthds-ui@npm:0.25.0"
   dependencies:
-    "@pipelex/mthds-form": "npm:^0.8.0"
+    "@pipelex/mthds-form": "npm:^0.11.0"
     "@xyflow/react": "npm:^12"
     elkjs: "npm:^0.11.1"
     smol-toml: "npm:^1.7.0"
   peerDependencies:
-    react: ^19
-    react-dom: ^19
+    react: ^19.2.3
+    react-dom: ^19.2.3
     shiki: ^3.22.0
   peerDependenciesMeta:
     react:
@@ -766,7 +792,7 @@ __metadata:
       optional: true
     shiki:
       optional: true
-  checksum: 207c5555921e1e829a35fa61a29d621d7a4a5e4d52cf3f9213c57284c46e562a27a36c315309817551f15dd9e750a81bf09574ff205fcab5fb7e18bfa7915679
+  checksum: a5b033255585708073657964cbfb3db499580ca7b4fb3b119b8d101642b552fcfd3a0b50b6283f11ac25aec2c02f0f8e8c40128c63d6dd42214b7251c8e031f7
   languageName: node
   linkType: hard
 
@@ -1153,6 +1179,32 @@ __metadata:
     "@types/react-dom":
       optional: true
   checksum: cc2d3670f78a14eb558a50b9979568ac2439551b4487cbf83f25b7f5cd2859d29672fab7fc8c97e16b9ee9420b4fd0a103f1bd409bb172a14ee8528aaec59fff
+  languageName: node
+  linkType: hard
+
+"@radix-ui/react-tabs@npm:^1.1.14":
+  version: 1.1.21
+  resolution: "@radix-ui/react-tabs@npm:1.1.21"
+  dependencies:
+    "@radix-ui/primitive": "npm:1.1.7"
+    "@radix-ui/react-context": "npm:1.2.2"
+    "@radix-ui/react-direction": "npm:1.1.4"
+    "@radix-ui/react-id": "npm:1.1.4"
+    "@radix-ui/react-presence": "npm:1.1.10"
+    "@radix-ui/react-primitive": "npm:2.1.10"
+    "@radix-ui/react-roving-focus": "npm:1.1.19"
+    "@radix-ui/react-use-controllable-state": "npm:1.2.6"
+  peerDependencies:
+    "@types/react": "*"
+    "@types/react-dom": "*"
+    react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+  peerDependenciesMeta:
+    "@types/react":
+      optional: true
+    "@types/react-dom":
+      optional: true
+  checksum: 9ed747ec592b04efc57bc1b124b9b4b4bb80011167ea5d87ea99955a88fa3a84df2e78a8ffaa1a15e2ba3d9598b6d8a8c28664fc3712aa8627c0e37267389652
   languageName: node
   linkType: hard
 
@@ -6004,7 +6056,7 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
-    "@pipelex/mthds-ui": "npm:0.24.0"
+    "@pipelex/mthds-ui": "npm:0.25.0"
     "@pipelex/sdk": "npm:0.17.0"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
@@ -6022,8 +6074,8 @@ __metadata:
     esbuild: "npm:^0.20.0"
     fast-glob: "npm:^3.3.2"
     node-fetch: "npm:^3.3.2"
-    react: "npm:^19"
-    react-dom: "npm:^19"
+    react: "npm:^19.2.3"
+    react-dom: "npm:^19.2.3"
     rollup: "npm:^4.9.6"
     rollup-plugin-esbuild: "npm:^6.1.1"
     smol-toml: "npm:^1.7.0"
@@ -6250,7 +6302,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-dom@npm:^19":
+"react-dom@npm:^19.2.3":
   version: 19.2.4
   resolution: "react-dom@npm:19.2.4"
   dependencies:
@@ -6332,7 +6384,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react@npm:^19":
+"react@npm:^19.2.3":
   version: 19.2.4
   resolution: "react@npm:19.2.4"
   checksum: cd2c9ff67a720799cc3b38a516009986f7fc4cb8d3e15716c6211cf098d1357ee3e348ab05ad0600042bbb0fd888530ba92e329198c92eafa0994f5213396596
@@ -8085,6 +8137,13 @@ __metadata:
   version: 4.4.3
   resolution: "zod@npm:4.4.3"
   checksum: 7ea31b558e88f9faf44f31dd185e2e1cbf51fed3081787fb96cc2534749b50c0acfc6da7f0922a7353ed092dd358c7d50c28ea96c94d04af64191bd33152eca3
+  languageName: node
+  linkType: hard
+
+"zod@npm:^4.5.4":
+  version: 4.6.5
+  resolution: "zod@npm:4.6.5"
+  checksum: 32eb6c5e98becbe045675b2141c3611451c16ba567f9779231d79af41c4d651ca1c22f154aef7e6c6e77b929f23e43f1154ca05b82e119e922353725d6776af5
   languageName: node
   linkType: hard
 
