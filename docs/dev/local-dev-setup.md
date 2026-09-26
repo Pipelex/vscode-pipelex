@@ -22,7 +22,7 @@ rustup target add wasm32-unknown-unknown
 make ext-install
 ```
 
-This builds the WASM LSP bundle, the VS Code extension, packages it into a `.vsix`, and installs it into the first IDE it finds (`cursor` or `code` CLI).
+This builds the WASM LSP bundle, the VS Code extension, packages it into a `.vsix`, and installs it into VS Code through its `code` CLI, or into Cursor through `cursor` when there is no `code` on the `PATH`. `make ext-uninstall` picks its target the same way.
 
 ## Makefile Targets
 
