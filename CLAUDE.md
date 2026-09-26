@@ -38,7 +38,7 @@ Publishes two PyPI packages from separate `pyproject.toml` files:
 - `make ext` - **Full extension rebuild**: compiles Rust → WASM → JS bundle (`ext-deps`), then builds the VS Code extension. Run this after any Rust LSP change to test in the Extension Host.
 - `make cli` - Build the `plxt` CLI binary (release mode)
 - `make vsix` - Package the extension into a `.vsix` file (runs `ext` first)
-- `make ext-install` - Build, package, and install the `.vsix` into Cursor or VS Code
+- `make ext-install` - Build, package, and install the `.vsix` into VS Code (Cursor only when there is no `code` CLI)
 - `make ext-uninstall` - Uninstall the extension from the IDE
 - `make test` - Run all fast tests (every Rust crate that has tests + VS Code extension vitest) and type-check the extension (`yarn typecheck`). It aggregates the per-package `test-*` targets below.
 - `make test-<package>` - Run one package's tests in isolation. One target per package that has a test suite: `test-taplo`, `test-taplo-common`, `test-taplo-lsp`, `test-lsp-async-stub`, `test-pipelex-common`, `test-pipelex-cli`, `test-pipelex-py` (Rust side), `test-ext` (extension tsc + vitest), and `test-pipelex-lib` (builds the Python wheel via maturin, then runs the `pipelex_tools` smoke test).
