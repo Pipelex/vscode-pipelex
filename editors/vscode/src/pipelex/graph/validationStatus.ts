@@ -10,7 +10,7 @@ import type { ValidationErrorItem } from '../validation/types';
  * pure, unit-testable half of the widget flow — has no dependency beyond the
  * backend error type. The panel/adapter pass them to the renderer verbatim.
  */
-export type GraphValidationState = 'validating' | 'valid' | 'invalid' | 'error';
+export type GraphValidationState = 'validating' | 'valid' | 'invalid' | 'error' | 'unvalidated';
 
 export interface GraphValidationIssue {
     severity: 'error' | 'warning';
@@ -143,9 +143,10 @@ export function parseStaticIssueContext(
 
 /**
  * Render a backend failure (no verdict could be produced) as the lead issue of
- * the widget's `error` state. Mirrors the per-kind wording the full-page views
- * used before the static-first flow; toast side-channels (install warning,
- * auth actions) stay with the panel.
+ * the widget's `error` state — or, for a declined remote send, of its
+ * `unvalidated` state, since the user chose not to validate. Mirrors the
+ * per-kind wording the full-page views used before the static-first flow;
+ * toast side-channels (install warning, auth actions) stay with the panel.
  */
 export function describeBackendErrorIssue(err: unknown): GraphValidationIssue {
     let message: string;
@@ -172,5 +173,8 @@ export function describeBackendErrorIssue(err: unknown): GraphValidationIssue {
     } else {
         message = err instanceof Error ? err.message : String(err);
     }
-    return { severity: 'error', message, origin: 'validator' };
+    // A declined send is the user's own choice, not a fault in anything, so it
+    // leads the list as a note rather than as an error.
+    const severity = err instanceof BackendError && err.kind === 'declined' ? 'warning' : 'error';
+    return { severity, message, origin: 'validator' };
 }

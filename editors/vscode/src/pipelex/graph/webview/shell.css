@@ -42,19 +42,20 @@ body.vscode-high-contrast-light {
 
 /* ─── The form kernel's token map ────────────────────────────────────────── */
 /* The detail panel renders a data node's value through `@pipelex/mthds-form`'s
-   controls, which are Tailwind classes over shadcn semantic tokens. mthds-ui
-   bundles the kernel's stylesheet (wrapped in `@layer mthds-form`) but
-   deliberately NOT its `theme.css`, because that file defines the very tokens a
-   shadcn host already owns and importing it would let the kernel repaint the
-   host's palette. Supplying them is therefore the host's lane, and this is the
-   host.
+   controls, which are Tailwind classes over shadcn semantic tokens. The webview
+   imports the kernel's stylesheet through `@pipelex/mthds-ui/form-kernel.css`
+   (which wraps it in `@layer mthds-form`) but deliberately NOT its `theme.css`,
+   because that file defines the very tokens a shadcn host already owns and
+   importing it would let the kernel repaint the host's palette. Supplying them
+   is therefore the host's lane, and this is the host.
 
-   Nothing here is cosmetic tidying. Since kernel 0.8.0 the sheet is a Tailwind
-   4 build holding whole colours — `background-color: var(--primary)`, with no
-   fallback — so an undefined token does not degrade, it makes the declaration
-   INVALID and the browser discards it. That is the quietest failure CSS has:
-   green build, token inspectable, control silently falling back to transparent
-   or to the initial `canvastext`.
+   Nothing here is cosmetic tidying. Since kernel 0.9.0 the sheet reads every
+   token with a fallback holding the kernel's LIGHT palette —
+   `background-color: var(--primary, #18181b)` — so an undefined token no longer
+   paints transparent, it paints light: a white field or a near-black selection
+   inside a dark graph, whichever way the in-graph toggle points. That is still
+   the quietest failure CSS has: green build, nothing discarded, and the panel
+   simply stops following the theme one control at a time.
 
    Defined on `.react-flow-container` rather than on `:root` or `body`, and from
    the GRAPH's palette rather than from VS Code's theme colours, because that is
@@ -70,12 +71,17 @@ body.vscode-high-contrast-light {
    `src/pipelex/__tests__/formKernelTokens.test.ts` reads the kernel's shipped
    stylesheet and holds this block to every token it actually reads, so a kernel
    upgrade that reaches for a new one fails loudly here instead of quietly
-   dropping a rule in the panel. */
+   painting one control in the wrong theme. That includes the tokens only the
+   kernel's `./generative` components read (`--card-foreground`, the
+   `--primary-foreground` and `--secondary` pairs), which nothing in this
+   webview mounts today: the requirement is the sheet the webview loads, not the
+   components that happen to render. */
 .react-flow-container {
     /* Surfaces and the text on them. */
     --background: var(--surface-panel);
     --foreground: var(--text-default);
     --card: var(--surface-elevated);
+    --card-foreground: var(--text-default);
     --muted: var(--surface-sunken);
     --muted-foreground: var(--text-muted);
 
@@ -90,11 +96,19 @@ body.vscode-high-contrast-light {
     --accent: var(--surface-elevated-hover);
     --accent-foreground: var(--text-primary);
 
-    /* `--primary` carries the kernel's active/selected state; `--destructive`
-       is only ever a text, border or ring colour in this sheet, never a fill,
-       so the palette's error hue reads correctly at both themes. */
+    /* `--primary` carries the kernel's active/selected state, and its
+       foreground is the palette's own text-on-accent. `--destructive` is only
+       ever a text, border or ring colour in the controls this panel renders,
+       never a fill (the sheet's destructive fills belong to the `./generative`
+       components), so the palette's error hue reads correctly at both themes. */
     --primary: var(--color-accent-strong);
+    --primary-foreground: var(--text-on-accent);
     --destructive: var(--color-error);
+
+    /* shadcn's `--secondary` is a subdued chip fill, such as a secondary badge:
+       the palette's pill surface, with the strong text `--accent` uses. */
+    --secondary: var(--surface-pill);
+    --secondary-foreground: var(--text-primary);
 
     /* Lines. `--input` is read as BOTH a border and a faint field fill, so it
        takes the same value as `--border`: legible as a hairline in either
