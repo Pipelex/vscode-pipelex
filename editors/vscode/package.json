@@ -826,7 +826,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "npm:0.25.0",
+    "@pipelex/mthds-ui": "npm:0.26.0",
     "@pipelex/sdk": "0.17.0",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
