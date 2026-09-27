@@ -1,5 +1,19 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.18.1] - 2026-09-27
+
+### Added
+
+- **API errors log the server's request id**: when the Pipelex API refuses a validation request or answers with an error, the line in the Pipelex output channel now ends with `(request <id>)` whenever the server sent one, the id that finds the server's log lines for that request.
+
+### Changed
+
+- **Bumped `@pipelex/sdk` `0.17.0` → `0.26.0`**: the `api` validation backend reads verdicts, error fields and the version handshake as before. Its requests from the desktop extension now carry a `User-Agent` naming the SDK and the Node runtime (`pipelex-sdk-js/0.26.0 node/…`).
+
+### Fixed
+
+- **An abandoned API validation no longer keeps its request open**: a save superseded by a newer one, or one that ran past `pipelex.validation.timeout`, stopped waiting for its answer but left the HTTP request running under the SDK's twenty-minute default, still uploading the bundle. The request is now cancelled together with the save.
+
 ## [0.18.0] - 2026-09-27
 
 ### Changed

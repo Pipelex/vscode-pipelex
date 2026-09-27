@@ -101,8 +101,11 @@ export class ApiValidationBackend implements ValidationBackend {
 
         let report: PipelexValidationResult;
         try {
+            // Hand the client the save's signal and timeout so a superseded or timed-out
+            // save cancels the request itself. Without them the SDK's own 20-minute
+            // default governs, and every abandoned save keeps its upload in flight.
             report = await this.runWithAbort(
-                client.validate(contents, true, names),
+                client.validate(contents, true, names, undefined, undefined, { timeoutMs: request.timeout, signal }),
                 signal,
                 request.timeout,
                 baseUrl,
@@ -161,9 +164,10 @@ export class ApiValidationBackend implements ValidationBackend {
     }
 
     /**
-     * Race the (uncancellable) client request against the abort signal and a
-     * timeout. The underlying fetch keeps running, but we stop awaiting it so a
-     * superseded save or a hung server does not pile up.
+     * Race the client request against the abort signal and a timeout. The request
+     * carries the same signal and timeout, so the SDK cancels the fetch as well; the
+     * race is what settles the save with our own outcome — an {@link AnalyzeAbortError}
+     * or an `unreachable` {@link BackendError} — whichever way the SDK reports its end.
      */
     private runWithAbort<T>(promise: Promise<T>, signal: AbortSignal, timeout: number, baseUrl: string): Promise<T> {
         return new Promise<T>((resolve, reject) => {
@@ -209,7 +213,9 @@ export class ApiValidationBackend implements ValidationBackend {
             // not "unreachable". An auth rejection (401/403) gets its own kind +
             // one-click remedies; everything else (a request-shape 422, a bad
             // request, a 5xx) is a generic api-error.
-            const logMessage = `Pipelex API ${err.status} at ${baseUrl}: ${err.serverMessage ?? err.statusText}`;
+            // The request id is what finds the server's log lines for this request.
+            const requestId = err.requestId ? ` (request ${err.requestId})` : '';
+            const logMessage = `Pipelex API ${err.status} at ${baseUrl}: ${err.serverMessage ?? err.statusText}${requestId}`;
             if (err.status === 401 || err.status === 403) {
                 throw new BackendError({
                     kind: 'auth',
