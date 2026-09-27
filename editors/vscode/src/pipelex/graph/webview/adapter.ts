@@ -9,6 +9,14 @@ import type {
     ValidationState,
 } from '@pipelex/mthds-ui';
 import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
+// The form kernel's prebuilt stylesheet, which styles the controls the detail
+// panel renders a data node's value with. mthds-ui stopped injecting it from
+// `graph/react` in 0.25.0, because no single cascade position served a host
+// with Tailwind of its own; a host without Tailwind, which this webview is,
+// imports it once itself. esbuild emits it into `graph.css` beside the
+// renderer's own sheets, inside `@layer mthds-form`, so `shell.css`'s unlayered
+// rules still win every tie. `scripts/build.mjs` fails the build if it is lost.
+import '@pipelex/mthds-ui/form-kernel.css';
 // The form kernel's types, reached THROUGH mthds-ui rather than from
 // `@pipelex/mthds-form` directly. The kernel carries React context, so a host
 // that declares its own dependency on it can end up with two copies and two
@@ -52,8 +60,9 @@ let lastReportedMode: GraphThemeMode | undefined;
 
 // The toolbar validation widget's state. Seeded from each setData payload and
 // updated by lightweight setValidationStatus messages (the setSystemTheme
-// pattern — no re-layout, no viewport reset). Null keeps the widget hidden
-// (graphspec-json views, hosts without validation).
+// pattern — no re-layout, no viewport reset). Null keeps the widget hidden,
+// which only a graphspec-json view does: a `.mthds` graph always carries a
+// state, `unvalidated` when nothing validates it.
 let currentValidation: { state: ValidationState; issues: ValidationIssue[] } | null = null;
 
 // The `/validate` artifacts the host read from beside a run's graphspec, and

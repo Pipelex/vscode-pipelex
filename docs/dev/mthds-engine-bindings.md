@@ -9,7 +9,7 @@ This repo ships MTHDS **lint** and **format** through several surfaces — a CLI
 | `plxt` CLI | PyPI `pipelex-tools` (native binary) | `crates/pipelex-cli` | terminals, editors' format-on-save, CI |
 | Python library | PyPI `pipelex-tools-py` (`import pipelex_tools`) | `crates/pipelex-py` | `pipelex-api`'s in-process `/v1/lint` + `/v1/format` |
 | Language server | npm `@pipelex/lsp` (LSP-in-WASM) | `crates/pipelex-wasm` | the VS Code extension |
-| Lint/format-only WASM | npm `@pipelex/tools-wasm` | `crates/pipelex-tools-wasm` + `js/tools-wasm` | Node consumers that need offline lint/format without the LSP — e.g. plugin hook bundles |
+| Lint/format-only WASM | npm `@pipelex/tools-wasm` | `crates/pipelex-tools-wasm` + `js/tools-wasm` | Node consumers that need offline lint/format without the LSP, such as the Pipelex plugin's post-edit hook, built in `pipelex-sdk-js` and vendored into `pipelex-plugins` |
 
 ## Where the engine lives
 

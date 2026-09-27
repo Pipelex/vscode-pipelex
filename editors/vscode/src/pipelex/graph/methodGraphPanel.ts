@@ -79,8 +79,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     /**
      * The static analyzer's issues (+ aligned best-effort jump targets) for the
      * graph currently shown, kept so verdict updates can re-compose the issue
-     * list per state: all of them while `validating`, warnings only on `valid`,
-     * appended after the failure description on `error`.
+     * list per state: all of them while `validating` and `unvalidated`,
+     * warnings only on `valid`, appended after the failure description on
+     * `error`.
      */
     private staticIssues: GraphValidationIssue[] = [];
     private staticTargets: (ErrorTarget | undefined)[] = [];
@@ -91,12 +92,13 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      */
     private currentValidation: GraphValidationPayload | undefined;
     /**
-     * The lead issue of the current `error` state (backend failure or skip
-     * reason). Retained separately from {@link currentValidation} so a static
-     * rebuild finishing after the verdict can re-compose `[lead, ...fresh
-     * static issues]` instead of keeping the previous render's static tail.
+     * The lead issue of the current `error` state (the backend failure) or
+     * `unvalidated` state (why the on-save validation was skipped). Retained
+     * separately from {@link currentValidation} so a static rebuild finishing
+     * after it can re-compose `[lead, ...fresh static issues]` instead of
+     * keeping the previous render's static tail.
      */
-    private errorLead: GraphValidationIssue | undefined;
+    private leadIssue: GraphValidationIssue | undefined;
     /**
      * Monotonic token claimed by each graph-producing render (static rebuild or
      * graphspec-json refresh). Re-checked after every await so a superseded
@@ -136,7 +138,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 // the on-save validator owns the single analyze call and hands the
                 // verdict to the widget (see setGraphSink), so only rebuild the static
                 // graph here; when disabled, go through refresh(), whose own
-                // validation.enabled gate renders static-only with the widget hidden.
+                // validation.enabled gate renders static-only under `unvalidated`.
                 const validationEnabled = vscode.workspace
                     .getConfiguration('pipelex', doc.uri)
                     .get<boolean>('validation.enabled', true);
@@ -435,7 +437,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         // `pipelex.validation.enabled: false` turns validation off everywhere:
         // since the static-first flow the graph does not need the backend, so the
         // panel runs no analyze at all (no subprocess, no API upload, no failure
-        // toasts on a pipelex-less machine) and the widget stays hidden.
+        // toasts on a pipelex-less machine) and the widget says `unvalidated`.
         if (!pipelexConfig.get<boolean>('validation.enabled', true)) {
             if (!this.webviewReady) {
                 this.setHtml(loadingHtml());
@@ -514,9 +516,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * newer render, or unreadable files — the latter falls back to the message
      * view).
      *
-     * `verdict: false` renders with validation off entirely: no widget (the
-     * `setData` payload carries no validation state) and no verdict channel to
-     * recompose around — the `pipelex.validation.enabled: false` path.
+     * `verdict: false` renders with validation off entirely — the
+     * `pipelex.validation.enabled: false` path: no verdict channel to recompose
+     * around, so the widget shows `unvalidated` over the static issues, and
+     * nothing ever moves it on.
      */
     private async renderStaticGraph(
         uri: vscode.Uri,
@@ -568,15 +571,18 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
 
         if (!verdict) {
-            // Validation is off: no widget at all, so no issue list to navigate.
-            this.currentValidation = undefined;
-            this.errorTargets = [];
+            // Validation is off, so nothing will ever validate this method: the
+            // widget says so, and lists what reading the source turned up.
+            this.leadIssue = undefined;
+            const next = this.composeUnvalidated();
+            this.currentValidation = next.payload;
+            this.errorTargets = next.targets;
         } else {
             // Fold the fresh static issues into the widget state. While the verdict
-            // is pending they ARE the list; a verdict that already landed (the
+            // is pending they ARE the list; a state that already landed (the
             // validator racing ahead of these file reads — e.g. an immediate skip)
-            // keeps its state, but any static portion of its issue list is rebuilt
-            // here so it can never retain the previous render's issues or targets.
+            // is kept, but any static portion of its issue list is rebuilt here so
+            // it can never retain the previous render's issues or targets.
             const current = this.currentValidation;
             if (!current || current.state === 'validating') {
                 const next = this.composeValidating();
@@ -586,8 +592,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 const kept = this.keptStaticWarnings();
                 this.currentValidation = { state: 'valid', issues: kept.issues };
                 this.errorTargets = kept.targets;
-            } else if (current.state === 'error' && this.errorLead) {
-                const next = this.composeError(this.errorLead);
+            } else if (current.state === 'error' && this.leadIssue) {
+                const next = this.composeError(this.leadIssue);
+                this.currentValidation = next.payload;
+                this.errorTargets = next.targets;
+            } else if (current.state === 'unvalidated') {
+                const next = this.composeUnvalidated(this.leadIssue);
                 this.currentValidation = next.payload;
                 this.errorTargets = next.targets;
             }
@@ -619,13 +629,33 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     /**
-     * The `error` widget payload: the failure/skip lead first (non-navigable),
+     * The `error` widget payload: the backend failure first (non-navigable),
      * static issues behind it. Same single-composer rationale as
      * {@link composeValidating}.
      */
     private composeError(lead: GraphValidationIssue): { payload: GraphValidationPayload; targets: (ErrorTarget | undefined)[] } {
         return {
             payload: { state: 'error', issues: [lead, ...this.staticIssues] },
+            targets: [undefined, ...this.staticTargets],
+        };
+    }
+
+    /**
+     * The `unvalidated` widget payload, for a graph nothing validated: the
+     * static issues, which are all anyone learned by reading the source, behind
+     * the reason the validation was skipped when there is one (non-navigable).
+     * Distinct from `error`, which says a validator ran and failed to produce a
+     * verdict; here no validator ran at all.
+     */
+    private composeUnvalidated(lead?: GraphValidationIssue): { payload: GraphValidationPayload; targets: (ErrorTarget | undefined)[] } {
+        if (!lead) {
+            return {
+                payload: { state: 'unvalidated', issues: this.staticIssues },
+                targets: this.staticTargets,
+            };
+        }
+        return {
+            payload: { state: 'unvalidated', issues: [lead, ...this.staticIssues] },
             targets: [undefined, ...this.staticTargets],
         };
     }
@@ -718,7 +748,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const seq = this.renderSequence;
 
         const validation = analysis.validation;
-        this.errorLead = undefined;
+        this.leadIssue = undefined;
         // Any produced verdict means the backend recovered — clear the
         // failure-toast dedupe so a later failure notifies again.
         this.lastNotifiedMessage = undefined;
@@ -783,8 +813,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
     /**
      * The on-save analysis threw (validator path). The static graph stays; the
-     * widget flips to `error`. Notifications are the validator's job on this
-     * path, so none are shown here. A no-op when the panel is not showing `uri`.
+     * widget flips to `error`, or to `unvalidated` for a declined remote send
+     * (see {@link showBackendErrorInWidget}). Notifications are the validator's
+     * job on this path, so none are shown here. A no-op when the panel is not
+     * showing `uri`.
      */
     applyBackendError(uri: vscode.Uri, err: unknown): void {
         if (!this.panel) return;
@@ -795,15 +827,16 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
     /**
      * The on-save validation was skipped for this file (another tool reported
-     * errors). The static graph stays; the widget flips to `error` with the
-     * skip reason as its lead issue.
+     * errors). The static graph stays; the widget flips to `unvalidated` with
+     * the skip reason as its lead issue — not `error`, because no validator ran
+     * and so none failed.
      */
     applySkipped(uri: vscode.Uri, message: string): void {
         if (!this.panel) return;
         if (this.sourceKind !== 'mthds') return;
         if (this.currentUri?.toString() !== uri.toString()) return;
-        this.errorLead = { severity: 'error', message, origin: 'validator' };
-        const next = this.composeError(this.errorLead);
+        this.leadIssue = { severity: 'error', message, origin: 'validator' };
+        const next = this.composeUnvalidated(this.leadIssue);
         this.postValidationStatus(next.payload, next.targets);
     }
 
@@ -831,7 +864,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
     }
 
-    /** Flip the widget to `error`: the failure as lead issue, static issues after it. */
+    /**
+     * Show a backend failure in the widget: the failure as lead issue, static
+     * issues after it. The state is `error` — a validator was asked and produced
+     * no verdict — except for a declined remote send, where the user chose not
+     * to validate and nothing was asked, which is `unvalidated`.
+     */
     private showBackendErrorInWidget(err: unknown): void {
         if (err instanceof BackendError) {
             this.output.appendLine(`pipelex graph: ${err.logMessage}`);
@@ -840,8 +878,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 `pipelex graph error: ${err instanceof Error ? err.message : String(err)}`,
             );
         }
-        this.errorLead = describeBackendErrorIssue(err);
-        const next = this.composeError(this.errorLead);
+        this.leadIssue = describeBackendErrorIssue(err);
+        const declined = err instanceof BackendError && err.kind === 'declined';
+        const next = declined ? this.composeUnvalidated(this.leadIssue) : this.composeError(this.leadIssue);
         this.postValidationStatus(next.payload, next.targets);
     }
 
@@ -1038,7 +1077,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     /**
      * Drop ALL per-file view state: the retained graphspec, the navigation
      * targets, and the whole validation-widget state (static issues/targets,
-     * current payload, error lead). Called on every view switch and on panel
+     * current payload, lead issue). Called on every view switch and on panel
      * dispose so nothing from the previous file can leak into the next one.
      */
     private resetViewState(): void {
@@ -1047,7 +1086,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         this.staticIssues = [];
         this.staticTargets = [];
         this.currentValidation = undefined;
-        this.errorLead = undefined;
+        this.leadIssue = undefined;
     }
 
     private buildWebviewHtml(): string | undefined {

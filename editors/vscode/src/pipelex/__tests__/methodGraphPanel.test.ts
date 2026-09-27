@@ -1306,6 +1306,27 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it('a declined remote send marks the method unvalidated, not error, and stays silent', async () => {
+        const uri = makeUri('/project/file.mthds');
+        seedBundle(uri);
+        const declined = new BackendError({ kind: 'declined', logMessage: 'remote send declined' });
+        const backend = { kind: 'api', analyze: vi.fn(() => Promise.reject(declined)) } as any;
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri(), () => backend);
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // The user chose not to send, so no validator was asked and none failed.
+        const pending = (panel as any).pendingData;
+        expect(pending.validation.state).toBe('unvalidated');
+        expect(pending.validation.issues[0]).toEqual(expect.objectContaining({
+            severity: 'warning',
+            message: expect.stringContaining('declined'),
+        }));
+        expect(mockState.showWarningMessage).not.toHaveBeenCalled();
+        panel.dispose();
+    });
+
     // `auth` is a key the server refused; `no-key` is the default backend's first
     // run, with no key stored at all. Both carry the same remedies.
     it.each(['auth', 'no-key'] as const)("the panel's own analyze failure (%s) toasts with the backend's remedy actions", async kind => {
@@ -1638,7 +1659,7 @@ describe('MethodGraphPanel', () => {
 
         // Lead issue kept, stale static tail dropped (fresh static is clean).
         const validation = (panel as any).pendingData?.validation ?? currentValidationPayload(panel);
-        expect(validation.state).toBe('error');
+        expect(validation.state).toBe('unvalidated');
         expect(validation.issues).toEqual([
             expect.objectContaining({ message: expect.stringContaining('another extension') }),
         ]);
@@ -1760,7 +1781,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it('validation disabled: renders the static graph with no analyze run and the widget hidden', async () => {
+    it('validation disabled: renders the static graph with no analyze run, marked unvalidated', async () => {
         const processUtils = await import('../validation/processUtils');
         mockState.configOverrides['validation.enabled'] = false;
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
@@ -1772,16 +1793,37 @@ describe('MethodGraphPanel', () => {
         // The graph rendered (setData buffered for the webview)…
         expect((panel as any).pendingData?.type).toBe('setData');
         expect((panel as any).pendingData?.graphspec).toBeTruthy();
-        // …but no backend ran and the widget stays hidden (no validation payload).
+        // …but no backend ran, so the widget claims no verdict: `unvalidated`,
+        // never a `validating` spinner that nothing would ever stop.
         expect(vi.mocked(processUtils.spawnCli)).not.toHaveBeenCalled();
-        expect((panel as any).pendingData?.validation).toBeUndefined();
-        expect(currentValidationPayload(panel)).toBeUndefined();
+        expect((panel as any).pendingData?.validation).toEqual({ state: 'unvalidated', issues: [] });
 
         // A save in the disabled state rebuilds the graph and still runs nothing.
         mockState.onSaveHandler!({ uri });
         await new Promise(r => setTimeout(r, 30));
         expect(vi.mocked(processUtils.spawnCli)).not.toHaveBeenCalled();
-        expect((panel as any).pendingData?.validation).toBeUndefined();
+        expect((panel as any).pendingData?.validation?.state).toBe('unvalidated');
+        panel.dispose();
+    });
+
+    it('validation disabled: lists the static issues under unvalidated, targets and jumps intact', async () => {
+        mockState.configOverrides['validation.enabled'] = false;
+        const uri = makeUri('/project/methods/screening.mthds');
+        const helpersUri = makeUri('/project/methods/helpers.mthds');
+        seedCollidingBundle(uri, helpersUri);
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 50));
+
+        // Reading the source is all anyone did, and what it found is listed —
+        // with the same qualified targeting the `validating` list carries.
+        const validation = currentValidationPayload(panel);
+        expect(validation.state).toBe('unvalidated');
+        const index = validation.issues.findIndex((issue: any) => issue.context === 'pipe.analyze.output');
+        expect(index).toBeGreaterThanOrEqual(0);
+        expect(validation.issues[index].pipeRef).toBe('helpers.analyze');
+        expect((panel as any).errorTargets[index]?.uri.toString()).toBe(helpersUri.toString());
         panel.dispose();
     });
 
@@ -1907,7 +1949,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it('applySkipped flips the widget to error with the skip reason', async () => {
+    it('applySkipped marks the method unvalidated with the skip reason, never error', async () => {
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/methods/main.mthds');
         panel.show(uri);
@@ -1915,8 +1957,9 @@ describe('MethodGraphPanel', () => {
 
         panel.applySkipped(uri, 'This file has errors reported by another extension.');
 
+        // No validator ran, so none failed: `error` would misreport the skip.
         const validation = currentValidationPayload(panel);
-        expect(validation.state).toBe('error');
+        expect(validation.state).toBe('unvalidated');
         expect(validation.issues[0].message).toContain('another extension');
         // The graph HTML is untouched — no full-page notice since static-first.
         expect(mockState.mockWebview.html).not.toContain('Graph Unavailable');

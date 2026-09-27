@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
+import { orderMthdsSources } from '@pipelex/mthds-ui/static-graph';
 import { gatherBundleFiles } from './bundleGather';
 import type { BundleFile } from './backend';
-
-const DEFAULT_BUNDLE_NAME = 'bundle.mthds';
 
 export interface GraphPrimaryBundle {
     /** The file whose `main_pipe` should anchor graph generation. */
@@ -18,41 +17,21 @@ export interface GraphPrimaryBundle {
  * ancillary sibling (signatures, concepts, helper pipes) inside a directory
  * whose `bundle.mthds` declares the method's `main_pipe`. In that case the
  * graph should still be generated from the directory's main bundle.
+ *
+ * Which file leads is `@pipelex/mthds-ui`'s rule (`orderMthdsSources`), shared
+ * with every other host that merges a method's files, so the panel, the
+ * standalone viewer and the hosted app can never disagree about it: the opened
+ * file leads when it declares a top-level `main_pipe`, otherwise the file that
+ * does (`bundle.mthds` when several do), otherwise the opened file. The rule
+ * matches the opened file by `name`, which is safe here because the gather is
+ * flat and every `name` is a basename unique within its directory.
  */
 export async function resolveGraphPrimaryBundle(openedUri: vscode.Uri): Promise<GraphPrimaryBundle> {
     const files = await gatherBundleFiles(openedUri);
-    const primary = selectGraphPrimaryFile(openedUri, files);
+    const opened = files.find(file => file.uri.toString() === openedUri.toString());
+    const ordered = orderMthdsSources(files, opened);
     return {
-        primaryUri: primary?.uri ?? openedUri,
-        files: primary ? reorderFilesWithPrimary(files, primary.uri) : files,
+        primaryUri: ordered[0]?.uri ?? openedUri,
+        files: ordered,
     };
-}
-
-export function selectGraphPrimaryFile(openedUri: vscode.Uri, files: BundleFile[]): BundleFile | undefined {
-    const opened = files.find(file => file.uri.toString() === openedUri.toString()) ?? files[0];
-    if (!opened) return undefined;
-
-    if (hasTopLevelMainPipe(opened.content)) {
-        return opened;
-    }
-
-    const filesWithMain = files.filter(file => hasTopLevelMainPipe(file.content));
-    const defaultBundle = filesWithMain.find(file => file.name.toLowerCase() === DEFAULT_BUNDLE_NAME);
-    return defaultBundle ?? filesWithMain[0] ?? opened;
-}
-
-export function hasTopLevelMainPipe(content: string): boolean {
-    for (const line of content.split(/\r\n|\r|\n/)) {
-        if (/^\s*\[/.test(line)) return false;
-        if (/^\s*main_pipe\s*=\s*(["'])[^"']+\1\s*(?:#.*)?$/.test(line)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function reorderFilesWithPrimary(files: BundleFile[], primaryUri: vscode.Uri): BundleFile[] {
-    const index = files.findIndex(file => file.uri.toString() === primaryUri.toString());
-    if (index <= 0) return files;
-    return [files[index], ...files.slice(0, index), ...files.slice(index + 1)];
 }

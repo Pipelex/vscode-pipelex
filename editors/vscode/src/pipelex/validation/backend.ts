@@ -96,15 +96,16 @@ export interface GraphAnalysisSink {
     applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis, analysisPrimaryUri: vscode.Uri): void | Promise<void>;
     /**
      * The on-save analysis threw (backend / transport error). The widget flips
-     * to its `error` state; the static graph stays on screen. A no-op when the
-     * panel is not currently showing `uri`.
+     * to its `error` state, or to `unvalidated` when the error is a declined
+     * remote send, since then no validator was asked; the static graph stays on
+     * screen. A no-op when the panel is not currently showing `uri`.
      */
     applyBackendError(uri: vscode.Uri, err: unknown): void;
     /**
      * The on-save validation was skipped for `uri` (another tool reported errors,
-     * so the validator deferred). The widget flips to `error` with the skip
-     * reason; the static graph stays on screen. A no-op when the panel is not
-     * currently showing `uri`.
+     * so the validator deferred). The widget flips to `unvalidated` with the
+     * skip reason leading its list; the static graph stays on screen. A no-op
+     * when the panel is not currently showing `uri`.
      */
     applySkipped(uri: vscode.Uri, message: string): void;
 }

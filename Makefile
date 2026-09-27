@@ -78,24 +78,24 @@ vsix: ext ## Package the extension into a .vsix file
 
 # ── Install / Uninstall ─────────────────────────────────────────────────────
 
-ext-install: vsix ## Install the .vsix into your VS Code-based IDE
-	@if command -v cursor >/dev/null 2>&1; then \
-		echo "Installing into Cursor…"; \
-		cursor --install-extension $(VSIX); \
-	elif command -v code >/dev/null 2>&1; then \
+ext-install: vsix ## Install the .vsix into VS Code (or Cursor when there is no `code` CLI)
+	@if command -v code >/dev/null 2>&1; then \
 		echo "Installing into VS Code…"; \
 		code --install-extension $(VSIX); \
+	elif command -v cursor >/dev/null 2>&1; then \
+		echo "Installing into Cursor…"; \
+		cursor --install-extension $(VSIX); \
 	else \
-		echo "ERROR: No VS Code-compatible CLI found (tried: cursor, code)."; \
+		echo "ERROR: No VS Code-compatible CLI found (tried: code, cursor)."; \
 		echo "Install manually: open your IDE → Extensions → ⋯ → Install from VSIX → $(VSIX)"; \
 		exit 1; \
 	fi
 
-ext-uninstall: ## Uninstall the extension from your VS Code-based IDE
-	@if command -v cursor >/dev/null 2>&1; then \
-		cursor --uninstall-extension Pipelex.pipelex 2>/dev/null || true; \
-	elif command -v code >/dev/null 2>&1; then \
+ext-uninstall: ## Uninstall the extension from VS Code (or Cursor when there is no `code` CLI)
+	@if command -v code >/dev/null 2>&1; then \
 		code --uninstall-extension Pipelex.pipelex 2>/dev/null || true; \
+	elif command -v cursor >/dev/null 2>&1; then \
+		cursor --uninstall-extension Pipelex.pipelex 2>/dev/null || true; \
 	fi
 	@echo "Done. Restart your IDE to complete removal."
 

@@ -1,16 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
+import { createRequire } from 'module';
 import * as path from 'path';
 
 /**
  * The webview shell must define every shadcn token the form kernel's shipped
  * stylesheet reads, because an undefined one fails silently.
  *
- * Since kernel 0.8.0 the sheet is a Tailwind 4 build holding whole colours, so
- * it emits `background-color: var(--primary)` with no fallback. A token nobody
- * defines makes that declaration INVALID, and the browser discards it: the
- * build stays green, the token is inspectable, and the control simply paints
- * transparent. Nothing in a type-check, a lint or a unit test would notice.
+ * Since kernel 0.9.0 the sheet reads every token with a fallback holding the
+ * kernel's LIGHT palette — `background-color: var(--primary, #18181b)`. A token
+ * nobody defines therefore paints light whatever the graph's theme: the build
+ * stays green, nothing is discarded, and one control in a dark panel turns
+ * white. (Under kernel 0.8.0 the same omission painted it transparent.) Nothing
+ * in a type-check, a lint or a unit test would notice.
  *
  * So this test derives the requirement from the kernel's own shipped bytes
  * rather than from a list someone remembered to update. A kernel upgrade that
@@ -20,9 +22,27 @@ import * as path from 'path';
 const VSCODE_ROOT = path.resolve(__dirname, '../../..');
 const NODE_MODULES = path.join(VSCODE_ROOT, 'node_modules');
 const SHELL_CSS = path.join(VSCODE_ROOT, 'src/pipelex/graph/webview/shell.css');
+const ADAPTER = path.join(VSCODE_ROOT, 'src/pipelex/graph/webview/adapter.ts');
 
-/** The kernel sheet mthds-ui bundles into the webview (via `@layer mthds-form`). */
-const KERNEL_STYLES = path.join(NODE_MODULES, '@pipelex/mthds-form/dist/styles.css');
+/** The specifier the webview entry imports to load the kernel's sheet. */
+const KERNEL_ENTRY_SPECIFIER = '@pipelex/mthds-ui/form-kernel.css';
+
+/**
+ * The kernel sheet the webview actually loads, found the way the bundle finds
+ * it: resolve the adapter's import through mthds-ui's `exports` map, then follow
+ * that file's own `@import` into `@pipelex/mthds-form`. A hardcoded path into
+ * the kernel's `dist/` would keep passing against a sheet the webview had
+ * stopped loading.
+ */
+function kernelStylesPath(): string {
+    const requireFromExtension = createRequire(path.join(VSCODE_ROOT, 'package.json'));
+    const entry = requireFromExtension.resolve(KERNEL_ENTRY_SPECIFIER);
+    const imported = /@import\s+["']([^"']+)["']/.exec(fs.readFileSync(entry, 'utf-8'));
+    if (!imported) {
+        throw new Error(`${KERNEL_ENTRY_SPECIFIER} (${entry}) no longer @imports the kernel sheet`);
+    }
+    return createRequire(entry).resolve(imported[1]);
+}
 
 /**
  * The renderer's own sheets, which reach the same bundle from `graph/react`'s
@@ -41,10 +61,21 @@ const RENDERER_STYLES = [
  */
 const RUNTIME_TOKEN = /^--radix-/;
 
-/** Every `var(--x)` used with NO fallback — the ones that fail silently. */
-function tokensReadWithoutFallback(css: string): Set<string> {
+/**
+ * Tailwind's own internals: per-utility state (`--tw-*`) and the preflight's
+ * font-feature hooks (`--default-*`), read with the fallback Tailwind designed
+ * as their value. No host defines them, and none should.
+ */
+const TAILWIND_INTERNAL = /^--(tw|default)-/;
+
+/**
+ * Every custom property the sheet reads, with a fallback or without. A missing
+ * one fails silently either way — transparent without a fallback, the kernel's
+ * light palette with one — so the fallback is no excuse.
+ */
+function tokensRead(css: string): Set<string> {
     return new Set(
-        [...css.matchAll(/var\((--[a-zA-Z0-9-]+)\s*\)/g)].map(m => m[1]),
+        [...css.matchAll(/var\((--[a-zA-Z0-9-]+)\s*[,)]/g)].map(m => m[1]),
     );
 }
 
@@ -56,11 +87,19 @@ function tokensDefined(css: string): Set<string> {
 }
 
 describe('the form kernel token map in shell.css', () => {
+    it('the webview entry imports the kernel sheet the token map is held to', () => {
+        // mthds-ui stopped injecting the kernel's sheet in 0.25.0; without this
+        // import the detail panel's controls render unstyled and the rest of
+        // this suite would be checking a sheet nothing loads.
+        const adapter = fs.readFileSync(ADAPTER, 'utf-8');
+        expect(adapter).toContain(`import '${KERNEL_ENTRY_SPECIFIER}';`);
+    });
+
     it('defines every token the kernel reads that nothing else in the bundle supplies', () => {
-        const kernelCss = fs.readFileSync(KERNEL_STYLES, 'utf-8');
+        const kernelCss = fs.readFileSync(kernelStylesPath(), 'utf-8');
         const shellCss = fs.readFileSync(SHELL_CSS, 'utf-8');
 
-        const required = tokensReadWithoutFallback(kernelCss);
+        const required = tokensRead(kernelCss);
 
         // Whatever the bundle already defines for itself — the kernel's own
         // Tailwind theme block (`--spacing`, `--text-sm`, `--font-sans`, the
@@ -74,7 +113,7 @@ describe('the form kernel token map in shell.css', () => {
         }
 
         const mustBeInShell = [...required]
-            .filter(t => !supplied.has(t) && !RUNTIME_TOKEN.test(t))
+            .filter(t => !supplied.has(t) && !RUNTIME_TOKEN.test(t) && !TAILWIND_INTERNAL.test(t))
             .sort();
 
         // If this is empty the test has stopped testing anything — most likely

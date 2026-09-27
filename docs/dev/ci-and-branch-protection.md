@@ -54,7 +54,7 @@ The rules that matter in daily use:
 
 ### Where the shape comes from
 
-These rulesets are not maintained by hand in this repo. They are rendered from the workspace-wide merge policy: `github-rules.toml` at the workspace root states this repository's shape, the `github-rules` command renders it into rulesets, and `make check-github-rules` reports drift. The policy, the tool and its three verbs are documented in the workspace meta-repo's `docs/github-rules.md`.
+These rulesets are not maintained by hand in this repo. They are rendered from the workspace-wide merge policy: `github-rules.toml` at the workspace root states this repository's shape, the `github-rules` command renders it into rulesets, and `make check-github-rules` reports drift. The policy, the tool and its three verbs are documented in the workspace meta-repo's `docs/workspace/github-rules.md`.
 
 The **check names are the exception** — the policy file deliberately does not carry them, because they differ per repo and per workflow. The tool reads them off the live ruleset of the branch it rewrites and carries them over unchanged. So renaming the `make check` or `make test-all` job in a workflow does **not** update the ruleset: rename the job and the required check together, or PRs will hang on a context that no longer reports.
 

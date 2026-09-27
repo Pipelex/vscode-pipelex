@@ -114,9 +114,10 @@ export class PipelexValidator implements vscode.Disposable {
         );
         if (hasOtherErrors) {
             this.clearDir(dir);
-            // Keep an open graph panel in sync: it no longer self-refreshes on save
-            // when validation is enabled, so tell it this save was skipped rather
-            // than let it keep showing a stale graph.
+            // Keep an open graph panel in sync: its own save listener rebuilds the
+            // static graph and flips the widget to `validating`, waiting for this
+            // validator's verdict, so tell it none is coming — the method stays
+            // `unvalidated` — rather than let the widget spin forever.
             //
             // Deferred past the save dispatch: this listener registers before the
             // panel's (extension activation precedes panel creation), and the skip
@@ -128,7 +129,7 @@ export class PipelexValidator implements vscode.Disposable {
             // verdict lands last regardless of listener order.
             queueMicrotask(() => this.graphSink?.applySkipped(
                 document.uri,
-                'This file has errors reported by another extension (e.g. syntax errors). Fix them and save to update the graph.',
+                'Validation skipped: this file has errors reported by another extension (e.g. syntax errors). Fix them and save to validate it.',
             ));
             return;
         }

@@ -212,7 +212,8 @@ describe('describeBackendErrorIssue', () => {
 
     it('explains a declined remote send, and how to get validation back', () => {
         const issue = describeBackendErrorIssue(new BackendError({ kind: 'declined', logMessage: 'x' }));
-        expect(issue.severity).toBe('error');
+        // The user's own choice, not a fault: a note, never an error.
+        expect(issue.severity).toBe('warning');
         expect(issue.message).toContain('declined');
         expect(issue.message).toContain('reload the window');
         expect(issue.message).toContain('pipelex.backend to cli');

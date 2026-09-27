@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { cpSync, existsSync, mkdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import esbuild from "esbuild";
@@ -35,7 +35,8 @@ cpSync(
 // The CSS comes out as `graph.css` beside `graph.js`, with every `@import`
 // resolved — including the two that cannot be linked as written: @xyflow's base
 // sheet, which `graph-core.css` pulls in by bare specifier, and the form
-// kernel's, which mthds-ui wraps in `@layer mthds-form`. The webview's own
+// kernel's, which the adapter imports through `@pipelex/mthds-ui/form-kernel.css`
+// and which that file wraps in `@layer mthds-form`. The webview's own
 // sheet is `shell.css` precisely so it does not collide with that output; when
 // it was called `graph.css` the collision was worked around by switching CSS
 // bundling off entirely and hand-copying each of mthds-ui's sheets, which meant
@@ -64,12 +65,26 @@ esbuild.buildSync({
 
 // The renderer's stylesheet is emitted, never copied, so nothing fails loudly
 // if it stops being emitted — the webview would simply render unstyled. Assert
-// it landed: that is the one silent failure this arrangement can still have.
-if (!existsSync("./dist/pipelex/graph/webview/graph.css")) {
+// it landed, and that the form kernel's sheet is inside it: the two silent
+// failures this arrangement can still have. The second is not hypothetical —
+// mthds-ui 0.25.0 stopped importing the kernel sheet from `graph/react`, and a
+// graph.css without it is still emitted, holding everything but the styles of
+// the detail panel's controls.
+const graphCss = "./dist/pipelex/graph/webview/graph.css";
+if (!existsSync(graphCss)) {
   throw new Error(
     "esbuild emitted no graph.css for the webview. The renderer's styles reach " +
       "the bundle through graph.js's import graph — check that no CSS loader " +
       "override was reintroduced and that @pipelex/mthds-ui still imports its sheets.",
+  );
+}
+if (!readFileSync(graphCss, "utf-8").includes("@layer mthds-form")) {
+  throw new Error(
+    "graph.css holds no `@layer mthds-form`: the form kernel's stylesheet did not " +
+      "reach the webview, so the detail panel's controls would render unstyled. " +
+      "Check that src/pipelex/graph/webview/adapter.ts still imports " +
+      "'@pipelex/mthds-ui/form-kernel.css', and that the file still wraps the " +
+      "kernel sheet in that layer.",
   );
 }
 
