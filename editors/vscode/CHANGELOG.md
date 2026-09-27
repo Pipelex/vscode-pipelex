@@ -3,6 +3,17 @@
 
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.18.0] - 2026-09-27
+
+### Changed
+
+- **The method graph says "Not validated" when nothing validated the method**: with `pipelex.validation.enabled` off, the graph's validation widget now reads "Not validated" and lists what the static graph builder found, where it used to be hidden and those findings were shown nowhere. Declining to send the files to the API, and a save whose validation is skipped because another extension reports errors, now land in the same state instead of the `error` warning triangle, which is kept for a validator that was asked and failed.
+- **Bumped `@pipelex/mthds-ui` `0.24.0` → `0.26.0`**: a stuff declared `Document[]` or `Document[5]` now shows that marker on its graph node, on the pipe card's and the detail panel's pills, and in the detail panel's header — straight away in a `.mthds` graph, and in a run graph when the `pipelex` that wrote it is v0.67.0 or later, as `[]` whatever the count. With the library's form kernel at `0.11.0`, the detail panel's result table shows five columns and moves the rest into the row's detail, an image inside a prose value renders as a link, and an `image/svg+xml` data URL is named rather than painted; the webview now imports the kernel's stylesheet and maps its theme tokens itself, so the panel's controls stay styled and follow the graph's light/dark toggle. Which `.mthds` file of a method leads the graph is now decided by the library's shared rule rather than a private copy of it.
+
+### Fixed
+
+- **Release publishing no longer times out waiting for CI**: `releases.yaml` looked for the `Test on Rust stable` check on the first page of the tagged commit's check runs, and a release commit carries more checks than one page holds, so the wait could time out on a green commit — which is how `@pipelex/tools-wasm` 0.3.0 missed its first publish attempt in 0.17.0. The wait now asks for the check by name and takes the newest copy, and a failed API call polls again instead of ending the step.
+
 ## [0.17.0] - 2026-09-23
 
 ### Added
