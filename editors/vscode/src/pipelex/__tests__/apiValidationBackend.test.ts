@@ -5,6 +5,7 @@ const apiState = vi.hoisted(() => ({
     validate: null as null | ((c: string[], a: boolean, n?: string[]) => Promise<any>),
     version: null as null | (() => Promise<any>),
     lastValidateArgs: null as any,
+    lastValidateOptions: null as any,
     lastConstructorOptions: null as any,
 }));
 
@@ -15,10 +16,14 @@ vi.mock('vscode', () => ({
 
 // ---------- @pipelex/sdk mock (classes defined inside the hoisted factory) ----------
 vi.mock('@pipelex/sdk', () => {
-    // Mirror the real `@pipelex/sdk` constructor signatures (message-first) so the
-    // call sites below type-check against the imported real classes, while the
-    // backend still reads `.status`/`.serverMessage`/`.statusText`/`.code`.
+    // Mirror the real `@pipelex/sdk` constructor signatures (message-first, then the
+    // trailing options bag) so the call sites below type-check against the imported
+    // real classes, while the backend still reads `.status`/`.serverMessage`/
+    // `.statusText`/`.code`/`.requestId`. Like the real class, `requestId` comes
+    // from `options.problem`, where the client puts the body's `request_id` or the
+    // `X-Request-ID` header.
     class ApiResponseError extends Error {
+        public requestId: string | undefined;
         constructor(
             message: string,
             public apiUrl: string,
@@ -29,9 +34,11 @@ vi.mock('@pipelex/sdk', () => {
             public serverMessage: string | undefined,
             public validationErrors: any[] | undefined,
             public code: string | undefined,
+            options?: { problem?: { requestId?: string } },
         ) {
             super(message);
             this.name = 'ApiResponseError';
+            this.requestId = options?.problem?.requestId;
         }
     }
     class ApiUnreachableError extends Error {
@@ -39,6 +46,7 @@ vi.mock('@pipelex/sdk', () => {
             message: string,
             public apiUrl: string,
             public code: string | undefined,
+            _options?: { cause?: unknown },
         ) {
             super(message);
             this.name = 'ApiUnreachableError';
@@ -60,8 +68,16 @@ vi.mock('@pipelex/sdk', () => {
                 throw new PipelineRequestError(`Invalid API base URL "${options.baseUrl}": must be host-only.`);
             }
         }
-        async validate(contents: string[], allow: boolean, names?: string[]) {
+        async validate(
+            contents: string[],
+            allow: boolean,
+            names?: string[],
+            _render?: string[],
+            _views?: string[],
+            options?: { timeoutMs?: number; signal?: AbortSignal },
+        ) {
             apiState.lastValidateArgs = [contents, allow, names];
+            apiState.lastValidateOptions = options;
             return apiState.validate!(contents, allow, names);
         }
         async version() {
@@ -78,9 +94,12 @@ import { ApiValidationBackend } from '../validation/apiValidationBackend';
 // `vi.mock` swaps the SDK's runtime impl, but TypeScript still resolves these
 // `import type`s to the published `.d.ts`. The bindings below fail `yarn typecheck`
 // (strict, in `make check` + CI) if the SDK renames/removes any surface this mock
-// stands in for — so the mock cannot silently drift from the real contract. (The
-// SDK's *runtime behavior* — what a verdict/error actually carries — is covered by
-// the integration tests against the published artifact, not here.)
+// stands in for — so the mock cannot silently drift from the real contract. They do
+// NOT bind the mock's constructor argument order, nor the SDK's runtime behavior
+// (when the constructor throws, what a verdict/error actually carries, what a
+// timeout becomes): no suite here reaches the real SDK or a server, so those are
+// checked by hand against the published `.d.ts`/`.js` and a live API on every bump
+// (the `/bump-sdk` skill).
 import type {
     PipelexApiClient as RealPipelexApiClient,
     PipelexApiClientOptions,
@@ -92,7 +111,7 @@ type _ClientSurface = Pick<RealPipelexApiClient, 'validate' | 'version'>;
 // Constructor option keys the backend passes must be the real option keys.
 type _ClientOptions = Required<Pick<PipelexApiClientOptions, 'baseUrl' | 'apiKey'>>;
 // Error fields the backend reads off these classes must exist on the real classes.
-type _ResponseErrorFields = Pick<RealApiResponseError, 'status' | 'statusText' | 'serverMessage' | 'code'>;
+type _ResponseErrorFields = Pick<RealApiResponseError, 'status' | 'statusText' | 'serverMessage' | 'code' | 'requestId'>;
 type _UnreachableErrorFields = Pick<RealApiUnreachableError, 'code'>;
 
 import { ApiCapabilityGate } from '../validation/apiCapabilityGate';
@@ -130,6 +149,7 @@ describe('ApiValidationBackend', () => {
         apiState.validate = null;
         apiState.version = null;
         apiState.lastValidateArgs = null;
+        apiState.lastValidateOptions = null;
         apiState.lastConstructorOptions = null;
     });
 
@@ -140,6 +160,19 @@ describe('ApiValidationBackend', () => {
         expect(analysis.graph).toEqual({ nodes: [], edges: [] });
         // contents + allowSignatures=true + parallel sources (file names)
         expect(apiState.lastValidateArgs).toEqual([['domain="d"'], true, ['a.mthds']]);
+    });
+
+    it("hands the client the save's own signal and timeout, so an abandoned request is cancelled", async () => {
+        // Without them the SDK's 20-minute default governs, and a superseded or
+        // timed-out save keeps its request (and the uploaded bundle) in flight.
+        apiState.validate = async () => ({ is_valid: true });
+        const controller = new AbortController();
+        await makeBackend().analyze(
+            { primaryUri: FILES[0].uri, files: FILES, timeout: 12345 },
+            { withGraph: false },
+            controller.signal,
+        );
+        expect(apiState.lastValidateOptions).toEqual({ timeoutMs: 12345, signal: controller.signal });
     });
 
     it('passes the resolved token to the client constructor (SecretStorage precedence)', async () => {
@@ -298,6 +331,20 @@ describe('ApiValidationBackend', () => {
         const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('api-error');
+        // No request id on the error, so none in the log line.
+        expect(err.logMessage).not.toMatch(/request /);
+    });
+
+    it("logs the server's request id with an API error, for support", async () => {
+        apiState.validate = async () => {
+            throw new ApiResponseError('internal error', 'https://api.pipelex.com', 500, 'Internal Server Error', '', undefined, 'internal error', undefined, undefined, { problem: { requestId: 'req_7f3a' } });
+        };
+        const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        expect(err.logMessage).toBe('Pipelex API 500 at https://api.pipelex.com: internal error (request req_7f3a)');
+        // The id is for the log, not the toast.
+        expect(err.userMessage).not.toContain('req_7f3a');
     });
 
     it('maps ApiUnreachableError to a transport BackendError', async () => {
