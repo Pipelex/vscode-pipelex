@@ -44,12 +44,16 @@ One more publish fires outside those two stages and outside the tag mechanism en
 The landing verifies the publish — the runs, the tags, the registries:
 
 ```bash
-gh run list --workflow=ci.yaml --branch main --limit 3 --json conclusion,headSha,url   # auto_tag on the merge SHA: success
-git fetch --tags --prune origin && git tag --points-at <merge SHA>                     # one tag per artifact bumped
-gh run list --workflow=releases.yaml --limit 10 --json conclusion,headBranch,event,url # one run per tag that was pushed
-pip index versions pipelex-tools && pip index versions pipelex-tools-py                # the PyPI answers
-npm view @pipelex/tools-wasm version                                                   # the npm answer
+gh run list --workflow=releases.yaml --branch pipelex-vscode-ext/vX.Y.Z --limit 10 --json conclusion,headSha,headBranch,url   # the release's own publish: success
+git fetch --tags --prune origin && git tag --list pipelex-vscode-ext/vX.Y.Z plxt-cli/vX.Y.Z pipelex-tools-py/vX.Y.Z pipelex-tools-wasm/vX.Y.Z   # the release's tag
+gh run list --workflow=ci.yaml --branch main --limit 3 --json conclusion,headSha,url    # auto_tag on the merge SHA: success
+git tag --points-at <merge SHA>                                                         # one tag per artifact bumped
+gh run list --workflow=releases.yaml --limit 10 --json conclusion,headBranch,event,url  # one run per tag that was pushed
+pip index versions pipelex-tools && pip index versions pipelex-tools-py                 # the PyPI answers
+npm view @pipelex/tools-wasm version                                                    # the npm answer
 ```
+
+`ledger land` reads the first two lines as this repo's declaration. The tags are listed in the order the release branch takes its version from the artifacts, and the landing holds the release to the first of them that points at the merge commit — the extension's, unless the extension was not bumped. Because the `--branch` on the `releases.yaml` line spells one of those tags, the landing reads that workflow as publishing once per tag, and checks the `Releases` run that tag's push started rather than whichever run sits latest at the commit, which may be the workflow's own check on the release pull request. The other artifacts' runs, `ci.yaml`'s tagging and the registries are the session's to read.
 
 The extension is confirmed on its two marketplace listings for the publisher/name pair `Pipelex.pipelex`. A tag that exists with **no `Releases` run against it** is the v0.16.0 failure mode — the recovery is to delete and re-push that tag, one at a time and from a real user account, and `docs/dev/release-publishing.md` carries the exact commands.
 
