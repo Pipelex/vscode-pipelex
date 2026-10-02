@@ -325,7 +325,7 @@ jobs:
       # anonymous-read level); the day this repo goes private, checkout 403s.
       contents: read
       # OIDC trusted publishing — the same credential-free model mthds-ui,
-      # mthds-js and pipelex-sdk-js use. No NPM_TOKEN secret anywhere.
+      # mthds-js and pipelex-sdk use. No NPM_TOKEN secret anywhere.
       id-token: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -342,7 +342,7 @@ jobs:
           # upgrade below pulls npm@latest, which is npm 12 and declares
           # `engines.node: ^22.22.2 || ^24.15.0 || >=26.0.0`. On Node 20 that
           # install dies with EBADENGINE before anything is built. 22 is also
-          # what mthds-ui / mthds-js / pipelex-sdk-js pin for the same publish.
+          # what mthds-ui / mthds-js / pipelex-sdk pin for the same publish.
           node-version: 22
           registry-url: "https://registry.npmjs.org"
       - name: Update npm to support trusted publishing

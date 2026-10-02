@@ -9,7 +9,7 @@ This repo ships MTHDS **lint** and **format** through several surfaces — a CLI
 | `plxt` CLI | PyPI `pipelex-tools` (native binary) | `crates/pipelex-cli` | terminals, editors' format-on-save, CI |
 | Python library | PyPI `pipelex-tools-py` (`import pipelex_tools`) | `crates/pipelex-py` | `pipelex-api`'s in-process `/v1/lint` + `/v1/format` |
 | Language server | npm `@pipelex/lsp` (LSP-in-WASM) | `crates/pipelex-wasm` | the VS Code extension |
-| Lint/format-only WASM | npm `@pipelex/tools-wasm` | `crates/pipelex-tools-wasm` + `js/tools-wasm` | Node consumers that need offline lint/format without the LSP, such as the Pipelex plugin's post-edit hook, built in `pipelex-sdk-js` and vendored into `pipelex-plugins` |
+| Lint/format-only WASM | npm `@pipelex/tools-wasm` | `crates/pipelex-tools-wasm` + `js/tools-wasm` | Node consumers that need offline lint/format without the LSP, such as the Pipelex plugin's post-edit hook, built in `pipelex-sdk/js/` and vendored into `pipelex-plugins` |
 
 ## Where the engine lives
 
@@ -38,7 +38,7 @@ Diagnostic = {
 }
 ```
 
-with `lint` returning `{ diagnostics }` and `format` returning `{ formatted, changed, diagnostics }`. This shape is mirrored by `@pipelex/sdk` (`pipelex-sdk-js/src/models.ts`) and served by `pipelex-api`. Everything that serializes into it carries a `⚠️ PUBLIC BINDING SURFACE` marker — grep for that before touching any of these types, and keep all mirrors (Rust structs, the Python `.pyi` stub, `js/tools-wasm/src/index.ts` types, `@pipelex/sdk` models) in sync in the same change.
+with `lint` returning `{ diagnostics }` and `format` returning `{ formatted, changed, diagnostics }`. This shape is mirrored by `@pipelex/sdk` (`pipelex-sdk/js/src/models.ts`) and served by `pipelex-api`. Everything that serializes into it carries a `⚠️ PUBLIC BINDING SURFACE` marker — grep for that before touching any of these types, and keep all mirrors (Rust structs, the Python `.pyi` stub, `js/tools-wasm/src/index.ts` types, `@pipelex/sdk` models) in sync in the same change.
 
 One subtlety specific to the WASM binding: serialization goes through `serde_wasm_bindgen`'s JSON-compatible serializer so absent `location`/`range` come out as `null` — the default serializer would emit `undefined` and silently drop always-present fields from the wire shape.
 

@@ -2,12 +2,12 @@
 name: bump-sdk
 description: >
   Move the VS Code extension onto a newer published `@pipelex/sdk` (the hosted-API client, from the
-  sibling `pipelex-sdk-js` repo) — read the SDK changelog for every version crossed, check each
-  change against the two files that consume it (`validation/apiValidationBackend.ts` and
+  `js/` directory of the `pipelex-sdk` repo) — read the SDK changelog for every version crossed,
+  check each change against the two files that consume it (`validation/apiValidationBackend.ts` and
   `validation/apiCapabilityGate.ts`), re-align the hand-written SDK mock and its compile-time
   conformance bindings, update the lockfile and the docs, and verify against a live API. Use
   whenever the user says "bump the SDK", "bump `@pipelex/sdk`", "update the pipelex sdk", "upgrade
-  pipelex-sdk-js", "we just released SDK X.Y.Z, pull it into the extension", "get the extension onto
+  the JS SDK", "we just released SDK X.Y.Z, pull it into the extension", "get the extension onto
   the latest SDK", "we're on an old SDK", or names an API capability the extension cannot reach yet.
   Also use when the `api` validation backend fails at runtime against a real server while
   `make check` passes — that pattern usually means the pinned SDK is behind the API — when the
@@ -17,7 +17,7 @@ description: >
 
 # Bump `@pipelex/sdk`
 
-`@pipelex/sdk` is our own package, published from the sibling `pipelex-sdk-js` repo, and it is pre-1.0 — **minors carry breaking changes**. The extension uses it for exactly one thing: the `api` validation backend, the alternative to shelling out to `pipelex-agent` when `pipelex.backend` is set to `api`.
+`@pipelex/sdk` is our own package, published from the `js/` directory of the sibling `pipelex-sdk` repo (`Pipelex/pipelex-sdk`), and it is pre-1.0 — **minors carry breaking changes**. The extension uses it for exactly one thing: the `api` validation backend, the alternative to shelling out to `pipelex-agent` when `pipelex.backend` is set to `api`.
 
 What makes this bump different from `/bump-mthds-ui` in this repo, and what every step below is shaped by:
 
@@ -32,34 +32,40 @@ What makes this bump different from `/bump-mthds-ui` in this repo, and what ever
 grep -n '"@pipelex/sdk"' editors/vscode/package.json                                # the declared PIN
 node -p "require('./editors/vscode/node_modules/@pipelex/sdk/package.json').version"  # INSTALLED
 npm view @pipelex/sdk version                                                        # latest PUBLISHED
-npm view @pipelex/sdk versions                                                       # everything in between
+npm view @pipelex/sdk versions --json                                                # everything in between
 ```
+
+**npm is the authority on which versions exist, not the tags of `pipelex-sdk`.** That repo releases both SDKs, the starters and the method apps under one version and one tag, `vX.Y.Z`, and a release ships only the packages that changed, so `@pipelex/sdk`'s own sequence has gaps, and a tag or even a changelog heading can name a version npm never received: 0.29.0 is one, a release whose npm publish failed and whose code reached npm as 0.29.1. The versions ending in `-sprint.g<sha>` sit on the `sprint` dist-tag for sprints that pin an unreleased commit, and are never a target here; `npm view @pipelex/sdk version` reads `latest`, which never points at one, but the `versions` list includes them, so read past them.
 
 **The spec is an exact pin — no caret, no `npm:` prefix** (`"@pipelex/sdk": "0.1.5"`), unlike every other dependency in this manifest. Keep it that way. A caret on a `0.x` package resolves patches only anyway, so the caret would buy nothing while making the manifest stop stating which version the extension was actually written against.
 
 Report all three numbers, and say plainly how far behind the pin is. This extension has sat many minors behind at times, and a large gap changes the shape of the work: Step 2 becomes the bulk of it, and the honest answer may be to move in two or three steps rather than one, verifying against a live API at each stop.
 
-If the user named a target, confirm it exists: `npm view @pipelex/sdk@X.Y.Z version`. **This skill only moves to published versions** — if the fix they want is unreleased, the fix is to cut the release in `../pipelex-sdk-js` first.
+If the user named a target, confirm it exists on npm: `npm view @pipelex/sdk@X.Y.Z version`, which answers `E404` for a version npm never received, tag or no tag. **This skill only moves to published versions** — if the fix they want is unreleased, the fix is to cut a release of `../pipelex-sdk` first, with that repo's root `/release` skill, which ships `@pipelex/sdk` when `js/` has changed since it last shipped.
 
 Note a dirty tree without treating it as a blocker; the commit at the end stages named files only.
 
 ## Step 2 — Read the changelog for every version crossed
 
-The published tarball ships `dist/` only, so read the changelog from the sibling checkout, from `origin` rather than a local branch that may be stale:
+The changelog is not in `node_modules`: the published tarball ships `dist/` and `docs/` only. It is `js/CHANGELOG.md` in the sibling `pipelex-sdk` checkout, the package's own history, which goes back past the SDK's move into that repo. Read it from `origin/main`, the branch releases merge into, rather than a local branch that may be stale:
 
 ```bash
-git -C ../pipelex-sdk-js fetch origin --quiet
-git -C ../pipelex-sdk-js show origin/main:CHANGELOG.md | sed -n '/## \[vTARGET\]/,/## \[vCURRENT\]/p'
+git -C ../pipelex-sdk fetch origin --tags --quiet
+git -C ../pipelex-sdk show origin/main:js/CHANGELOG.md | sed -n '/## \[vTARGET\]/,/## \[vCURRENT\]/p'
 ```
 
-Substitute the real numbers — the file is newest-first, so the target heading comes before the current one. If the sibling is not checked out: `gh api repos/Pipelex/pipelex-sdk-js/contents/CHANGELOG.md --jq '.content' | base64 -d`.
+Substitute the real numbers — the file is newest-first, so the target heading comes before the current one. If that range comes back empty, or the sibling is not checked out: `gh api repos/Pipelex/pipelex-sdk/contents/js/CHANGELOG.md --jq '.content' | base64 -d`.
 
-Read every entry, not the newest — an intermediate minor's rename is still your rename. Then read the target's own type declarations, because the changelog is a summary and the `.d.ts` is the contract:
+The release is a second view, not a substitute: `gh release view vX.Y.Z --repo Pipelex/pipelex-sdk` shows the package's entry beside those of the other packages that release shipped. A release that held `@pipelex/sdk` back has a tag and a GitHub Release with no `@pipelex/sdk` section, a release that stopped part-way can have a tag and no GitHub Release at all (v0.29.0), and the versions released before the SDK moved into that repo (0.28.1 and earlier) have no tag there, though their entries are in `js/CHANGELOG.md` all the same.
+
+Read every entry, not the newest — an intermediate minor's rename is still your rename. Then read the target's own declarations, because the changelog is a summary and the code is the contract. Until Step 4 the copy under `editors/vscode/node_modules` is still the current version, so read the target from its tag, the source its npm tarball was built from:
 
 ```bash
-ls editors/vscode/node_modules/@pipelex/sdk/dist/
-grep -rn "class ApiResponseError\|class ApiUnreachableError\|class PipelineRequestError\|class PipelexApiClient" editors/vscode/node_modules/@pipelex/sdk/dist/*.d.ts
+git -C ../pipelex-sdk grep -n "class ApiResponseError\|class ApiUnreachableError\|class PipelexApiClient" vTARGET -- js/src
+git -C ../pipelex-sdk show vTARGET:js/src/errors.ts
 ```
+
+`PipelineRequestError` is not declared there: the SDK re-exports it from `mthds/protocol`. Once Step 4 has installed the target, `editors/vscode/node_modules/@pipelex/sdk/dist/*.d.ts` is the same contract as compiled, and the place to re-check it.
 
 Sort what you read into three buckets:
 
@@ -182,7 +188,7 @@ Then summarize for the user: the version move, every file touched, **which of th
 ## Rules
 
 - Keep the pin exact — no caret, no `npm:` prefix, no range.
-- Never point the pin at an unpublished version; cut the release in `../pipelex-sdk-js` first.
+- Never point the pin at an unpublished version, nor at a `-sprint.g<sha>` prerelease; npm, not a tag or a changelog heading, says what is published, and an unreleased fix is a release of `../pipelex-sdk` first.
 - Commit `editors/vscode/yarn.lock` with `package.json` — both PR gates install with `--immutable`.
 - Never report a green `yarn test` as evidence about the SDK: the suite runs against a hand-written mock.
 - Mirror the real constructors in that mock, and extend the conformance bindings whenever the backend starts reading a new field. Never delete a binding to go green.
