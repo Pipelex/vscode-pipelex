@@ -43,15 +43,15 @@ jobs:
         # With no `rust-toolchain` input, `rustup toolchain install` installs
         # what rust-toolchain.toml pins, components and wasm32 target included,
         # so this gate runs the same Clippy as a local `make check`. The canary
-        # passes `stable`; RUSTUP_TOOLCHAIN then outranks the file in every
-        # later step.
+        # passes `stable`, which the same command brings up to the newest
+        # release even where the runner image already ships an older one;
+        # RUSTUP_TOOLCHAIN then outranks the file in every later step.
         env:
           TOOLCHAIN_OVERRIDE: ${{ inputs.rust-toolchain }}
         run: |
           if [ -n "$TOOLCHAIN_OVERRIDE" ]; then
-            rustup update --no-self-update "$TOOLCHAIN_OVERRIDE"
-            rustup component add --toolchain "$TOOLCHAIN_OVERRIDE" rustfmt clippy
-            rustup target add --toolchain "$TOOLCHAIN_OVERRIDE" wasm32-unknown-unknown
+            rustup toolchain install --no-self-update --profile minimal \
+              --component rustfmt,clippy --target wasm32-unknown-unknown "$TOOLCHAIN_OVERRIDE"
             echo "RUSTUP_TOOLCHAIN=$TOOLCHAIN_OVERRIDE" >> "$GITHUB_ENV"
             export RUSTUP_TOOLCHAIN="$TOOLCHAIN_OVERRIDE"
           else
