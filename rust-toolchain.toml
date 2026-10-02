@@ -1,0 +1,12 @@
+# The Rust release every build here uses: a local `make check`, the CI gates
+# and the release builds alike, so local runs and CI lint with the same Clippy.
+# Move it on purpose, in its own pull request, when the Rust canary
+# (.github/workflows/rust-canary.yml) goes red — see
+# docs/dev/ci-and-branch-protection.md#the-rust-toolchain.
+# The MSRV floor is separate: `rust-version` in Cargo.toml, which ci.yaml's
+# test-msrv-* jobs select through RUSTUP_TOOLCHAIN, since this file outranks
+# `rustup default`.
+[toolchain]
+channel    = "1.99.0"
+components = ["clippy", "rustfmt"]
+targets    = ["wasm32-unknown-unknown"]

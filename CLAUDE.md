@@ -57,6 +57,7 @@ Publishes two PyPI packages from separate `pyproject.toml` files:
 
 ## Key Technical Details
 - **Rust MSRV**: 1.74 (CI tests against this)
+- **Rust toolchain**: `rust-toolchain.toml` pins the release used locally and by every workflow, so never add `rustup update` to a workflow; the weekly `rust-canary.yml` runs `make check` on the latest stable, and a red canary means moving the pin in its own PR. Select another toolchain with `RUSTUP_TOOLCHAIN`, never `rustup default`, which the file outranks (`docs/dev/ci-and-branch-protection.md#the-rust-toolchain`).
 - **VS Code engine**: ^1.90.0
 - **Package manager**: Yarn 4 (via corepack)
 - **Main branch**: `main`

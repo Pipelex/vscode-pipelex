@@ -97,8 +97,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
-        run: rustup update --no-self-update
+      # The job keeps its "Test on Rust stable" name although it now builds on
+      # the toolchain rust-toolchain.toml pins: releases.yaml's wait_for_ci
+      # looks this check up by that name.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install --no-self-update
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Install Python
         # Pin the interpreter (matches the Makefile's PYTHON_VERSION) so this
@@ -132,9 +135,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
-        run: |
-          rustup update --no-self-update
+      - name: Install the Rust toolchain
+        run: rustup toolchain install --no-self-update
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Retrieve toml-test
         run: |
@@ -147,15 +149,21 @@ jobs:
       - name: Run toml-test
         run: ./toml-test-v1.1.0-linux-amd64 ./target/debug/taplo -- toml-test
 
+  # The MSRV jobs select 1.74 through RUSTUP_TOOLCHAIN, never `rustup default`:
+  # rust-toolchain.toml outranks the default, so `rustup default 1.74` would
+  # leave a job building on the pinned toolchain and passing without testing
+  # 1.74. Each install step also fails the job if any other rustc is active.
   test-msrv-lib:
     name: Test libraries with MSRV
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.74"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
+      - name: Install the MSRV toolchain
         run: |
-          rustup update --no-self-update
-          rustup default 1.74
+          rustup toolchain install --no-self-update "$RUSTUP_TOOLCHAIN" --profile minimal
+          rustc --version | grep '^rustc 1\.74\.' || { echo "::error::expected Rust 1.74, got $(rustc --version)"; exit 1; }
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Test MSRV for taplo
         run: |
@@ -165,12 +173,14 @@ jobs:
   test-msrv-bin:
     name: Test binaries with MSRV
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.74"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
+      - name: Install the MSRV toolchain
         run: |
-          rustup update --no-self-update
-          rustup default 1.74
+          rustup toolchain install --no-self-update "$RUSTUP_TOOLCHAIN" --profile minimal
+          rustc --version | grep '^rustc 1\.74\.' || { echo "::error::expected Rust 1.74, got $(rustc --version)"; exit 1; }
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Test taplo-cli
         run: |
@@ -180,13 +190,14 @@ jobs:
   test-msrv-wasm:
     name: Test WASM with MSRV
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.74"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
+      - name: Install the MSRV toolchain
         run: |
-          rustup update --no-self-update
-          rustup default 1.74
-          rustup target install wasm32-unknown-unknown
+          rustup toolchain install --no-self-update "$RUSTUP_TOOLCHAIN" --profile minimal --target wasm32-unknown-unknown
+          rustc --version | grep '^rustc 1\.74\.' || { echo "::error::expected Rust 1.74, got $(rustc --version)"; exit 1; }
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Test taplo-wasm
         working-directory: crates/taplo-wasm

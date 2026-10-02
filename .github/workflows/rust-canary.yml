@@ -1,0 +1,30 @@
+name: Rust canary
+
+# Runs the `make check` gate (check.yml) on the latest stable Rust against
+# `dev`. The required gates build on the version rust-toolchain.toml pins, so a
+# new stable's Clippy lints fail this canary instead of every pull request. Red
+# means: move the pin and fix the lints in their own pull request, as
+# docs/dev/ci-and-branch-protection.md#the-rust-toolchain describes. Not a
+# required check, and it never runs on a pull request.
+#
+# A scheduled workflow runs from the default branch, `main`, so the code is
+# checked out from `dev` explicitly; the gate's own setup steps are `main`'s
+# copy of check.yml until the next release brings `dev`'s.
+
+on:
+  schedule:
+    # Fridays at 05:00 UTC: a new stable ships on a Thursday, so the canary
+    # tries it the next morning.
+    - cron: "0 5 * * 5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Latest stable Rust
+    uses: ./.github/workflows/check.yml
+    with:
+      rust-toolchain: stable
+      ref: dev
