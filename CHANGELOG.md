@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Upstream `taplo-common`/`lsp-async-stub` clippy warnings**: Fixed Rust 1.99 clippy lints (`double_must_use` on functions returning an iterator or a boxed future, `assert_is_empty` in a test) that broke the `make check` gate under CI's unpinned stable Rust. `async-trait` moves to 0.1.92, which no longer marks the futures it generates `#[must_use]`; the two `#[async_recursion]` functions allow the lint, since that macro still adds the attribute; and the two iterator-returning functions keep `#[must_use]` with a reason, which Rust 1.97's `must_use_candidate` also requires. (plxt >=X.Y.Z, pipelex-tools-py >=X.Y.Z, @pipelex/tools-wasm >=X.Y.Z)
+
 ## [0.18.1] - 2026-09-27
 
 ### Added

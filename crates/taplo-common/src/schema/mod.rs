@@ -796,7 +796,8 @@ impl<E: Environment> Schemas<E> {
     }
 
     #[async_recursion(?Send)]
-    #[must_use]
+    // async-recursion marks the boxed future it returns `#[must_use]`, which Clippy 1.99 reports as `double_must_use`.
+    #[allow(clippy::double_must_use)]
     pub(crate) async fn resolve_schema(&self, url: Url) -> Result<Arc<Value>, anyhow::Error> {
         match url.fragment() {
             Some(fragment) => {
@@ -1051,7 +1052,8 @@ impl<E: Environment> Schemas<E> {
     }
 
     #[async_recursion(?Send)]
-    #[must_use]
+    // async-recursion marks the boxed future it returns `#[must_use]`, which Clippy 1.99 reports as `double_must_use`.
+    #[allow(clippy::double_must_use)]
     #[allow(clippy::too_many_arguments)]
     async fn collect_child_schemas(
         &self,
@@ -1413,7 +1415,7 @@ impl NodeValidationError {
         )
     }
 
-    #[must_use]
+    #[must_use = "the iterator is lazy and does nothing unless consumed"]
     pub fn text_ranges(&self) -> Box<dyn Iterator<Item = TextRange> + '_> {
         let is_additional_props = match &self.source {
             ErrorSource::Validation(e) => {
