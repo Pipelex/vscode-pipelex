@@ -16,7 +16,7 @@ repository   = "https://github.com/Pipelex/vscode-pipelex"
 ahash              = { version = "0.8.4" }
 anyhow             = { version = "1.0.53" }
 arc-swap           = { version = "1.5.0" }
-async-trait        = { version = "0.1.52" }
+async-trait        = { version = "0.1.92" }
 clap               = { version = "4.5.31", default-features = false, features = ["std"] }
 either             = { version = "1.6.1" }
 futures            = { version = "0.3.30" }

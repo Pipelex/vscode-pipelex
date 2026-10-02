@@ -104,7 +104,7 @@ impl Config {
         }
     }
 
-    #[must_use]
+    #[must_use = "the iterator is lazy and does nothing unless consumed"]
     pub fn rules_for<'r>(
         &'r self,
         path: &'r Path,
