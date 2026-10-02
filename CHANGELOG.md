@@ -1,5 +1,15 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.18.2] - 2026-10-02
+
+### Changed
+
+- **Pinned Rust toolchain**: `rust-toolchain.toml` pins the Rust release that a local `make check`, the CI gates and the release builds all use, so a new stable Rust no longer fails the gate on unchanged code; a weekly canary runs `make check` on the latest stable instead, and the pin moves in a pull request of its own.
+
+### Fixed
+
+- **Upstream `taplo-common`/`lsp-async-stub` clippy warnings**: Fixed Rust 1.99 clippy lints (`double_must_use` on functions returning an iterator or a boxed future, `assert_is_empty` in a test) that broke the `make check` gate under CI's unpinned stable Rust. `async-trait` moves to 0.1.92, which no longer marks the futures it generates `#[must_use]`; the two `#[async_recursion]` functions allow the lint, since that macro still adds the attribute; and the two iterator-returning functions keep `#[must_use]` with a reason, which Rust 1.97's `must_use_candidate` also requires.
+
 ## [0.18.1] - 2026-09-27
 
 ### Added

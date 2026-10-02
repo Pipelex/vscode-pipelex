@@ -4,16 +4,12 @@ How to build and install the Pipelex extension and CLI from source for local tes
 
 ## Prerequisites
 
-- Rust toolchain (1.74+) with `wasm32-unknown-unknown` target
+- [rustup](https://rustup.rs)
 - Node.js 20+
 - Yarn 4 (via corepack: `corepack enable`)
 - A VS Code-compatible IDE (VS Code, Cursor, Windsurf, etc.)
 
-Install the WASM target if you haven't already:
-
-```bash
-rustup target add wasm32-unknown-unknown
-```
+You do not choose the Rust version: `rust-toolchain.toml` pins the release CI uses, with Clippy, rustfmt and the `wasm32-unknown-unknown` target, and rustup installs it on the first `cargo` command you run inside the repository, so your `make check` lints exactly as CI does. If your rustup does not install it by itself, run `rustup toolchain install` in the repository. Why it is pinned and how the pin moves is in [`ci-and-branch-protection.md`](ci-and-branch-protection.md#the-rust-toolchain).
 
 ## Quick Start
 

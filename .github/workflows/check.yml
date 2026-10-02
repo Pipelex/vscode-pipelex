@@ -13,6 +13,18 @@ on:
     branches:
       - main
       - dev
+  # The Rust canary (rust-canary.yml) runs this same gate on the latest stable
+  # Rust against `dev`, ahead of the version rust-toolchain.toml pins.
+  workflow_call:
+    inputs:
+      rust-toolchain:
+        description: Toolchain to run the gate on instead of the one rust-toolchain.toml pins
+        type: string
+        default: ""
+      ref:
+        description: Git ref to check out instead of the triggering event's
+        type: string
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref }}
@@ -24,12 +36,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ inputs.ref }}
 
-      - name: Install latest Rust toolchain
+      - name: Install the Rust toolchain
+        # With no `rust-toolchain` input, `rustup toolchain install` installs
+        # what rust-toolchain.toml pins, components and wasm32 target included,
+        # so this gate runs the same Clippy as a local `make check`. The canary
+        # passes `stable`, which the same command brings up to the newest
+        # release even where the runner image already ships an older one;
+        # RUSTUP_TOOLCHAIN then outranks the file in every later step.
+        env:
+          TOOLCHAIN_OVERRIDE: ${{ inputs.rust-toolchain }}
         run: |
-          rustup update --no-self-update
-          rustup component add rustfmt clippy
-          rustup target add wasm32-unknown-unknown
+          if [ -n "$TOOLCHAIN_OVERRIDE" ]; then
+            rustup toolchain install --no-self-update --profile minimal \
+              --component rustfmt,clippy --target wasm32-unknown-unknown "$TOOLCHAIN_OVERRIDE"
+            echo "RUSTUP_TOOLCHAIN=$TOOLCHAIN_OVERRIDE" >> "$GITHUB_ENV"
+            export RUSTUP_TOOLCHAIN="$TOOLCHAIN_OVERRIDE"
+          else
+            rustup toolchain install --no-self-update
+          fi
+          rustc --version
+          cargo clippy --version
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
 

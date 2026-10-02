@@ -24,7 +24,7 @@ import loadPipelexTools from "../../../crates/pipelex-tools-wasm/Cargo.toml";
 
 // ⚠️ PUBLIC BINDING SURFACE — these types mirror `@pipelex/sdk`'s
 // `Diagnostic`/`DiagnosticRange`/`DiagnosticKind`/`LintResponse`/`FormatResponse`
-// (pipelex-sdk-js/src/models.ts) and the crate's serialized shapes. Keep all
+// (pipelex-sdk/js/src/models.ts) and the crate's serialized shapes. Keep all
 // three in sync.
 
 /** Which analysis produced a `Diagnostic` — mirror of `pipelex-tools`' closed kind set. */

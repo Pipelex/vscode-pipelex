@@ -679,7 +679,7 @@ mod tests {
         let assoc = schema_association_from_opts(&opts, priority::CONFIG).unwrap();
 
         assert_eq!(assoc.url.as_str(), "https://legacy.example.com/schema.json");
-        assert!(assoc.fallback_urls.is_empty());
+        assert_eq!(assoc.fallback_urls, Vec::<Url>::new());
     }
 
     #[test]
