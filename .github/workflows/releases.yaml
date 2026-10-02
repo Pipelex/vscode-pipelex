@@ -68,10 +68,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
-        run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
+      - name: Install the Rust toolchain
+        # What rust-toolchain.toml pins, with its wasm32 target. The maturin
+        # wheel builds below read the same file through maturin-action.
+        run: rustup toolchain install --no-self-update
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Install Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -329,11 +329,10 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Install latest Rust toolchain
-        # wasm32 is the only target this crate ever builds for.
-        run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
+      - name: Install the Rust toolchain
+        # What rust-toolchain.toml pins, with its wasm32 target — the only
+        # target this crate ever builds for.
+        run: rustup toolchain install --no-self-update
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Install Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
