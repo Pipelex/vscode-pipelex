@@ -50,7 +50,7 @@ One npm package is published from this repo: **`@pipelex/tools-wasm`** (`js/tool
 
 The job builds with `RELEASE=true` explicitly rather than relying on the package's `prepublish` script — npm 7+ **does not run `prepublish` on `npm publish`** (it was deprecated in favour of `prepare`/`prepublishOnly`), so a publish that trusted it would ship whatever stale `dist/` happened to be lying around, or a debug-profile WASM build.
 
-Authentication is **OIDC trusted publishing** (`permissions: id-token: write` + `npm publish --provenance`) — no `NPM_TOKEN` secret, matching PyPI here and the `mthds-ui` / `mthds-js` / `pipelex-sdk-js` repos. The trusted publisher is registered per package on npmjs.com and names the workflow file, so **renaming `releases.yaml` breaks publishing**. See `docs/dev/release-publishing.md`.
+Authentication is **OIDC trusted publishing** (`permissions: id-token: write` + `npm publish --provenance`) — no `NPM_TOKEN` secret, matching PyPI here and the `mthds-ui` / `mthds-js` / `pipelex-sdk` repos. The trusted publisher is registered per package on npmjs.com and names the workflow file, so **renaming `releases.yaml` breaks publishing**. See `docs/dev/release-publishing.md`.
 
 `publish-tools-wasm.sh` at the repo root is the manual escape hatch for when CI cannot run. It defaults to `none` (publish the committed version without bumping) precisely so it cannot become a competing source of truth: **the version bump belongs to this skill, the publish belongs to CI.**
 

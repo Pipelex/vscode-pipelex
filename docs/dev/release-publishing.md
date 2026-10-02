@@ -20,7 +20,7 @@ The CLI (`pipelex-tools`) and the library (`pipelex-tools-py`) are **two separat
 
 Because the MTHDS JSON Schema is `include_str!`-embedded into all three engine bindings, **a schema refresh must ship all three** (`plxt`, `pipelex-tools-py`, `@pipelex/tools-wasm`) or the ones left behind keep serving the stale schema.
 
-For `@pipelex/tools-wasm` the publish is not the end of the chain. The Pipelex plugin's post-edit hook embeds it: `pipelex-sdk-js` pins it to an exact version and builds the hook bundle (`npm run build:hook`), and `pipelex-plugins` vendors that bundle (`make vendor-hook`) and ships it in a plugin release. A new engine, and the schema inside it, reaches builders only once both repos have moved, so a release that publishes `@pipelex/tools-wasm` files those two follow-ups in the ledger; the `/release` skill's **Particulars** carry the commands.
+For `@pipelex/tools-wasm` the publish is not the end of the chain. The Pipelex plugin's post-edit hook embeds it: `pipelex-sdk` pins it to an exact version in `js/package.json` and builds the hook bundle there (`npm run build:hook`), and `pipelex-plugins` vendors that bundle (`make vendor-hook`) and ships it in a plugin release. A new engine, and the schema inside it, reaches builders only once both repos have moved, so a release that publishes `@pipelex/tools-wasm` files those two follow-ups in the ledger; the `/release` skill's **Particulars** carry the commands.
 
 ---
 
@@ -46,7 +46,7 @@ OIDC trusted publishing lets GitHub Actions publish to PyPI without storing an A
 
 ### npm — Trusted Publishing (no API token needed)
 
-Same credential-free OIDC model as PyPI above, and the same one `mthds-ui`, `mthds-js` and `pipelex-sdk-js` already use — **there is no `NPM_TOKEN` secret in this repo and there should not be one.**
+Same credential-free OIDC model as PyPI above, and the same one `mthds-ui`, `mthds-js` and `pipelex-sdk` already use — **there is no `NPM_TOKEN` secret in this repo and there should not be one.**
 
 1. Log in to [npmjs.com](https://www.npmjs.com) as an account with admin rights on the **`@pipelex`** scope
 2. Go to the **`@pipelex/tools-wasm`** package → **Settings → Trusted Publisher → GitHub Actions**
@@ -141,7 +141,7 @@ The publish step queries the registry first and exits green if the version is al
 
 **The npm job is the one job in `releases.yaml` that does not run on pull requests**, and that is deliberate. It is also the only job that holds `id-token: write` *while executing repository code* (`yarn install`, `yarn build`, `yarn test`) — the two PyPI publish jobs hold the OIDC identity but run nothing but `download-artifact` + `gh-action-pypi-publish`. On a PR that code is attacker-controlled, and the `github.event_name == 'push'` guard on the publish step is no defense: any build step can read `$ACTIONS_ID_TOKEN_REQUEST_URL` and mint the token itself, then publish out of band. So the job is gated to tag pushes and `workflow_dispatch` only, and the publish identity never exists in a PR run. Little coverage is lost — `test-all.yml` already builds `@pipelex/tools-wasm` and runs its vitest suite on every PR (via `make test` → `test-tools-wasm-js`, debug profile), and `make check` cargo-checks the crate for `wasm32`. What moves to the dry run below is the `RELEASE=true` profile rehearsal.
 
-**This repo tags, then publishes; the sibling JS repos publish straight off `main`.** `mthds-ui` / `mthds-js` / `pipelex-sdk-js` each ship a single npm package, so "merged to main" *is* the release signal and their workflow creates the tag afterwards. This repo ships four artifacts on independent versions, so the tag is what selects *which* one is being released — `auto_tag` creates it and `releases.yaml` reacts. The npm authentication is identical; only the trigger differs.
+**This repo tags, then publishes; `mthds-ui` and `mthds-js` publish straight off `main`.** Each ships a single npm package, so "merged to main" *is* the release signal and their workflow creates the tag afterwards. This repo ships four artifacts on independent versions, so the tag is what selects *which* one is being released — `auto_tag` creates it and `releases.yaml` reacts. `pipelex-sdk` also tags before it publishes, but with one tag for everything: its packages share one version and one `vX.Y.Z` tag, and its release workflow publishes, from that tag, each package whose manifest carries the release's version. The npm authentication is identical; only the trigger differs.
 
 ### Several at once
 
