@@ -58,14 +58,15 @@ Substitute the real numbers — the file is newest-first, so the target heading 
 
 The release is a second view, not a substitute: `gh release view vX.Y.Z --repo Pipelex/pipelex-sdk` shows the package's entry beside those of the other packages that release shipped. A release that held `@pipelex/sdk` back has a tag and a GitHub Release with no `@pipelex/sdk` section, a release that stopped part-way can have a tag and no GitHub Release at all (v0.29.0), and the versions released before the SDK moved into that repo (0.28.1 and earlier) have no tag there, though their entries are in `js/CHANGELOG.md` all the same.
 
-Read every entry, not the newest — an intermediate minor's rename is still your rename. Then read the target's own declarations, because the changelog is a summary and the code is the contract. Until Step 4 the copy under `editors/vscode/node_modules` is still the current version, so read the target from its tag, the source its npm tarball was built from:
+Read every entry, not the newest — an intermediate minor's rename is still your rename. Then read the target's own declarations, because the changelog is a summary and the code is the contract. Until Step 4 the copy under `editors/vscode/node_modules` is still the current version, so read the target from npm, whose tarball holds the compiled declarations of every published version, tagged in `pipelex-sdk` or not, and is exactly what Step 4 will install. Shell state does not survive between calls, so the command prints the directory it unpacked into; read the rest of `package/dist/` there:
 
 ```bash
-git -C ../pipelex-sdk grep -n "class ApiResponseError\|class ApiUnreachableError\|class PipelexApiClient" vTARGET -- js/src
-git -C ../pipelex-sdk show vTARGET:js/src/errors.ts
+DIR=$(mktemp -d) && npm pack @pipelex/sdk@TARGET --pack-destination "$DIR" --silent >/dev/null \
+  && tar -xzf "$DIR/pipelex-sdk-TARGET.tgz" -C "$DIR" && echo "$DIR" \
+  && grep -n "declare class Api\(Response\|Unreachable\)Error\|declare class PipelexApiClient" "$DIR"/package/dist/errors.d.ts "$DIR"/package/dist/client.d.ts
 ```
 
-`PipelineRequestError` is not declared there: the SDK re-exports it from `mthds/protocol`. Once Step 4 has installed the target, `editors/vscode/node_modules/@pipelex/sdk/dist/*.d.ts` is the same contract as compiled, and the place to re-check it.
+A target released from `pipelex-sdk` (0.29.1 and later) also has its source at its tag, with the comments the `.d.ts` drops: `git -C ../pipelex-sdk show vTARGET:js/src/errors.ts`. The versions released before the move have no tag there, so for them the tarball is the read. `PipelineRequestError` is declared in neither: the SDK re-exports it from `mthds/protocol`. Once Step 4 has installed the target, `editors/vscode/node_modules/@pipelex/sdk/dist/*.d.ts` is the same contract, and the place to re-check it.
 
 Sort what you read into three buckets:
 
