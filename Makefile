@@ -134,8 +134,11 @@ test-all: test test-pipelex-lib ## Run every test suite, incl. the Python librar
 test-taplo: ## Test the taplo core crate
 	cargo test -p taplo
 
-test-taplo-common: ## Test the taplo-common crate
-	cargo test -p taplo-common
+test-taplo-common: ## Test the taplo-common crate (incl. the schema module)
+	# `schema` gates the schema module and its tests (the MTHDS pipe validation and
+	# diagnostic placement among them), and that module does not compile without
+	# `reqwest`; a plain `cargo test -p taplo-common` builds neither.
+	cargo test -p taplo-common --features schema,reqwest
 
 test-taplo-lsp: ## Test the taplo-lsp crate
 	cargo test -p taplo-lsp

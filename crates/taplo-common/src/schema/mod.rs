@@ -1243,6 +1243,27 @@ enum ErrorSource {
     },
 }
 
+/// Whether an `apply()` output unit reports an `additionalProperties` failure.
+///
+/// The keyword location alone is not enough: through a `$ref` — a `oneOf` of step shapes,
+/// say — `apply()` stops the location at the `$ref` and the keyword survives only in the
+/// message.
+fn is_additional_properties_unit(keyword_location: &str, message: &str) -> bool {
+    keyword_location.ends_with("/additionalProperties")
+        || message.starts_with("Additional properties are not allowed (")
+}
+
+/// The keys an `apply()` output unit's `additionalProperties` message names, which
+/// it carries only in its text: "Additional properties are not allowed ('foo' was
+/// unexpected)", or "('foo', 'bar' were unexpected)".
+fn unexpected_keys_in_message(message: &str) -> Vec<String> {
+    let re = Regex::new(r"'([^']+)'").expect("valid regex");
+    re.captures_iter(message)
+        .filter_map(|cap| cap.get(1))
+        .map(|key_name| key_name.as_str().to_string())
+        .collect()
+}
+
 /// A validation error that contains text ranges as well.
 #[derive(Debug)]
 pub struct NodeValidationError {
@@ -1300,15 +1321,10 @@ impl NodeValidationError {
         let message = unit.error_description().to_string();
 
         // Check if this is an additionalProperties error — extract unexpected keys from message
-        let is_additional_props = keyword_location.ends_with("/additionalProperties");
+        let is_additional_props = is_additional_properties_unit(&keyword_location, &message);
         if is_additional_props {
-            // Message format: "Additional properties are not allowed ('foo' was unexpected)"
-            // or: "Additional properties are not allowed ('foo', 'bar' were unexpected)"
-            let re = Regex::new(r"'([^']+)'").expect("valid regex");
-            for cap in re.captures_iter(&message) {
-                if let Some(key_name) = cap.get(1) {
-                    keys = keys.join(Key::from(key_name.as_str()));
-                }
+            for key_name in unexpected_keys_in_message(&message) {
+                keys = keys.join(Key::from(key_name));
             }
         }
 
@@ -1415,33 +1431,54 @@ impl NodeValidationError {
         )
     }
 
+    /// The keys an `additionalProperties` error names as unexpected, or `None` for any
+    /// other kind of error.
+    ///
+    /// Read off the error itself rather than off `keys`: `keys` also carries the base keys
+    /// of a per-pipe validation and the instance-path keys of a nested one, and none of
+    /// those is an entry of the node the error sits on.
+    fn unexpected_keys(&self) -> Option<Vec<String>> {
+        match &self.source {
+            ErrorSource::Validation(e) => match &e.kind {
+                ValidationErrorKind::AdditionalProperties { unexpected } => {
+                    Some(unexpected.clone())
+                }
+                _ => None,
+            },
+            ErrorSource::Applied {
+                message,
+                keyword_location,
+            } => is_additional_properties_unit(keyword_location, message)
+                .then(|| unexpected_keys_in_message(message)),
+        }
+    }
+
+    /// The ranges of the error, most specific last.
+    ///
+    /// An `additionalProperties` error yields the value of each unexpected entry, so its
+    /// first and its last range both point at an offending entry — the language server
+    /// publishes the first and the compact CLI printer and the lint bindings take the last.
+    /// Looking every key of `keys` up in the node instead, as upstream taplo does, resolves
+    /// the base and instance-path keys to empty ranges at the start of the document, which
+    /// put a nested or per-pipe error on line 1.
     #[must_use = "the iterator is lazy and does nothing unless consumed"]
     pub fn text_ranges(&self) -> Box<dyn Iterator<Item = TextRange> + '_> {
-        let is_additional_props = match &self.source {
-            ErrorSource::Validation(e) => {
-                matches!(e.kind, ValidationErrorKind::AdditionalProperties { .. })
-            }
-            ErrorSource::Applied {
-                keyword_location, ..
-            } => keyword_location.ends_with("/additionalProperties"),
+        let Some(unexpected) = self.unexpected_keys() else {
+            return Box::new(self.node.text_ranges(true));
         };
 
-        if is_additional_props {
-            let include_children = false;
+        let include_children = false;
+        let ranges: Vec<TextRange> = unexpected
+            .iter()
+            .filter_map(|key| self.node.try_get(key.as_str()).ok())
+            .flat_map(|entry| entry.text_ranges(include_children))
+            .collect();
 
-            if self.keys.is_empty() {
-                return Box::new(self.node.text_ranges(include_children));
-            }
-
-            Box::new(
-                self.keys
-                    .clone()
-                    .into_iter()
-                    .flat_map(move |key| self.node.get(key).text_ranges(include_children)),
-            )
-        } else {
-            Box::new(self.node.text_ranges(true))
+        if ranges.is_empty() {
+            // The error names no entry the node holds: point at the node as a whole.
+            return Box::new(self.node.text_ranges(include_children));
         }
+        Box::new(ranges.into_iter())
     }
 
     /// Format a human-readable error message.
@@ -1991,5 +2028,118 @@ model = "$default"
             locations.contains(&Some("pipe.bad_pipe.type".to_string())),
             "Should locate the discriminator error at the offending `type` key — got: {locations:?}",
         );
+    }
+
+    /// An `additionalProperties` error must point at the entry it names from both ends of
+    /// its ranges, because the consumers disagree on which end they read: the language
+    /// server publishes the first range, while the compact CLI printer and the lint
+    /// bindings take the last. A key the error's node does not hold resolves to an empty
+    /// range at the start of the document, so a range list that mixed such keys in put the
+    /// diagnostic on line 1 in the editor, or in the CLI, or both.
+    #[tokio::test]
+    async fn mthds_additional_property_errors_point_at_the_unexpected_entry() {
+        let env = MockEnv {
+            files: std::collections::HashMap::new(),
+        };
+        let schemas = super::Schemas::new(env, None);
+        let schema_url: Url = super::builtins::MTHDS_SCHEMA_URL.parse().unwrap();
+        schemas
+            .add_schema(&schema_url, super::builtins::mthds_schema())
+            .await;
+
+        // (what the case exercises, the bundle, the text the ranges must cover)
+        let cases = [
+            (
+                "a field the pipe's blueprint does not declare",
+                r#"
+domain = "proofing"
+
+[pipe.ask]
+type = "PipeLLM"
+description = "Answer the question"
+inputs = { question = "Text" }
+output = "Text"
+prompt = "Answer $question"
+prompt_template = "Answer $question"
+"#,
+                r#""Answer $question""#,
+            ),
+            (
+                "a dotted input name",
+                r#"
+domain = "proofing"
+
+[pipe.describe]
+type = "PipeLLM"
+description = "Describe the printed page"
+inputs = { "page.page_view" = "Image" }
+output = "Text"
+prompt = "Describe this page: @page.page_view"
+"#,
+                r#""Image""#,
+            ),
+            (
+                "a binding step in a PipeParallel's branches",
+                r#"
+domain = "proofing"
+
+[pipe.both]
+type = "PipeParallel"
+description = "Bind and answer at once"
+inputs = { invoice = "Text" }
+output = "Text"
+add_each_output = true
+branches = [{ from = "invoice.total", result = "bound_total" }, { pipe = "ask", result = "answer" }]
+"#,
+                r#""invoice.total""#,
+            ),
+            (
+                "a step mixing `pipe` with `from`",
+                r#"
+domain = "proofing"
+
+[pipe.seq]
+type = "PipeSequence"
+description = "Answer from the invoice"
+inputs = { invoice = "Text" }
+output = "Text"
+steps = [{ pipe = "ask", from = "invoice.total", result = "answer" }]
+"#,
+                r#""invoice.total""#,
+            ),
+        ];
+
+        for (case, content, expected) in cases {
+            let dom = taplo::parser::parse(content).into_dom();
+            let errors = schemas.validate_root(&schema_url, &dom).await.unwrap();
+            let additional: Vec<_> = errors
+                .iter()
+                .filter(|e| e.display_message().starts_with("Additional properties"))
+                .collect();
+            assert!(
+                !additional.is_empty(),
+                "{case}: expected an additional-properties error — got: {:?}",
+                errors
+                    .iter()
+                    .map(super::NodeValidationError::display_message)
+                    .collect::<Vec<_>>(),
+            );
+            for error in additional {
+                let ranges: Vec<_> = error.text_ranges().collect();
+                for (end, range) in [("first", ranges.first()), ("last", ranges.last())] {
+                    let range = range.unwrap_or_else(|| {
+                        panic!("{case}: `{}` carries no range", error.display_message())
+                    });
+                    let covered = &content
+                        [u32::from(range.start()) as usize..u32::from(range.end()) as usize];
+                    assert_eq!(
+                        covered,
+                        expected,
+                        "{case}: the {end} range of `{}` covers {covered:?}, not the unexpected entry — all ranges: {ranges:?}",
+                        error.display_message(),
+                    );
+                }
+            }
+        }
     }
 }
