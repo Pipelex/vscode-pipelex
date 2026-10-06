@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Bundled MTHDS schema follows the binding step (Breaking)**: `plxt`, the language server, `pipelex-tools-py` and `@pipelex/tools-wasm` now accept a binding step `{ from = "invoice.total", result = "total_amount" }` in a PipeSequence's `steps` and a dotted `batch_over` such as `"catalog.pages"` on a sequence step, and reject a binding step in a PipeParallel's `branches`, a step that mixes `from` with `pipe` or with a pipe step's fields, a dotted input name, and any name under the reserved `_bound_` prefix; the schema also gains the `PipeDocGen` and `PipeJudge` pipe types. The schema copy and the vendored MTHDS Test Corpus that holds `plxt` to it are both taken from the pipelex sprint branch, ahead of the pipelex release that will carry the binding step.
+
 ## [0.18.2] - 2026-10-02
 
 ### Changed

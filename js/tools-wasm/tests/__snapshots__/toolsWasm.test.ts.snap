@@ -906,7 +906,7 @@ exports[`corpus snapshots (committed expected outputs) > lint jinja-templates.mt
   {
     "kind": "schema",
     "location": "pipe.format.type",
-    "message": ""PipeJinja2" is not one of ["PipeBatch","PipeCompose","PipeCondition","PipeExtract","PipeFunc","PipeImgGen","PipeLLM","PipeParallel","PipeSearch","PipeSequence","PipeStructure"]",
+    "message": ""PipeJinja2" is not one of ["PipeBatch","PipeCompose","PipeCondition","PipeDocGen","PipeExtract","PipeFunc","PipeImgGen","PipeJudge","PipeLLM","PipeParallel","PipeSearch","PipeSequence","PipeStructure"]",
     "range": {
       "end_col": 20,
       "end_line": 8,
@@ -920,7 +920,7 @@ exports[`corpus snapshots (committed expected outputs) > lint jinja-templates.mt
   {
     "kind": "schema",
     "location": "pipe.filter_content.type",
-    "message": ""PipeJinja2" is not one of ["PipeBatch","PipeCompose","PipeCondition","PipeExtract","PipeFunc","PipeImgGen","PipeLLM","PipeParallel","PipeSearch","PipeSequence","PipeStructure"]",
+    "message": ""PipeJinja2" is not one of ["PipeBatch","PipeCompose","PipeCondition","PipeDocGen","PipeExtract","PipeFunc","PipeImgGen","PipeJudge","PipeLLM","PipeParallel","PipeSearch","PipeSequence","PipeStructure"]",
     "range": {
       "end_col": 20,
       "end_line": 22,
@@ -934,7 +934,7 @@ exports[`corpus snapshots (committed expected outputs) > lint jinja-templates.mt
   {
     "kind": "schema",
     "location": "pipe.inline_format.type",
-    "message": ""PipeJinja2" is not one of ["PipeBatch","PipeCompose","PipeCondition","PipeExtract","PipeFunc","PipeImgGen","PipeLLM","PipeParallel","PipeSearch","PipeSequence","PipeStructure"]",
+    "message": ""PipeJinja2" is not one of ["PipeBatch","PipeCompose","PipeCondition","PipeDocGen","PipeExtract","PipeFunc","PipeImgGen","PipeJudge","PipeLLM","PipeParallel","PipeSearch","PipeSequence","PipeStructure"]",
     "range": {
       "end_col": 22,
       "end_line": 43,
@@ -953,7 +953,7 @@ exports[`corpus snapshots (committed expected outputs) > lint lint/invalid_schem
   {
     "kind": "schema",
     "location": "pipe.bad_pipe.type",
-    "message": ""UnknownPipeType" is not one of ["PipeBatch","PipeCompose","PipeCondition","PipeExtract","PipeFunc","PipeImgGen","PipeLLM","PipeParallel","PipeSearch","PipeSequence","PipeStructure"]",
+    "message": ""UnknownPipeType" is not one of ["PipeBatch","PipeCompose","PipeCondition","PipeDocGen","PipeExtract","PipeFunc","PipeImgGen","PipeJudge","PipeLLM","PipeParallel","PipeSearch","PipeSequence","PipeStructure"]",
     "range": {
       "end_col": 32,
       "end_line": 12,
