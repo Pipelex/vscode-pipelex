@@ -547,43 +547,73 @@ describe('Result variables', () => {
 });
 
 describe('Binding steps', () => {
-  it('colors the from path and the result of a binding step', async () => {
-    const tokens = await getTokens(['  { from = "invoice.total", result = "total_amount" },']);
+  /** The text each token covers, in push order. */
+  function covered(lines: string[], tokens: PushedToken[]): string[] {
+    return tokens.map(t => lines[t.line].slice(t.char, t.char + t.length));
+  }
+
+  it('colors the from path and the result of a binding step in a multi-line steps array', async () => {
+    const lines = [
+      'steps = [',
+      '  { from = "invoice.total", result = "total_amount" },',
+      '  { pipe = "write_receipt", result = "receipt" },',
+      ']',
+    ];
+    const tokens = await getTokens(lines);
 
     expect(tokens).toEqual([
-      // result -> "total_amount" (the step-variable pass runs first)
-      { line: 0, char: 38, length: 12, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      // result -> "total_amount" (the step-variable pass runs before the steps scanner)
+      { line: 1, char: 38, length: 12, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
       // from -> "invoice.total"
-      { line: 0, char: 12, length: 13, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      { line: 1, char: 12, length: 13, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      // result -> "receipt"
+      { line: 2, char: 38, length: 7, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
     ]);
-  });
-
-  it('colors a field name that carries capitals', async () => {
-    const tokens = await getTokens(['{ from = "order.lineItems", result = "lines" }']);
-
-    const fromToken = tokens.find(t => t.char === 10);
-    expect(fromToken).toEqual({ line: 0, char: 10, length: 15, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 });
   });
 
   it('colors every binding step on a single-line steps array', async () => {
-    const line = 'steps = [{ from = "invoice.total", result = "total" }, { from = "invoice.date", result = "date" }]';
-    const tokens = await getTokens([line]);
+    const lines = ['steps = [{ from = "invoice.total", result = "total" }, { from = "invoice.date", result = "date" }]'];
+    expect(covered(lines, await getTokens(lines))).toEqual(['total', 'date', 'invoice.total', 'invoice.date']);
+  });
 
-    expect(tokens.map(t => line.slice(t.char, t.char + t.length))).toEqual([
-      'total',
-      'date',
-      'invoice.total',
-      'invoice.date',
-    ]);
+  it('colors a field name that carries capitals', async () => {
+    const lines = ['steps = [{ from = "order.lineItems", result = "lines" }]'];
+    expect(covered(lines, await getTokens(lines))).toEqual(['lines', 'order.lineItems']);
+  });
+
+  it('does not color a from key in an input slot\'s hints', async () => {
+    const lines = ['inputs = { notes = { concept = "Text", hints = { from = "sender" } } }'];
+    // the slot name and its concept, never the hint value
+    expect(covered(lines, await getTokens(lines))).toEqual(['notes', 'Text']);
+  });
+
+  it('does not color a from key in a table nested inside a step', async () => {
+    const lines = ['steps = [{ pipe = "ask", result = "answer", meta = { from = "sender" } }]'];
+    expect(covered(lines, await getTokens(lines))).toEqual(['answer']);
+  });
+
+  it('does not color a from key in a PipeParallel branch', async () => {
+    const lines = ['branches = [{ from = "invoice.total", result = "total" }]'];
+    expect(covered(lines, await getTokens(lines))).toEqual(['total']);
+  });
+
+  it('counts brackets and braces outside strings and comments only', async () => {
+    const lines = [
+      'steps = [ # a ] or } here closes nothing',
+      '  { pipe = "odd]}name", result = "first" }, { from = "invoice.total", result = "total" },',
+      ']',
+    ];
+    expect(covered(lines, await getTokens(lines))).toEqual(['first', 'total', 'invoice.total']);
+  });
+
+  it('abandons a steps array left open when a table header follows', async () => {
+    const lines = ['steps = [', '[pipe.next]', '{ from = "invoice.total" }'];
+    const tokens = await getTokens(lines);
+    expect(tokens.filter(t => t.line === 2)).toHaveLength(0);
   });
 
   it('does not color a top-level from key, as a concept structure field would write it', async () => {
     const tokens = await getTokens(['[concept.Email.structure]', 'from = "sender"']);
-    expect(tokens).toHaveLength(0);
-  });
-
-  it('does not color a from key whose inline table closed before it', async () => {
-    const tokens = await getTokens(['meta = { a = "b" }, from = "sender"']);
     expect(tokens).toHaveLength(0);
   });
 });

@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Binding steps are coloured**: the semantic-token provider colours a binding step's `from` path as a data variable, as it already does `result` and `batch_over`, and a dotted path's field names may now carry capitals.
+- **Binding steps are coloured**: the semantic-token provider colours the `from` path of a binding step in a PipeSequence's `steps` as a data variable, as it already does `result` and `batch_over`, and leaves a `from` anywhere else, such as an input slot's hints, uncoloured; a dotted path's field names may now carry capitals.
 
 ### Changed
 

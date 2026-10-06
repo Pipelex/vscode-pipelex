@@ -2060,9 +2060,9 @@ description = "Answer the question"
 inputs = { question = "Text" }
 output = "Text"
 prompt = "Answer $question"
-prompt_template = "Answer $question"
+prompt_template = "Legacy template for $question"
 "#,
-                r#""Answer $question""#,
+                r#""Legacy template for $question""#,
             ),
             (
                 "a dotted input name",
@@ -2110,6 +2110,14 @@ steps = [{ pipe = "ask", from = "invoice.total", result = "answer" }]
         ];
 
         for (case, content, expected) in cases {
+            // The ranges are held to an offset as well as to a text: a range landing on an
+            // identical value elsewhere in the bundle would pass a text comparison alone.
+            assert_eq!(
+                content.matches(expected).count(),
+                1,
+                "{case}: the expected text must occur once in the bundle to pin an offset",
+            );
+            let expected_start = content.find(expected).unwrap();
             let dom = taplo::parser::parse(content).into_dom();
             let errors = schemas.validate_root(&schema_url, &dom).await.unwrap();
             let additional: Vec<_> = errors
@@ -2130,12 +2138,12 @@ steps = [{ pipe = "ask", from = "invoice.total", result = "answer" }]
                     let range = range.unwrap_or_else(|| {
                         panic!("{case}: `{}` carries no range", error.display_message())
                     });
-                    let covered = &content
-                        [u32::from(range.start()) as usize..u32::from(range.end()) as usize];
+                    let start = u32::from(range.start()) as usize;
+                    let covered = &content[start..u32::from(range.end()) as usize];
                     assert_eq!(
-                        covered,
-                        expected,
-                        "{case}: the {end} range of `{}` covers {covered:?}, not the unexpected entry — all ranges: {ranges:?}",
+                        (start, covered),
+                        (expected_start, expected),
+                        "{case}: the {end} range of `{}` covers {covered:?} at {start}, not the unexpected entry at {expected_start} — all ranges: {ranges:?}",
                         error.display_message(),
                     );
                 }
