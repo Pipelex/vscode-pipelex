@@ -68,6 +68,10 @@ Like `format_mthds`, it **never raises on bad content**: even a validator failur
 
 Schema errors on pipes go through the engine's MTHDS-aware selection (`validate_mthds_pipes` in `taplo-common`): each pipe is validated against the specific blueprint its `type` names, so the diagnostics describe *that* blueprint's violations rather than the generic `oneOf` branch-ranking fallout. When the `type` names **no** known pipe type, the engine reports the discriminator mistake itself — `"X" is not one of [...]`, listing the valid pipe types and locating the offending `type` key — instead of letting the best-branch heuristic blame the pipe's legitimate fields as additional properties. This selection behavior is part of the specced surface, pinned by the workspace conformance suite (`conformance/tests/pipelex_tools/test_lint.py`).
 
+#### Where an additional-properties error points
+
+An "Additional properties are not allowed" diagnostic is placed on the value of each entry it names: the `"Image"` of a dotted input name written `"page.page_view" = "Image"`, or the path of a `from` in a parallel branch or beside a step's `pipe`. `NodeValidationError::text_ranges` in `taplo-common` reads the unexpected keys off the error itself, so the first and the last of its ranges both land on an offending entry, which matters because the consumers read different ends: the language server publishes the first range, while `plxt lint`'s compact printer and these bindings take the last. When the error names no entry the node holds, the range is the node's own. `mthds_additional_property_errors_point_at_the_unexpected_entry` in that module pins the per-pipe, nested and `$ref` cases.
+
 ### `Diagnostic` shape
 
 Both functions return diagnostics with this stable shape (`location` and `range` are always present, `null` when absent):

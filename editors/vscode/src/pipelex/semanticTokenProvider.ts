@@ -42,6 +42,32 @@ const IDENTIFIER = /[A-Za-z0-9_-]+/y;
  */
 const CONCEPT_VALUE = /^(?:([a-z][a-z0-9_]*)\.)?([A-Z][A-Za-z0-9]*)(?:\[\d*\])?$/;
 
+/**
+ * A path into working memory as it appears between the quotes: a name, then zero or
+ * more field names after dots, as in a binding step's `from = "invoice.total"` or a
+ * dotted `batch_over = "catalog.pages"`. The name is a plain input name, so it is
+ * lowercase; a field name follows the structure that declares it.
+ */
+const WORKING_MEMORY_PATH = '[a-z][a-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)*';
+
+/** A step field whose value names working memory: the whole value is one data variable token. */
+const STEP_VARIABLE = new RegExp(`\\b(result|batch_as|batch_over)(\\s*=\\s*")(${WORKING_MEMORY_PATH})(")`, 'g');
+
+/** A whole string value that is a working-memory path. */
+const WORKING_MEMORY_PATH_VALUE = new RegExp(`^${WORKING_MEMORY_PATH}$`);
+
+/**
+ * The line that opens a PipeSequence's `steps` array. The capture is everything up to
+ * and including the `[`, so the scan starts at `match[1].length`.
+ */
+const STEPS_ARRAY_START = /^(\s*steps\s*=\s*\[)/;
+
+/**
+ * Nesting inside an open `steps` array at which a step's own keys sit: 1 for the array,
+ * 2 for the step's inline table. A binding step's `from` is read only there.
+ */
+const STEP_KEY_DEPTH = 2;
+
 export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTokensProvider {
     private readonly legend: vscode.SemanticTokensLegend;
 
@@ -69,6 +95,9 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
         // Nesting inside the open `inputs` block: 0 = not in one, 1 = directly inside
         // `inputs = { … }`, 2 = inside a slot table, 3+ = inside its hints.
         let inputsDepth = 0;
+        // Nesting inside the open `steps` array: 0 = not in one, 1 = directly inside
+        // `steps = [ … ]`, 2 = inside a step's inline table, 3+ = inside a value of it.
+        let stepsDepth = 0;
 
         for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
             const line = document.lineAt(lineIndex).text;
@@ -82,6 +111,12 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
                 continue;
             }
             inputsDepth = 0;
+
+            // A steps array left open is abandoned the same way: an element of `steps` is
+            // an inline table, so a line opening with `[` is a table header, not a step.
+            if (TABLE_HEADER_LINE.test(line)) {
+                stepsDepth = 0;
+            }
 
             // Table headers — add declaration modifier
             this.analyzeTableHeaders(line, lineIndex, tokensBuilder);
@@ -105,6 +140,23 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
 
             // result/batch_as/batch_over variable names in step objects
             this.analyzeResultVariables(line, lineIndex, tokensBuilder);
+
+            // A binding step's `from`, read only on a step of an open `steps` array. Like
+            // the inputs scanner, the steps scanner reports the depth it ended the line at.
+            if (stepsDepth > 0) {
+                stepsDepth = this.scanStepsArray(line, 0, lineIndex, stepsDepth, tokensBuilder);
+            } else {
+                const stepsStart = STEPS_ARRAY_START.exec(line);
+                if (stepsStart) {
+                    stepsDepth = this.scanStepsArray(
+                        line,
+                        stepsStart[1].length,
+                        lineIndex,
+                        1,
+                        tokensBuilder
+                    );
+                }
+            }
         }
 
         return tokensBuilder.build();
@@ -285,12 +337,91 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
     }
 
     private analyzeResultVariables(line: string, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
-        const regex = /\b(result|batch_as|batch_over)(\s*=\s*")([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)(")/g;
         let match;
-        while ((match = regex.exec(line)) !== null) {
+        while ((match = STEP_VARIABLE.exec(line)) !== null) {
             const varOffset = match.index + match[1].length + match[2].length;
             tokensBuilder.push(lineIndex, varOffset, match[3].length, TOKEN_TYPES.mthdsDataVariable);
         }
+    }
+
+    /**
+     * Scan one line of an open `steps` array, emitting a token for each binding step's
+     * `from` path, and return the nesting the line ends at (0 once the array has closed).
+     *
+     * `from` is a common word, and the same key can sit in an input's presentation
+     * hints, in a nested table, or at the top level as a concept structure's field, so
+     * the key alone says nothing. What makes it a binding step's path is where it sits:
+     * directly inside an inline table that is an element of a PipeSequence's `steps`,
+     * at depth {@link STEP_KEY_DEPTH}. Brackets and braces are counted together and
+     * outside strings only, and a `#` outside a string ends the line, as in
+     * {@link scanInputsBlock}.
+     */
+    private scanStepsArray(
+        line: string,
+        start: number,
+        lineIndex: number,
+        depth: number,
+        tokensBuilder: vscode.SemanticTokensBuilder
+    ): number {
+        let i = start;
+
+        while (i < line.length) {
+            const ch = line[i];
+
+            if (ch === '#') {
+                return depth; // comment runs to end of line
+            }
+            if (ch === '"' || ch === "'") {
+                i = this.skipString(line, i);
+                continue;
+            }
+            if (ch === '[' || ch === '{') {
+                depth += 1;
+                i += 1;
+                continue;
+            }
+            if (ch === ']' || ch === '}') {
+                depth -= 1;
+                i += 1;
+                if (depth <= 0) {
+                    return 0;
+                }
+                continue;
+            }
+
+            // Sticky, so a match can only start at `i` — anything else advances by one.
+            IDENTIFIER.lastIndex = i;
+            const identifier = IDENTIFIER.exec(line);
+            if (!identifier) {
+                i += 1;
+                continue;
+            }
+
+            const key = identifier[0];
+            i = IDENTIFIER.lastIndex;
+
+            let valueStart = this.skipSpaces(line, i);
+            if (line[valueStart] !== '=') {
+                continue;
+            }
+            valueStart = this.skipSpaces(line, valueStart + 1);
+            i = valueStart;
+
+            if (key !== 'from' || depth !== STEP_KEY_DEPTH || line[valueStart] !== '"') {
+                continue;
+            }
+
+            const closingQuote = this.skipString(line, valueStart) - 1;
+            if (closingQuote <= valueStart || line[closingQuote] !== '"') {
+                continue; // unterminated while the user is typing
+            }
+            const value = line.slice(valueStart + 1, closingQuote);
+            if (WORKING_MEMORY_PATH_VALUE.test(value)) {
+                tokensBuilder.push(lineIndex, valueStart + 1, value.length, TOKEN_TYPES.mthdsDataVariable);
+            }
+        }
+
+        return depth;
     }
 
     getSemanticTokensLegend(): vscode.SemanticTokensLegend {
