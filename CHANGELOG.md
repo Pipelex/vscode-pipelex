@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.19.1] - 2026-10-06
+
+### Changed
+
+- **Vendored MTHDS Test Corpus follows pipelex v0.76.0**: the corpus that `plxt` and the `pipelex_tools` library are held to gains entries for the `markdown` filter of an HTML template, a sequence whose steps read one input as Markdown and then as Text, a sequence step storing a list that the next step reads as a single item, and a step calling a pipe from a package no runtime can resolve, and its vocabulary gains the `feature.markdown_filter` and `error.unresolved_package_dependency` tags. Every new entry lints clean against the bundled MTHDS schema, which already matches pipelex v0.76.0 and does not change.
+
 ## [0.19.0] - 2026-10-06
 
 ### Added
