@@ -42,6 +42,20 @@ const IDENTIFIER = /[A-Za-z0-9_-]+/y;
  */
 const CONCEPT_VALUE = /^(?:([a-z][a-z0-9_]*)\.)?([A-Z][A-Za-z0-9]*)(?:\[\d*\])?$/;
 
+/**
+ * A path into working memory as it appears between the quotes: a name, then zero or
+ * more field names after dots, as in a binding step's `from = "invoice.total"` or a
+ * dotted `batch_over = "catalog.pages"`. The name is a plain input name, so it is
+ * lowercase; a field name follows the structure that declares it.
+ */
+const WORKING_MEMORY_PATH = '[a-z][a-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)*';
+
+/** A step field whose value names working memory: the whole value is one data variable token. */
+const STEP_VARIABLE = new RegExp(`\\b(result|batch_as|batch_over)(\\s*=\\s*")(${WORKING_MEMORY_PATH})(")`, 'g');
+
+/** A binding step's `from` path, `{ from = "invoice.total", result = "total_amount" }`. */
+const BINDING_FROM = new RegExp(`\\b(from)(\\s*=\\s*")(${WORKING_MEMORY_PATH})(")`, 'g');
+
 export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTokensProvider {
     private readonly legend: vscode.SemanticTokensLegend;
 
@@ -285,9 +299,19 @@ export class PipelexSemanticTokensProvider implements vscode.DocumentSemanticTok
     }
 
     private analyzeResultVariables(line: string, lineIndex: number, tokensBuilder: vscode.SemanticTokensBuilder) {
-        const regex = /\b(result|batch_as|batch_over)(\s*=\s*")([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)(")/g;
         let match;
-        while ((match = regex.exec(line)) !== null) {
+        while ((match = STEP_VARIABLE.exec(line)) !== null) {
+            const varOffset = match.index + match[1].length + match[2].length;
+            tokensBuilder.push(lineIndex, varOffset, match[3].length, TOKEN_TYPES.mthdsDataVariable);
+        }
+
+        // `from` is a common word, so it is read as a binding step's path only inside an
+        // inline table — where every step is written — and never as a top-level key, which
+        // is where a concept structure would put a field called `from`.
+        while ((match = BINDING_FROM.exec(line)) !== null) {
+            if (line.lastIndexOf('{', match.index) <= line.lastIndexOf('}', match.index)) {
+                continue;
+            }
             const varOffset = match.index + match[1].length + match[2].length;
             tokensBuilder.push(lineIndex, varOffset, match[3].length, TOKEN_TYPES.mthdsDataVariable);
         }

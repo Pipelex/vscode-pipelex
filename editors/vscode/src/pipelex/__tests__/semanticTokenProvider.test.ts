@@ -531,6 +531,61 @@ describe('Result variables', () => {
     expect(tokens[2].tokenType).toBe(TOKEN.mthdsDataVariable);
     expect(tokens[2].length).toBe(3); // "out"
   });
+
+  it('colors a dotted batch_over path as one variable', async () => {
+    const tokens = await getTokens(['{ pipe = "describe_page", batch_over = "catalog.pages", batch_as = "page" }']);
+
+    expect(tokens).toHaveLength(2);
+    expect(tokens[0]).toEqual({
+      line: 0,
+      char: 40, // "catalog.pages"
+      length: 13,
+      tokenType: TOKEN.mthdsDataVariable,
+      tokenModifiers: 0,
+    });
+  });
+});
+
+describe('Binding steps', () => {
+  it('colors the from path and the result of a binding step', async () => {
+    const tokens = await getTokens(['  { from = "invoice.total", result = "total_amount" },']);
+
+    expect(tokens).toEqual([
+      // result -> "total_amount" (the step-variable pass runs first)
+      { line: 0, char: 38, length: 12, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+      // from -> "invoice.total"
+      { line: 0, char: 12, length: 13, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 },
+    ]);
+  });
+
+  it('colors a field name that carries capitals', async () => {
+    const tokens = await getTokens(['{ from = "order.lineItems", result = "lines" }']);
+
+    const fromToken = tokens.find(t => t.char === 10);
+    expect(fromToken).toEqual({ line: 0, char: 10, length: 15, tokenType: TOKEN.mthdsDataVariable, tokenModifiers: 0 });
+  });
+
+  it('colors every binding step on a single-line steps array', async () => {
+    const line = 'steps = [{ from = "invoice.total", result = "total" }, { from = "invoice.date", result = "date" }]';
+    const tokens = await getTokens([line]);
+
+    expect(tokens.map(t => line.slice(t.char, t.char + t.length))).toEqual([
+      'total',
+      'date',
+      'invoice.total',
+      'invoice.date',
+    ]);
+  });
+
+  it('does not color a top-level from key, as a concept structure field would write it', async () => {
+    const tokens = await getTokens(['[concept.Email.structure]', 'from = "sender"']);
+    expect(tokens).toHaveLength(0);
+  });
+
+  it('does not color a from key whose inline table closed before it', async () => {
+    const tokens = await getTokens(['meta = { a = "b" }, from = "sender"']);
+    expect(tokens).toHaveLength(0);
+  });
 });
 
 describe('False positives (should produce NO tokens)', () => {

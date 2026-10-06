@@ -13,8 +13,10 @@ The legend is seven types and one modifier, `declaration`:
 | `mthdsConceptSection` / `mthdsPipeSection` | the `concept` / `pipe` keyword in a `[concept.X]` / `[pipe.x]` header (with `declaration`) |
 | `mthdsConcept` | a concept name — in a header (with `declaration`), or referenced from `output`, `refines`, or an input slot |
 | `mthdsPipeName` | a pipe name in a `[pipe.x]` header (with `declaration`) |
-| `mthdsDataVariable` | an input slot name, and the value of `result`, `batch_as`, `batch_over` |
+| `mthdsDataVariable` | an input slot name, the value of `result`, `batch_as` and `batch_over`, and a binding step's `from` path |
 | `mthdsPipeType`, `mthdsModelRef` | in the legend, currently unused by the provider |
+
+A working-memory **path** — a binding step's `from = "invoice.total"`, or a dotted `batch_over = "catalog.pages"` — is coloured whole, as one data variable: a lowercase name, then field names after dots, which may carry capitals as the structure that declares them does. `from` is a common word, so it is read as a binding step's path only inside an inline table, where every step is written; a top-level `from = "…"`, as a concept structure would declare a field of that name, is left to the grammar.
 
 A concept **value** is coloured on its bare name only: the domain prefix and the multiplicity suffix in `legal.Contract[]` are the grammar's job. The one place that grammar is written is the `CONCEPT_VALUE` regex, shared by every position that reads a concept value.
 
