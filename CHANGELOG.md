@@ -1,5 +1,19 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.19.0] - 2026-10-06
+
+### Added
+
+- **Binding steps are coloured**: the semantic-token provider colours the `from` path of a binding step in a PipeSequence's `steps` as a data variable, as it already does `result` and `batch_over`, and leaves a `from` anywhere else, such as an input slot's hints, uncoloured; a dotted path's field names may now carry capitals.
+
+### Changed
+
+- **Bundled MTHDS schema follows the binding step (Breaking)**: `plxt`, the language server, `pipelex-tools-py` and `@pipelex/tools-wasm` now accept a binding step `{ from = "invoice.total", result = "total_amount" }` in a PipeSequence's `steps` and a dotted `batch_over` such as `"catalog.pages"` on a sequence step, and reject a binding step in a PipeParallel's `branches`, a step that mixes `from` with `pipe` or with a pipe step's fields, a dotted input name, and any name under the reserved `_bound_` prefix; the schema also gains the `PipeDocGen` and `PipeJudge` pipe types. The schema copy and the vendored MTHDS Test Corpus that holds `plxt` to it are both taken from pipelex v0.75.0. (plxt 0.10.0, pipelex-tools-py 0.4.0, @pipelex/tools-wasm 0.4.0)
+
+### Fixed
+
+- **Additional-property errors point at the offending entry**: an "Additional properties are not allowed" diagnostic inside a pipe, such as an undeclared field, a dotted input name or a `from` in a parallel branch, now lands on the entry it names. The editor used to show every such error on the first line of the file, and `plxt lint` reported a nested one at line 1, column 1. (plxt 0.10.0, pipelex-tools-py 0.4.0, @pipelex/tools-wasm 0.4.0)
+
 ## [0.18.2] - 2026-10-02
 
 ### Changed

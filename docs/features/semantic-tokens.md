@@ -13,8 +13,10 @@ The legend is seven types and one modifier, `declaration`:
 | `mthdsConceptSection` / `mthdsPipeSection` | the `concept` / `pipe` keyword in a `[concept.X]` / `[pipe.x]` header (with `declaration`) |
 | `mthdsConcept` | a concept name — in a header (with `declaration`), or referenced from `output`, `refines`, or an input slot |
 | `mthdsPipeName` | a pipe name in a `[pipe.x]` header (with `declaration`) |
-| `mthdsDataVariable` | an input slot name, and the value of `result`, `batch_as`, `batch_over` |
+| `mthdsDataVariable` | an input slot name, the value of `result`, `batch_as` and `batch_over`, and a binding step's `from` path |
 | `mthdsPipeType`, `mthdsModelRef` | in the legend, currently unused by the provider |
+
+A working-memory **path** — a binding step's `from = "invoice.total"`, or a dotted `batch_over = "catalog.pages"` — is coloured whole, as one data variable: a lowercase name, then field names after dots, which may carry capitals as the structure that declares them does. `from` is a common word, so the key alone says nothing; the steps array scanner below decides where it counts.
 
 A concept **value** is coloured on its bare name only: the domain prefix and the multiplicity suffix in `legal.Contract[]` are the grammar's job. The one place that grammar is written is the `CONCEPT_VALUE` regex, shared by every position that reads a concept value.
 
@@ -47,6 +49,12 @@ One escape hatch keeps a typo cheap. A table header cannot appear inside an inli
 ### Why a scanner rather than another regex
 
 The previous implementation was two regexes and an `insideMultiLineInputs` boolean, and the expanded form broke both at once. The entry regex matched `key = "Concept"` anywhere in the content, so inside a slot table it coloured the keyword `concept` as if it were the slot name and left the real slot name bare. And the block ended on the first `}` on a line — which in the expanded form is the hints table's — so every slot written after an expanded one went uncoloured. The two bugs interact across lines (a slot table spanning lines, a hints table on its own line), which is why a third regex would not have settled it.
+
+## The steps array scanner
+
+A binding step's `from` is coloured only where a binding step can stand: directly inside an inline table that is an element of a PipeSequence's `steps` array. The same key elsewhere is something else — an input slot's presentation hint (`hints = { from = "sender" }`), a value nested inside a step, a PipeParallel branch, which never binds, or a concept structure's field at the top level — and stays uncoloured, which keeps the presentation-hint exclusion the inputs scanner makes.
+
+`scanStepsArray` works like the inputs scanner, with one depth counter for brackets and braces together: the array opens on a line matching `STEPS_ARRAY_START` (`^\s*steps\s*=\s*\[`) at depth 1, a step's own keys sit at depth 2 (`STEP_KEY_DEPTH`), and the array closes when the depth returns to 0. Brackets and braces are counted outside strings only, a `#` outside a string ends the line, and a table header met while the array is open abandons it, for the same reasons as above. The `result`, `batch_as` and `batch_over` values are read by a single-line regex pass instead.
 
 ## Relationship to the LSP
 
