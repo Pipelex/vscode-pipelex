@@ -36,6 +36,24 @@ function isToolbarPosition(value: unknown): value is GraphToolbarPosition {
     return typeof value === 'string' && (TOOLBAR_POSITIONS as readonly string[]).includes(value);
 }
 
+/**
+ * How the graph is drawn — passed to the renderer's `config.graphStyle`.
+ * Mirrors mthds-ui's `GraphStyleId` registry: `detailed` (every pipe with its
+ * inputs, outputs and settings, the drawing before styles existed) and `simple`
+ * (the method's steps in plain words). Local for the same reason as
+ * {@link GraphToolbarPosition}. A style mthds-ui adds later reaches a user only
+ * once it is listed here and in the `pipelex.graph.style` enum; a test holds
+ * both to mthds-ui's registry, so the bump that brings one in goes red.
+ */
+export type GraphStyle = 'detailed' | 'simple';
+
+/** Every {@link GraphStyle}, in the order of mthds-ui's registry and the setting's enum. */
+export const GRAPH_STYLE_IDS: readonly GraphStyle[] = ['detailed', 'simple'];
+
+export function isGraphStyle(value: unknown): value is GraphStyle {
+    return typeof value === 'string' && (GRAPH_STYLE_IDS as readonly string[]).includes(value);
+}
+
 export interface GraphRenderConfig {
     edgeType: string;
     nodesep: number;
@@ -57,6 +75,12 @@ export interface GraphRenderConfig {
      * `pipelex.graph.toolbarPosition` setting.
      */
     toolbarPosition: GraphToolbarPosition;
+    /**
+     * The style a graph opens in. Defaults to `'detailed'` (the mthds-ui
+     * default); seeded by the `pipelex.graph.style` setting, which the
+     * toolbar's style menu writes back to (methodGraphPanel.persistGraphStyle).
+     */
+    graphStyle: GraphStyle;
 }
 
 const DEFAULTS: Omit<GraphRenderConfig, 'theme' | 'systemTheme'> = {
@@ -66,6 +90,7 @@ const DEFAULTS: Omit<GraphRenderConfig, 'theme' | 'systemTheme'> = {
     initialZoom: undefined,
     panToTop: true,
     toolbarPosition: 'top-right',
+    graphStyle: 'detailed',
 };
 
 function isGraphTheme(value: unknown): value is GraphTheme {
@@ -147,6 +172,13 @@ export async function resolveGraphConfig(): Promise<GraphRenderConfig> {
     // and falls back to the `'top-right'` default.
     const toolbarPosition = cfg.get<string>('graph.toolbarPosition');
     if (isToolbarPosition(toolbarPosition)) merged.toolbarPosition = toolbarPosition;
+
+    // `pipelex.graph.style` picks the style a graph opens in. Like the toolbar
+    // anchor it has no pipelex.toml source; the guard turns a value naming no
+    // style this extension knows (one written by a newer version, say) into the
+    // `'detailed'` default rather than relaying it.
+    const graphStyle = cfg.get<string>('graph.style');
+    if (isGraphStyle(graphStyle)) merged.graphStyle = graphStyle;
 
     // `pipelex.graph.theme`: `auto` follows the editor (`system` mode);
     // `dark`/`light` pin it. Inspect rather than `get` so the contributed

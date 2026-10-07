@@ -53,6 +53,7 @@ const RENDERER_STYLES = [
     '@pipelex/mthds-ui/dist/graph/react/graph-core.css',
     '@pipelex/mthds-ui/dist/graph/react/detail/DetailPanel.css',
     '@pipelex/mthds-ui/dist/graph/react/viewer/GraphToolbar.css',
+    '@pipelex/mthds-ui/dist/graph/react/styles/simple/SimpleStyle.css',
 ].map(p => path.join(NODE_MODULES, p));
 
 /**
@@ -156,5 +157,27 @@ describe('the form kernel token map in shell.css', () => {
             if (name === '--radius') continue;
             expect(value.trim(), `${name} should read the graph palette`).toMatch(/^var\(--[a-z-]+\)$/);
         }
+    });
+
+    it('leaves margins and padding to the kernel\'s layered preflight', () => {
+        // shell.css is unlayered, and an unlayered declaration outranks every
+        // layered one whatever its specificity. A `* { padding: 0 }` here once
+        // beat each of the kernel's spacing utilities in `@layer mthds-form`
+        // and collapsed the detail panel's controls onto their text, with a
+        // green build and every token defined.
+        const shellCss = fs.readFileSync(SHELL_CSS, 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
+        const universal = [...shellCss.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+            .filter(([, selectors]) => selectors.split(',').some(s => /(^|\s)\*(\s|$|::?)/.test(s.trim())));
+        for (const [, selectors, body] of universal) {
+            expect(body, `shell.css rule "${selectors.trim()}" resets spacing on every element`)
+                .not.toMatch(/(^|[\s;])(margin|padding)(-[a-z-]+)?\s*:/);
+        }
+
+        // Which is safe only because the kernel's sheet still zeroes them
+        // itself, inside the layer, for the whole page.
+        const kernelCss = fs.readFileSync(kernelStylesPath(), 'utf-8');
+        expect(kernelCss).toMatch(/@layer base\s*\{\s*\*[^{]*\{[^}]*margin:\s*0[^}]*padding:\s*0/);
+        const entry = fs.readFileSync(createRequire(path.join(VSCODE_ROOT, 'package.json')).resolve(KERNEL_ENTRY_SPECIFIER), 'utf-8');
+        expect(entry).toMatch(/@import\s+["'][^"']+["']\s+layer\(/);
     });
 });

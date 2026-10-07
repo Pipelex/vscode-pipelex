@@ -41,7 +41,7 @@ describe('readRunArtifacts', () => {
 
         const artifacts = await readRunArtifacts(graphspec, log);
 
-        expect(artifacts).toEqual({ contracts: CONTRACTS, outputForm: OUTPUT_FORM });
+        expect(artifacts).toEqual({ pipeIoContracts: CONTRACTS, outputForm: OUTPUT_FORM });
         // input_form is genuinely optional: its absence is not worth a word.
         expect(artifacts!.inputForm).toBeUndefined();
         expect(logged).toEqual([]);
@@ -55,7 +55,7 @@ describe('readRunArtifacts', () => {
         const artifacts = await readRunArtifacts(graphspec, log);
 
         expect(artifacts).toEqual({
-            contracts: CONTRACTS,
+            pipeIoContracts: CONTRACTS,
             outputForm: OUTPUT_FORM,
             inputForm: INPUT_FORM,
         });
@@ -117,7 +117,7 @@ describe('readRunArtifacts', () => {
 
         const artifacts = await readRunArtifacts(graphspec, log);
 
-        expect(artifacts).toEqual({ contracts: CONTRACTS, outputForm: OUTPUT_FORM });
+        expect(artifacts).toEqual({ pipeIoContracts: CONTRACTS, outputForm: OUTPUT_FORM });
         expect(logged.some(m => m.includes('input_form.json'))).toBe(true);
     });
 
@@ -131,7 +131,7 @@ describe('readRunArtifacts', () => {
         // level (which has none) must still take the floor.
         expect(await readRunArtifacts(graphspec, log)).toBeUndefined();
         expect(await readRunArtifacts(path.join(nested, 'graphspec.json'), log)).toEqual({
-            contracts: CONTRACTS,
+            pipeIoContracts: CONTRACTS,
             outputForm: OUTPUT_FORM,
         });
     });

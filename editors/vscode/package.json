@@ -687,6 +687,20 @@
           "default": "top-right",
           "description": "Anchor for the method graph's floating toolbar (direction toggle, fold/expand, zoom, theme). Corner and top/bottom-center anchors render a horizontal bar; the two edge-center anchors render a vertical bar."
         },
+        "pipelex.graph.style": {
+          "type": "string",
+          "enum": [
+            "detailed",
+            "simple"
+          ],
+          "enumDescriptions": [
+            "Every pipe with its inputs, outputs and settings (default)",
+            "The method's steps in plain words: a flowchart for a reader who does not write methods"
+          ],
+          "scope": "window",
+          "default": "detailed",
+          "description": "Style the method graph opens in. The style menu in the graph's toolbar switches it live and saves the choice here."
+        },
         "pipelex.formatter.alignEntries": {
           "scope": "resource",
           "type": "boolean",
@@ -826,7 +840,7 @@
   },
   "dependencies": {
     "@pipelex/lsp": "portal:../../js/lsp",
-    "@pipelex/mthds-ui": "npm:0.26.0",
+    "@pipelex/mthds-ui": "npm:0.30.0",
     "@pipelex/sdk": "0.26.0",
     "deep-equal": "^2.2.3",
     "encoding": "^0.1.13",
