@@ -122,7 +122,16 @@ body.vscode-high-contrast-light {
     --radius: 6px;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* No margin or padding reset on every element. This sheet is unlayered, and an
+   unlayered declaration outranks every layered one whatever its specificity, so
+   `* { padding: 0 }` here beat each of the form kernel's spacing utilities in
+   `@layer mthds-form` (`px-2`, `p-0.5`, `mt-2`) and collapsed the detail
+   panel's controls onto their text. The kernel's own preflight, inside that
+   layer, already zeroes every element's margin and padding, in the same cascade
+   position a Tailwind host's `@layer base` gives it, so the renderer's sheets
+   and the kernel's utilities both win over it as they were written to.
+   `formKernelTokens.test.ts` holds this file to that. */
+* { box-sizing: border-box; }
 html, body {
     padding: 0 !important;
     margin: 0 !important;

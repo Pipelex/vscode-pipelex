@@ -14,7 +14,7 @@ const props: Record<string, { scope?: string }> = pkg.contributes.configuration.
 // The contributed `scope` of each graph setting must match HOW it is read:
 //
 //   - `resolveGraphConfig` (graph/graphConfig.ts) reads toolbarPosition / edgeType
-//     / theme through `getConfiguration('pipelex')` with NO resource URI — they
+//     / theme / style through `getConfiguration('pipelex')` with NO resource URI — they
 //     blend with the machine-level ~/.pipelex/pipelex.toml, so they are
 //     window-level concerns. An unscoped read cannot see a folder value, so these
 //     MUST be `window`-scoped: declaring `resource` would advertise a per-folder
@@ -24,7 +24,7 @@ const props: Record<string, { scope?: string }> = pkg.contributes.configuration.
 //     (`getConfiguration('pipelex', uri)` in methodGraphPanel) and legitimately
 //     stay `resource`-scoped.
 describe('contributed graph-setting scopes match how each is read', () => {
-    it.each(['graph.toolbarPosition', 'graph.edgeType', 'graph.theme'])(
+    it.each(['graph.toolbarPosition', 'graph.edgeType', 'graph.theme', 'graph.style'])(
         'pipelex.%s is window-scoped (read unscoped via resolveGraphConfig)',
         key => {
             expect(props[`pipelex.${key}`].scope).toBe('window');

@@ -393,6 +393,26 @@ describe('MethodGraphPanel', () => {
         // Toolbar anchor defaults to top-right (the mthds-ui default) when the
         // pipelex.graph.toolbarPosition setting is unset.
         expect(setData.config.toolbarPosition).toBe('top-right');
+        // The graph opens in the detailed style, the drawing it had before
+        // styles existed, when pipelex.graph.style is unset.
+        expect(setData.config.graphStyle).toBe('detailed');
+        panel.dispose();
+    });
+
+    it('forwards the pipelex.graph.style setting into setData config', async () => {
+        mockState.configOverrides['graph.style'] = 'simple';
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+        messageHandler({ type: 'webviewReady' });
+
+        const setData = mockState.mockWebview.postMessage.mock.calls
+            .map(c => c[0])
+            .find((m: any) => m?.type === 'setData');
+        expect(setData.config.graphStyle).toBe('simple');
         panel.dispose();
     });
 
@@ -655,6 +675,76 @@ describe('MethodGraphPanel', () => {
 
         expect(mockState.configUpdates).toHaveLength(0);
         expect(output.appendLine).toHaveBeenCalledWith(expect.stringContaining('unknown theme mode "sepia"'));
+        panel.dispose();
+    });
+
+    // --- graphStyleChanged persistence ---
+
+    // The toolbar's style menu reports the user's pick; the host persists it into
+    // `pipelex.graph.style` so the next graph opens in it. Same writer as the
+    // theme toggle, so the same scope rules hold.
+
+    it('persists a style menu choice to pipelex.graph.style (Global)', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+        mockState.configInspect['graph.style'] = { defaultValue: 'detailed' };
+
+        messageHandler({ type: 'graphStyleChanged', style: 'simple' });
+        await new Promise(r => setTimeout(r, 0));
+
+        // ConfigurationTarget.Global === 1
+        expect(mockState.configUpdates).toContainEqual({ key: 'graph.style', value: 'simple', target: 1 });
+        panel.dispose();
+    });
+
+    it('writes a style choice where the setting is already defined in the workspace', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+        mockState.configInspect['graph.style'] = { defaultValue: 'detailed', workspaceValue: 'simple' };
+
+        messageHandler({ type: 'graphStyleChanged', style: 'detailed' });
+        await new Promise(r => setTimeout(r, 0));
+
+        // ConfigurationTarget.Workspace === 2
+        expect(mockState.configUpdates).toContainEqual({ key: 'graph.style', value: 'detailed', target: 2 });
+        panel.dispose();
+    });
+
+    it('never targets WorkspaceFolder for a style choice', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+        mockState.configInspect['graph.style'] = { defaultValue: 'detailed', workspaceFolderValue: 'detailed' };
+
+        messageHandler({ type: 'graphStyleChanged', style: 'simple' });
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(mockState.configUpdates).toContainEqual({ key: 'graph.style', value: 'simple', target: 1 });
+        panel.dispose();
+    });
+
+    // Picking the default while nothing is set must not pin `detailed` as an
+    // explicit value: a later change of the contributed default would then
+    // never reach this user.
+    it('does not pin the default style as an explicit value', async () => {
+        const { panel, messageHandler } = await showGraphAndGetHandler();
+        mockState.configInspect['graph.style'] = { defaultValue: 'detailed' };
+
+        messageHandler({ type: 'graphStyleChanged', style: 'detailed' });
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(mockState.configUpdates).toHaveLength(0);
+        panel.dispose();
+    });
+
+    it('ignores a style this extension does not contribute, without writing', async () => {
+        const output = mockOutput();
+        const panel = new MethodGraphPanel(output, makeExtensionUri());
+        panel.show(makeUri('/project/file.mthds'));
+        await new Promise(r => setTimeout(r, 50));
+        const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
+
+        messageHandler({ type: 'graphStyleChanged', style: 'swimlanes' });
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(mockState.configUpdates).toHaveLength(0);
+        expect(output.appendLine).toHaveBeenCalledWith(expect.stringContaining('unknown graph style "swimlanes"'));
         panel.dispose();
     });
 
@@ -2093,7 +2183,7 @@ describe('MethodGraphPanel', () => {
             getText: () => JSON.stringify({ meta: { format: 'mthds' }, nodes: [], edges: [] }),
         }];
         mockState.runArtifacts = {
-            contracts: { 'domain.pipe_a': { inputs: {}, output: {} } },
+            pipeIoContracts: { 'domain.pipe_a': { inputs: {}, output: {} } },
             outputForm: { 'domain.pipe_a': { field: {} } },
             inputForm: { 'domain.pipe_a': { fields: [] } },
         };
@@ -2111,7 +2201,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    // GraphViewer renders a value only when BOTH contracts and outputForm
+    // GraphViewer renders a value only when BOTH pipeIoContracts and outputForm
     // arrive, so an absent pair must reach it as a plain undefined rather than
     // as an empty object that would read as artifacts with no pipes in them.
     it('setData carries no artifacts when the graphspec has none beside it', async () => {

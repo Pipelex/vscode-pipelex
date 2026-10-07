@@ -12,7 +12,7 @@ import { AnalyzeAbortError, BackendError } from '../validation/backend';
 import type { BundleAnalysis, BundleFile, GraphAnalysisSink, ValidationBackend } from '../validation/backend';
 import { CliValidationBackend } from '../validation/cliValidationBackend';
 import { findTableHeader, findTableHeaderInLines } from '../validation/sourceLocator';
-import { resolveGraphConfig, activeEditorGraphTheme } from './graphConfig';
+import { resolveGraphConfig, activeEditorGraphTheme, isGraphStyle } from './graphConfig';
 import { parseGraphspecFile } from './graphspecDetector';
 import { readRunArtifacts } from './runArtifacts';
 import type { RunArtifacts } from './runArtifacts';
@@ -1034,10 +1034,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             // The `/validate` artifacts that let the detail panel render a data
             // node's value. Deliberately top-level rather than inside `config`:
             // `config` is the render config the adapter forwards wholesale as
-            // GraphViewer's `config` prop, while these are three separate props
-            // of their own (`contracts`, `outputForm`, `inputForm`). Undefined
-            // whenever the pair is not on disk, which is GraphViewer's
-            // documented no-data-view floor rather than an error.
+            // GraphViewer's `config` prop, while these join the graphspec in
+            // GraphViewer's `graph` bundle (`pipeIoContracts`, `outputForm`,
+            // `inputForm`). Undefined whenever the pair is not on disk, which is
+            // GraphViewer's documented no-data-view floor rather than an error.
             artifacts,
             config: {
                 direction: dagreDirection,
@@ -1052,6 +1052,12 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 // `config.toolbarPosition` reactively on every render, so the
                 // pinned value takes effect on the next analysis / open.
                 toolbarPosition: graphConfig.toolbarPosition,
+                // The style the graph opens in. GraphViewer adopts a change of
+                // `config.graphStyle` reactively, but between two sends the
+                // toolbar's style menu owns it; a menu choice comes back as
+                // `graphStyleChanged` and is persisted (persistGraphStyle), so
+                // this carries the user's last pick on the next open.
+                graphStyle: graphConfig.graphStyle,
                 // The renderer derives its full light/dark palette from `theme`.
                 // Do NOT send `paletteColors` here — GraphViewer merges it *over*
                 // the theme palette, which would pin node/edge colors to one theme
@@ -1134,19 +1140,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * Persist the in-graph theme toggle into the `pipelex.graph.theme` setting so
      * the choice survives panel reloads and VS Code restarts (restored via
      * resolveGraphConfig). The renderer's mode (`dark`/`light`/`system`) maps onto
-     * the setting's enum (`dark`/`light`/`auto`).
-     *
-     * Reads and writes through the SAME unscoped accessor `resolveGraphConfig`
-     * uses (graphConfig.ts) — `getConfiguration('pipelex')` with no resource — and
-     * targets Workspace (when a workspace value already exists, so the toggle
-     * "sticks") or otherwise Global. It deliberately never targets WorkspaceFolder:
-     * the unscoped reader cannot see a folder-scoped value, so a folder write would
-     * be persisted but never read back. The no-op guard compares against the
-     * *effective* value including the contributed `auto` default, so toggling to
-     * `system` while nothing is explicitly set does NOT pin an explicit `auto` that
-     * would then clobber a `pipelex.toml` `style.theme` pin. No panel re-render is
-     * triggered (there is no config-change listener for the graph), so the live
-     * viewport is untouched; the value takes effect on the next analysis or open.
+     * the setting's enum (`dark`/`light`/`auto`). The no-op guard in
+     * writeGraphSetting compares against the contributed `auto` default too, so
+     * toggling to `system` while nothing is explicitly set does NOT pin an
+     * explicit `auto` that would then clobber a `pipelex.toml` `style.theme` pin.
      */
     private async persistThemeMode(mode: string): Promise<void> {
         const value = mode === 'dark' || mode === 'light' ? mode : mode === 'system' ? 'auto' : undefined;
@@ -1154,24 +1151,57 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             this.output.appendLine(`pipelex graph: ignoring unknown theme mode "${mode}"`);
             return;
         }
+        await this.writeGraphSetting('graph.theme', value, 'theme mode');
+    }
 
+    /**
+     * Persist a choice from the toolbar's style menu into `pipelex.graph.style`,
+     * so the next graph opens in it (restored via resolveGraphConfig). The id is
+     * checked against the styles this extension contributes: a style the menu
+     * offers but the setting's enum does not list would be written, flagged as
+     * invalid in settings.json, and refused by resolveGraphConfig's guard on the
+     * next read.
+     */
+    private async persistGraphStyle(style: string): Promise<void> {
+        if (!isGraphStyle(style)) {
+            this.output.appendLine(`pipelex graph: ignoring unknown graph style "${style}"`);
+            return;
+        }
+        await this.writeGraphSetting('graph.style', style, 'graph style');
+    }
+
+    /**
+     * Write one of the window-scoped graph settings an in-graph control owns.
+     *
+     * Reads and writes through the SAME unscoped accessor `resolveGraphConfig`
+     * uses (graphConfig.ts) — `getConfiguration('pipelex')` with no resource — and
+     * targets Workspace (when a workspace value already exists, so the choice
+     * "sticks") or otherwise Global. It deliberately never targets WorkspaceFolder:
+     * the unscoped reader cannot see a folder-scoped value, and the settings'
+     * `window` scope makes VS Code refuse a folder write outright. The no-op guard
+     * compares against the *effective* value including the contributed default,
+     * so a choice matching what the reader already resolves writes nothing. The
+     * graph's only config-change listener is scoped to `graph.toolbarPosition`, so
+     * a write here never re-renders the panel or resets the live viewport; the
+     * value takes effect on the next analysis or open.
+     */
+    private async writeGraphSetting(key: 'graph.theme' | 'graph.style', value: string, what: string): Promise<void> {
         try {
             const cfg = vscode.workspace.getConfiguration('pipelex');
-            const inspect = cfg.inspect<string>('graph.theme');
+            const inspect = cfg.inspect<string>(key);
             const target = inspect?.workspaceValue !== undefined
                 ? vscode.ConfigurationTarget.Workspace
                 : vscode.ConfigurationTarget.Global;
 
             // Effective value the reader resolves: explicit scopes, then the
             // contributed default. Skipping the write when it matches avoids churn
-            // and — when the effective value is already `auto` by default — keeps a
-            // `system` toggle from pinning an explicit `auto` over a toml pin.
+            // and never pins the default as an explicit value.
             const current = inspect?.workspaceValue ?? inspect?.globalValue ?? inspect?.defaultValue;
             if (current === value) return;
 
-            await cfg.update('graph.theme', value, target);
+            await cfg.update(key, value, target);
         } catch (err: any) {
-            this.output.appendLine(`pipelex graph: failed to persist theme mode: ${err?.message ?? err}`);
+            this.output.appendLine(`pipelex graph: failed to persist ${what}: ${err?.message ?? err}`);
         }
     }
 
@@ -1190,6 +1220,10 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
         if (message.type === 'themeModeChanged' && typeof message.mode === 'string') {
             void this.persistThemeMode(message.mode);
+            return;
+        }
+        if (message.type === 'graphStyleChanged' && typeof message.style === 'string') {
+            void this.persistGraphStyle(message.style);
             return;
         }
         if (message.type === 'navigateToPipe' && message.pipeCode && this.currentUri) {

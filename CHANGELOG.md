@@ -1,5 +1,19 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Graph styles, and the `pipelex.graph.style` setting**: the method graph's toolbar has a style menu offering `detailed`, the drawing graphs have always had, and `simple`, a flowchart in plain words in which each step is titled by its pipe's description, only the method's inputs and final output are drawn as data, a condition reads as a decision and a batch as "for each". A pick redraws the open graph in place and is saved to the new `pipelex.graph.style` setting (default `detailed`), so the next graph opens in the same style; clicking a step still opens its detail panel and jumps to its declaration.
+
+### Changed
+
+- **Bumped `@pipelex/mthds-ui` `0.26.0` → `0.30.0`**: a `.mthds` graph now draws a sequence's binding steps as nodes of their own, renders `PipeJudge` and `PipeDocGen` as cards badged `Judge` and `DocGen`, wires a condition's output to every step that reads it rather than to the default route's step alone, and skips a dotted input name with a warning, as the runtime refuses it. In a run graph, clicking a second invocation of a pipe opens that invocation's detail panel instead of the first one's, and the detail panel's form kernel moves to `0.14.1`; in every graph, redrawing for another style keeps what the reader folded, and a press on the canvas closes the validation dropdown. The library now takes a graph and its run artifacts as one `graph` prop, which the webview passes, so the data tab of `Pipelex: Show Run Graph` keeps showing values.
+
+### Fixed
+
+- **Spacing of the detail panel's controls**: the Download button, the Result/JSON switch and every other control the graph's detail panel draws from the form kernel rendered with no padding or margin, their text against their borders, because the webview's own stylesheet reset both on every element and, being unlayered, outranked the kernel's layered spacing; the reset is gone, and the kernel's own preflight does that job beneath its controls. The library bump revealed it; the bug dates from the earlier move to `@pipelex/mthds-ui` `0.26.0`.
+
 ## [0.19.1] - 2026-10-06
 
 ### Changed
