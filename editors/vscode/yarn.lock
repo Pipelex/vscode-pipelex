@@ -746,7 +746,7 @@ __metadata:
   languageName: node
   linkType: soft
 
-"@pipelex/mthds-form@npm:^0.14.0":
+"@pipelex/mthds-form@npm:^0.14.1":
   version: 0.14.1
   resolution: "@pipelex/mthds-form@npm:0.14.1"
   dependencies:
@@ -782,11 +782,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pipelex/mthds-ui@npm:0.30.0":
-  version: 0.30.0
-  resolution: "@pipelex/mthds-ui@npm:0.30.0"
+"@pipelex/mthds-ui@npm:0.31.0":
+  version: 0.31.0
+  resolution: "@pipelex/mthds-ui@npm:0.31.0"
   dependencies:
-    "@pipelex/mthds-form": "npm:^0.14.0"
+    "@pipelex/mthds-form": "npm:^0.14.1"
     "@xyflow/react": "npm:^12"
     elkjs: "npm:^0.11.1"
     smol-toml: "npm:^1.7.0"
@@ -801,7 +801,7 @@ __metadata:
       optional: true
     shiki:
       optional: true
-  checksum: 76e79e3a5de03c1dbc8ed35e17417a3b2bb4fafbf9255e86efccd58ca1e4e4d16f666f4f556645e9b971021c852b080c09ad4ff776d1cb239ecf22b7b300b3f7
+  checksum: 41fac77fd7a3cd04576d4222325a8e91b32c2cbcb8462444b56f0200b1d4a59cbee90279b14fddd6a84afab0a653cab2ebfe59fedc79c45025f1a710fac5b204
   languageName: node
   linkType: hard
 
@@ -6237,7 +6237,7 @@ __metadata:
   resolution: "pipelex@workspace:."
   dependencies:
     "@pipelex/lsp": "portal:../../js/lsp"
-    "@pipelex/mthds-ui": "npm:0.30.0"
+    "@pipelex/mthds-ui": "npm:0.31.0"
     "@pipelex/sdk": "npm:0.26.0"
     "@rollup/plugin-commonjs": "npm:^25.0.7"
     "@rollup/plugin-node-resolve": "npm:^15.2.3"
