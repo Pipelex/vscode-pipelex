@@ -92,7 +92,7 @@ pub(crate) async fn hover<E: Environment>(
         if is_model_field(&query) {
             if let Some(pi) = find_string_position_info(&query) {
                 let value = extract_string_value(pi);
-                if !value.is_empty() {
+                if !value.trim().is_empty() {
                     // Look up the pipe type from the parent table's "type" field.
                     let pipe_type = pi.dom_node.as_ref().and_then(|(keys, _)| {
                         // keys points to e.g. pipe.xyz.model — skip last to get pipe.xyz
@@ -466,29 +466,62 @@ pub(crate) fn build_mthds_hover_content(resolved: &ResolvedReference) -> String 
     parts.join("\n\n")
 }
 
+/// The kinds of model reference, with the sigil and the namespace each is written with,
+/// in the order the runtime tries them (`pipelex/cogt/models/model_reference.py`): the
+/// sigils first, then the namespaces. A reference matching none is a bare model handle.
+const MODEL_REFERENCE_PREFIXES: [(&str, &str, &str); 3] = [
+    ("preset", "$", "preset:"),
+    ("alias", "@", "alias:"),
+    ("waterfall", "~", "waterfall:"),
+];
+const MODEL_HANDLE_NAMESPACE: &str = "handle:";
+
+/// Split a model reference into its kind and name, by the runtime's grammar.
+///
+/// Surrounding whitespace is ignored. `$`, `@` and `~` name a preset, an alias and a
+/// waterfall, and so do the namespaces `preset:`, `alias:` and `waterfall:`. Anything
+/// else is a model handle, written bare or under `handle:`, whose name is read as it
+/// stands: there is no handle sigil, so `#gpt` is the handle `#gpt`, and `handle:@x`
+/// is the handle `@x`. The kind is `None` for a handle.
+pub(crate) fn parse_model_reference(value: &str) -> (Option<&'static str>, &str) {
+    let value = value.trim();
+    for (kind, sigil, _) in MODEL_REFERENCE_PREFIXES {
+        if let Some(name) = value.strip_prefix(sigil) {
+            return (Some(kind), name);
+        }
+    }
+    for (kind, _, namespace) in MODEL_REFERENCE_PREFIXES {
+        if let Some(name) = value.strip_prefix(namespace) {
+            return (Some(kind), name);
+        }
+    }
+    (
+        None,
+        value.strip_prefix(MODEL_HANDLE_NAMESPACE).unwrap_or(value),
+    )
+}
+
 /// Build a simple hover for a model field value.
 ///
-/// Recognizes the prefix convention (`$` preset, `@` alias, `~` waterfall,
-/// `#` handle) and shows a short, readable label.
+/// Reads the reference by the runtime's grammar (see `parse_model_reference`) and shows a
+/// short, readable label. A reference whose prefix is followed by no name, which the
+/// runtime refuses, says so.
 ///
 /// When `pipe_type` is provided (e.g. `"PipeLLM"`), strips the `"Pipe"` prefix
 /// and prepends it to give context: `**gpt-4o** — LLM model preset`.
 pub(crate) fn build_model_hover(value: &str, pipe_type: Option<&str>) -> String {
-    let (kind, name) = match value.chars().next() {
-        Some('$') => ("preset", &value[1..]),
-        Some('@') => ("alias", &value[1..]),
-        Some('~') => ("waterfall", &value[1..]),
-        Some('#') => ("handle", &value[1..]),
-        _ => ("", value),
-    };
+    let (kind, name) = parse_model_reference(value);
+    if name.is_empty() {
+        return format!("`{}` — no model name after its prefix", value.trim());
+    }
     let type_prefix = pipe_type
         .and_then(|t| t.strip_prefix("Pipe"))
         .filter(|s| !s.is_empty());
     match (type_prefix, kind) {
-        (Some(prefix), "") => format!("**{}** — {} model", name, prefix),
-        (Some(prefix), _) => format!("**{}** — {} model {}", name, prefix, kind),
-        (_, "") => format!("**{}** — model", name),
-        (_, _) => format!("**{}** — model {}", name, kind),
+        (Some(prefix), None) => format!("**{}** — {} model", name, prefix),
+        (Some(prefix), Some(kind)) => format!("**{}** — {} model {}", name, prefix, kind),
+        (None, None) => format!("**{}** — model", name),
+        (None, Some(kind)) => format!("**{}** — model {}", name, kind),
     }
 }
 

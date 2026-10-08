@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- **The hover and the highlighting read a model reference by the runtime's grammar**: hovering a pipe's `model` reads `preset:`, `alias:`, `waterfall:` and `handle:` like their sigils, ignores surrounding whitespace, shows no hover on a blank value, and says so when a prefix is followed by no name, and the highlighting marks a namespace as it marks a sigil, where both read `#` as a handle sigil the runtime does not have and the hover ignored the namespaces. `#gpt` is now the handle it names, and `handle:@named` the handle `@named`.
 - **Spacing of the detail panel's controls**: the Download button, the Result/JSON switch and every other control the graph's detail panel draws from the form kernel rendered with no padding or margin, their text against their borders, because the webview's own stylesheet reset both on every element and, being unlayered, outranked the kernel's layered spacing; the reset is gone, and the kernel's own preflight does that job beneath its controls. The library bump revealed it; the bug dates from the earlier move to `@pipelex/mthds-ui` `0.26.0`.
 
 ## [0.19.1] - 2026-10-06

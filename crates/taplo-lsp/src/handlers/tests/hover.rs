@@ -577,6 +577,60 @@ fn test_build_model_hover_bare_model() {
 }
 
 #[test]
+fn test_build_model_hover_namespaces_read_as_their_sigils() {
+    assert_eq!(
+        build_model_hover("preset:gpt-4o", Some("PipeLLM")),
+        "**gpt-4o** — LLM model preset"
+    );
+    assert_eq!(
+        build_model_hover("alias:best-gpt", None),
+        "**best-gpt** — model alias"
+    );
+    assert_eq!(
+        build_model_hover("waterfall:small-llm", None),
+        "**small-llm** — model waterfall"
+    );
+    assert_eq!(
+        build_model_hover("handle:gpt-4o-mini", Some("PipeLLM")),
+        "**gpt-4o-mini** — LLM model"
+    );
+}
+
+#[test]
+fn test_build_model_hover_has_no_handle_sigil() {
+    // The runtime has no `#` sigil: `#gpt` is a bare handle named `#gpt`.
+    assert_eq!(
+        build_model_hover("#gpt", Some("PipeLLM")),
+        "**#gpt** — LLM model"
+    );
+    // `handle:` reads no sigil: `handle:@named` is the handle `@named`, not the alias `named`.
+    assert_eq!(
+        build_model_hover("handle:@named", None),
+        "**@named** — model"
+    );
+}
+
+#[test]
+fn test_build_model_hover_ignores_surrounding_whitespace() {
+    assert_eq!(
+        build_model_hover("  @best-gpt ", None),
+        "**best-gpt** — model alias"
+    );
+}
+
+#[test]
+fn test_build_model_hover_prefix_without_a_name() {
+    assert_eq!(
+        build_model_hover("$", None),
+        "`$` — no model name after its prefix"
+    );
+    assert_eq!(
+        build_model_hover("waterfall:", Some("PipeLLM")),
+        "`waterfall:` — no model name after its prefix"
+    );
+}
+
+#[test]
 fn test_build_model_hover_pipe_type_without_prefix() {
     // If type doesn't start with "Pipe", no prefix is shown
     let content = build_model_hover("$gpt-4o", Some("SomethingElse"));

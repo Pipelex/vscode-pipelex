@@ -68,10 +68,12 @@ const typeEntry = {
   },
 };
 
-// 5. model = "$sigil-ref"
+// 5. model = "$sigil-ref", or the same reference under its namespace ("preset:x", "alias:x",
+// "waterfall:x", "handle:x"), read as the runtime reads it: there is no handle sigil, and the
+// runtime takes any name after the prefix, so "handle:@named" is the handle "@named".
 const modelEntry = {
   name: "meta.entry.model.mthds",
-  match: '\\s*(model)\\s*(=)\\s*(")([$@~#])([a-zA-Z][a-zA-Z0-9_-]*)(")',
+  match: '\\s*(model)\\s*(=)\\s*(")([$@~]|preset:|alias:|waterfall:|handle:)([^"\\s]+)(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
@@ -82,10 +84,10 @@ const modelEntry = {
   },
 };
 
-// 5b. model = "bare-model-name" (no sigil)
+// 5b. model = "bare-model-name" (no sigil): any name the runtime reads as a handle, "#gpt" included
 const modelBareEntry = {
   name: "meta.entry.model.mthds",
-  match: '\\s*(model)\\s*(=)\\s*(")([a-zA-Z][a-zA-Z0-9_.:-]*)(")',
+  match: '\\s*(model)\\s*(=)\\s*(")([^"\\s$@~][^"\\s]*)(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
