@@ -92,7 +92,7 @@ pub(crate) async fn hover<E: Environment>(
         if is_model_field(&query) {
             if let Some(pi) = find_string_position_info(&query) {
                 let value = extract_string_value(pi);
-                if !value.is_empty() {
+                if !value.trim().is_empty() {
                     // Look up the pipe type from the parent table's "type" field.
                     let pipe_type = pi.dom_node.as_ref().and_then(|(keys, _)| {
                         // keys points to e.g. pipe.xyz.model — skip last to get pipe.xyz

@@ -68,10 +68,11 @@ const typeEntry = {
   },
 };
 
-// 5. model = "$sigil-ref"
+// 5. model = "$sigil-ref", or the same reference under its namespace ("preset:x", "alias:x",
+// "waterfall:x", "handle:x"), read as the runtime reads it: there is no handle sigil.
 const modelEntry = {
   name: "meta.entry.model.mthds",
-  match: '\\s*(model)\\s*(=)\\s*(")([$@~#])([a-zA-Z][a-zA-Z0-9_-]*)(")',
+  match: '\\s*(model)\\s*(=)\\s*(")([$@~]|preset:|alias:|waterfall:|handle:)([a-zA-Z][a-zA-Z0-9_-]*)(")',
   captures: {
     1: { name: "support.type.property-name.mthds" },
     2: { name: "punctuation.eq.mthds" },
