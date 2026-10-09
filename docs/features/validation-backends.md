@@ -33,7 +33,7 @@ The `api` backend's default `baseUrl` is the hosted Pipelex API (`https://api.pi
 
 Token resolution is **SecretStorage → `PIPELEX_API_KEY` environment variable**: a stored key wins; with none stored, the env var is used.
 
-**The key `pipelex login` saves is not picked up.** `pipelex login`, and `pipelex init` when you choose the hosted API, save the key as `PIPELEX_API_KEY` in `~/.pipelex/.env`, or in the `.env` of `PIPELEX_HOME` when that is set. Only the pipelex CLI loads that file: it is neither SecretStorage nor the environment VS Code was started with, so the extension does not read that key today, and someone who has just signed in from the terminal still meets the no-key toast. Give the extension the key in one of two ways:
+**The key `pipelex login` saves is not picked up.** `pipelex login`, and `pipelex init` when you choose the hosted API, save the key as `PIPELEX_API_KEY` in `~/.pipelex/.env`, or in the `.env` of `PIPELEX_HOME` when that is set. Only pipelex itself loads that file, when its Python package is imported: it is neither SecretStorage nor the environment VS Code was started with, so the extension does not read that key today, and someone who has just signed in from the terminal still meets the no-key toast. Give the extension the key in one of two ways:
 
 - run **`Pipelex: Set Hosted API Key`** and paste it;
 - or export `PIPELEX_API_KEY` in a shell and start VS Code from that shell, for example with `code .`. VS Code reads its environment when it starts, so a variable set afterwards reaches the extension only after a restart.

@@ -69,7 +69,7 @@ On every save, the extension validates your method on the hosted Pipelex API at 
 
 Then, to validate your methods, get an API key at [app.pipelex.com](https://app.pipelex.com/) and store it with the **Pipelex: Set Hosted API Key** command. The key is kept in VS Code's secret storage. When no key is stored, the extension uses the `PIPELEX_API_KEY` environment variable if it is set.
 
-The extension does not read the key that `pipelex login` (or `pipelex init` with the hosted API) saves in `~/.pipelex/.env`. If you signed in from the terminal, give the extension a key with the **Pipelex: Set Hosted API Key** command, or export `PIPELEX_API_KEY` in a shell before starting VS Code from it (`code .`). `pipelex login` does not print its key, so create another one at [app.pipelex.com](https://app.pipelex.com/) or copy the value from that file.
+The extension does not read the key that `pipelex login` (or `pipelex init` with the hosted API) saves in `~/.pipelex/.env`, or in the `.env` of `PIPELEX_HOME` when that is set. If you signed in from the terminal, give the extension a key with the **Pipelex: Set Hosted API Key** command, or export `PIPELEX_API_KEY` in a shell before starting VS Code from it (`code .`). `pipelex login` does not print its key, so create another one at [app.pipelex.com](https://app.pipelex.com/) or copy the value from that file.
 
 ---
 
