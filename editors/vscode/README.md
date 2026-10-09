@@ -58,7 +58,7 @@ The extension looks for a settings file at **`.pipelex/plxt.toml`** (preferred) 
 
 On every save, the extension validates your method on the hosted Pipelex API at `https://api.pipelex.com`, and reports the errors in the Problems panel and in the method graph. There is nothing to install and no setting to change: an API key is the only setup step (see Installation below). Before the first validation, the extension asks once for your consent to send the `.mthds` files in the saved file's directory.
 
-- **Use your own server:** point `pipelex.api.baseUrl` at a self-hosted [pipelex-api](https://github.com/Pipelex/pipelex-api), such as `http://localhost:8081`.
+- **Use your own server:** point `pipelex.api.baseUrl` at a self-hosted Pipelex API server, such as `http://localhost:8081`. The server is the [`api/` member of the pipelex repository](https://github.com/Pipelex/pipelex/tree/main/api), published as the `pipelex/pipelex-api` Docker image.
 - **Validate locally:** set `pipelex.backend` to `cli` to validate with a local `pipelex-agent`, so nothing leaves your machine.
 
 ## 📦 Installation
@@ -68,6 +68,8 @@ On every save, the extension validates your method on the hosted Pipelex API at 
 3. **Manual** — Download `.vsix` from [releases](https://github.com/Pipelex/vscode-pipelex/releases)
 
 Then, to validate your methods, get an API key at [app.pipelex.com](https://app.pipelex.com/) and store it with the **Pipelex: Set Hosted API Key** command. The key is kept in VS Code's secret storage. When no key is stored, the extension uses the `PIPELEX_API_KEY` environment variable if it is set.
+
+The extension does not read the key that `pipelex login` (or `pipelex init` with the hosted API) saves in `~/.pipelex/.env`, or in the `.env` of `PIPELEX_HOME` when that is set. If you signed in from the terminal, give the extension a key with the **Pipelex: Set Hosted API Key** command, or export `PIPELEX_API_KEY` in a shell before starting VS Code from it (`code .`). `pipelex login` does not print its key, so create another one at [app.pipelex.com](https://app.pipelex.com/) or copy the value from that file.
 
 ---
 
