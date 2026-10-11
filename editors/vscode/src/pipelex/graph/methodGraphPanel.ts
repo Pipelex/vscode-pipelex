@@ -18,6 +18,7 @@ import { readRunArtifacts } from './runArtifacts';
 import type { RunArtifacts } from './runArtifacts';
 import { escapeHtml } from '../htmlEscape';
 import { describeBackendErrorIssue, parseStaticIssueContext, validationErrorsToIssues } from './validationStatus';
+import { recordFeatureUse } from '../usageStats/recorder';
 import type { GraphValidationIssue, GraphValidationPayload } from './validationStatus';
 
 /**
@@ -283,6 +284,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     show(uri: vscode.Uri) {
+        recordFeatureUse('graph_preview');
         this.resetViewState();
         this.currentUri = uri;
         this.sourceKind = 'mthds';
@@ -328,6 +330,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     showGraphspecJson(uri: vscode.Uri) {
+        recordFeatureUse('graph_preview');
         // A graphspec-json view never validates — abort any in-flight analyze
         // from a previous .mthds view rather than letting it run to completion
         // for a verdict the sourceKind guards would drop anyway.
@@ -481,6 +484,7 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             const backend = this.getBackend(uri);
             // The CLI reads siblings via `--library-dir` itself; only the API path needs contents.
             const files = backend.kind === 'api' ? graphPrimary.files : [];
+            recordFeatureUse('validation');
             const analysis = await backend.analyze(
                 { primaryUri: graphPrimary.primaryUri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
                 { withGraph: false },

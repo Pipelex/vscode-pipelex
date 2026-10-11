@@ -6,6 +6,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use codespan_reporting::files::SimpleFile;
+use itertools::Itertools;
 use taplo::{
     dom::{Keys, Node},
     parser,
@@ -34,7 +35,12 @@ impl<E: Environment> Taplo<E> {
             }
         };
 
+        self.record_stats(|stats| stats.documents += 1);
         let parse = parser::parse(&source);
+        if !parse.errors.is_empty() {
+            let reported = parse.errors.iter().unique_by(|e| e.range).count();
+            self.record_stats(|stats| stats.diagnostics_syntax += reported);
+        }
 
         let file_path = cmd
             .file_path
@@ -52,7 +58,10 @@ impl<E: Environment> Taplo<E> {
         let node = parse.into_dom();
 
         if let Err(errors) = node.validate() {
-            self.print_semantic_errors(&SimpleFile::new(&file_path, &source), errors)
+            let errors = errors.collect::<Vec<_>>();
+            let reported = errors.len();
+            self.record_stats(|stats| stats.diagnostics_semantic += reported);
+            self.print_semantic_errors(&SimpleFile::new(&file_path, &source), errors.into_iter())
                 .await?;
 
             return Err(anyhow!("semantic errors found"));

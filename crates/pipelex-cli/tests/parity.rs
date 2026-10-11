@@ -77,6 +77,8 @@ fn mthds_fixtures() -> Vec<PathBuf> {
 /// `wait_with_output`) concurrently with the write avoids that.
 fn run_plxt(current_dir: Option<&Path>, args: &[&str], content: &str) -> std::process::Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_plxt"));
+    // Usage statistics off: no notice in the compared output, nothing reported.
+    command.env("DO_NOT_TRACK", "1");
     if let Some(dir) = current_dir {
         command.current_dir(dir);
     }

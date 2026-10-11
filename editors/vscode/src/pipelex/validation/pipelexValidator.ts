@@ -7,6 +7,7 @@ import { buildBundleDiagnostics } from './crossFileDiagnostics';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { BackendFactory } from './backendFactory';
 import type { BackendErrorAction, BundleAnalysis, GraphAnalysisSink } from './backend';
+import { recordFeatureUse } from '../usageStats/recorder';
 
 const DIAGNOSTIC_SOURCE = 'pipelex';
 
@@ -152,6 +153,7 @@ export class PipelexValidator implements vscode.Disposable {
                 : undefined;
             const analysisPrimaryUri = graphPrimary?.primaryUri ?? document.uri;
             const files = graphPrimary?.files ?? await gatherBundleFiles(document.uri);
+            recordFeatureUse('validation');
             const analysis = await backend.analyze(
                 { primaryUri: analysisPrimaryUri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
                 { withGraph: false },

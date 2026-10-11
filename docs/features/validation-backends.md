@@ -61,6 +61,8 @@ The `api` backend sends file contents to `baseUrl` on each save. Since it is the
 
 Point `baseUrl` at a localhost runner and contents never leave your machine (no confirmation prompt).
 
+The `pipelex-agent` the `cli` backend spawns, like every process the extension starts, runs with `PIPELEX_USAGE_STATS=0`, so it sends no usage statistics of its own: the extension counts each validation in its own anonymous `feature_used`, under VS Code's telemetry setting ([Anonymous usage statistics](usage-statistics.md)).
+
 ## Multi-file bundles and cross-file diagnostics
 
 For a saved `.mthds` file, the extension gathers every `.mthds` file in the **same directory** (matching the CLI's `--library-dir <dir>`, a non-recursive directory glob). A validation error is placed on its **declaring file** — resolved from the error's `source` field, falling back to a declaration scan (`[pipe.<code>]` / `[concept.<code>]`), then to the saved file. So an error caused by a sibling file lands on that sibling, not on the file you happened to save.

@@ -2,6 +2,12 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
+# Nothing a target runs reports anonymous usage statistics: the gates format and
+# lint this repository with the `plxt` they build, and the tests drive it. The
+# tests of the reporting itself (crates/pipelex-cli/tests/usage_stats.rs) clear
+# their environment and post only to a loopback capture server.
+export DO_NOT_TRACK := 1
+
 # ── Paths ────────────────────────────────────────────────────────────────────
 
 GRAMMAR_SRC       := editors/vscode/mthds.tmLanguage.json

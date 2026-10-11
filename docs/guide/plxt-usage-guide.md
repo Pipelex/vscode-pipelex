@@ -45,6 +45,7 @@ cursor --install-extension Pipelex.pipelex
 | `plxt config default` | `plxt cfg default` | Print a default config file |
 | `plxt config schema` | `plxt cfg schema` | Print JSON schema for the config file |
 | `plxt completions` | — | Generate shell completions |
+| `plxt usage-stats` | — | See, turn off or on, or reset the anonymous usage statistics (`status`, `disable`, `enable`, `reset-id`) |
 
 ---
 
@@ -346,6 +347,20 @@ plxt fmt --check --diff || {
   exit 1
 }
 ```
+
+---
+
+## Usage Statistics
+
+`plxt` sends anonymous usage statistics: one event per `format`, `lint`, `get` or `config` command, counting the files it processed and the diagnostics it reported by kind, never naming a file or quoting its content. `plxt lsp` and `plxt completions` send nothing. The first run prints a notice on stderr once per machine.
+
+```sh
+plxt usage-stats status                # whether they are on, and what turns them off
+plxt usage-stats status --format json  # the same, for programs
+plxt usage-stats disable               # off for every Pipelex tool on this machine
+```
+
+`DO_NOT_TRACK=1` or `PIPELEX_USAGE_STATS=0` in the environment, or `[usage_stats] enabled = false` in a project's `.pipelex/pipelex.toml`, turns them off too; a CI job that should not report sets one of the variables. See [Anonymous usage statistics](../features/usage-statistics.md) for what is sent and how.
 
 ---
 

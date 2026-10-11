@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { CHILD_USAGE_STATS_VALUE, CHILD_USAGE_STATS_VARIABLE, childProcessEnvOverrides } from './usageStats/childEnv';
+import { recordFeatureUse } from './usageStats/recorder';
 
 /** Escape a string for safe use in a POSIX shell command. */
 function shellQuote(s: string): string {
@@ -38,6 +40,12 @@ export function pipeHasInputs(text: string, pipeName: string): boolean {
     return false;
 }
 
+/** Whether a terminal was created with `PIPELEX_USAGE_STATS=0` in its environment. */
+function runsWithStatisticsOff(terminal: vscode.Terminal): boolean {
+    const options = terminal.creationOptions as vscode.TerminalOptions | undefined;
+    return options?.env?.[CHILD_USAGE_STATS_VARIABLE] === CHILD_USAGE_STATS_VALUE;
+}
+
 /** Resolve pipelex command, get/create terminal, and send a command string. */
 export function runInTerminal(
     filePath: string,
@@ -62,10 +70,14 @@ export function runInTerminal(
         }
     }
     const terminalName = 'Pipelex';
-    let terminal = vscode.window.terminals.find(t => t.name === terminalName);
+    // The run is counted in the extension's own `feature_used`, so the `pipelex` it
+    // types runs with usage statistics off; a "Pipelex" terminal opened without that
+    // variable (by an earlier version, or by hand) is not reused.
+    let terminal = vscode.window.terminals.find(t => t.name === terminalName && runsWithStatisticsOff(t));
     if (!terminal) {
-        terminal = vscode.window.createTerminal({ name: terminalName });
+        terminal = vscode.window.createTerminal({ name: terminalName, env: childProcessEnvOverrides() });
     }
+    recordFeatureUse('run');
     const inputsPath = path.join(path.dirname(filePath), 'inputs.json');
     const quote = isWindows ? winQuote : shellQuote;
 

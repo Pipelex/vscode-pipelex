@@ -1,7 +1,11 @@
 use std::process::Command;
 
+/// `plxt` with usage statistics off, so that no notice reaches the output these
+/// tests read and nothing is reported from a test run.
 fn plxt_cmd() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_plxt"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_plxt"));
+    command.env("DO_NOT_TRACK", "1");
+    command
 }
 
 const VALID_FILE: &str = "../../test-data/mthds/lint/valid.mthds";

@@ -6,6 +6,7 @@ use std::{
 use crate::{args::FormatCommand, Taplo};
 use anyhow::anyhow;
 use codespan_reporting::files::SimpleFile;
+use itertools::Itertools;
 
 use taplo::{formatter, parser};
 use taplo_common::{config::Config, environment::Environment, util::Normalize};
@@ -39,9 +40,12 @@ impl<E: Environment> Taplo<E> {
             }
             None => PathBuf::from("-"),
         };
+        self.record_stats(|stats| stats.documents += 1);
         let p = parser::parse(&source);
 
         if !p.errors.is_empty() {
+            let reported = p.errors.iter().unique_by(|e| e.range).count();
+            self.record_stats(|stats| stats.diagnostics_syntax += reported);
             self.print_parse_errors(
                 &SimpleFile::new(&display_path.to_string_lossy(), source.as_str()),
                 &p.errors,
@@ -69,6 +73,7 @@ impl<E: Environment> Taplo<E> {
 
         if cmd.check {
             if source != formatted {
+                self.record_stats(|stats| stats.unformatted += 1);
                 return Err(anyhow!("the input was not properly formatted"));
             }
         } else {
@@ -225,9 +230,12 @@ impl<E: Environment> Taplo<E> {
             let f = self.env.read_file(&path).await?;
             let source = String::from_utf8_lossy(&f).into_owned();
 
+            self.record_stats(|stats| stats.documents += 1);
             let p = parser::parse(&source);
 
             if !p.errors.is_empty() {
+                let reported = p.errors.iter().unique_by(|e| e.range).count();
+                self.record_stats(|stats| stats.diagnostics_syntax += reported);
                 self.print_parse_errors(
                     &SimpleFile::new(&*path.to_string_lossy(), source.as_str()),
                     &p.errors,
@@ -269,6 +277,7 @@ impl<E: Environment> Taplo<E> {
                 }
 
                 if cmd.check {
+                    self.record_stats(|stats| stats.unformatted += 1);
                     tracing::error!(?path, "the file is not properly formatted");
                     result = Err(anyhow!("some files were not properly formatted"));
                 } else {

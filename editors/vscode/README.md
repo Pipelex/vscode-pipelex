@@ -61,6 +61,14 @@ On every save, the extension validates your method on the hosted Pipelex API at 
 - **Use your own server:** point `pipelex.api.baseUrl` at a self-hosted Pipelex API server, such as `http://localhost:8081`. The server is the [`api/` member of the pipelex repository](https://github.com/Pipelex/pipelex/tree/main/api), published as the `pipelex/pipelex-api` Docker image.
 - **Validate locally:** set `pipelex.backend` to `cli` to validate with a local `pipelex-agent`, so nothing leaves your machine.
 
+### Usage statistics
+
+The extension sends anonymous usage statistics: once a day that it was activated, and how many times its graph preview, validation, run and formatting were used, with the editor and extension versions. It never sends your methods, prompts, inputs, outputs, file names or pipe names. The first activation says so once:
+
+> Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run `Pipelex: Disable Usage Statistics` or set DO_NOT_TRACK=1. Details: https://docs.pipelex.com/latest/setup/usage-statistics/
+
+VS Code's own telemetry setting (`telemetry.telemetryLevel`) governs them, and so do `DO_NOT_TRACK=1`, `PIPELEX_USAGE_STATS=0`, `[usage_stats] enabled = false` in a project's `.pipelex/pipelex.toml`, and `plxt usage-stats disable`, which turns them off for every Pipelex tool on the machine. The tools the extension starts, such as `pipelex-agent`, send none of their own.
+
 ## 📦 Installation
 
 1. **Extensions marketplace** — Search for "Pipelex" in the Extensions view
