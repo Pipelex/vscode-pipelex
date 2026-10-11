@@ -3,6 +3,7 @@ import { PipelexSemanticTokensProvider } from './semanticTokenProvider';
 import { getOutput } from '../util';
 import { registerApiKeyCommands } from './validation/apiKey';
 import { registerLightSyntaxColors } from './syntax/lightColors';
+import { recordFeatureUse } from './usageStats/recorder';
 
 /**
  * Register all Pipelex-specific features for MTHDS support
@@ -152,6 +153,9 @@ async function registerNodeFeatures(
                 vscode.window.showWarningMessage('Open an MTHDS file to view the method graph.');
                 return;
             }
+            // Counted here, where the person asks for a graph, and not in show(), which
+            // also redraws the open panel for every MTHDS editor the person switches to.
+            recordFeatureUse('graph_preview');
             graphPanel.show(editor.document.uri);
         })
     );
@@ -168,6 +172,7 @@ async function registerNodeFeatures(
                 );
                 return;
             }
+            recordFeatureUse('graph_preview');
             graphPanel.showGraphspecJson(editor.document.uri);
         })
     );

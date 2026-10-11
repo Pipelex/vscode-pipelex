@@ -284,7 +284,6 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     show(uri: vscode.Uri) {
-        recordFeatureUse('graph_preview');
         this.resetViewState();
         this.currentUri = uri;
         this.sourceKind = 'mthds';
@@ -330,7 +329,6 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
     }
 
     showGraphspecJson(uri: vscode.Uri) {
-        recordFeatureUse('graph_preview');
         // A graphspec-json view never validates — abort any in-flight analyze
         // from a previous .mthds view rather than letting it run to completion
         // for a verdict the sourceKind guards would drop anyway.

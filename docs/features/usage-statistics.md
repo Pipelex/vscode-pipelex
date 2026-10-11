@@ -12,7 +12,7 @@ Every event carries the same common properties: the tool (`plxt` or `vscode-pipe
 
 | Feature | Counted when |
 | --- | --- |
-| `graph_preview` | `Pipelex: Show Method Graph` or `Pipelex: Show Run Graph` opens a graph (not when VS Code restores one) |
+| `graph_preview` | the person runs `Pipelex: Show Method Graph` or `Pipelex: Show Run Graph` on a document it can show (not when the open graph follows the active editor, nor when VS Code restores one) |
 | `validation` | a bundle is validated, on save or in the background of an open graph |
 | `run` | `Pipelex: Run Bundle` or a pipe's gutter play icon types a run into the Pipelex terminal |
 | `format` | the language server formats a TOML or MTHDS document, whole or a range |
