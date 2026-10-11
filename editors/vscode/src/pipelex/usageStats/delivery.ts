@@ -9,7 +9,7 @@ import type { Envelope } from './events';
 import type { Endpoint, UsageContext } from './switches';
 import { runLegacyMigration } from './switches';
 import type { StateDir } from './state';
-import { Spool } from './spool';
+import { Spool, isQueuedFor } from './spool';
 import type { Claimed } from './spool';
 
 export type PostOutcome = 'accepted' | 'refused' | 'failed';
@@ -87,15 +87,19 @@ export interface DrainOptions {
     signal?: AbortSignal;
 }
 
-/** `drained`: the spool is empty. `failed`: a post failed or time ran out, and what is
- * left waits for a retry. `stopped`: a switch turned statistics off. */
+/** `drained`: every file queued for the endpoint is sent. `failed`: a post failed or
+ * time ran out, and what is left waits for a retry. `stopped`: a switch turned
+ * statistics off, an invalid endpoint override included. */
 export type DrainOutcome = 'drained' | 'failed' | 'stopped';
 
 /**
- * Post the extension's spool before `deadline`, as few files to a post as
- * `MAX_EVENTS_PER_POST` allows, each file once. The checks every post is preceded by
- * run before each post, `options.allowed` included; a failed post leaves its files
- * and every file not yet tried queued, since the endpoint is unreachable or failing.
+ * Post the files of the extension's spool queued for `endpoint` before `deadline`, as
+ * few files to a post as `MAX_EVENTS_PER_POST` allows, each file once. A file queued
+ * for another endpoint is left for a sender posting there, so events queued under a
+ * test's loopback override never reach PostHog, and events queued for PostHog never
+ * reach a loopback endpoint. The checks every post is preceded by run before each
+ * post, `options.allowed` included; a failed post leaves its files and every file not
+ * yet tried queued, since the endpoint is unreachable or failing.
  */
 export async function drainSpool(
     context: UsageContext,
@@ -104,9 +108,11 @@ export async function drainSpool(
     deadline: number,
     options: DrainOptions = {},
 ): Promise<DrainOutcome> {
+    // An invalid override is a switch that says off: nothing is posted, nothing touched.
+    if (endpoint.kind === 'invalid') return 'stopped';
     const spool = new Spool(state.toolSpool());
     spool.tidy();
-    const claimed = spool.claimAll();
+    const claimed = spool.claimAll(endpoint.origin);
     while (claimed.length > 0) {
         if (deadline - Date.now() <= 0 || options.signal?.aborted) {
             claimed.splice(0).forEach(file => file.release());
@@ -122,7 +128,7 @@ export async function drainSpool(
             claimed.splice(0).forEach(file => file.release());
             return 'stopped';
         }
-        const batch = nextBatch(claimed, check.id);
+        const batch = nextBatch(claimed, check.id, endpoint.origin);
         if (batch.files.length === 0) continue;
         const outcome = await post(endpoint, batch.events, deadline - Date.now(), options.fetch, options.signal);
         if (outcome === 'failed') {
@@ -134,22 +140,31 @@ export async function drainSpool(
     return 'drained';
 }
 
-/** Take from the front of `claimed` the files whose current events fit in one post,
- * deleting on the way the files nothing of which is sent: unreadable ones, and those
- * whose events were all made under a replaced identifier. A file keeping only some of
- * its events is rewritten with them first. */
-function nextBatch(claimed: Claimed[], current: string | undefined): { files: Claimed[]; events: Envelope[] } {
+/** Take from the front of `claimed` the files whose current events fit in one post to
+ * `origin`, deleting on the way the files nothing of which is sent: unreadable ones,
+ * and those whose events were all made under a replaced identifier. A file queued for
+ * another endpoint is given back untouched. A file keeping only some of its events is
+ * rewritten with them first. */
+function nextBatch(claimed: Claimed[], current: string | undefined, origin: string): { files: Claimed[]; events: Envelope[] } {
     const files: Claimed[] = [];
     const events: Envelope[] = [];
     while (claimed.length > 0) {
         const file = claimed[0];
-        const held = file.events();
-        if (!held) {
+        const content = file.content();
+        if (!content) {
             // Not a spool file this version can read or send: nobody ever will.
             claimed.shift();
             file.delete();
             continue;
         }
+        if (!isQueuedFor(content, origin)) {
+            // Queued for another endpoint, which only a read after the claim told: a
+            // sender posting there sends it.
+            claimed.shift();
+            file.release();
+            continue;
+        }
+        const held = content.events;
         const kept = keepCurrent(held, current);
         if (kept.length === 0) {
             claimed.shift();
@@ -160,7 +175,7 @@ function nextBatch(claimed: Claimed[], current: string | undefined): { files: Cl
         claimed.shift();
         if (kept.length !== held.length) {
             try {
-                file.rewrite(kept);
+                file.rewrite({ endpoint: content.endpoint, events: kept });
             } catch {
                 file.delete();
                 continue;

@@ -150,7 +150,8 @@ function queueFiles(perFile: number[]): void {
     const id = state.obtainIdentity().id;
     const spool = new Spool(state.toolSpool());
     perFile.forEach((count, file) => {
-        spool.write(Array.from({ length: count }, (_, index) => featureUsed(
+        // The origin `startWith` posts to.
+        spool.write('http://127.0.0.1:9', Array.from({ length: count }, (_, index) => featureUsed(
             id,
             `${String(file).padStart(8, '0')}-0000-4000-8000-${String(index).padStart(12, '0')}`,
             {
@@ -182,20 +183,28 @@ function spooled(): string[] {
     }
 }
 
+/** A loopback server answering `status`, which `setStatus` changes so that one origin
+ * serves several sessions. */
 async function captureServer(status: number) {
     const bodies: any[] = [];
+    let answer = status;
     const server = http.createServer((request, response) => {
         let body = '';
         request.on('data', chunk => { body += chunk; });
         request.on('end', () => {
             bodies.push(JSON.parse(body));
-            response.writeHead(status);
+            response.writeHead(answer);
             response.end('{}');
         });
     });
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
     const { port } = server.address() as AddressInfo;
-    return { origin: `http://127.0.0.1:${port}`, bodies, close: () => new Promise<void>(resolve => server.close(() => resolve())) };
+    return {
+        origin: `http://127.0.0.1:${port}`,
+        bodies,
+        setStatus: (next: number) => { answer = next; },
+        close: () => new Promise<void>(resolve => server.close(() => resolve())),
+    };
 }
 
 beforeEach(() => {
@@ -338,29 +347,37 @@ describe('the usage statistics service', () => {
         } finally {
             await accepting.close();
         }
-        const failing = await captureServer(503);
+        // The failing session and the one that later sends what it queued post to one
+        // origin: a queued file is posted only to the endpoint it was queued for.
+        const server = await captureServer(503);
+        const elsewhere = await captureServer(200);
         try {
-            const service = start({ PIPELEX_USAGE_STATS_ENDPOINT: failing.origin });
+            const service = start({ PIPELEX_USAGE_STATS_ENDPOINT: server.origin });
             recordFeatureUse('format');
             await service.shutdown();
-            expect(failing.bodies).toHaveLength(1);
+            expect(server.bodies).toHaveLength(1);
             const files = spooled();
             expect(files).toHaveLength(1);
             const body = JSON.parse(fs.readFileSync(path.join(stateDir(), 'spool', 'vscode-pipelex', files[0]), 'utf-8'));
             expect(body.spool_version).toBe(1);
+            expect(body.endpoint).toBe(server.origin);
             expect(body.events.map((event: any) => event.properties.feature)).toEqual(['format']);
-        } finally {
-            await failing.close();
-        }
-        // The next session posts the spooled file.
-        const later = await captureServer(200);
-        try {
-            const service = start({ PIPELEX_USAGE_STATS_ENDPOINT: later.origin });
-            await service.postNow(5000, true);
-            expect(later.bodies.flatMap(body => body.batch).map((event: any) => event.properties.feature)).toEqual(['format']);
+
+            // A session posting to another endpoint leaves the file queued.
+            const other = start({ PIPELEX_USAGE_STATS_ENDPOINT: elsewhere.origin });
+            await other.postNow(5000, true);
+            expect(elsewhere.bodies).toEqual([]);
+            expect(spooled()).toEqual(files);
+
+            // The next session posting to its endpoint sends it.
+            server.setStatus(200);
+            const later = start({ PIPELEX_USAGE_STATS_ENDPOINT: server.origin });
+            await later.postNow(5000, true);
+            expect(server.bodies.slice(1).flatMap(body => body.batch).map((event: any) => event.properties.feature)).toEqual(['format']);
             expect(spooled()).toEqual([]);
         } finally {
-            await later.close();
+            await server.close();
+            await elsewhere.close();
         }
     });
 

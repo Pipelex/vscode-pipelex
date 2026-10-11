@@ -127,6 +127,11 @@ impl Session {
     }
 
     async fn deliver(&self, events: Vec<Value>, identity: &Identity, in_process: bool) {
+        // An invalid endpoint override is a switch that says off, so `begin` made no
+        // session for it; this origin is the one every queued file names.
+        let Some(origin) = self.endpoint.origin() else {
+            return;
+        };
         let deadline = Instant::now() + Duration::from_millis(contract::BUDGET_CLI_IN_PROCESS_MS);
         let poster = Poster::new(&self.endpoint);
         if !identity.persisted {
@@ -151,13 +156,13 @@ impl Session {
                     }
                 }
                 InProcess::Unsent(unsent) => {
-                    let _ = spool.write(&unsent);
+                    let _ = spool.write(origin, &unsent);
                 }
                 InProcess::Disabled => {}
             }
             return;
         }
-        if spool.write(&events).is_err() {
+        if spool.write(origin, &events).is_err() {
             let _ = self
                 .post_in_process(poster.as_ref(), events, identity, deadline)
                 .await;

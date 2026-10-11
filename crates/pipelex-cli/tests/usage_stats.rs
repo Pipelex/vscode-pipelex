@@ -16,7 +16,10 @@ use std::{
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
     process::{Output, Stdio},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicU16, Ordering},
+        Arc, Mutex,
+    },
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -345,10 +348,12 @@ impl Drop for Sandbox {
     }
 }
 
-/// A loopback HTTP server that records every request and answers with one status.
+/// A loopback HTTP server that records every request and answers with one status,
+/// which a test may change between runs to keep one origin across them.
 struct CaptureServer {
     origin: String,
     requests: Arc<Mutex<Vec<(String, Value)>>>,
+    status: Arc<AtomicU16>,
 }
 
 impl CaptureServer {
@@ -363,12 +368,24 @@ impl CaptureServer {
         let origin = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
         let requests = Arc::new(Mutex::new(Vec::new()));
         let recorded = Arc::clone(&requests);
+        let status = Arc::new(AtomicU16::new(status));
+        let answered = Arc::clone(&status);
         thread::spawn(move || {
             for stream in listener.incoming().flatten() {
+                let status = answered.load(Ordering::SeqCst);
                 let _ = Self::serve(stream, status, delay, &recorded);
             }
         });
-        Self { origin, requests }
+        Self {
+            origin,
+            requests,
+            status,
+        }
+    }
+
+    /// Answer every later request with `status`.
+    fn set_status(&self, status: u16) {
+        self.status.store(status, Ordering::SeqCst);
     }
 
     fn serve(
@@ -1112,10 +1129,12 @@ fn a_failed_post_is_kept_and_a_refused_one_is_dropped_on(index: usize, retry_var
     let sandbox = Sandbox::new(&format!("failures-{index}"));
     sandbox.write("doc.toml", "a = 1\n");
 
-    let failing = CaptureServer::start(503);
-    sandbox.plxt(&failing.origin, &["lint", "doc.toml"], &[("CI", "1")]);
+    // One origin for both runs: a sender posts a queued file only to the endpoint it
+    // was queued for.
+    let server = CaptureServer::start(503);
+    sandbox.plxt(&server.origin, &["lint", "doc.toml"], &[("CI", "1")]);
     assert_eq!(
-        failing
+        server
             .wait_for_requests(1, Duration::from_millis(500))
             .len(),
         1
@@ -1125,12 +1144,12 @@ fn a_failed_post_is_kept_and_a_refused_one_is_dropped_on(index: usize, retry_var
     let spooled: Value = serde_json::from_str(&fs::read_to_string(&kept[0]).unwrap()).unwrap();
     assert_eq!(spooled["spool_version"], 1);
 
-    let refusing = CaptureServer::start(400);
-    sandbox.plxt(&refusing.origin, &["lint", "doc.toml"], retry_vars);
-    let requests = refusing.wait_for_requests(1, Duration::from_secs(20));
-    assert!(!requests.is_empty());
+    server.set_status(400);
+    sandbox.plxt(&server.origin, &["lint", "doc.toml"], retry_vars);
+    let requests = server.wait_for_requests(2, Duration::from_secs(20));
+    assert!(requests.len() > 1);
     // The spooled event from the failing run is resent unchanged.
-    let resent = requests
+    let resent = requests[1..]
         .iter()
         .flat_map(|(_, body)| body["batch"].as_array().unwrap().clone())
         .collect::<Vec<_>>();
@@ -1204,37 +1223,157 @@ fn sent_events(server: &CaptureServer) -> Vec<Value> {
         .collect()
 }
 
-/// Queue a spool file of `events`, named as if written `age_ms` ago.
-fn queue(sandbox: &Sandbox, age_ms: u128, label: &str, events: &[Value]) {
+/// Queue a spool file of `events`, named as if written `age_ms` ago, naming no
+/// endpoint, as a file any sender may post.
+fn queue(sandbox: &Sandbox, age_ms: u128, label: &str, events: &[Value]) -> PathBuf {
+    queue_body(
+        sandbox,
+        age_ms,
+        label,
+        &json!({ "spool_version": 1, "events": events }),
+    )
+}
+
+/// Queue a spool file of `events` for the endpoint at `origin`, named as if written
+/// `age_ms` ago.
+fn queue_for(
+    sandbox: &Sandbox,
+    origin: &str,
+    age_ms: u128,
+    label: &str,
+    events: &[Value],
+) -> PathBuf {
+    queue_body(
+        sandbox,
+        age_ms,
+        label,
+        &json!({ "spool_version": 1, "endpoint": origin, "events": events }),
+    )
+}
+
+fn queue_body(sandbox: &Sandbox, age_ms: u128, label: &str, body: &Value) -> PathBuf {
     fs::create_dir_all(sandbox.spool()).unwrap();
     let created = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis()
         - age_ms;
-    fs::write(
-        sandbox.spool().join(format!("{created}-{label}.json")),
-        json!({ "spool_version": 1, "events": events }).to_string(),
-    )
-    .unwrap();
+    let path = sandbox.spool().join(format!("{created}-{label}.json"));
+    fs::write(&path, body.to_string()).unwrap();
+    path
+}
+
+/// `made` under a new `uuid`, so that it is a distinct event of the same identifier.
+fn copy_of(made: &Value, uuid: &str) -> Value {
+    let mut event = made.clone();
+    event["uuid"] = json!(uuid);
+    event
+}
+
+/// A file queued under a test's loopback override must never be posted anywhere else,
+/// PostHog above all: a sender posts only the files queued for its own endpoint and
+/// those naming none, and leaves the others queued as they were. On both delivery
+/// paths: the default one (a detached sender, or in-process on a container host) and
+/// CI's in-process one, which drains the queue after posting the command's own event.
+#[test]
+fn a_sender_posts_only_the_files_queued_for_its_endpoint() {
+    for (index, vars) in [&[][..], &[("CI", "1")][..]].into_iter().enumerate() {
+        a_sender_posts_only_the_files_queued_for_its_endpoint_on(index, vars);
+    }
+}
+
+fn a_sender_posts_only_the_files_queued_for_its_endpoint_on(index: usize, vars: Vars) {
+    let schema = schema();
+    let posting = CaptureServer::start(200);
+    let elsewhere = CaptureServer::start(200);
+    let sandbox = Sandbox::new(&format!("endpoints-{index}"));
+    sandbox.write("doc.toml", "a = 1\n");
+    // A debug run creates the identifier the queued events are made under, so that
+    // nothing but its endpoint keeps the foreign file from being sent.
+    let (_, made) = sandbox.debug_events(&["lint", "doc.toml"], &[]);
+    let foreign_event = copy_of(&made[0], "33333333-3333-4333-8333-333333333333");
+    let anywhere_event = copy_of(&made[0], "44444444-4444-4444-8444-444444444444");
+    let foreign = queue_for(
+        &sandbox,
+        &elsewhere.origin,
+        2000,
+        "foreign",
+        std::slice::from_ref(&foreign_event),
+    );
+    let foreign_before = fs::read(&foreign).unwrap();
+    queue(
+        &sandbox,
+        1000,
+        "anywhere",
+        std::slice::from_ref(&anywhere_event),
+    );
+
+    let output = sandbox.plxt(&posting.origin, &["lint", "doc.toml"], vars);
+    assert!(output.status.success(), "{output:?}");
+    assert!(
+        wait_until(Duration::from_secs(20), || sandbox.spooled_files()
+            == [foreign.clone()]),
+        "only the file queued elsewhere stays queued: {:?}",
+        sandbox.spooled_files()
+    );
+    let sent = posting
+        .requests()
+        .iter()
+        .flat_map(|request| assert_batch(request, &schema))
+        .collect::<Vec<_>>();
+    assert_eq!(sent.len(), 2, "{sent:?}");
+    assert!(sent.contains(&anywhere_event), "{sent:?}");
+    assert!(!sent.contains(&foreign_event), "{sent:?}");
+    assert_eq!(
+        fs::read(&foreign).unwrap(),
+        foreign_before,
+        "the file queued elsewhere is left as it was"
+    );
+    assert!(elsewhere.requests().is_empty());
+}
+
+/// The endpoint a spooled file names is the origin its run resolved, on both delivery
+/// paths, so that a sender posting there finds it.
+#[test]
+fn a_spooled_file_names_the_endpoint_it_was_queued_for() {
+    let server = CaptureServer::start(503);
+    for (index, vars) in [&[][..], &[("CI", "1")][..]].into_iter().enumerate() {
+        let sandbox = Sandbox::new(&format!("named-{index}"));
+        sandbox.write("doc.toml", "a = 1\n");
+        let posted = server.requests().len();
+        sandbox.plxt(&server.origin, &["lint", "doc.toml"], vars);
+        server.wait_for_requests(posted + 1, Duration::from_secs(20));
+        // The detached sender gives the file back after its failed post.
+        assert!(wait_until(Duration::from_secs(10), || {
+            let files = sandbox.spooled_files();
+            files.len() == 1 && files[0].to_string_lossy().ends_with(".json")
+        }));
+        let spooled: Value =
+            serde_json::from_str(&fs::read_to_string(&sandbox.spooled_files()[0]).unwrap())
+                .unwrap();
+        assert_eq!(spooled["spool_version"], 1, "{spooled}");
+        assert_eq!(spooled["endpoint"], json!(server.origin), "{spooled}");
+        assert_eq!(spooled["events"].as_array().unwrap().len(), 1, "{spooled}");
+    }
 }
 
 #[test]
 fn a_ci_run_sends_what_an_earlier_ci_run_left_queued() {
     let sandbox = Sandbox::new("ci-retry");
     sandbox.write("doc.toml", "a = 1\n");
-    let failing = CaptureServer::start(503);
-    sandbox.plxt(&failing.origin, &["lint", "doc.toml"], &[("CI", "1")]);
+    let server = CaptureServer::start(503);
+    sandbox.plxt(&server.origin, &["lint", "doc.toml"], &[("CI", "1")]);
     let kept = sandbox.spooled_files();
     assert_eq!(kept.len(), 1, "a transient failure in CI spools the event");
     let queued: Value = serde_json::from_str(&fs::read_to_string(&kept[0]).unwrap()).unwrap();
+    let failed = sent_events(&server).len();
 
-    let accepting = CaptureServer::start(200);
-    let output = sandbox.plxt(&accepting.origin, &["lint", "doc.toml"], &[("CI", "1")]);
+    server.set_status(200);
+    let output = sandbox.plxt(&server.origin, &["lint", "doc.toml"], &[("CI", "1")]);
     assert!(output.status.success(), "{output:?}");
     // In-process: by the time the command has exited, its own event and the queued one
     // are both posted, and the queue is empty.
-    let sent = sent_events(&accepting);
+    let sent = sent_events(&server).split_off(failed);
     assert_eq!(sent.len(), 2, "{sent:?}");
     assert!(
         sent.contains(&queued["events"][0]),

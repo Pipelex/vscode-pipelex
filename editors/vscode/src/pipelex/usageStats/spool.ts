@@ -5,6 +5,13 @@
  * sender claims it by renaming it to `<name>.sending-<random>`, then deletes it or
  * renames it back.
  *
+ * A file holds `{"spool_version": 1, "endpoint": <origin>, "events": [...]}`, the
+ * endpoint being the origin of the capture endpoint its events were queued for,
+ * exactly as the switches resolved it. A sender posts a file only to that origin and
+ * leaves it for a sender posting there otherwise, so events queued under a test's
+ * loopback override never reach PostHog. A file naming no endpoint may be posted by
+ * any sender.
+ *
  * Node only.
  */
 
@@ -18,9 +25,39 @@ const SPOOL_VERSION = 1;
 const CLAIM_MARK = '.sending-';
 const EXTENSION = '.json';
 
-function writeAtomically(file: string, events: readonly Envelope[]): void {
+/** What a spool file holds: the origin of the endpoint its events were queued for,
+ * `undefined` in a file that names none, and the events. */
+export interface SpoolContent {
+    endpoint: string | undefined;
+    events: Envelope[];
+}
+
+/** Whether a sender posting to `origin` may post `content`: the file names that
+ * origin, or names none. */
+export function isQueuedFor(content: SpoolContent, origin: string): boolean {
+    return content.endpoint === undefined || content.endpoint === origin;
+}
+
+/** What the spool file at `file` holds, or `undefined` when it is not one this
+ * version reads: unreadable, not JSON, of another version, or naming an endpoint that
+ * is not a string. A `null` endpoint names none. */
+function readContent(file: string): SpoolContent | undefined {
+    try {
+        const body = JSON.parse(fs.readFileSync(file, 'utf-8'));
+        if (body?.spool_version !== SPOOL_VERSION || !Array.isArray(body.events)) return undefined;
+        const endpoint: unknown = body.endpoint ?? undefined;
+        if (endpoint !== undefined && typeof endpoint !== 'string') return undefined;
+        return { endpoint, events: body.events as Envelope[] };
+    } catch {
+        return undefined;
+    }
+}
+
+function writeAtomically(file: string, content: SpoolContent): void {
     const temporary = path.join(path.dirname(file), `.${path.basename(file)}.${randomSuffix()}.tmp`);
-    const body = JSON.stringify({ spool_version: SPOOL_VERSION, events });
+    const body = JSON.stringify(content.endpoint === undefined
+        ? { spool_version: SPOOL_VERSION, events: content.events }
+        : { spool_version: SPOOL_VERSION, endpoint: content.endpoint, events: content.events });
     try {
         const descriptor = fs.openSync(temporary, 'wx', 0o600);
         try {
@@ -48,19 +85,15 @@ function createdMs(name: string): number | undefined {
 export class Claimed {
     constructor(readonly original: string, readonly claimed: string) {}
 
-    /** The events the file holds, or `undefined` when it is not a spool file this version reads. */
-    events(): Envelope[] | undefined {
-        try {
-            const body = JSON.parse(fs.readFileSync(this.claimed, 'utf-8'));
-            if (body?.spool_version !== SPOOL_VERSION || !Array.isArray(body.events)) return undefined;
-            return body.events as Envelope[];
-        } catch {
-            return undefined;
-        }
+    /** What the file holds, or `undefined` when it is not a spool file this version reads. */
+    content(): SpoolContent | undefined {
+        return readContent(this.claimed);
     }
 
-    rewrite(events: readonly Envelope[]): void {
-        writeAtomically(this.claimed, events);
+    /** Replace the file's content, after dropping some of its events; the endpoint it
+     * names, or names none, stays as it was. */
+    rewrite(content: SpoolContent): void {
+        writeAtomically(this.claimed, content);
     }
 
     delete(): void {
@@ -84,11 +117,12 @@ export class Claimed {
 export class Spool {
     constructor(readonly dir: string) {}
 
-    /** Queue `events` in a new file, then trim the spool to its limit, oldest first. */
-    write(events: readonly Envelope[]): string {
+    /** Queue `events` for the endpoint at `origin` in a new file, then trim the spool
+     * to its limit, oldest first. */
+    write(origin: string, events: readonly Envelope[]): string {
         fs.mkdirSync(this.dir, { recursive: true, mode: 0o700 });
         const file = path.join(this.dir, `${Date.now()}-${randomSuffix()}${EXTENSION}`);
-        writeAtomically(file, events);
+        writeAtomically(file, { endpoint: origin, events: [...events] });
         this.trimToLimit();
         return file;
     }
@@ -178,9 +212,16 @@ export class Spool {
         return new Claimed(file, claimed);
     }
 
-    claimAll(): Claimed[] {
+    /** Claim, oldest first, every unclaimed file a sender posting to `origin` may post.
+     * A file queued for another endpoint is left unclaimed, for a sender posting there;
+     * one that cannot be read is claimed, so that its sender deletes it. */
+    claimAll(origin: string): Claimed[] {
         return this.files()
             .filter(file => file.endsWith(EXTENSION))
+            .filter(file => {
+                const content = readContent(file);
+                return content === undefined || isQueuedFor(content, origin);
+            })
             .map(file => this.claim(file))
             .filter((claimed): claimed is Claimed => claimed !== undefined);
     }

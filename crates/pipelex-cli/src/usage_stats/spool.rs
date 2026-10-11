@@ -2,6 +2,13 @@
 //! sender. A file is `<created-ms>-<random>.json`, written under a dot name and
 //! renamed into place; a sender claims it by renaming it to
 //! `<name>.sending-<random>`, then deletes it or renames it back.
+//!
+//! A file holds `{"spool_version": 1, "endpoint": <origin>, "events": [...]}`, the
+//! endpoint being the origin of the capture endpoint its events were queued for,
+//! exactly as the switches resolved it. A sender posts a file only to that origin and
+//! leaves it for a sender posting there otherwise, so events queued under a test's
+//! loopback override never reach PostHog. A file naming no endpoint may be posted by
+//! any sender.
 
 use std::{
     fs, io,
@@ -17,8 +24,30 @@ use super::{
 };
 
 const SPOOL_VERSION: u64 = 1;
+/// The member naming the origin a file's events were queued for.
+const ENDPOINT_KEY: &str = "endpoint";
 const CLAIM_MARK: &str = ".sending-";
 const EXTENSION: &str = ".json";
+
+/// What a spool file holds.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Content {
+    /// The origin of the endpoint the events were queued for; `None` in a file that
+    /// names none.
+    pub endpoint: Option<String>,
+    pub events: Vec<Value>,
+}
+
+impl Content {
+    /// Whether a sender posting to `origin` may post these events: the file names
+    /// that origin, or names none.
+    pub fn is_queued_for(&self, origin: &str) -> bool {
+        match &self.endpoint {
+            None => true,
+            Some(endpoint) => endpoint == origin,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Spool {
@@ -37,12 +66,17 @@ impl Spool {
         Self { dir }
     }
 
-    /// Queue `events` in a new file, then trim the spool to its limit, oldest first.
-    pub fn write(&self, events: &[Value]) -> io::Result<PathBuf> {
+    /// Queue `events` for the endpoint at `origin` in a new file, then trim the spool
+    /// to its limit, oldest first.
+    pub fn write(&self, origin: &str, events: &[Value]) -> io::Result<PathBuf> {
         create_private_dir(&self.dir)?;
         let name = format!("{}-{}{EXTENSION}", random::now_ms(), random::suffix());
         let path = self.dir.join(&name);
-        write_atomically(&self.dir.join(format!(".{name}.tmp")), &path, &body(events))?;
+        write_atomically(
+            &self.dir.join(format!(".{name}.tmp")),
+            &path,
+            &body(Some(origin), events),
+        )?;
         self.trim_to_limit();
         Ok(path)
     }
@@ -118,33 +152,38 @@ impl Spool {
         })
     }
 
-    /// Claim every unclaimed file, oldest first.
-    pub fn claim_all(&self) -> Vec<Claimed> {
+    /// Claim, oldest first, every unclaimed file a sender posting to `origin` may
+    /// post. A file queued for another endpoint is left unclaimed, for a sender
+    /// posting there; one that cannot be read is claimed, so that its sender deletes it.
+    pub fn claim_all(&self, origin: &str) -> Vec<Claimed> {
         self.files()
             .into_iter()
             .filter(|path| path.to_string_lossy().ends_with(EXTENSION))
+            .filter(|path| match read(path) {
+                Some(content) => content.is_queued_for(origin),
+                None => true,
+            })
             .filter_map(|path| self.claim(&path))
             .collect()
     }
 }
 
 impl Claimed {
-    /// The events the file holds, or `None` when it is not a spool file this
-    /// version reads.
-    pub fn events(&self) -> Option<Vec<Value>> {
-        let text = fs::read_to_string(&self.claimed).ok()?;
-        let body: Value = serde_json::from_str(&text).ok()?;
-        if body.get("spool_version").and_then(Value::as_u64) != Some(SPOOL_VERSION) {
-            return None;
-        }
-        body.get("events")?.as_array().cloned()
+    /// What the file holds, or `None` when it is not a spool file this version reads.
+    pub fn content(&self) -> Option<Content> {
+        read(&self.claimed)
     }
 
-    /// Replace the claimed file's events, after dropping some of them.
-    pub fn rewrite(&self, events: &[Value]) -> io::Result<()> {
+    /// Replace the claimed file's content, after dropping some of its events; the
+    /// endpoint it names, or names none, stays as it was.
+    pub fn rewrite(&self, content: &Content) -> io::Result<()> {
         let dir = self.claimed.parent().unwrap_or_else(|| Path::new("."));
         let temporary = dir.join(format!(".rewrite-{}.tmp", random::suffix()));
-        write_atomically(&temporary, &self.claimed, &body(events))
+        write_atomically(
+            &temporary,
+            &self.claimed,
+            &body(content.endpoint.as_deref(), &content.events),
+        )
     }
 
     pub fn delete(self) {
@@ -159,11 +198,31 @@ impl Claimed {
     }
 }
 
-/// A spool file's content.
-fn body(events: &[Value]) -> Vec<u8> {
-    json!({ "spool_version": SPOOL_VERSION, "events": events })
-        .to_string()
-        .into_bytes()
+/// A spool file's bytes, naming `endpoint` when there is one.
+fn body(endpoint: Option<&str>, events: &[Value]) -> Vec<u8> {
+    let mut body = json!({ "spool_version": SPOOL_VERSION, "events": events });
+    if let (Some(endpoint), Some(members)) = (endpoint, body.as_object_mut()) {
+        members.insert(ENDPOINT_KEY.to_string(), Value::from(endpoint));
+    }
+    body.to_string().into_bytes()
+}
+
+/// What the spool file at `path` holds, or `None` when it is not one this version
+/// reads: unreadable, not JSON, of another version, or naming an endpoint that is not
+/// a string. A `null` endpoint names none.
+fn read(path: &Path) -> Option<Content> {
+    let text = fs::read_to_string(path).ok()?;
+    let body: Value = serde_json::from_str(&text).ok()?;
+    if body.get("spool_version").and_then(Value::as_u64) != Some(SPOOL_VERSION) {
+        return None;
+    }
+    let endpoint = match body.get(ENDPOINT_KEY) {
+        None | Some(Value::Null) => None,
+        Some(Value::String(endpoint)) => Some(endpoint.clone()),
+        Some(_) => return None,
+    };
+    let events = body.get("events")?.as_array()?.clone();
+    Some(Content { endpoint, events })
 }
 
 fn is_hidden(path: &Path) -> bool {
@@ -200,4 +259,196 @@ fn unclaimed_name(path: &Path) -> Option<PathBuf> {
     let name = path.file_name()?.to_str()?;
     let index = name.find(CLAIM_MARK)?;
     Some(path.with_file_name(&name[..index]))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+    use crate::usage_stats::{context::Context, switches::Endpoint};
+
+    /// A spool in a directory of its own under the system's temporary directory,
+    /// removed when dropped.
+    struct Scratch {
+        root: PathBuf,
+        spool: Spool,
+    }
+
+    impl Scratch {
+        fn new(name: &str) -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "plxt-spool-{name}-{}-{}",
+                std::process::id(),
+                random::suffix()
+            ));
+            let spool = Spool::new(root.join("spool").join("plxt"));
+            Self { root, spool }
+        }
+
+        /// The names of the spool's files, sorted.
+        fn names(&self) -> Vec<String> {
+            let mut names = fs::read_dir(&self.spool.dir)
+                .unwrap()
+                .flatten()
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+            names.sort();
+            names
+        }
+
+        /// Queue a file holding `body` as it is, as another tool or version may have.
+        fn queue_raw(&self, label: &str, body: &Value) -> PathBuf {
+            create_private_dir(&self.spool.dir).unwrap();
+            let path = self
+                .spool
+                .dir
+                .join(format!("{}-{label}{EXTENSION}", random::now_ms()));
+            fs::write(&path, body.to_string()).unwrap();
+            path
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn event(uuid: &str) -> Value {
+        json!({ "event": "command_completed", "uuid": uuid })
+    }
+
+    fn origin_resolved_from(vars: &[(&str, &str)]) -> String {
+        let vars = vars
+            .iter()
+            .map(|(name, value)| (name.to_string(), value.to_string()))
+            .collect::<HashMap<_, _>>();
+        Endpoint::from_context(&Context::new(vars, None, None))
+            .origin()
+            .unwrap()
+            .to_string()
+    }
+
+    fn file_json(path: &Path) -> Value {
+        serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn a_written_file_names_the_origin_the_switches_resolved() {
+        let scratch = Scratch::new("written");
+        for (vars, expected) in [
+            (&[][..], "https://eu.i.posthog.com"),
+            (
+                &[(contract::ENV_ENDPOINT_OVERRIDE, "http://127.0.0.1:9")][..],
+                "http://127.0.0.1:9",
+            ),
+            (
+                &[(contract::ENV_ENDPOINT_OVERRIDE, "http://localhost:8080/")][..],
+                "http://localhost:8080",
+            ),
+        ] {
+            let origin = origin_resolved_from(vars);
+            let path = scratch.spool.write(&origin, &[event("a")]).unwrap();
+            let body = file_json(&path);
+            assert_eq!(body["spool_version"], json!(1), "{vars:?}");
+            assert_eq!(body["endpoint"], json!(expected), "{vars:?}");
+            assert_eq!(body["events"], json!([event("a")]), "{vars:?}");
+        }
+    }
+
+    #[test]
+    fn a_sender_claims_only_the_files_queued_for_its_endpoint() {
+        let scratch = Scratch::new("claim");
+        let own = scratch
+            .spool
+            .write("http://127.0.0.1:9", &[event("own")])
+            .unwrap();
+        let foreign = scratch
+            .spool
+            .write("http://127.0.0.1:10", &[event("foreign")])
+            .unwrap();
+        let production = scratch
+            .spool
+            .write(contract::CAPTURE_HOST, &[event("production")])
+            .unwrap();
+        let anywhere = scratch.queue_raw(
+            "anywhere",
+            &json!({ "spool_version": 1, "events": [event("anywhere")] }),
+        );
+        let null = scratch.queue_raw(
+            "null",
+            &json!({ "spool_version": 1, "endpoint": null, "events": [event("null")] }),
+        );
+        let unreadable = scratch.queue_raw("unreadable", &json!("not a spool file"));
+        let foreign_before = fs::read(&foreign).unwrap();
+        let production_before = fs::read(&production).unwrap();
+
+        let claimed = scratch.spool.claim_all("http://127.0.0.1:9");
+        let mut originals = claimed
+            .iter()
+            .map(|file| file.original.clone())
+            .collect::<Vec<_>>();
+        originals.sort();
+        let mut expected = vec![own, anywhere, null, unreadable];
+        expected.sort();
+        assert_eq!(originals, expected);
+
+        // The files queued elsewhere stay where they were, as they were.
+        assert_eq!(fs::read(&foreign).unwrap(), foreign_before);
+        assert_eq!(fs::read(&production).unwrap(), production_before);
+
+        let contents = claimed.iter().map(Claimed::content).collect::<Vec<_>>();
+        assert!(contents.contains(&Some(Content {
+            endpoint: Some("http://127.0.0.1:9".to_string()),
+            events: vec![event("own")],
+        })));
+        assert!(contents.contains(&Some(Content {
+            endpoint: None,
+            events: vec![event("anywhere")],
+        })));
+        assert!(contents.contains(&Some(Content {
+            endpoint: None,
+            events: vec![event("null")],
+        })));
+        assert!(contents.contains(&None));
+        claimed.into_iter().for_each(Claimed::release);
+    }
+
+    #[test]
+    fn a_file_naming_an_endpoint_that_is_not_a_string_is_not_read() {
+        let scratch = Scratch::new("malformed");
+        let path = scratch.queue_raw(
+            "malformed",
+            &json!({ "spool_version": 1, "endpoint": 9, "events": [event("a")] }),
+        );
+        assert_eq!(read(&path), None);
+    }
+
+    #[test]
+    fn a_rewrite_keeps_the_endpoint_the_file_named() {
+        let scratch = Scratch::new("rewrite");
+        scratch
+            .spool
+            .write("http://127.0.0.1:9", &[event("a"), event("b")])
+            .unwrap();
+        scratch.queue_raw(
+            "anywhere",
+            &json!({ "spool_version": 1, "events": [event("c"), event("d")] }),
+        );
+        for file in scratch.spool.claim_all("http://127.0.0.1:9") {
+            let mut content = file.content().unwrap();
+            content.events.truncate(1);
+            file.rewrite(&content).unwrap();
+            assert_eq!(file.content(), Some(content.clone()));
+            let body = file_json(&file.claimed);
+            assert_eq!(
+                body.get("endpoint").cloned(),
+                content.endpoint.map(Value::from),
+                "a file naming no endpoint is rewritten naming none"
+            );
+            file.release();
+        }
+        assert_eq!(scratch.names().len(), 2);
+    }
 }
