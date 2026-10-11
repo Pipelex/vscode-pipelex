@@ -16,7 +16,7 @@ use super::{
     context::Context,
     contract,
     event::distinct_id,
-    spool::{Claimed, Spool},
+    spool::{Claimed, Content, Spool},
     state::{IdReading, StateDir},
     switches::{run_legacy_migration, Endpoint},
 };
@@ -79,6 +79,7 @@ pub const MAX_EVENTS_PER_POST: usize = 500;
 /// One HTTP client for a whole run of posts, to the endpoint the switches allow.
 pub struct Poster {
     client: reqwest::Client,
+    origin: String,
     url: String,
 }
 
@@ -98,8 +99,15 @@ impl Poster {
         }
         Some(Self {
             client: builder.build().ok()?,
+            origin: origin.to_string(),
             url: format!("{origin}{}", contract::BATCH_PATH),
         })
+    }
+
+    /// The origin this poster posts to, as the switches resolved it: the one a spool
+    /// file names when its events were queued for this endpoint.
+    pub fn origin(&self) -> &str {
+        &self.origin
     }
 
     /// Post one batch, waiting no longer than `timeout`.
@@ -143,14 +151,17 @@ pub async fn run_detached() {
     drain(&context, &state, &poster, deadline).await;
 }
 
-/// Post every file of `plxt`'s spool until the deadline, as few files to a post as
-/// [`MAX_EVENTS_PER_POST`] allows, each file once. The checks every post is preceded
-/// by run before each post; a failed post leaves its files and every file not yet
-/// tried queued for the next sender, since the endpoint is unreachable or failing.
+/// Post every file of `plxt`'s spool queued for the poster's endpoint until the
+/// deadline, as few files to a post as [`MAX_EVENTS_PER_POST`] allows, each file once.
+/// A file queued for another endpoint is left for a sender posting there, so events
+/// queued under a test's loopback override never reach PostHog, and events queued for
+/// PostHog never reach a loopback endpoint. The checks every post is preceded by run
+/// before each post; a failed post leaves its files and every file not yet tried
+/// queued for the next sender, since the endpoint is unreachable or failing.
 pub async fn drain(context: &Context, state: &StateDir, poster: &Poster, deadline: Instant) {
     let spool = Spool::new(state.tool_spool(contract::TOOL));
     spool.tidy();
-    let mut claimed: VecDeque<Claimed> = spool.claim_all().into();
+    let mut claimed: VecDeque<Claimed> = spool.claim_all(poster.origin()).into();
     while !claimed.is_empty() {
         if remaining(deadline).is_zero() {
             claimed.into_iter().for_each(Claimed::release);
@@ -164,7 +175,7 @@ pub async fn drain(context: &Context, state: &StateDir, poster: &Poster, deadlin
             }
             PrePost::Current(current) => current,
         };
-        let (files, events) = next_batch(&mut claimed, current.as_deref());
+        let (files, events) = next_batch(&mut claimed, current.as_deref(), poster.origin());
         if files.is_empty() {
             continue;
         }
@@ -180,24 +191,32 @@ pub async fn drain(context: &Context, state: &StateDir, poster: &Poster, deadlin
     }
 }
 
-/// Take from the front of `claimed` the files whose current events fit in one post,
-/// deleting on the way the files nothing of which is sent: unreadable ones, and those
-/// whose events were all made under a replaced identifier. A file keeping only some
-/// of its events is rewritten with them first.
+/// Take from the front of `claimed` the files whose current events fit in one post to
+/// `origin`, deleting on the way the files nothing of which is sent: unreadable ones,
+/// and those whose events were all made under a replaced identifier. A file queued for
+/// another endpoint is given back untouched. A file keeping only some of its events is
+/// rewritten with them first.
 fn next_batch(
     claimed: &mut VecDeque<Claimed>,
     current: Option<&str>,
+    origin: &str,
 ) -> (Vec<Claimed>, Vec<Value>) {
     let mut files = Vec::new();
     let mut batch = Vec::new();
     while let Some(file) = claimed.pop_front() {
-        let Some(events) = file.events() else {
+        let Some(content) = file.content() else {
             // Not a spool file this version can read or send: nobody ever will.
             file.delete();
             continue;
         };
-        let total = events.len();
-        let events = keep_current(events, current);
+        if !content.is_queued_for(origin) {
+            // Queued for another endpoint, which only a read after the claim told:
+            // a sender posting there sends it.
+            file.release();
+            continue;
+        }
+        let total = content.events.len();
+        let events = keep_current(content.events, current);
         if events.is_empty() {
             file.delete();
             continue;
@@ -206,11 +225,15 @@ fn next_batch(
             claimed.push_front(file);
             break;
         }
-        if events.len() != total && file.rewrite(&events).is_err() {
+        let kept = Content {
+            endpoint: content.endpoint,
+            events,
+        };
+        if kept.events.len() != total && file.rewrite(&kept).is_err() {
             file.delete();
             continue;
         }
-        batch.extend(events);
+        batch.extend(kept.events);
         files.push(file);
     }
     (files, batch)

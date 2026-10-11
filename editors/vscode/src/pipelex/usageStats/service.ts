@@ -396,11 +396,16 @@ export class UsageStatsService implements vscode.Disposable {
         this.retryDelay = Math.min(this.retryDelay * 2, MAX_RETRY_DELAY_MS);
     }
 
+    /** Queue `unsent` for the endpoint this process posts to, which only a sender
+     * posting there then sends. */
     private spool(unsent: Envelope[]): void {
         const state = this.state;
         if (!state || unsent.length === 0 || this.localIdentity) return;
+        // An invalid override is a switch that says off: there is nowhere to queue for.
+        const endpoint = endpointOf(this.host.env);
+        if (endpoint.kind === 'invalid') return;
         try {
-            new Spool(state.toolSpool()).write(unsent);
+            new Spool(state.toolSpool()).write(endpoint.origin, unsent);
         } catch {
             // A read-only filesystem loses them.
         }
