@@ -63,17 +63,7 @@ impl StateDir {
 
     /// Create the directory, with mode `0700` on POSIX, when it does not exist yet.
     pub fn ensure(&self) -> io::Result<()> {
-        if self.root.is_dir() {
-            return Ok(());
-        }
-        let mut builder = fs::DirBuilder::new();
-        builder.recursive(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
-        }
-        builder.create(&self.root)
+        create_private_dir(&self.root)
     }
 
     pub fn read_id(&self) -> IdReading {
@@ -113,18 +103,7 @@ impl StateDir {
         self.ensure()?;
         let fresh = random::uuid_v4().ok_or_else(|| io::Error::other("no random source"))?;
         let temporary = self.file(&format!("{}.tmp-{}", contract::STATE_ID, random::suffix()));
-        let written = (|| {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temporary)?;
-            file.write_all(fresh.as_bytes())?;
-            file.sync_all()
-        })();
-        if let Err(error) = written {
-            let _ = fs::remove_file(&temporary);
-            return Err(error);
-        }
+        write_new_synced(&temporary, fresh.as_bytes())?;
         let linked = fs::hard_link(&temporary, self.file(contract::STATE_ID));
         let _ = fs::remove_file(&temporary);
         match linked {
@@ -291,6 +270,46 @@ pub fn is_installation_id(text: &str) -> bool {
         }
     }
     true
+}
+
+/// Create `dir` and its parents, with mode `0700` on POSIX, when it does not exist yet.
+pub fn create_private_dir(dir: &Path) -> io::Result<()> {
+    if dir.is_dir() {
+        return Ok(());
+    }
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(dir)
+}
+
+/// Write `bytes` to `path`, which must not exist yet, and flush them to disk. Nothing
+/// is left at `path` when this fails.
+pub fn write_new_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let written = (|| {
+        let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
+        file.write_all(bytes)?;
+        file.sync_all()
+    })();
+    if written.is_err() {
+        let _ = fs::remove_file(path);
+    }
+    written
+}
+
+/// Replace `target` whole, so that a reader never sees it partial: write `bytes` under
+/// `temporary`, which must not exist yet, flush them, and rename it into place.
+pub fn write_atomically(temporary: &Path, target: &Path, bytes: &[u8]) -> io::Result<()> {
+    write_new_synced(temporary, bytes)?;
+    let renamed = fs::rename(temporary, target);
+    if renamed.is_err() {
+        let _ = fs::remove_file(temporary);
+    }
+    renamed
 }
 
 /// Create an empty marker file; one that exists already is left as it is.

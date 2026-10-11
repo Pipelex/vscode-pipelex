@@ -4,8 +4,7 @@
 //! `<name>.sending-<random>`, then deletes it or renames it back.
 
 use std::{
-    fs::{self, OpenOptions},
-    io::{self, Write},
+    fs, io,
     path::{Path, PathBuf},
     time::{Duration, SystemTime},
 };
@@ -14,7 +13,7 @@ use serde_json::{json, Value};
 
 use super::{
     contract, random,
-    state::{is_older_than, minutes, remove_if_present},
+    state::{create_private_dir, is_older_than, minutes, remove_if_present, write_atomically},
 };
 
 const SPOOL_VERSION: u64 = 1;
@@ -40,24 +39,10 @@ impl Spool {
 
     /// Queue `events` in a new file, then trim the spool to its limit, oldest first.
     pub fn write(&self, events: &[Value]) -> io::Result<PathBuf> {
-        create_dir(&self.dir)?;
+        create_private_dir(&self.dir)?;
         let name = format!("{}-{}{EXTENSION}", random::now_ms(), random::suffix());
-        let temporary = self.dir.join(format!(".{name}.tmp"));
         let path = self.dir.join(&name);
-        let body = json!({ "spool_version": SPOOL_VERSION, "events": events });
-        let written = (|| {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temporary)?;
-            file.write_all(body.to_string().as_bytes())?;
-            file.sync_all()?;
-            fs::rename(&temporary, &path)
-        })();
-        if let Err(error) = written {
-            let _ = fs::remove_file(&temporary);
-            return Err(error);
-        }
+        write_atomically(&self.dir.join(format!(".{name}.tmp")), &path, &body(events))?;
         self.trim_to_limit();
         Ok(path)
     }
@@ -159,20 +144,7 @@ impl Claimed {
     pub fn rewrite(&self, events: &[Value]) -> io::Result<()> {
         let dir = self.claimed.parent().unwrap_or_else(|| Path::new("."));
         let temporary = dir.join(format!(".rewrite-{}.tmp", random::suffix()));
-        let body = json!({ "spool_version": SPOOL_VERSION, "events": events });
-        let written = (|| {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temporary)?;
-            file.write_all(body.to_string().as_bytes())?;
-            file.sync_all()?;
-            fs::rename(&temporary, &self.claimed)
-        })();
-        if written.is_err() {
-            let _ = fs::remove_file(&temporary);
-        }
-        written
+        write_atomically(&temporary, &self.claimed, &body(events))
     }
 
     pub fn delete(self) {
@@ -187,18 +159,11 @@ impl Claimed {
     }
 }
 
-fn create_dir(dir: &Path) -> io::Result<()> {
-    if dir.is_dir() {
-        return Ok(());
-    }
-    let mut builder = fs::DirBuilder::new();
-    builder.recursive(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
-    }
-    builder.create(dir)
+/// A spool file's content.
+fn body(events: &[Value]) -> Vec<u8> {
+    json!({ "spool_version": SPOOL_VERSION, "events": events })
+        .to_string()
+        .into_bytes()
 }
 
 fn is_hidden(path: &Path) -> bool {
