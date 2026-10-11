@@ -10,11 +10,21 @@ use super::{
     context::Context,
     contract, detect,
     event::{self, CommandCompleted, Common, Outcome},
-    sender::{self, PostOutcome, PrePost},
+    sender::{self, PostOutcome, Poster, PrePost},
     spool::Spool,
     state::{Identity, StateDir},
     switches::{self, Endpoint},
 };
+
+/// How an in-process post of a command's own events went.
+enum InProcess {
+    /// Posted, refused for good, or nothing left to send after the checks.
+    Delivered,
+    /// `disabled` exists: nothing is sent and nothing is kept.
+    Disabled,
+    /// A transient failure: these are for the spool.
+    Unsent(Vec<Value>),
+}
 
 /// A command whose statistics are on.
 pub struct Session {
@@ -101,65 +111,76 @@ impl Session {
     }
 
     async fn deliver(&self, events: Vec<Value>, identity: &Identity, in_process: bool) {
-        let budget = Duration::from_millis(contract::BUDGET_CLI_IN_PROCESS_MS);
+        let deadline = Instant::now() + Duration::from_millis(contract::BUDGET_CLI_IN_PROCESS_MS);
+        let poster = Poster::new(&self.endpoint);
         if !identity.persisted {
             // No sender could match an identifier drawn for this process alone, so
             // its events are posted now or not at all.
-            let _ = self.post_in_process(events, identity, budget).await;
+            let _ = self
+                .post_in_process(poster.as_ref(), events, identity, deadline)
+                .await;
             return;
         }
         let spool = Spool::new(self.state.tool_spool(contract::TOOL));
         if in_process {
-            if let Some(unsent) = self.post_in_process(events, identity, budget).await {
-                let _ = spool.write(&unsent);
+            // CI and containers: this command's events, then what earlier runs left
+            // queued, all within the one in-process budget.
+            match self
+                .post_in_process(poster.as_ref(), events, identity, deadline)
+                .await
+            {
+                InProcess::Delivered => {
+                    if let Some(poster) = &poster {
+                        sender::drain(&self.context, &self.state, poster, deadline).await;
+                    }
+                }
+                InProcess::Unsent(unsent) => {
+                    let _ = spool.write(&unsent);
+                }
+                InProcess::Disabled => {}
             }
             return;
         }
-        let path = match spool.write(&events) {
-            Ok(path) => path,
-            Err(_) => {
-                let _ = self.post_in_process(events, identity, budget).await;
-                return;
-            }
-        };
+        if spool.write(&events).is_err() {
+            let _ = self
+                .post_in_process(poster.as_ref(), events, identity, deadline)
+                .await;
+            return;
+        }
         if sender::start_detached_sender(self.state.root()).is_ok() {
             return;
         }
-        // No sender could start: post the file now, within the CLI budget, and leave
-        // it queued when that fails.
-        if let Some(claimed) = spool.claim(&path) {
-            let deadline = Instant::now() + budget;
-            let _ = sender::send_claimed(
-                &self.context,
-                &self.state,
-                &self.endpoint,
-                claimed,
-                deadline,
-            )
-            .await;
+        // No sender could start: drain the spool, this command's file included, within
+        // the CLI budget, and leave what fails queued.
+        if let Some(poster) = &poster {
+            sender::drain(&self.context, &self.state, poster, deadline).await;
         }
     }
 
-    /// Post events held in memory within `budget`, after the checks every post is
-    /// preceded by. Answers the events a transient failure left unsent.
+    /// Post events held in memory before `deadline`, after the checks every post is
+    /// preceded by.
     async fn post_in_process(
         &self,
+        poster: Option<&Poster>,
         events: Vec<Value>,
         identity: &Identity,
-        budget: Duration,
-    ) -> Option<Vec<Value>> {
+        deadline: Instant,
+    ) -> InProcess {
         let own_local_id = (!identity.persisted).then_some(identity.id.as_str());
         let current = match sender::before_post(&self.context, &self.state, own_local_id) {
-            PrePost::Disabled => return None,
+            PrePost::Disabled => return InProcess::Disabled,
             PrePost::Current(current) => current,
         };
         let events = sender::keep_current(events, current.as_deref());
         if events.is_empty() {
-            return None;
+            return InProcess::Delivered;
         }
-        match sender::post(&self.endpoint, &events, budget).await {
-            PostOutcome::Accepted | PostOutcome::Refused => None,
-            PostOutcome::Failed => Some(events),
+        let Some(poster) = poster else {
+            return InProcess::Unsent(events);
+        };
+        match poster.post(&events, sender::remaining(deadline)).await {
+            PostOutcome::Accepted | PostOutcome::Refused => InProcess::Delivered,
+            PostOutcome::Failed => InProcess::Unsent(events),
         }
     }
 }

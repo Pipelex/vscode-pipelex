@@ -353,21 +353,30 @@ struct CaptureServer {
 
 impl CaptureServer {
     fn start(status: u16) -> Self {
+        Self::start_delayed(status, Duration::ZERO)
+    }
+
+    /// A server that records each request as soon as it has read it, then waits
+    /// `delay` before answering.
+    fn start_delayed(status: u16, delay: Duration) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let origin = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
         let requests = Arc::new(Mutex::new(Vec::new()));
         let recorded = Arc::clone(&requests);
         thread::spawn(move || {
             for stream in listener.incoming().flatten() {
-                if let Some(request) = Self::serve(stream, status) {
-                    recorded.lock().unwrap().push(request);
-                }
+                let _ = Self::serve(stream, status, delay, &recorded);
             }
         });
         Self { origin, requests }
     }
 
-    fn serve(mut stream: TcpStream, status: u16) -> Option<(String, Value)> {
+    fn serve(
+        mut stream: TcpStream,
+        status: u16,
+        delay: Duration,
+        recorded: &Mutex<Vec<(String, Value)>>,
+    ) -> Option<()> {
         stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
         let mut reader = BufReader::new(stream.try_clone().ok()?);
         let mut request_line = String::new();
@@ -388,12 +397,16 @@ impl CaptureServer {
         }
         let mut body = vec![0; content_length];
         reader.read_exact(&mut body).ok()?;
+        let path = request_line.split_whitespace().nth(1)?.to_string();
+        recorded
+            .lock()
+            .unwrap()
+            .push((path, serde_json::from_slice(&body).ok()?));
+        thread::sleep(delay);
         let response = format!(
             "HTTP/1.1 {status} Status\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}"
         );
-        stream.write_all(response.as_bytes()).ok()?;
-        let path = request_line.split_whitespace().nth(1)?.to_string();
-        Some((path, serde_json::from_slice(&body).ok()?))
+        stream.write_all(response.as_bytes()).ok()
     }
 
     fn requests(&self) -> Vec<(String, Value)> {
@@ -1038,6 +1051,8 @@ fn assert_batch(request: &(String, Value), schema: &Value) -> Vec<Value> {
     events
 }
 
+/// On a container host the command posts in-process instead, as in CI, and every
+/// assertion below holds on that path too: one post, then an empty spool.
 #[test]
 fn a_detached_sender_posts_the_spooled_event() {
     let schema = schema();
@@ -1083,9 +1098,18 @@ fn ci_posts_in_process_before_exiting() {
     assert!(sandbox.spooled_files().is_empty());
 }
 
+/// The retry runs on both delivery paths: the default one (a detached sender, or
+/// in-process on a container host) and CI's in-process one, which drains the queue
+/// after posting the command's own event.
 #[test]
 fn a_failed_post_is_kept_and_a_refused_one_is_dropped() {
-    let sandbox = Sandbox::new("failures");
+    for (index, retry_vars) in [&[][..], &[("CI", "1")][..]].into_iter().enumerate() {
+        a_failed_post_is_kept_and_a_refused_one_is_dropped_on(index, retry_vars);
+    }
+}
+
+fn a_failed_post_is_kept_and_a_refused_one_is_dropped_on(index: usize, retry_vars: Vars) {
+    let sandbox = Sandbox::new(&format!("failures-{index}"));
     sandbox.write("doc.toml", "a = 1\n");
 
     let failing = CaptureServer::start(503);
@@ -1102,7 +1126,7 @@ fn a_failed_post_is_kept_and_a_refused_one_is_dropped() {
     assert_eq!(spooled["spool_version"], 1);
 
     let refusing = CaptureServer::start(400);
-    sandbox.plxt(&refusing.origin, &["lint", "doc.toml"], &[]);
+    sandbox.plxt(&refusing.origin, &["lint", "doc.toml"], retry_vars);
     let requests = refusing.wait_for_requests(1, Duration::from_secs(20));
     assert!(!requests.is_empty());
     // The spooled event from the failing run is resent unchanged.
@@ -1123,10 +1147,18 @@ fn a_failed_post_is_kept_and_a_refused_one_is_dropped() {
     );
 }
 
+/// On both delivery paths: the default one (a detached sender, or in-process on a
+/// container host) and CI's in-process one.
 #[test]
 fn queued_events_of_another_identifier_are_dropped_unsent() {
+    for (index, vars) in [&[][..], &[("CI", "1")][..]].into_iter().enumerate() {
+        queued_events_of_another_identifier_are_dropped_unsent_on(index, vars);
+    }
+}
+
+fn queued_events_of_another_identifier_are_dropped_unsent_on(index: usize, vars: Vars) {
     let server = CaptureServer::start(200);
-    let sandbox = Sandbox::new("identifier");
+    let sandbox = Sandbox::new(&format!("identifier-{index}"));
     sandbox.write("doc.toml", "a = 1\n");
     sandbox.debug_events(&["lint", "doc.toml"], &[]);
     let foreign = json!({
@@ -1149,7 +1181,7 @@ fn queued_events_of_another_identifier_are_dropped_unsent() {
         json!({ "spool_version": 1, "events": [foreign] }).to_string(),
     )
     .unwrap();
-    sandbox.plxt(&server.origin, &["lint", "doc.toml"], &[]);
+    sandbox.plxt(&server.origin, &["lint", "doc.toml"], vars);
     server.wait_for_requests(1, Duration::from_secs(20));
     assert!(wait_until(Duration::from_secs(10), || sandbox
         .spooled_files()
@@ -1161,6 +1193,120 @@ fn queued_events_of_another_identifier_are_dropped_unsent() {
         .collect::<Vec<_>>();
     assert_eq!(sent.len(), 1, "{sent:?}");
     assert_ne!(sent[0]["distinct_id"], foreign["distinct_id"]);
+}
+
+/// The events every request of `server` carried, in order.
+fn sent_events(server: &CaptureServer) -> Vec<Value> {
+    server
+        .requests()
+        .iter()
+        .flat_map(|(_, body)| body["batch"].as_array().unwrap().clone())
+        .collect()
+}
+
+/// Queue a spool file of `events`, named as if written `age_ms` ago.
+fn queue(sandbox: &Sandbox, age_ms: u128, label: &str, events: &[Value]) {
+    fs::create_dir_all(sandbox.spool()).unwrap();
+    let created = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
+        - age_ms;
+    fs::write(
+        sandbox.spool().join(format!("{created}-{label}.json")),
+        json!({ "spool_version": 1, "events": events }).to_string(),
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_ci_run_sends_what_an_earlier_ci_run_left_queued() {
+    let sandbox = Sandbox::new("ci-retry");
+    sandbox.write("doc.toml", "a = 1\n");
+    let failing = CaptureServer::start(503);
+    sandbox.plxt(&failing.origin, &["lint", "doc.toml"], &[("CI", "1")]);
+    let kept = sandbox.spooled_files();
+    assert_eq!(kept.len(), 1, "a transient failure in CI spools the event");
+    let queued: Value = serde_json::from_str(&fs::read_to_string(&kept[0]).unwrap()).unwrap();
+
+    let accepting = CaptureServer::start(200);
+    let output = sandbox.plxt(&accepting.origin, &["lint", "doc.toml"], &[("CI", "1")]);
+    assert!(output.status.success(), "{output:?}");
+    // In-process: by the time the command has exited, its own event and the queued one
+    // are both posted, and the queue is empty.
+    let sent = sent_events(&accepting);
+    assert_eq!(sent.len(), 2, "{sent:?}");
+    assert!(
+        sent.contains(&queued["events"][0]),
+        "the queued event is sent as it was made"
+    );
+    assert!(
+        sandbox.spooled_files().is_empty(),
+        "{:?}",
+        sandbox.spooled_files()
+    );
+}
+
+#[test]
+fn a_sender_posts_the_queue_in_as_few_posts_as_the_batch_limit_allows() {
+    let server = CaptureServer::start(200);
+    let sandbox = Sandbox::new("batching");
+    sandbox.write("doc.toml", "a = 1\n");
+    // A debug run creates the identifier the queued events are made under.
+    let (_, made) = sandbox.debug_events(&["lint", "doc.toml"], &[]);
+    // Two files that cannot share a post, then the command's own file.
+    let per_file = sender::MAX_EVENTS_PER_POST / 2 + 1;
+    for file in 0..2_u128 {
+        let events = (0..per_file)
+            .map(|index| {
+                let mut event = made[0].clone();
+                event["uuid"] = json!(format!("{file:08x}-0000-4000-8000-{index:012x}"));
+                event
+            })
+            .collect::<Vec<_>>();
+        queue(&sandbox, 2000 - file, &format!("seeded{file}"), &events);
+    }
+    sandbox.plxt(&server.origin, &["lint", "doc.toml"], &[]);
+    let requests = server.wait_for_requests(2, Duration::from_secs(20));
+    assert!(wait_until(Duration::from_secs(10), || sandbox
+        .spooled_files()
+        .is_empty()));
+    let sizes = server
+        .requests()
+        .iter()
+        .map(|(_, body)| body["batch"].as_array().unwrap().len())
+        .collect::<Vec<_>>();
+    assert_eq!(requests.len(), 2, "{sizes:?}");
+    assert_eq!(sizes, [per_file, per_file + 1]);
+}
+
+#[test]
+fn a_caller_reading_the_output_is_not_held_by_the_detached_sender() {
+    // The server keeps the sender waiting well past the time the command takes.
+    let server = CaptureServer::start_delayed(200, Duration::from_secs(4));
+    let sandbox = Sandbox::new("detached-pipes");
+    sandbox.write("doc.toml", "a = 1\n");
+    let container = status_json(&sandbox, &[])["container"] == true;
+    let started = Instant::now();
+    // `output()` reads stdout and stderr to their end: it returns only once every
+    // process holding them has closed them.
+    let output = sandbox.plxt(&server.origin, &["lint", "doc.toml"], &[]);
+    let elapsed = started.elapsed();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        server.wait_for_requests(1, Duration::from_secs(20)).len(),
+        1
+    );
+    assert!(
+        elapsed < Duration::from_secs(3),
+        "the command's output stayed open while its sender posted: {elapsed:?}"
+    );
+    // On a container host the command posted in-process and gave up at its budget.
+    if !container {
+        assert!(wait_until(Duration::from_secs(10), || sandbox
+            .spooled_files()
+            .is_empty()));
+    }
 }
 
 #[test]

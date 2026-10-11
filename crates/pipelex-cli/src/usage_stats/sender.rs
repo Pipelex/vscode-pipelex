@@ -1,7 +1,9 @@
-//! Posting events to PostHog: the detached sender a command starts, the in-process
-//! send of CI and containers, and the checks every post is preceded by.
+//! Posting events to PostHog: the detached sender a command starts, the drain of the
+//! spool it and the in-process send of CI and containers run, and the checks every
+//! post is preceded by.
 
 use std::{
+    collections::VecDeque,
     io,
     path::Path,
     process::{Command, Stdio},
@@ -70,83 +72,62 @@ pub fn keep_current(events: Vec<Value>, current: Option<&str>) -> Vec<Value> {
     }
 }
 
-/// Post one batch, waiting no longer than `timeout`.
-pub async fn post(endpoint: &Endpoint, events: &[Value], timeout: Duration) -> PostOutcome {
-    // A unit test posts to a loopback capture server or nowhere, never to PostHog.
-    #[cfg(test)]
-    assert!(
-        !matches!(endpoint, Endpoint::Default),
-        "a unit test tried to post usage statistics to the real capture host"
-    );
-    let Some(origin) = endpoint.origin() else {
-        return PostOutcome::Failed;
-    };
-    if timeout.is_zero() {
-        return PostOutcome::Failed;
-    }
-    let mut builder = reqwest::Client::builder().timeout(timeout);
-    if matches!(endpoint, Endpoint::Loopback(_)) {
-        builder = builder.no_proxy();
-    }
-    let Ok(client) = builder.build() else {
-        return PostOutcome::Failed;
-    };
-    let body = json!({ "api_key": contract::PROJECT_TOKEN, "batch": events });
-    let response = client
-        .post(format!("{origin}{}", contract::BATCH_PATH))
-        .header("Content-Type", "application/json")
-        .body(body.to_string())
-        .send()
-        .await;
-    match response {
-        Ok(response) if response.status().is_success() => PostOutcome::Accepted,
-        Ok(response) if matches!(response.status().as_u16(), 400 | 401 | 403 | 413) => {
-            PostOutcome::Refused
+/// The most events one post carries: far below the capture endpoint's request size
+/// limit, and enough that a full spool goes in a few posts rather than one per file.
+pub const MAX_EVENTS_PER_POST: usize = 500;
+
+/// One HTTP client for a whole run of posts, to the endpoint the switches allow.
+pub struct Poster {
+    client: reqwest::Client,
+    url: String,
+}
+
+impl Poster {
+    /// `None` when the endpoint override is invalid or no client can be built.
+    pub fn new(endpoint: &Endpoint) -> Option<Self> {
+        // A unit test posts to a loopback capture server or nowhere, never to PostHog.
+        #[cfg(test)]
+        assert!(
+            !matches!(endpoint, Endpoint::Default),
+            "a unit test tried to post usage statistics to the real capture host"
+        );
+        let origin = endpoint.origin()?;
+        let mut builder = reqwest::Client::builder();
+        if matches!(endpoint, Endpoint::Loopback(_)) {
+            builder = builder.no_proxy();
         }
-        Ok(_) | Err(_) => PostOutcome::Failed,
+        Some(Self {
+            client: builder.build().ok()?,
+            url: format!("{origin}{}", contract::BATCH_PATH),
+        })
+    }
+
+    /// Post one batch, waiting no longer than `timeout`.
+    pub async fn post(&self, events: &[Value], timeout: Duration) -> PostOutcome {
+        if timeout.is_zero() {
+            return PostOutcome::Failed;
+        }
+        let body = json!({ "api_key": contract::PROJECT_TOKEN, "batch": events });
+        let response = self
+            .client
+            .post(&self.url)
+            .timeout(timeout)
+            .header("Content-Type", "application/json")
+            .body(body.to_string())
+            .send()
+            .await;
+        match response {
+            Ok(response) if response.status().is_success() => PostOutcome::Accepted,
+            Ok(response) if matches!(response.status().as_u16(), 400 | 401 | 403 | 413) => {
+                PostOutcome::Refused
+            }
+            Ok(_) | Err(_) => PostOutcome::Failed,
+        }
     }
 }
 
-fn remaining(deadline: Instant) -> Duration {
+pub fn remaining(deadline: Instant) -> Duration {
     deadline.saturating_duration_since(Instant::now())
-}
-
-/// Send one claimed spool file: check, filter, post, and delete it or give it back.
-/// Answers false when `disabled` stopped the drain.
-pub async fn send_claimed(
-    context: &Context,
-    state: &StateDir,
-    endpoint: &Endpoint,
-    claimed: Claimed,
-    deadline: Instant,
-) -> bool {
-    let current = match before_post(context, state, None) {
-        PrePost::Disabled => {
-            claimed.delete();
-            return false;
-        }
-        PrePost::Current(current) => current,
-    };
-    let Some(events) = claimed.events() else {
-        // Not a spool file this version can read or send: nobody ever will.
-        claimed.delete();
-        return true;
-    };
-    let total = events.len();
-    let events = keep_current(events, current.as_deref());
-    if events.is_empty() {
-        claimed.delete();
-        return true;
-    }
-    if events.len() != total && claimed.rewrite(&events).is_err() {
-        claimed.delete();
-        return true;
-    }
-    match post(endpoint, &events, remaining(deadline)).await {
-        PostOutcome::Accepted | PostOutcome::Refused => claimed.delete(),
-        PostOutcome::Failed => claimed.release(),
-    }
-    true
 }
 
 /// The detached sender's run: post every file of `plxt`'s spool within its budget.
@@ -155,31 +136,84 @@ pub async fn run_detached() {
     let Some(state) = StateDir::from_context(&context) else {
         return;
     };
-    let endpoint = Endpoint::from_context(&context);
-    if endpoint == Endpoint::Invalid {
+    let Some(poster) = Poster::new(&Endpoint::from_context(&context)) else {
         return;
-    }
+    };
     let deadline = Instant::now() + Duration::from_millis(contract::BUDGET_DETACHED_SENDER_MS);
-    drain(&context, &state, &endpoint, deadline).await;
+    drain(&context, &state, &poster, deadline).await;
 }
 
-/// Post every file of `plxt`'s spool until the deadline; what is left stays queued.
-pub async fn drain(context: &Context, state: &StateDir, endpoint: &Endpoint, deadline: Instant) {
+/// Post every file of `plxt`'s spool until the deadline, as few files to a post as
+/// [`MAX_EVENTS_PER_POST`] allows, each file once. The checks every post is preceded
+/// by run before each post; a failed post leaves its files and every file not yet
+/// tried queued for the next sender, since the endpoint is unreachable or failing.
+pub async fn drain(context: &Context, state: &StateDir, poster: &Poster, deadline: Instant) {
     let spool = Spool::new(state.tool_spool(contract::TOOL));
     spool.tidy();
-    let mut claimed = spool.claim_all().into_iter();
-    while let Some(file) = claimed.next() {
+    let mut claimed: VecDeque<Claimed> = spool.claim_all().into();
+    while !claimed.is_empty() {
         if remaining(deadline).is_zero() {
-            file.release();
-            claimed.for_each(Claimed::release);
+            claimed.into_iter().for_each(Claimed::release);
             return;
         }
-        if !send_claimed(context, state, endpoint, file, deadline).await {
-            // `disabled` appeared: what is still claimed is deleted unsent.
-            claimed.for_each(Claimed::delete);
-            return;
+        let current = match before_post(context, state, None) {
+            PrePost::Disabled => {
+                // `disabled` appeared: what is claimed is deleted unsent.
+                claimed.into_iter().for_each(Claimed::delete);
+                return;
+            }
+            PrePost::Current(current) => current,
+        };
+        let (files, events) = next_batch(&mut claimed, current.as_deref());
+        if files.is_empty() {
+            continue;
+        }
+        match poster.post(&events, remaining(deadline)).await {
+            PostOutcome::Accepted | PostOutcome::Refused => {
+                files.into_iter().for_each(Claimed::delete);
+            }
+            PostOutcome::Failed => {
+                files.into_iter().chain(claimed).for_each(Claimed::release);
+                return;
+            }
         }
     }
+}
+
+/// Take from the front of `claimed` the files whose current events fit in one post,
+/// deleting on the way the files nothing of which is sent: unreadable ones, and those
+/// whose events were all made under a replaced identifier. A file keeping only some
+/// of its events is rewritten with them first.
+fn next_batch(
+    claimed: &mut VecDeque<Claimed>,
+    current: Option<&str>,
+) -> (Vec<Claimed>, Vec<Value>) {
+    let mut files = Vec::new();
+    let mut batch = Vec::new();
+    while let Some(file) = claimed.pop_front() {
+        let Some(events) = file.events() else {
+            // Not a spool file this version can read or send: nobody ever will.
+            file.delete();
+            continue;
+        };
+        let total = events.len();
+        let events = keep_current(events, current);
+        if events.is_empty() {
+            file.delete();
+            continue;
+        }
+        if !batch.is_empty() && batch.len() + events.len() > MAX_EVENTS_PER_POST {
+            claimed.push_front(file);
+            break;
+        }
+        if events.len() != total && file.rewrite(&events).is_err() {
+            file.delete();
+            continue;
+        }
+        batch.extend(events);
+        files.push(file);
+    }
+    (files, batch)
 }
 
 /// Start the detached sender: this binary, with no terminal and no output, in a
