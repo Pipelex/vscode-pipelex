@@ -154,10 +154,25 @@ describe('the switches', () => {
     });
 
     it('accept only a loopback endpoint override', () => {
-        for (const value of ['http://127.0.0.1:9', 'http://localhost:8080/', 'http://[::1]:443']) {
-            expect(endpointOf({ PIPELEX_USAGE_STATS_ENDPOINT: value }).kind).toBe('loopback');
+        for (const value of ['http://127.0.0.1:9', 'http://localhost:8080', 'http://[::1]:443']) {
+            expect(endpointOf({ PIPELEX_USAGE_STATS_ENDPOINT: value })).toEqual({ kind: 'loopback', origin: value });
         }
-        for (const value of ['', 'https://127.0.0.1:9', 'http://127.0.0.1', 'http://127.0.0.1:9/batch/', 'http://127.0.0.1:0', 'http://example.com:80']) {
+        for (const value of [
+            '',
+            'https://127.0.0.1:9',
+            'http://127.0.0.1',
+            'http://127.0.0.1:9/',
+            'http://localhost:8080/',
+            'http://127.0.0.1:9/batch/',
+            ' http://127.0.0.1:9',
+            'http://127.0.0.1:9 ',
+            'http://127.0.0.1:9\n',
+            'HTTP://127.0.0.1:9',
+            'http://LOCALHOST:9',
+            'http://127.0.0.1:0',
+            'http://127.0.0.1:70000',
+            'http://example.com:80',
+        ]) {
             expect(endpointOf({ PIPELEX_USAGE_STATS_ENDPOINT: value }).kind).toBe('invalid');
         }
         expect(endpointOf({})).toEqual({ kind: 'default', origin: 'https://eu.i.posthog.com' });
@@ -260,7 +275,7 @@ describe('the spool and its sender', () => {
         const cases: [Record<string, string>, string][] = [
             [{}, 'https://eu.i.posthog.com'],
             [{ PIPELEX_USAGE_STATS_ENDPOINT: 'http://127.0.0.1:9' }, 'http://127.0.0.1:9'],
-            [{ PIPELEX_USAGE_STATS_ENDPOINT: 'http://localhost:8080/' }, 'http://localhost:8080'],
+            [{ PIPELEX_USAGE_STATS_ENDPOINT: 'http://[::1]:8080' }, 'http://[::1]:8080'],
         ];
         for (const [env, expected] of cases) {
             const endpoint = endpointOf(env);

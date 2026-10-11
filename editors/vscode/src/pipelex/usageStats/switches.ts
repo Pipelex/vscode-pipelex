@@ -43,17 +43,23 @@ function toolVariableSaysOff(env: Record<string, string | undefined>): boolean {
 
 export type Endpoint = { kind: 'default'; origin: string } | { kind: 'loopback'; origin: string } | { kind: 'invalid' };
 
-const LOOPBACK_RE = /^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):([0-9]{1,5})\/?$/;
+/** A loopback `http` origin with a port and no path: the only override the endpoint variable accepts. */
+const LOOPBACK_RE = /^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):([0-9]{1,5})$/;
 
-/** Where events are posted: PostHog, or the loopback origin the test-only override names. */
+/**
+ * Where events are posted: PostHog, or the loopback origin the test-only override names,
+ * taken verbatim. Unlike a switch value, the override is not trimmed, and a trailing slash
+ * is a path: either makes it invalid, as it is for pipelex and `mthds`, so the same value
+ * sends from every tool or from none.
+ */
 export function endpointOf(env: Record<string, string | undefined>): Endpoint {
     const value = env[contract.ENV_ENDPOINT_OVERRIDE];
     if (value === undefined) return { kind: 'default', origin: contract.CAPTURE_HOST };
-    const match = LOOPBACK_RE.exec(value.trim());
+    const match = LOOPBACK_RE.exec(value);
     if (!match) return { kind: 'invalid' };
     const port = Number(match[2]);
     if (port < 1 || port > 65535) return { kind: 'invalid' };
-    return { kind: 'loopback', origin: value.trim().replace(/\/$/, '') };
+    return { kind: 'loopback', origin: value };
 }
 
 /** The value of `DISABLE_TELEMETRY` in `~/.mthds/config`'s dialect: `KEY=value` lines,

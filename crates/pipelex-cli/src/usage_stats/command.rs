@@ -172,6 +172,12 @@ fn yes_no(value: bool) -> &'static str {
     }
 }
 
+/// What `invalid_endpoint_override` means: the override is taken verbatim, so a value
+/// with a path, a trailing slash or surrounding whitespace is invalid too.
+const INVALID_ENDPOINT_OVERRIDE_MEANING: &str = "PIPELEX_USAGE_STATS_ENDPOINT must be exactly \
+     http://127.0.0.1:<port>, http://localhost:<port> or http://[::1]:<port>, \
+     with no path and no surrounding whitespace";
+
 /// The switches saying off, each with its token and what it means.
 fn describe(off_by: &[OffBy]) -> String {
     off_by
@@ -183,9 +189,7 @@ fn describe(off_by: &[OffBy]) -> String {
                 OffBy::MachineChoice => "turned off on this machine",
                 OffBy::LegacyMthdsChoice => "DISABLE_TELEMETRY is on in ~/.mthds/config",
                 OffBy::ProjectSetting => "the project's .pipelex/pipelex.toml turns them off",
-                OffBy::InvalidEndpointOverride => {
-                    "PIPELEX_USAGE_STATS_ENDPOINT is not a loopback address"
-                }
+                OffBy::InvalidEndpointOverride => INVALID_ENDPOINT_OVERRIDE_MEANING,
             };
             format!("{} ({meaning})", off.token())
         })
