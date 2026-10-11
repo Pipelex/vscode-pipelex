@@ -1,5 +1,5 @@
 /**
- * The extension's two events, `extension_activated` and `feature_used`, in the
+ * The extension's events, `extension_activated` and `feature_used`, in the
  * envelope PostHog receives. Every value is an enum value, a count, a version or one
  * of the contract's own identifiers: no path, setting, file or message can reach one.
  *
