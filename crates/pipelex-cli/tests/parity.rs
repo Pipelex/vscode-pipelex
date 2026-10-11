@@ -34,7 +34,7 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use pipelex_tools::diagnostic::{Diagnostic, DiagnosticKind};
 use pipelex_tools::format::format_mthds_impl;
@@ -76,7 +76,9 @@ fn mthds_fixtures() -> Vec<PathBuf> {
 /// output, parent blocked writing input. Draining stdout/stderr (via
 /// `wait_with_output`) concurrently with the write avoids that.
 fn run_plxt(current_dir: Option<&Path>, args: &[&str], content: &str) -> std::process::Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_plxt"));
+    // In a throwaway home with usage statistics off: no notice in the compared
+    // output, nothing reported.
+    let mut command = common::plxt_command();
     if let Some(dir) = current_dir {
         command.current_dir(dir);
     }

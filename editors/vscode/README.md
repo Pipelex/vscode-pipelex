@@ -58,8 +58,16 @@ The extension looks for a settings file at **`.pipelex/plxt.toml`** (preferred) 
 
 On every save, the extension validates your method on the hosted Pipelex API at `https://api.pipelex.com`, and reports the errors in the Problems panel and in the method graph. There is nothing to install and no setting to change: an API key is the only setup step (see Installation below). Before the first validation, the extension asks once for your consent to send the `.mthds` files in the saved file's directory.
 
-- **Use your own server:** point `pipelex.api.baseUrl` at a self-hosted [pipelex-api](https://github.com/Pipelex/pipelex-api), such as `http://localhost:8081`.
+- **Use your own server:** point `pipelex.api.baseUrl` at a self-hosted Pipelex API server, such as `http://localhost:8081`. The server is the [`api/` member of the pipelex repository](https://github.com/Pipelex/pipelex/tree/main/api), published as the `pipelex/pipelex-api` Docker image.
 - **Validate locally:** set `pipelex.backend` to `cli` to validate with a local `pipelex-agent`, so nothing leaves your machine.
+
+### Usage statistics
+
+The extension sends anonymous usage statistics: once a day that it was activated, and how many times its graph preview, validation, run and formatting were used, with the editor and extension versions. It never sends your methods, prompts, inputs, outputs, file names or pipe names. The first activation says so once:
+
+> Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run `Pipelex: Disable Usage Statistics` or set DO_NOT_TRACK=1. Details: https://docs.pipelex.com/latest/setup/usage-statistics/
+
+VS Code's own telemetry setting (`telemetry.telemetryLevel`) governs them, and so do `DO_NOT_TRACK=1`, `PIPELEX_USAGE_STATS=0`, `[usage_stats] enabled = false` in a project's `.pipelex/pipelex.toml`, and `plxt usage-stats disable`, which turns them off for every Pipelex tool on the machine. The tools the extension starts, such as `pipelex-agent`, send none of their own.
 
 ## 📦 Installation
 
@@ -68,6 +76,8 @@ On every save, the extension validates your method on the hosted Pipelex API at 
 3. **Manual** — Download `.vsix` from [releases](https://github.com/Pipelex/vscode-pipelex/releases)
 
 Then, to validate your methods, get an API key at [app.pipelex.com](https://app.pipelex.com/) and store it with the **Pipelex: Set Hosted API Key** command. The key is kept in VS Code's secret storage. When no key is stored, the extension uses the `PIPELEX_API_KEY` environment variable if it is set.
+
+The extension does not read the key that `pipelex login` (or `pipelex init` with the hosted API) saves in `~/.pipelex/.env`, or in the `.env` of `PIPELEX_HOME` when that is set. If you signed in from the terminal, give the extension a key with the **Pipelex: Set Hosted API Key** command, or export `PIPELEX_API_KEY` in a shell before starting VS Code from it (`code .`). `pipelex login` does not print its key, so create another one at [app.pipelex.com](https://app.pipelex.com/) or copy the value from that file.
 
 ---
 

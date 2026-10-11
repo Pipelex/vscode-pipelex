@@ -302,3 +302,32 @@ describe('MTHDS TextMate grammar — concept-value entry patterns (inputs etc.)'
     expect(concept.length).toBe(0);
   });
 });
+
+describe('MTHDS TextMate grammar — model reference patterns', () => {
+  /** The prefix the line's model reference is highlighted with, and its highlighted name. */
+  function modelParts(line: string) {
+    const prefix = findTokensByScope(line, 'storage.modifier.mthds').map((t) => t.text);
+    const name = findTokensByScope(line, 'constant.other.symbol.mthds').map((t) => t.text);
+    return { prefix, name };
+  }
+
+  it.each([
+    ['$writing-factual', '$', 'writing-factual'],
+    ['@default-text-from-pdf', '@', 'default-text-from-pdf'],
+    ['~premium-llm', '~', 'premium-llm'],
+    ['preset:writing-factual', 'preset:', 'writing-factual'],
+    ['alias:best-claude', 'alias:', 'best-claude'],
+    ['waterfall:premium-llm', 'waterfall:', 'premium-llm'],
+    ['handle:gpt-4o', 'handle:', 'gpt-4o'],
+    ['handle:@named', 'handle:', '@named'],
+  ])('highlights the prefix and the name of model = "%s"', (reference, prefix, name) => {
+    expect(modelParts(`model = "${reference}"`)).toEqual({ prefix: [prefix], name: [name] });
+  });
+
+  it.each(['gpt-4o-mini', 'claude-4.5-sonnet', '#gpt'])(
+    'highlights the bare handle model = "%s" whole, with no prefix',
+    (reference) => {
+      expect(modelParts(`model = "${reference}"`)).toEqual({ prefix: [], name: [reference] });
+    },
+  );
+});

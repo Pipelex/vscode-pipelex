@@ -30,6 +30,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref }}
   cancel-in-progress: true
 
+# Nothing CI runs reports anonymous usage statistics: `plxt` and the tools it
+# drives honour DO_NOT_TRACK. The reporting tests set their own environment and
+# post only to a loopback capture server.
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   check:
     name: make check

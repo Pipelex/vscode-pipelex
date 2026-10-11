@@ -1,14 +1,14 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
-    GraphSpec,
     GraphConfig,
+    GraphStyleId,
     GraphTheme,
     GraphThemeMode,
     ValidationIssue,
     ValidationState,
 } from '@pipelex/mthds-ui';
-import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
+import { GraphViewer, type GraphArtifacts } from '@pipelex/mthds-ui/graph/react';
 // The form kernel's prebuilt stylesheet, which styles the controls the detail
 // panel renders a data node's value with. mthds-ui stopped injecting it from
 // `graph/react` in 0.25.0, because no single cascade position served a host
@@ -17,12 +17,6 @@ import { GraphViewer } from '@pipelex/mthds-ui/graph/react';
 // renderer's own sheets, inside `@layer mthds-form`, so `shell.css`'s unlayered
 // rules still win every tie. `scripts/build.mjs` fails the build if it is lost.
 import '@pipelex/mthds-ui/form-kernel.css';
-// The form kernel's types, reached THROUGH mthds-ui rather than from
-// `@pipelex/mthds-form` directly. The kernel carries React context, so a host
-// that declares its own dependency on it can end up with two copies and two
-// context identities; mthds-ui re-exports the kernel from `./form` precisely so
-// a consumer never has to name it. Type-only here, so nothing is emitted.
-import type { PipeIOContracts, OutputForm, InputForm } from '@pipelex/mthds-ui/form';
 
 // VS Code webview API
 const vscode = acquireVsCodeApi();
@@ -41,7 +35,20 @@ window.addEventListener('message', _globalListener);
 // Direction and showControllers seeds live in `currentConfig` — GraphViewer
 // reads `config.direction` / `config.showControllers` as initial values and
 // owns those toggles internally afterward (mthds-ui v0.4+).
-let currentGraphspec: GraphSpec | null = null;
+//
+// `currentGraph` is the graphspec together with the `/validate` artifacts the
+// host read from beside a run's graphspec: what the detail panel needs before it
+// can show a data node's VALUE rather than only the concept's structure table.
+// `pipeIoContracts` names the payload's shape, `outputForm` says what the result
+// IS, and the optional `inputForm` covers the method's own inputs, which no pipe
+// produced. They travel as one bundle because the panel looks each descriptor up
+// by the pipe refs of THIS graph. A view whose artifacts the host does not hold
+// — a `.mthds` static graph, or a run written before the runtime emitted them —
+// carries the graphspec alone, which is mthds-ui's documented floor, not a
+// degraded mode: a data tab opening onto an empty pane would read as data that
+// failed to load. Built once per setData, so every other re-render (a theme
+// flip, a validation update) hands GraphViewer the same object.
+let currentGraph: GraphArtifacts | null = null;
 let currentConfig: GraphConfig = {};
 let currentUri: string | null = null;
 let renderApp: (() => void) | null = null;
@@ -58,28 +65,18 @@ let currentSystemTheme: GraphTheme | undefined;
 // gets forwarded so the host can persist it (see onThemeChange).
 let lastReportedMode: GraphThemeMode | undefined;
 
+// The style last reported to the host for persistence, seeded from each
+// setData's `config.graphStyle` the same way. GraphViewer reports a style it
+// adopted from a changed `config.graphStyle` too, and that value came FROM the
+// setting; only a pick in the toolbar's style menu is news to the host.
+let lastReportedStyle: GraphStyleId | undefined;
+
 // The toolbar validation widget's state. Seeded from each setData payload and
 // updated by lightweight setValidationStatus messages (the setSystemTheme
 // pattern — no re-layout, no viewport reset). Null keeps the widget hidden,
 // which only a graphspec-json view does: a `.mthds` graph always carries a
 // state, `unvalidated` when nothing validates it.
 let currentValidation: { state: ValidationState; issues: ValidationIssue[] } | null = null;
-
-// The `/validate` artifacts the host read from beside a run's graphspec, and
-// what the detail panel needs before it can show a data node's VALUE rather
-// than only the concept's structure table. `contracts` names the payload's
-// shape, `outputForm` says what the result IS, and the optional `inputForm`
-// covers the method's own inputs, which no pipe produced.
-//
-// Null on every view whose artifacts the host does not hold — a `.mthds` static
-// graph, or a run written before the runtime emitted them. That is mthds-ui's
-// documented floor, not a degraded mode: a data tab opening onto an empty pane
-// would read as data that failed to load.
-let currentArtifacts: {
-    contracts?: PipeIOContracts;
-    outputForm?: OutputForm;
-    inputForm?: InputForm;
-} | null = null;
 
 // Held so we can preserve the viewport across same-file refreshes.
 let reactFlowInstance: any = null;
@@ -108,7 +105,7 @@ function onNodeSelect(nodeId: string, nodeData: any) {
         lastSelectedPipeNode = null;
         return;
     }
-    const specNode = currentGraphspec?.nodes?.find(n => n.id === nodeId && n.pipe_code === pipeCode);
+    const specNode = currentGraph?.graphSpec.nodes?.find(n => n.id === nodeId && n.pipe_code === pipeCode);
     lastSelectedPipeNode = {
         nodeId,
         pipeCode,
@@ -129,6 +126,16 @@ function onThemeChange(mode: GraphThemeMode) {
     if (mode === lastReportedMode) return;
     lastReportedMode = mode;
     vscode.postMessage({ type: 'themeModeChanged', mode });
+}
+
+// The user picked a style from the toolbar's style menu. Forward it so the host
+// persists it to `pipelex.graph.style` and the next graph opens in it. Deduped
+// against the last reported style, so a style adopted from the host's own
+// config is not echoed back as if the user had picked it.
+function onGraphStyleChange(style: GraphStyleId) {
+    if (style === lastReportedStyle) return;
+    lastReportedStyle = style;
+    vscode.postMessage({ type: 'graphStyleChanged', style });
 }
 
 // A validation issue row was clicked. The host resolves the index against its
@@ -177,7 +184,7 @@ function handleMessage(event: { data: any }) {
         // When switching to a different file, let fitView run fresh so the
         // new graph is properly sized instead of inheriting the old zoom.
         const isSameFile = currentUri !== null && message.uri === currentUri;
-        const savedViewport = isSameFile && currentGraphspec && reactFlowInstance
+        const savedViewport = isSameFile && currentGraph && reactFlowInstance
             ? reactFlowInstance.getViewport()
             : null;
 
@@ -191,20 +198,24 @@ function handleMessage(event: { data: any }) {
         currentUri = message.uri || null;
         lastSelectedPipeNode = null;
 
-        currentGraphspec = message.graphspec || null;
+        // The artifacts are replaced with the graphspec on every setData, never
+        // carried over, so switching from a run that has artifacts to one that
+        // has none drops back to the structure table instead of rendering the
+        // new graph's payloads against the old method's contracts.
+        currentGraph = message.graphspec
+            ? { graphSpec: message.graphspec, ...(message.artifacts ?? {}) }
+            : null;
         currentConfig = message.config || {};
         currentValidation = message.validation ?? null;
-        // Reset on every setData, so switching from a run that has artifacts to
-        // one that has none drops back to the structure table instead of
-        // rendering the new graph's payloads against the old method's contracts.
-        currentArtifacts = message.artifacts ?? null;
         if (message.config?.systemTheme) {
             currentSystemTheme = message.config.systemTheme;
         }
-        // Seed the persist baseline from the host-resolved mode so the first
-        // genuine toggle (not the initial mount or a systemTheme flip) is what
-        // gets forwarded for persistence.
+        // Seed the persist baselines from the host-resolved mode and style so
+        // the first genuine user choice (not the initial mount, a systemTheme
+        // flip, or a style adopted from this very config) is what gets
+        // forwarded for persistence.
         lastReportedMode = currentConfig.theme;
+        lastReportedStyle = currentConfig.graphStyle;
 
         // Theme drives the renderer's palette: GraphViewer applies the full
         // light/dark palette (getPaletteForTheme) as inline styles on its own
@@ -245,10 +256,15 @@ function App() {
     // GraphViewer instance across files and the useState-seeded toggles stay
     // latched to the first graph's config. Same-URI refreshes (save) keep the
     // same key, preserving viewport + interactive state as before.
-    if (currentGraphspec === null) return null;
+    if (currentGraph === null) return null;
     return React.createElement(GraphViewer, {
         key: currentUri ?? 'graphviewer',
-        graphspec: currentGraphspec,
+        // The graphspec and, on a run graph whose artifacts were on disk, the
+        // descriptors the detail panel renders a data node's value from.
+        // GraphViewer renders a value only when BOTH `pipeIoContracts` and
+        // `outputForm` are in it; the host sends the pair or nothing (see
+        // runArtifacts.ts).
+        graph: currentGraph,
         config: currentConfig,
         // Host-injected environment theme for `system` mode (the webview's own
         // `prefers-color-scheme` is unreliable). Reactive: a setSystemTheme
@@ -257,6 +273,12 @@ function App() {
         // Persist the in-graph theme toggle to `pipelex.graph.theme` so it
         // survives panel reloads and VS Code restarts.
         onThemeChange,
+        // The toolbar's style menu, offering every style mthds-ui registers.
+        // The style the graph opens in is `config.graphStyle`, from the
+        // `pipelex.graph.style` setting; a pick in the menu redraws the graph
+        // in place and is persisted to that setting for the next open.
+        styleMenu: true,
+        onGraphStyleChange,
         onNavigateToPipe,
         onNodeSelect,
         onReactFlowInit,
@@ -265,12 +287,6 @@ function App() {
         validationState: currentValidation?.state,
         validationIssues: currentValidation?.issues,
         onValidationIssueClick,
-        // The data view. GraphViewer renders a value only when BOTH `contracts`
-        // and `outputForm` arrive, so passing them separately is safe: the host
-        // sends the pair or nothing (see runArtifacts.ts).
-        contracts: currentArtifacts?.contracts,
-        outputForm: currentArtifacts?.outputForm,
-        inputForm: currentArtifacts?.inputForm,
     });
 }
 

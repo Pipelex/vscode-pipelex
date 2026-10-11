@@ -27,10 +27,14 @@ import * as path from 'path';
  * table is already the right rendering there.
  */
 
-/** The artifact trio, in the shape `adapter.ts` spreads onto `GraphViewer`. */
+/**
+ * The artifact trio, named as mthds-ui's `GraphArtifacts` names them, so
+ * `adapter.ts` spreads it beside the graphspec into the one `graph` bundle
+ * `GraphViewer` takes.
+ */
 export interface RunArtifacts {
     /** `pipe_io_contracts` — keyed by pipe ref. */
-    contracts: Record<string, unknown>;
+    pipeIoContracts: Record<string, unknown>;
     /** `output_form` — keyed by pipe ref, from the same `/validate` call. */
     outputForm: Record<string, unknown>;
     /**
@@ -95,7 +99,7 @@ async function readArtifactFile(
  * pair the viewer needs is not both there.
  *
  * **Both required files or neither.** `GraphViewer` renders data only when
- * `contracts` AND `outputForm` are present, so handing it one of the two is
+ * `pipeIoContracts` AND `outputForm` are present, so handing it one of the two is
  * indistinguishable at the panel from handing it none — except that it hides
  * the fact that a results directory is half written. When exactly one is
  * present that is said out loud; when neither is, this is simply a graphspec
@@ -109,15 +113,15 @@ export async function readRunArtifacts(
 ): Promise<RunArtifacts | undefined> {
     const dir = path.dirname(graphspecFsPath);
 
-    const [contracts, outputForm, inputForm] = await Promise.all([
+    const [pipeIoContracts, outputForm, inputForm] = await Promise.all([
         readArtifactFile(path.join(dir, CONTRACTS_FILE), log),
         readArtifactFile(path.join(dir, OUTPUT_FORM_FILE), log),
         readArtifactFile(path.join(dir, INPUT_FORM_FILE), log),
     ]);
 
-    if (!contracts || !outputForm) {
-        if (contracts || outputForm) {
-            const missing = contracts ? OUTPUT_FORM_FILE : CONTRACTS_FILE;
+    if (!pipeIoContracts || !outputForm) {
+        if (pipeIoContracts || outputForm) {
+            const missing = pipeIoContracts ? OUTPUT_FORM_FILE : CONTRACTS_FILE;
             log?.(
                 `pipelex graph: ${missing} is missing or unusable beside the graphspec, `
                 + 'so the detail panel cannot show values — both artifacts are required together.',
@@ -126,5 +130,5 @@ export async function readRunArtifacts(
         return undefined;
     }
 
-    return inputForm ? { contracts, outputForm, inputForm } : { contracts, outputForm };
+    return inputForm ? { pipeIoContracts, outputForm, inputForm } : { pipeIoContracts, outputForm };
 }

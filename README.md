@@ -59,6 +59,14 @@ See [`editors/vscode/README.md`](editors/vscode/README.md) for full details.
 - **Pipelex config discovery**: `.pipelex/plxt.toml` or `plxt.toml`
 - **Complete TOML 1.0.0 support and tooling**
 
+## Usage statistics
+
+`plxt` and the extension send anonymous usage statistics. The first run says so once per machine:
+
+> Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run `plxt usage-stats disable` or set DO_NOT_TRACK=1. Details: https://docs.pipelex.com/latest/setup/usage-statistics/
+
+In the extension, the same is the **Pipelex: Disable Usage Statistics** command, and VS Code's own telemetry setting also governs it. `PIPELEX_USAGE_STATS=0`, or `[usage_stats] enabled = false` in a project's `.pipelex/pipelex.toml`, turns them off as well. See [`docs/features/usage-statistics.md`](docs/features/usage-statistics.md) for what is sent and every way to turn it off.
+
 ## Where to file issues
 
 File all issues at [this repository](https://github.com/Pipelex/vscode-pipelex/issues).

@@ -8,6 +8,8 @@ const state = vi.hoisted(() => ({
     activeKind: 2, // ColorThemeKind.Dark
     // `pipelex.graph.toolbarPosition` setting value (undefined → not set).
     toolbarPosition: undefined as string | undefined,
+    // `pipelex.graph.style` setting value (undefined → not set).
+    graphStyle: undefined as string | undefined,
 }));
 
 vi.mock('fs', () => ({
@@ -31,7 +33,9 @@ vi.mock('vscode', () => ({
     },
     workspace: {
         getConfiguration: vi.fn(() => ({
-            get: (key: string) => (key === 'graph.toolbarPosition' ? state.toolbarPosition : undefined),
+            get: (key: string) => (key === 'graph.toolbarPosition'
+                ? state.toolbarPosition
+                : key === 'graph.style' ? state.graphStyle : undefined),
             inspect: (key: string) => (key === 'graph.theme' ? state.themeInspect : undefined),
         })),
     },
@@ -107,5 +111,35 @@ describe('resolveGraphConfig toolbar position', () => {
         state.toolbarPosition = 'middle-of-nowhere';
         const cfg = await resolveGraphConfig();
         expect(cfg.toolbarPosition).toBe('top-right');
+    });
+});
+
+describe('resolveGraphConfig graph style', () => {
+    beforeEach(() => {
+        state.tomlContent = undefined;
+        state.themeInspect = { defaultValue: 'auto' };
+        state.activeKind = 2;
+        state.toolbarPosition = undefined;
+        state.graphStyle = undefined;
+    });
+
+    it('defaults to detailed, the drawing every graph had before styles', async () => {
+        const cfg = await resolveGraphConfig();
+        expect(cfg.graphStyle).toBe('detailed');
+    });
+
+    it('honors a pipelex.graph.style setting naming a known style', async () => {
+        state.graphStyle = 'simple';
+        const cfg = await resolveGraphConfig();
+        expect(cfg.graphStyle).toBe('simple');
+    });
+
+    // A settings.json shared with a newer extension may name a style this one
+    // does not know; relaying it would hand the renderer an id it treats as
+    // unset anyway, so the host settles it to the default itself.
+    it('falls back to detailed for a style this extension does not know', async () => {
+        state.graphStyle = 'swimlanes';
+        const cfg = await resolveGraphConfig();
+        expect(cfg.graphStyle).toBe('detailed');
     });
 });

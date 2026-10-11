@@ -12,6 +12,12 @@ on:
       - main
   workflow_dispatch:
 
+# Nothing CI runs reports anonymous usage statistics: `plxt` and the tools it
+# drives honour DO_NOT_TRACK. The reporting tests set their own environment and
+# post only to a loopback capture server.
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   wait_for_ci:
     name: Wait for CI Workflow

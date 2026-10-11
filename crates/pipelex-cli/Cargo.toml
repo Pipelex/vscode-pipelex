@@ -1,7 +1,7 @@
 [package]
 name         = "pipelex-cli"
 description  = "Pipelex Tools CLI (plxt) - wraps taplo-cli with MTHDS support"
-version      = "0.10.0"
+version      = "0.11.0"
 rust-version = { workspace = true }
 authors      = { workspace = true }
 edition      = { workspace = true }
@@ -10,7 +10,7 @@ homepage     = { workspace = true }
 repository   = { workspace = true }
 
 [features]
-default = ["completions", "lint", "lsp", "rustls-tls"]
+default = ["completions", "lint", "lsp", "rustls-tls", "usage-stats"]
 lint = [
   "dep:url",
   "reqwest",
@@ -22,6 +22,17 @@ lsp = ["async-ctrlc", "lint", "taplo-cli/lsp", "taplo-lsp"]
 native-tls = ["taplo-common/native-tls", "taplo-lsp?/native-tls"]
 rustls-tls = ["taplo-common/rustls-tls", "taplo-lsp?/rustls-tls"]
 completions = ["dep:clap_complete"]
+# Anonymous usage statistics of the native `plxt` binary (conformance's
+# usage-statistics contract): the `usage-stats` command group, the notice, the
+# spool and its detached sender. Off in the WASM builds, which take no default
+# features, since only the native CLI reports.
+usage-stats = [
+  "dep:filetime",
+  "dep:getrandom",
+  "dep:serde_json",
+  "dep:time",
+  "reqwest",
+]
 
 [dependencies]
 pipelex-common = { version = "0.1.0", path = "../pipelex-common" }
@@ -29,11 +40,15 @@ taplo-cli      = { version = "0.10.0", path = "../taplo-cli", default-features =
 taplo-common   = { version = "0.6.0", path = "../taplo-common" }
 taplo-lsp      = { version = "0.8.0", path = "../taplo-lsp", default-features = false, optional = true }
 
-anyhow  = { workspace = true }
-clap    = { workspace = true, features = ["derive", "cargo", "env", "default"] }
-toml    = { version = "0.7" }
-tracing = { workspace = true }
-url     = { workspace = true, optional = true }
+anyhow     = { workspace = true }
+clap       = { workspace = true, features = ["derive", "cargo", "env", "default"] }
+filetime   = { version = "0.2", optional = true }
+getrandom  = { workspace = true, optional = true, features = ["std"] }
+serde_json = { workspace = true, optional = true }
+time       = { workspace = true, optional = true }
+toml       = { version = "0.7" }
+tracing    = { workspace = true }
+url        = { workspace = true, optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 lsp-async-stub = { version = "0.7.0", path = "../lsp-async-stub", features = [
@@ -49,8 +64,10 @@ tokio = { workspace = true, features = [
   "fs",
   "time",
   "io-std",
+  "macros",
   "rt-multi-thread",
   "parking_lot",
+  "signal",
 ] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
@@ -73,6 +90,10 @@ path = "bin/plxt.rs"
 # feature stays OFF, so this dev-dep is pure Rust (no PyO3) and never reaches the
 # `plxt` binary (dev-dependencies are compiled only for test/bench targets).
 pipelex-py = { path = "../pipelex-py" }
+# The usage-statistics contract tests read the vendored schema and match its
+# patterns, and drive the binary against a local capture server.
+regex      = { workspace = true }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true
