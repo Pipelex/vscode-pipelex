@@ -1,7 +1,11 @@
 //! One reporting command, from the switches read before it does anything to the
 //! event delivered after it ends.
 
-use std::time::{Duration, Instant};
+use std::{
+    future::Future,
+    io,
+    time::{Duration, Instant},
+};
 
 use serde_json::{json, Value};
 use taplo_cli::RunStats;
@@ -15,6 +19,18 @@ use super::{
     state::{Identity, StateDir},
     switches::{self, Endpoint},
 };
+
+/// Resolves when `signal`, `tokio::signal::ctrl_c()` in `plxt`, reports a Ctrl-C. A
+/// handler that could not be installed reports an error instead: no Ctrl-C can be
+/// seen then, so this never resolves and the command's own outcome stands.
+pub async fn interrupted<F>(signal: F)
+where
+    F: Future<Output = io::Result<()>>,
+{
+    if signal.await.is_err() {
+        std::future::pending::<()>().await;
+    }
+}
 
 /// How an in-process post of a command's own events went.
 enum InProcess {
@@ -182,5 +198,26 @@ impl Session {
             PostOutcome::Accepted | PostOutcome::Refused => InProcess::Delivered,
             PostOutcome::Failed => InProcess::Unsent(events),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn only_a_received_ctrl_c_interrupts_the_command() {
+        let wait = Duration::from_millis(100);
+        let received = tokio::time::timeout(wait, interrupted(async { Ok(()) })).await;
+        assert!(received.is_ok(), "a Ctrl-C interrupts");
+        let unavailable = tokio::time::timeout(
+            wait,
+            interrupted(async { Err(io::Error::other("no signal handler")) }),
+        )
+        .await;
+        assert!(
+            unavailable.is_err(),
+            "a handler that could not be installed is not a Ctrl-C"
+        );
     }
 }

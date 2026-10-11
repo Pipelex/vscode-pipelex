@@ -10,7 +10,10 @@ use pipelex_cli::{
 };
 
 #[cfg(all(feature = "usage-stats", not(target_family = "wasm")))]
-use pipelex_cli::usage_stats::{event::Outcome, session::Session};
+use pipelex_cli::usage_stats::{
+    event::Outcome,
+    session::{interrupted, Session},
+};
 
 /// The exit code of a command interrupted by Ctrl-C, as a shell reports it.
 #[cfg(all(feature = "usage-stats", not(target_family = "wasm")))]
@@ -46,10 +49,11 @@ async fn main() {
         let result = {
             let execution = plxt.execute(cli).instrument(tracing::info_span!("plxt"));
             tokio::pin!(execution);
-            // A Ctrl-C still sends the command's statistics, as `cancelled`.
+            // A Ctrl-C still sends the command's statistics, as `cancelled`; a signal
+            // handler that could not be installed changes nothing.
             tokio::select! {
                 result = &mut execution => Some(result),
-                _ = tokio::signal::ctrl_c() => None,
+                () = interrupted(tokio::signal::ctrl_c()) => None,
             }
         };
         let outcome = match &result {
