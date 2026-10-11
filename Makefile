@@ -2,11 +2,17 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-# Nothing a target runs reports anonymous usage statistics: the gates format and
-# lint this repository with the `plxt` they build, and the tests drive it. The
-# tests of the reporting itself (crates/pipelex-cli/tests/usage_stats.rs) clear
-# their environment and post only to a loopback capture server.
+# Nothing a target runs reports anonymous usage statistics or touches the
+# developer's own ~/.mthds/usage-stats/: the gates format and lint this repository
+# with the `plxt` they build, through $(PLXT), which runs it in a throwaway home
+# under target/tmp (plxt migrates the legacy `mthds` opt-out into its home even when
+# statistics are off), and the test suites isolate every run they start themselves
+# (docs/features/usage-statistics.md#debugging-and-tests).
 export DO_NOT_TRACK := 1
+PLXT_HOME := $(CURDIR)/target/tmp/plxt-make-home
+# Cargo and rustup keep their real homes; only the `plxt` that cargo runs gets the
+# throwaway one.
+PLXT = mkdir -p "$(PLXT_HOME)" && env CARGO_HOME="$${CARGO_HOME:-$$HOME/.cargo}" RUSTUP_HOME="$${RUSTUP_HOME:-$$HOME/.rustup}" HOME="$(PLXT_HOME)" USERPROFILE="$(PLXT_HOME)" cargo run --bin plxt --
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 
@@ -109,11 +115,11 @@ ext-uninstall: ## Uninstall the extension from VS Code (or Cursor when there is 
 
 fmt: ## Format Rust source and TOML/MTHDS files
 	cargo fmt
-	cargo run --bin plxt -- fmt
+	$(PLXT) fmt
 
 fmt-check: ## Check Rust and TOML/MTHDS formatting
 	cargo fmt --check
-	cargo run --bin plxt -- fmt --check --diff
+	$(PLXT) fmt --check --diff
 
 lint: ## Run Clippy on the workspace
 	cargo clippy --workspace --all-targets -- -D warnings
@@ -126,7 +132,7 @@ lint: ## Run Clippy on the workspace
 	cargo clippy -p pipelex-common --features tools --locked --all-targets -- -D warnings
 
 plxt-lint: ## Lint TOML/MTHDS files with plxt
-	cargo run --bin plxt -- lint
+	$(PLXT) lint
 
 # One target per package that has a test suite. `make test` runs the fast
 # native + extension suites; `make test-all` additionally builds the Python

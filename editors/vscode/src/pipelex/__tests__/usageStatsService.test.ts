@@ -84,6 +84,7 @@ import { recordFeatureUse } from '../usageStats/recorder';
 import { noticeText } from '../usageStats/contract';
 import { utcDay } from '../usageStats/events';
 import { gateDropReason, loadSchema } from './usageStatsGate';
+import { TEST_HOME, takeRefusedRequests } from './usageStatsIsolation';
 
 const schema = loadSchema();
 
@@ -174,6 +175,25 @@ afterEach(() => {
 });
 
 describe('the usage statistics service', () => {
+    it('runs in the suite\'s throwaway home, with statistics off, when given no host of its own', () => {
+        expect(os.homedir()).toBe(TEST_HOME);
+        expect(TEST_HOME.startsWith(fs.realpathSync(os.tmpdir()))).toBe(true);
+        const service = new UsageStatsService(extensionContext(), output);
+        services.push(service);
+        service.start();
+        const status = service.status();
+        expect(status.enabled).toBe(false);
+        expect(status.off_by).toContain('do_not_track');
+        expect(status.state_dir).toBe(path.join(TEST_HOME, '.mthds', 'usage-stats'));
+        expect(fs.existsSync(path.join(TEST_HOME, '.mthds'))).toBe(false);
+        expect(vs.info).toEqual([]);
+    });
+
+    it('cannot reach a host other than loopback', async () => {
+        await expect(fetch('https://eu.i.posthog.com/batch/', { method: 'POST', body: '{}' })).rejects.toThrow(/not a loopback host/);
+        expect(takeRefusedRequests()).toEqual(['POST https://eu.i.posthog.com']);
+    });
+
     it('sends through a telemetry logger without VS Code\'s common properties', () => {
         start({ PIPELEX_USAGE_STATS_DEBUG: '1' });
         expect(vs.loggerOptions).toEqual([{ ignoreBuiltInCommonProperties: true, ignoreUnhandledErrors: true }]);

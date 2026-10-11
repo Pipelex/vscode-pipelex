@@ -72,6 +72,12 @@ pub fn keep_current(events: Vec<Value>, current: Option<&str>) -> Vec<Value> {
 
 /// Post one batch, waiting no longer than `timeout`.
 pub async fn post(endpoint: &Endpoint, events: &[Value], timeout: Duration) -> PostOutcome {
+    // A unit test posts to a loopback capture server or nowhere, never to PostHog.
+    #[cfg(test)]
+    assert!(
+        !matches!(endpoint, Endpoint::Default),
+        "a unit test tried to post usage statistics to the real capture host"
+    );
     let Some(origin) = endpoint.origin() else {
         return PostOutcome::Failed;
     };

@@ -77,7 +77,14 @@ A `plxt` command writes its event to `spool/plxt/` when it ends, starts a detach
 
 `PIPELEX_USAGE_STATS_DEBUG=1` prints each event, exactly as it would be posted, as one JSON line `{"usage_stats_debug": …}` instead of sending or queueing it: on stderr for `plxt`, in the Pipelex output channel for the extension. `PIPELEX_USAGE_STATS_ENDPOINT` points the senders at a loopback origin (`http://127.0.0.1:<port>`, `http://localhost:<port>` or `http://[::1]:<port>`) for tests; any other value turns statistics off.
 
-This repository's own runs never report: the Makefile exports `DO_NOT_TRACK=1` for every target, the workflows set it for every job, and the reporting tests clear their environment and post only to a loopback capture server. The tests are:
+This repository's own runs never report and never touch the developer's own `~/.mthds/usage-stats/`, which matters because `plxt` runs the legacy `mthds` opt-out migration in its home even when statistics are off:
+
+- The Makefile exports `DO_NOT_TRACK=1` for every target and runs the `plxt` its gates format and lint with through `$(PLXT)`, in a throwaway home under `target/tmp/`. The workflows set `DO_NOT_TRACK=1` for every job.
+- Every Rust suite starts `plxt` through `common::plxt_command()` in `crates/pipelex-cli/tests/common/mod.rs`, in a throwaway home under Cargo's temporary directory, with `DO_NOT_TRACK=1` and the endpoint override on a loopback port nothing listens on. The statistics suite clears that environment and gives each run its own throwaway home and a loopback endpoint, refusing any other for a command that may post. `every_plxt_run_goes_through_the_isolated_command` fails when a suite names the binary anywhere else, and `post()` refuses the real capture host under a unit test.
+- Every extension test file loads `src/pipelex/__tests__/usageStatsIsolation.ts` first (`setupFiles` in `vitest.config.mts`): it points `HOME` and `USERPROFILE` at a throwaway directory, sets `DO_NOT_TRACK=1` and a loopback endpoint override, and wraps the global `fetch` so that a request to any host but loopback is refused and fails the test that made it.
+- A manual run of `plxt` while developing the statistics gets the same treatment by hand: `env HOME=$(mktemp -d) DO_NOT_TRACK=1 target/debug/plxt …`, or a loopback `PIPELEX_USAGE_STATS_ENDPOINT` in place of `DO_NOT_TRACK` when the run tests the switches.
+
+The tests are:
 
 - `crates/pipelex-cli/tests/usage_stats.rs`: the constants against the vendored schema, every built event through a port of the PostHog gate, aliases, diagnostics by kind, the switches, the group, and delivery to a capture server;
 - `editors/vscode/src/pipelex/__tests__/usageStats*.test.ts`: the same for the extension, the service under a mocked VS Code whose telemetry logger behaves like the real one, and `usageStatsSpawnEnv.test.ts`, which asserts `PIPELEX_USAGE_STATS=0` at every spawn site and fails when a new one appears untested.

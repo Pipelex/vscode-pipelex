@@ -1,4 +1,5 @@
-//! Fixture discovery shared by this crate's integration suites.
+//! Fixture discovery and the isolated `plxt` command shared by this crate's
+//! integration suites.
 //!
 //! Cargo compiles every file directly under `tests/` as its own test binary, so a
 //! helper shared between two suites has to live in a subdirectory — hence
@@ -17,6 +18,40 @@
 #![allow(dead_code)]
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
+
+/// A loopback address nothing listens on: a post to it fails at once.
+pub const UNREACHABLE_ENDPOINT: &str = "http://127.0.0.1:9";
+
+/// A throwaway home directory for `plxt`, under Cargo's temporary directory for this
+/// crate's integration tests, never the developer's own.
+pub fn isolated_home() -> PathBuf {
+    let home = Path::new(env!("CARGO_TARGET_TMPDIR")).join("plxt-test-home");
+    std::fs::create_dir_all(&home).expect("the isolated home should be creatable");
+    home
+}
+
+/// **The only way a suite starts `plxt`.** `plxt` reads and writes the shared usage-
+/// statistics state under `~/.mthds/usage-stats/`, runs the legacy `mthds` opt-out
+/// migration there even when statistics are off, and posts to PostHog, so no test may
+/// run it in the developer's home or let it reach the real capture host. The command
+/// returned here runs in [`isolated_home`], with `DO_NOT_TRACK=1`, and with the endpoint
+/// override on [`UNREACHABLE_ENDPOINT`], so even a test that turns statistics back on
+/// can only post to a loopback port. A suite that tests the statistics clears this
+/// environment and sets its own throwaway home and loopback endpoint instead.
+///
+/// `every_plxt_run_goes_through_the_isolated_command` in `usage_stats.rs` fails when a
+/// suite names the binary anywhere else.
+pub fn plxt_command() -> Command {
+    let home = isolated_home();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_plxt"));
+    command
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("DO_NOT_TRACK", "1")
+        .env("PIPELEX_USAGE_STATS_ENDPOINT", UNREACHABLE_ENDPOINT);
+    command
+}
 
 /// Repo root, resolved from this crate's manifest dir (`<root>/crates/pipelex-cli`).
 pub fn repo_root() -> PathBuf {

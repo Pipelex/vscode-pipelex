@@ -5,14 +5,17 @@
 //! Every binary run here happens in a throwaway home directory with a cleared
 //! environment and `PIPELEX_USAGE_STATS_ENDPOINT` pointing at a loopback address,
 //! either a port nothing listens on or the capture server below, so no test ever
-//! posts to PostHog or touches the developer's own `~/.mthds/usage-stats/`.
+//! posts to PostHog or touches the developer's own `~/.mthds/usage-stats/`. Every
+//! other suite starts `plxt` through `common::plxt_command`, in its own throwaway home
+//! with `DO_NOT_TRACK=1`, and `every_plxt_run_goes_through_the_isolated_command`
+//! holds both rules.
 
 use std::{
     fs,
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
-    process::{Command, Output, Stdio},
+    process::{Output, Stdio},
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -35,8 +38,13 @@ type Mutation = Box<dyn Fn(&mut Value)>;
 /// Environment variables a run adds to its cleared environment.
 type Vars<'a> = &'a [(&'a str, &'a str)];
 
-/// A loopback address nothing listens on: a post to it fails at once.
-const UNREACHABLE_ENDPOINT: &str = "http://127.0.0.1:9";
+mod common;
+
+use common::UNREACHABLE_ENDPOINT;
+
+/// The loopback origins the endpoint override accepts, so the only hosts a run here
+/// can post to.
+const LOOPBACK_ORIGINS: [&str; 3] = ["http://127.0.0.1:", "http://localhost:", "http://[::1]:"];
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -279,8 +287,25 @@ impl Sandbox {
     }
 
     /// `plxt` with nothing of the developer's environment but `PATH`, in this home.
+    ///
+    /// A command that may post gets a loopback endpoint, so that it reaches the capture
+    /// server or nothing; only the read-only `usage-stats` group, which never posts, is
+    /// run with a non-loopback override, to check that it is refused.
     fn plxt(&self, endpoint: &str, args: &[&str], vars: &[(&str, &str)]) -> Output {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_plxt"));
+        let read_only = args.first() == Some(&"usage-stats");
+        assert!(
+            read_only
+                || LOOPBACK_ORIGINS
+                    .iter()
+                    .any(|origin| endpoint.starts_with(origin)),
+            "a test run of `plxt {args:?}` must post to a loopback origin, not {endpoint:?}"
+        );
+        assert!(
+            vars.iter()
+                .all(|(name, _)| !matches!(*name, "HOME" | "USERPROFILE")),
+            "a test run must stay in its sandbox's home"
+        );
+        let mut command = common::plxt_command();
         command
             .env_clear()
             .env("PATH", std::env::var_os("PATH").unwrap_or_default())
@@ -1172,4 +1197,47 @@ fn the_endpoint_override_must_be_a_loopback_origin() {
             );
         }
     }
+}
+
+/// No suite starts `plxt` outside the isolated command: naming the binary anywhere but
+/// `tests/common/mod.rs` would run it in the developer's home, where it migrates the
+/// legacy `mthds` opt-out into the real `~/.mthds/usage-stats/` and, without
+/// `DO_NOT_TRACK`, posts to PostHog.
+#[test]
+fn every_plxt_run_goes_through_the_isolated_command() {
+    let binary = concat!("CARGO_BIN_", "EXE_plxt\"");
+    let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+    let mut naming = Vec::new();
+    let mut pending = vec![tests.clone()];
+    while let Some(dir) = pending.pop() {
+        for entry in fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "rs")
+                && fs::read_to_string(&path).unwrap().contains(binary)
+            {
+                naming.push(path.strip_prefix(&tests).unwrap().to_path_buf());
+            }
+        }
+    }
+    assert_eq!(naming, vec![PathBuf::from("common").join("mod.rs")]);
+    let isolated = common::plxt_command();
+    let vars = isolated
+        .get_envs()
+        .map(|(name, value)| {
+            (
+                name.to_string_lossy().into_owned(),
+                value.map(|value| value.to_string_lossy().into_owned()),
+            )
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+    let home = common::isolated_home().to_string_lossy().into_owned();
+    assert_eq!(vars["HOME"].as_deref(), Some(home.as_str()));
+    assert_eq!(vars["USERPROFILE"].as_deref(), Some(home.as_str()));
+    assert_eq!(vars["DO_NOT_TRACK"].as_deref(), Some("1"));
+    assert_eq!(
+        vars[contract::ENV_ENDPOINT_OVERRIDE].as_deref(),
+        Some(UNREACHABLE_ENDPOINT)
+    );
 }
