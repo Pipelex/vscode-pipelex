@@ -15,7 +15,8 @@ import {
 } from '../usageStats/switches';
 import type { UsageContext } from '../usageStats/switches';
 import { Spool } from '../usageStats/spool';
-import { beforePost, drainSpool, post } from '../usageStats/delivery';
+import { MAX_EVENTS_PER_POST, beforePost, drainSpool, post } from '../usageStats/delivery';
+import type { FetchLike } from '../usageStats/delivery';
 import * as events from '../usageStats/events';
 
 let root: string;
@@ -254,6 +255,74 @@ describe('the spool and its sender', () => {
         } finally {
             await refusing.close();
         }
+    });
+
+    /** Spool files of `perFile` events each, under `id`, oldest first. */
+    function queueFiles(id: string, perFile: number[]): Spool {
+        const spool = new Spool(state.toolSpool());
+        const oldest = Date.now() - 10_000;
+        perFile.forEach((count, file) => {
+            const batch = Array.from({ length: count }, (_, index) =>
+                envelope(id, `${String(file).padStart(8, '0')}-0000-4000-8000-${String(index).padStart(12, '0')}`));
+            const written = spool.write(batch);
+            // Spool order is by the creation time a name starts with.
+            fs.renameSync(written, path.join(spool.dir, `${oldest + file}-${path.basename(written).split('-')[1]}`));
+        });
+        return spool;
+    }
+
+    it('posts the queue in as few posts as the batch limit allows', async () => {
+        const id = state.obtainIdentity().id;
+        const half = MAX_EVENTS_PER_POST / 2 + 1;
+        const spool = queueFiles(id, [half, half, 1]);
+        const sizes: number[] = [];
+        const fetchImpl: FetchLike = async (_url, init) => {
+            sizes.push(JSON.parse(init.body).batch.length);
+            return { status: 200 };
+        };
+        const outcome = await drainSpool(context(), state, endpointOf({ PIPELEX_USAGE_STATS_ENDPOINT: 'http://127.0.0.1:9' }), Date.now() + 5000, { fetch: fetchImpl });
+        expect(outcome).toBe('drained');
+        // Two files of more than half the limit cannot share a post; the small one joins the second.
+        expect(sizes).toEqual([half, half + 1]);
+        expect(fs.readdirSync(spool.dir)).toEqual([]);
+    });
+
+    it('stops before its next post when the live check turns statistics off, keeping the rest queued', async () => {
+        const id = state.obtainIdentity().id;
+        const half = MAX_EVENTS_PER_POST / 2 + 1;
+        const spool = queueFiles(id, [half, half]);
+        let on = true;
+        let posts = 0;
+        const fetchImpl: FetchLike = async () => {
+            posts++;
+            // VS Code's telemetry is turned off while the first post is on its way.
+            on = false;
+            return { status: 200 };
+        };
+        const outcome = await drainSpool(context(), state, endpointOf({ PIPELEX_USAGE_STATS_ENDPOINT: 'http://127.0.0.1:9' }), Date.now() + 5000, {
+            fetch: fetchImpl,
+            allowed: () => on,
+        });
+        expect(outcome).toBe('stopped');
+        expect(posts).toBe(1);
+        const left = fs.readdirSync(spool.dir);
+        expect(left).toHaveLength(1);
+        expect(left[0].endsWith('.json')).toBe(true);
+    });
+
+    it('leaves a failed batch and the files not yet tried queued', async () => {
+        const id = state.obtainIdentity().id;
+        const half = MAX_EVENTS_PER_POST / 2 + 1;
+        const spool = queueFiles(id, [half, half]);
+        let posts = 0;
+        const fetchImpl: FetchLike = async () => {
+            posts++;
+            return { status: 503 };
+        };
+        const outcome = await drainSpool(context(), state, endpointOf({ PIPELEX_USAGE_STATS_ENDPOINT: 'http://127.0.0.1:9' }), Date.now() + 5000, { fetch: fetchImpl });
+        expect(outcome).toBe('failed');
+        expect(posts).toBe(1);
+        expect(fs.readdirSync(spool.dir).filter(name => name.endsWith('.json'))).toHaveLength(2);
     });
 
     it('never posts to an invalid endpoint', async () => {

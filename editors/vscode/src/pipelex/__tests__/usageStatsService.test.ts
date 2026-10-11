@@ -79,10 +79,22 @@ vi.mock('vscode', () => {
     };
 });
 
-import { UsageStatsService, COMMAND_DISABLE, COMMAND_RESET_ID, LAST_ACTIVATED_DAY_KEY } from '../usageStats/service';
+import {
+    UsageStatsService,
+    COMMAND_DISABLE,
+    COMMAND_RESET_ID,
+    LAST_ACTIVATED_DAY_KEY,
+    POST_DELAY_MS,
+    RETRY_DELAY_MS,
+} from '../usageStats/service';
+import { MAX_EVENTS_PER_POST } from '../usageStats/delivery';
+import type { FetchLike } from '../usageStats/delivery';
+import { Spool } from '../usageStats/spool';
+import { StateDir, stateDirOf } from '../usageStats/state';
 import { recordFeatureUse } from '../usageStats/recorder';
+import * as contract from '../usageStats/contract';
 import { noticeText } from '../usageStats/contract';
-import { utcDay } from '../usageStats/events';
+import { featureUsed, utcDay } from '../usageStats/events';
 import { gateDropReason, loadSchema } from './usageStatsGate';
 import { TEST_HOME, takeRefusedRequests } from './usageStatsIsolation';
 
@@ -118,6 +130,38 @@ function start(env: Record<string, string> = {}): UsageStatsService {
     services.push(service);
     service.start();
     return service;
+}
+
+/** A service posting through `fetchImpl` instead of the network. */
+function startWith(fetchImpl: FetchLike, env: Record<string, string> = {}): UsageStatsService {
+    const service = new UsageStatsService(extensionContext(), output, {
+        env: { PIPELEX_USAGE_STATS_ENDPOINT: 'http://127.0.0.1:9', ...env },
+        home,
+        fetch: fetchImpl,
+    });
+    services.push(service);
+    service.start();
+    return service;
+}
+
+/** Queue spool files of `perFile` `feature_used` events each, under the machine's identifier. */
+function queueFiles(perFile: number[]): void {
+    const state = new StateDir(stateDirOf(home));
+    const id = state.obtainIdentity().id;
+    const spool = new Spool(state.toolSpool());
+    perFile.forEach((count, file) => {
+        spool.write(Array.from({ length: count }, (_, index) => featureUsed(
+            id,
+            `${String(file).padStart(8, '0')}-0000-4000-8000-${String(index).padStart(12, '0')}`,
+            {
+                toolVersion: '0.19.1', idNew: false, os: 'darwin', arch: 'arm64', languageRuntime: 'node-20',
+                ci: false, container: false, internal: false, noticeVersion: 1,
+            },
+            { editor: 'vscode', editorVersion: '1.95.3' },
+            'run',
+            1,
+        )));
+    });
 }
 
 function debugEvents(): any[] {
@@ -317,6 +361,67 @@ describe('the usage statistics service', () => {
             expect(spooled()).toEqual([]);
         } finally {
             await later.close();
+        }
+    });
+
+    it('stops draining the queue as soon as VS Code\'s telemetry is turned off', async () => {
+        vs.globalState.set(LAST_ACTIVATED_DAY_KEY, utcDay());
+        // Two files that cannot share a post.
+        queueFiles([MAX_EVENTS_PER_POST / 2 + 1, MAX_EVENTS_PER_POST / 2 + 1]);
+        let posts = 0;
+        const service = startWith(async () => {
+            posts++;
+            // The person turns telemetry off while the first post is on its way.
+            vs.telemetryEnabled = false;
+            return { status: 200 };
+        });
+        await service.postNow(5000, true);
+        expect(posts).toBe(1);
+        expect(spooled().filter(name => name.endsWith('.json'))).toHaveLength(1);
+    });
+
+    it('spools a batch still in flight when the shutdown budget runs out, and only once', async () => {
+        vs.globalState.set(LAST_ACTIVATED_DAY_KEY, utcDay());
+        let settle: (status: number) => void = () => undefined;
+        // A request that neither answers nor heeds its abort until told to.
+        const service = startWith(() => new Promise(resolve => {
+            settle = status => resolve({ status });
+        }));
+        recordFeatureUse('run');
+        service.flushFeatures();
+        const background = service.postNow(contract.BUDGET_BACKGROUND_POST_DELAY_MS, false);
+        await service.shutdown();
+        const files = spooled();
+        expect(files).toHaveLength(1);
+        const body = JSON.parse(fs.readFileSync(path.join(stateDir(), 'spool', 'vscode-pipelex', files[0]), 'utf-8'));
+        expect(body.events.map((event: any) => event.properties.feature)).toEqual(['run']);
+        // The abandoned request fails late: its batch is not spooled a second time.
+        settle(503);
+        await background;
+        expect(spooled()).toHaveLength(1);
+    }, 10_000);
+
+    it('retries a failed post after a delay, from the spool', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+        try {
+            vs.globalState.set(LAST_ACTIVATED_DAY_KEY, utcDay());
+            const statuses = [503, 200];
+            const bodies: any[] = [];
+            const service = startWith(async (_url, init) => {
+                bodies.push(JSON.parse(init.body));
+                return { status: statuses.shift() ?? 200 };
+            });
+            recordFeatureUse('validation');
+            service.flushFeatures();
+            await vi.advanceTimersByTimeAsync(POST_DELAY_MS);
+            expect(bodies).toHaveLength(1);
+            expect(spooled().filter(name => name.endsWith('.json'))).toHaveLength(1);
+            await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS);
+            expect(bodies).toHaveLength(2);
+            expect(bodies[1].batch.map((event: any) => event.properties.feature)).toEqual(['validation']);
+            expect(spooled()).toEqual([]);
+        } finally {
+            vi.useRealTimers();
         }
     });
 

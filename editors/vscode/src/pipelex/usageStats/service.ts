@@ -36,8 +36,11 @@ export const LAST_ACTIVATED_DAY_KEY = 'pipelex.usageStats.lastActivatedDay';
 export const FEATURE_FLUSH_INTERVAL_MS = 5 * 60 * 1000;
 /** How long after an event is made it is posted, well inside the ten-second budget. */
 export const POST_DELAY_MS = 2000;
-/** The most events kept in memory waiting for a retry; older ones are spooled. */
+/** The most events kept in memory waiting for a post; older ones are spooled. */
 const MAX_PENDING = 500;
+/** How long after a failed post the next attempt is made, doubling up to the cap. */
+export const RETRY_DELAY_MS = 30_000;
+export const MAX_RETRY_DELAY_MS = 30 * 60 * 1000;
 
 export const COMMAND_STATUS = 'pipelex.usageStats.status';
 export const COMMAND_DISABLE = 'pipelex.usageStats.disable';
@@ -76,6 +79,13 @@ export interface StatusReport {
     state_dir: string | null;
 }
 
+/** A batch being posted. Shutdown spools one still in flight at the end of its budget
+ * and marks it handed off, so that its late failure does not spool it twice. */
+interface InFlight {
+    events: Envelope[];
+    handedOff: boolean;
+}
+
 export class UsageStatsService implements vscode.Disposable {
     private readonly state: StateDir | undefined;
     private readonly logger: vscode.TelemetryLogger;
@@ -93,6 +103,10 @@ export class UsageStatsService implements vscode.Disposable {
     private postTimer: ReturnType<typeof setTimeout> | undefined;
     private flushTimer: ReturnType<typeof setInterval> | undefined;
     private posting: Promise<void> | undefined;
+    private inFlight: InFlight | undefined;
+    private retryDelay = RETRY_DELAY_MS;
+    /** Aborted at shutdown: whatever is still posting gives up. */
+    private readonly halt = new AbortController();
     private stopped = false;
 
     constructor(
@@ -140,9 +154,8 @@ export class UsageStatsService implements vscode.Disposable {
                 // Retried before every post.
             }
         }
-        this.refresh();
         this.flushTimer = setInterval(() => this.flushFeatures(), FEATURE_FLUSH_INTERVAL_MS);
-        if (this.on && !this.debug) this.schedulePost();
+        this.refresh();
     }
 
     private usageContext(): UsageContext {
@@ -162,7 +175,8 @@ export class UsageStatsService implements vscode.Disposable {
     }
 
     /** Re-read the switches. Turning off drops what is held; turning on shows the
-     * notice when this machine has not seen it and sends the day's activation. */
+     * notice when this machine has not seen it, sends the day's activation and
+     * schedules a post, which also sends what an earlier session left queued. */
     refresh(): void {
         if (this.stopped) return;
         const wasOn = this.on;
@@ -176,7 +190,14 @@ export class UsageStatsService implements vscode.Disposable {
         if (!wasOn) {
             this.showNoticeIfDue();
             this.sendActivationIfDue();
+            if (!this.debug) this.schedulePost();
         }
+    }
+
+    /** Whether a post may go now: every switch re-read, VS Code's setting included. */
+    private allowed(): boolean {
+        this.refresh();
+        return this.on && !this.stopped;
     }
 
     private showNoticeIfDue(): void {
@@ -304,10 +325,11 @@ export class UsageStatsService implements vscode.Disposable {
         }, delay);
     }
 
-    /** Post what is held, then the spool, within `budgetMs`. */
+    /** Post what is held, then the spool, within `budgetMs` of now. */
     async postNow(budgetMs: number, drain: boolean): Promise<void> {
+        const deadline = Date.now() + budgetMs;
         if (this.posting) await this.posting;
-        const run = this.postWithin(Date.now() + budgetMs, drain);
+        const run = this.postWithin(deadline, drain);
         this.posting = run;
         try {
             await run;
@@ -318,13 +340,12 @@ export class UsageStatsService implements vscode.Disposable {
 
     private async postWithin(deadline: number, drain: boolean): Promise<void> {
         const state = this.state;
-        if (!state || this.debug) return;
+        if (!state || this.debug || !this.allowed()) return;
         const context = this.usageContext();
         const endpoint = endpointOf(context.env);
+        let failed = false;
         const batch = this.pending.splice(0);
         if (batch.length > 0) {
-            this.refresh();
-            if (!this.on) return;
             const check = beforePost(context, state, this.localIdentity?.id);
             if (check.kind === 'disabled') {
                 this.refresh();
@@ -332,16 +353,47 @@ export class UsageStatsService implements vscode.Disposable {
             }
             const current = keepCurrent(batch, check.id);
             if (current.length > 0) {
-                const outcome = await post(endpoint, current, deadline - Date.now(), this.host.fetch);
-                if (outcome === 'failed') {
-                    // Kept for the next post, or spooled at deactivation.
-                    this.pending.unshift(...current);
+                const flight: InFlight = { events: current, handedOff: false };
+                this.inFlight = flight;
+                const outcome = await post(endpoint, current, deadline - Date.now(), this.host.fetch, this.halt.signal);
+                if (this.inFlight === flight) this.inFlight = undefined;
+                if (outcome === 'failed' && !flight.handedOff) {
+                    this.keepUnsent(current);
+                    failed = true;
                 }
             }
         }
-        if (drain && this.on && Date.now() < deadline) {
-            await drainSpool(context, state, endpoint, deadline, this.host.fetch);
+        if (drain && !failed && this.allowed() && Date.now() < deadline) {
+            const drained = await drainSpool(context, state, endpoint, deadline, {
+                fetch: this.host.fetch,
+                allowed: () => this.allowed(),
+                signal: this.halt.signal,
+            });
+            failed = drained === 'failed';
         }
+        if (failed) {
+            this.scheduleRetry();
+        } else {
+            this.retryDelay = RETRY_DELAY_MS;
+        }
+    }
+
+    /** Events a post could not deliver: spooled, where the retry and any later session
+     * find them, or kept in memory when they were made under an identifier drawn for
+     * this process alone, which no spool reader could match. */
+    private keepUnsent(events: Envelope[]): void {
+        if (!this.localIdentity) {
+            this.spool(events);
+        } else if (!this.stopped) {
+            this.pending.unshift(...events);
+            this.pending.splice(MAX_PENDING);
+        }
+    }
+
+    /** Try again after a failed post, waiting longer after each failure in a row. */
+    private scheduleRetry(): void {
+        this.schedulePost(this.retryDelay);
+        this.retryDelay = Math.min(this.retryDelay * 2, MAX_RETRY_DELAY_MS);
     }
 
     private spool(unsent: Envelope[]): void {
@@ -355,7 +407,7 @@ export class UsageStatsService implements vscode.Disposable {
     }
 
     /** Deactivation: send the feature counts and what is held within two seconds, and
-     * spool the rest. */
+     * spool the rest, a batch still in flight included. */
     async shutdown(): Promise<void> {
         if (this.stopped) return;
         this.flushFeatures();
@@ -367,13 +419,24 @@ export class UsageStatsService implements vscode.Disposable {
             clearInterval(this.flushTimer);
             this.flushTimer = undefined;
         }
-        if (this.on && this.pending.length > 0) {
-            const flushed = this.postNow(contract.BUDGET_SHUTDOWN_FLUSH_MS, false);
-            const timeout = new Promise<void>(resolve => setTimeout(resolve, contract.BUDGET_SHUTDOWN_FLUSH_MS + 200));
-            await Promise.race([flushed, timeout]);
+        if (this.on && (this.pending.length > 0 || this.posting)) {
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const budget = new Promise<void>(resolve => {
+                timer = setTimeout(resolve, contract.BUDGET_SHUTDOWN_FLUSH_MS);
+            });
+            await Promise.race([this.postNow(contract.BUDGET_SHUTDOWN_FLUSH_MS, false), budget]);
+            clearTimeout(timer);
         }
-        this.spool(this.pending.splice(0));
         this.stopped = true;
+        // A post still running at the end of the budget is abandoned: its batch is
+        // spooled for the next session, and the request is aborted.
+        const flight = this.inFlight;
+        if (flight && !flight.handedOff) {
+            flight.handedOff = true;
+            this.spool(flight.events);
+        }
+        this.halt.abort();
+        this.spool(this.pending.splice(0));
         this.dispose();
     }
 
