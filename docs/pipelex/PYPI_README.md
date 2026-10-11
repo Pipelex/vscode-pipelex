@@ -25,6 +25,7 @@ pipx install pipelex-tools
 | `plxt config default` | Print the default configuration file |
 | `plxt config schema` | Print the JSON schema of the configuration file |
 | `plxt completions <shell>` | Generate shell completions |
+| `plxt usage-stats status` | Show whether anonymous usage statistics are on, and what turns them off (also `disable`, `enable`, `reset-id`) |
 
 ## Configuration
 
@@ -33,6 +34,10 @@ pipx install pipelex-tools
 1. `.pipelex/plxt.toml` (preferred)
 2. `plxt.toml`
 3. `.taplo.toml` (fallback)
+
+## Usage statistics
+
+`plxt` sends anonymous usage statistics: which of `format`, `lint`, `get` and `config` ran, how it ended, how long it took, how many files it processed in buckets and how many diagnostics it reported by kind. It never sends your methods, prompts, inputs, outputs, file names or pipe names, and `plxt lsp` sends nothing. The first run says so once per machine on stderr. Turn them off with `plxt usage-stats disable`, `DO_NOT_TRACK=1`, `PIPELEX_USAGE_STATS=0`, or `[usage_stats] enabled = false` in a project's `.pipelex/pipelex.toml`. Details: [docs.pipelex.com/latest/setup/usage-statistics](https://docs.pipelex.com/latest/setup/usage-statistics/).
 
 ## MTHDS Example
 

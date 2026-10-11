@@ -92,7 +92,10 @@ vi.mock('../graph/graphspecDetector', () => ({
 }));
 
 // ---------- Import SUT ----------
+import * as vscode from 'vscode';
 import { registerPipelexFeatures } from '../pipelexExtension';
+import { isGraphspecJson } from '../graph/graphspecDetector';
+import { setFeatureSink } from '../usageStats/recorder';
 
 function makeContext() {
     mockState.subscriptions = [];
@@ -164,5 +167,43 @@ describe('registerPipelexFeatures', () => {
         await registerPipelexFeatures(context);
 
         expect(mockState.validatorConstructed).toBe(true);
+    });
+});
+
+describe('the graph commands count graph_preview', () => {
+    function handler(command: string): () => void {
+        const call = mockState.registerCommand.mock.calls.find(([name]) => name === command);
+        expect(call, command).toBeDefined();
+        return call![1];
+    }
+
+    function editorOf(languageId: string): void {
+        (vscode.window as any).activeTextEditor = {
+            document: { languageId, uri: { fsPath: '/project/file' }, getText: () => '{}' },
+        };
+    }
+
+    it('once per command that opens a graph, and never for a refusal', async () => {
+        vi.clearAllMocks();
+        const used: string[] = [];
+        const removeSink = setFeatureSink(feature => used.push(feature));
+        try {
+            await registerPipelexFeatures(makeContext());
+            editorOf('mthds');
+            handler('pipelex.showMethodGraph')();
+            editorOf('json');
+            vi.mocked(isGraphspecJson).mockReturnValueOnce(true);
+            handler('pipelex.showGraphSpec')();
+            expect(used).toEqual(['graph_preview', 'graph_preview']);
+            // No graph opens: nothing is counted.
+            editorOf('plaintext');
+            handler('pipelex.showMethodGraph')();
+            editorOf('json');
+            handler('pipelex.showGraphSpec')();
+            expect(used).toEqual(['graph_preview', 'graph_preview']);
+        } finally {
+            removeSink();
+            (vscode.window as any).activeTextEditor = undefined;
+        }
     });
 });

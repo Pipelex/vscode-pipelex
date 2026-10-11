@@ -5,6 +5,9 @@ import { syncExtensionSchemas } from "./tomlValidation";
 import { getOutput, showMessage } from "./util";
 import { registerPipelexFeatures } from "./pipelex/pipelexExtension";
 
+/** The anonymous usage statistics of this extension host, in the Node host only. */
+let usageStats: { shutdown(): Promise<void> } | undefined;
+
 export async function activate(context: vscode.ExtensionContext) {
   const schemaIndicator = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
@@ -45,6 +48,19 @@ export async function activate(context: vscode.ExtensionContext) {
   // Register Pipelex-specific features for MTHDS
   await registerPipelexFeatures(context);
 
+  // Anonymous usage statistics (docs/features/usage-statistics.md). They read and
+  // write the shared state in the home directory, so the browser host has none.
+  if (!import.meta.env.BROWSER) {
+    try {
+      const { startUsageStats } = await import("./pipelex/usageStats/service");
+      usageStats = startUsageStats(context, getOutput());
+    } catch (err: any) {
+      getOutput().appendLine(
+        `Pipelex: usage statistics could not start: ${err?.message ?? err}`
+      );
+    }
+  }
+
   context.subscriptions.push(
     getOutput(),
     schemaIndicator,
@@ -79,4 +95,11 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     )
   );
+}
+
+/** Send the usage statistics still held, within their two-second budget. */
+export async function deactivate(): Promise<void> {
+  const stats = usageStats;
+  usageStats = undefined;
+  await stats?.shutdown();
 }

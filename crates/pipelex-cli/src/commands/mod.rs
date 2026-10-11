@@ -101,6 +101,16 @@ impl<E: Environment> PlxtCli<E> {
             }
             #[cfg(feature = "lsp")]
             PlxtCommand::Lsp { cmd } => self.execute_lsp(cmd).await,
+            #[cfg(all(feature = "usage-stats", not(target_family = "wasm")))]
+            PlxtCommand::UsageStats { cmd } => match crate::usage_stats::command::run(&cmd) {
+                0 => Ok(()),
+                _ => Err(anyhow::anyhow!("the usage-stats command did not complete")),
+            },
+            #[cfg(all(feature = "usage-stats", not(target_family = "wasm")))]
+            PlxtCommand::SendUsageStats => {
+                crate::usage_stats::sender::run_detached().await;
+                Ok(())
+            }
         }
     }
 }

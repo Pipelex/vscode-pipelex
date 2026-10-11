@@ -252,6 +252,7 @@ vi.mock('@pipelex/mthds-ui/static-graph', async (importOriginal) => {
 import { buildStaticGraphSpecFromToml } from '@pipelex/mthds-ui/static-graph';
 import { MethodGraphPanel } from '../graph/methodGraphPanel';
 import { BackendError } from '../validation/backend';
+import { setFeatureSink } from '../usageStats/recorder';
 
 // Helper to create a mock output channel
 function mockOutput() {
@@ -324,6 +325,20 @@ describe('MethodGraphPanel', () => {
         mockState.activeColorThemeKind = 2; // ColorThemeKind.Dark
         mockState.runArtifacts = undefined;
         mockState.runArtifactsCalls = [];
+    });
+
+    it('show() counts no graph_preview: the commands do, so following the active editor counts nothing', () => {
+        const used: string[] = [];
+        const removeSink = setFeatureSink(feature => used.push(feature));
+        try {
+            const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+            panel.show(makeUri('/project/first.mthds'));
+            panel.show(makeUri('/project/second.mthds'));
+            expect(used.filter(feature => feature === 'graph_preview')).toEqual([]);
+            panel.dispose();
+        } finally {
+            removeSink();
+        }
     });
 
     // --- Bug B: Filename extraction ---

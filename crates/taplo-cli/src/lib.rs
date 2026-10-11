@@ -14,6 +14,22 @@ pub mod args;
 pub mod commands;
 pub mod printing;
 
+/// What a command processed, counted for callers that report on it (the `plxt`
+/// CLI's usage statistics). Counts only: never a path, a key or a message.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct RunStats {
+    /// Documents read: each file, and standard input when it is the input.
+    pub documents: usize,
+    /// Syntax errors reported, one per distinct range, as they are printed.
+    pub diagnostics_syntax: usize,
+    /// Semantic errors reported (duplicate keys, conflicting tables and the like).
+    pub diagnostics_semantic: usize,
+    /// Schema validation errors found.
+    pub diagnostics_schema: usize,
+    /// Documents a `format --check` found not properly formatted.
+    pub unformatted: usize,
+}
+
 pub struct Taplo<E: Environment> {
     env: E,
     colors: bool,
@@ -23,6 +39,9 @@ pub struct Taplo<E: Environment> {
     #[cfg(feature = "lint")]
     schemas: Option<Schemas<E>>,
     config: Option<Arc<Config>>,
+    /// Counters a caller reads after a command; behind a lock because `execute_get`
+    /// takes `&self`.
+    stats: std::sync::Mutex<RunStats>,
 }
 
 impl<E: Environment> Taplo<E> {
@@ -38,7 +57,23 @@ impl<E: Environment> Taplo<E> {
             colors: env.atty_stderr(),
             compact: false,
             config: None,
+            stats: std::sync::Mutex::new(RunStats::default()),
             env,
+        }
+    }
+
+    /// What the commands run so far processed and reported.
+    pub fn run_stats(&self) -> RunStats {
+        match self.stats.lock() {
+            Ok(stats) => *stats,
+            Err(poisoned) => *poisoned.into_inner(),
+        }
+    }
+
+    pub(crate) fn record_stats(&self, update: impl FnOnce(&mut RunStats)) {
+        match self.stats.lock() {
+            Ok(mut stats) => update(&mut stats),
+            Err(poisoned) => update(&mut poisoned.into_inner()),
         }
     }
 

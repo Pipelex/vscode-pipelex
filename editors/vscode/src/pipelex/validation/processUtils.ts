@@ -1,4 +1,5 @@
 import { execFile } from 'child_process';
+import { childProcessEnv } from '../usageStats/childEnv';
 
 export interface SpawnResult {
     stdout: string;
@@ -8,6 +9,9 @@ export interface SpawnResult {
 /**
  * Spawn a CLI process and return its stdout and stderr.
  * Rejects with `{ exitCode, stderr, stdout, message }` on non-zero exit.
+ *
+ * The process runs with `PIPELEX_USAGE_STATS=0`: the extension counts the use in
+ * its own `feature_used`, under VS Code's telemetry setting (`usageStats/childEnv.ts`).
  */
 export function spawnCli(
     command: string,
@@ -20,7 +24,7 @@ export function spawnCli(
         const onAbort = () => {
             proc.kill();
         };
-        const proc = execFile(command, args, { timeout, maxBuffer: 1024 * 1024, cwd }, (err, stdout, stderr) => {
+        const proc = execFile(command, args, { timeout, maxBuffer: 1024 * 1024, cwd, env: childProcessEnv() }, (err, stdout, stderr) => {
             signal.removeEventListener('abort', onAbort);
             if (err) {
                 reject({ exitCode: (err as NodeJS.ErrnoException).code, stderr, stdout, message: err.message });

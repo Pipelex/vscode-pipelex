@@ -3,7 +3,9 @@ import * as node from "vscode-languageclient/node";
 import * as browser from "vscode-languageclient/browser";
 import which from "which";
 import { getOutput } from "./util";
-import { BaseLanguageClient } from "vscode-languageclient";
+import { childProcessEnvOverrides } from "./pipelex/usageStats/childEnv";
+import { recordFeatureUse } from "./pipelex/usageStats/recorder";
+import { BaseLanguageClient, Middleware } from "vscode-languageclient";
 
 export async function createClient(
   context: vscode.ExtensionContext
@@ -73,10 +75,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
       module: taploPath,
       transport: node.TransportKind.ipc,
       options: {
-        env:
-          vscode.workspace
-            .getConfiguration()
-            .get("pipelex.server.environment") ?? undefined,
+        env: serverEnvironment(),
       },
     };
 
@@ -111,10 +110,7 @@ async function createNodeClient(context: vscode.ExtensionContext) {
       command: taploPath,
       args: ["lsp", "stdio", ...args],
       options: {
-        env:
-          vscode.workspace
-            .getConfiguration()
-            .get("pipelex.server.environment") ?? undefined,
+        env: serverEnvironment(),
       },
     };
 
@@ -132,6 +128,23 @@ async function createNodeClient(context: vscode.ExtensionContext) {
   );
 }
 
+/**
+ * The language server's environment: `pipelex.server.environment` on top of the
+ * extension host's (the language client merges it into `process.env`), with usage
+ * statistics off like every process the extension starts
+ * (`pipelex/usageStats/childEnv.ts`).
+ */
+export function serverEnvironment(): Record<string, string> {
+  const configured = vscode.workspace
+    .getConfiguration()
+    .get("pipelex.server.environment");
+  const base =
+    configured && typeof configured === "object"
+      ? (configured as Record<string, string>)
+      : {};
+  return childProcessEnvOverrides({ ...base });
+}
+
 async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
   await vscode.workspace.fs.createDirectory(context.globalStorageUri);
 
@@ -146,6 +159,18 @@ async function clientOpts(context: vscode.ExtensionContext): Promise<any> {
       configurationSection: "pipelex",
       cachePath: context.globalStorageUri.fsPath,
     },
+
+    // Formatting is one of the features the extension counts in its usage statistics.
+    middleware: {
+      provideDocumentFormattingEdits: (document, options, token, next) => {
+        recordFeatureUse("format");
+        return next(document, options, token);
+      },
+      provideDocumentRangeFormattingEdits: (document, range, options, token, next) => {
+        recordFeatureUse("format");
+        return next(document, range, options, token);
+      },
+    } as Middleware,
 
     synchronize: {
       // Synchronize the setting section 'pipelex' to the server

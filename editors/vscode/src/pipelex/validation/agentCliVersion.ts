@@ -1,4 +1,5 @@
 import { execFile } from 'child_process';
+import { childProcessEnv } from '../usageStats/childEnv';
 
 /**
  * Probe `pipelex-agent --version` and return the parsed semver, or null if
@@ -50,7 +51,8 @@ export function getAgentCliVersion(command: string, baseArgs: string[], cwd?: st
     if (cached) return cached;
 
     const probe = new Promise<Semver | null>((resolve) => {
-        execFile(command, [...baseArgs, '--version'], { cwd, timeout: 5000, maxBuffer: 64 * 1024 }, (err, stdout, stderr) => {
+        // Usage statistics off, like every process the extension starts (`usageStats/childEnv.ts`).
+        execFile(command, [...baseArgs, '--version'], { cwd, timeout: 5000, maxBuffer: 64 * 1024, env: childProcessEnv() }, (err, stdout, stderr) => {
             if (err) {
                 resolve(null);
                 return;

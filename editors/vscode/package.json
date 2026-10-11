@@ -151,6 +151,22 @@
         {
           "command": "pipelex.showGraphSpec",
           "when": "editorLangId == json && pipelex.isGraphspecJson"
+        },
+        {
+          "command": "pipelex.usageStats.status",
+          "when": "!isWeb"
+        },
+        {
+          "command": "pipelex.usageStats.disable",
+          "when": "!isWeb"
+        },
+        {
+          "command": "pipelex.usageStats.enable",
+          "when": "!isWeb"
+        },
+        {
+          "command": "pipelex.usageStats.resetId",
+          "when": "!isWeb"
         }
       ],
       "editor/title": [
@@ -225,6 +241,22 @@
       {
         "command": "pipelex.removeLightSyntaxColors",
         "title": "Pipelex: Remove Light Theme Colors for MTHDS"
+      },
+      {
+        "command": "pipelex.usageStats.status",
+        "title": "Pipelex: Show Usage Statistics Status"
+      },
+      {
+        "command": "pipelex.usageStats.disable",
+        "title": "Pipelex: Disable Usage Statistics"
+      },
+      {
+        "command": "pipelex.usageStats.enable",
+        "title": "Pipelex: Enable Usage Statistics"
+      },
+      {
+        "command": "pipelex.usageStats.resetId",
+        "title": "Pipelex: Reset Usage Statistics Identifier"
       }
     ],
     "semanticTokenTypes": [

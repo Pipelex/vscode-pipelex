@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::{args::LintCommand, Taplo};
 use anyhow::{anyhow, Context};
 use codespan_reporting::files::SimpleFile;
+use itertools::Itertools;
 use serde_json::json;
 use taplo::parser;
 use taplo_common::{
@@ -117,9 +118,12 @@ impl<E: Environment> Taplo<E> {
         source: &str,
         cwd: &Path,
     ) -> Result<(), anyhow::Error> {
+        self.record_stats(|stats| stats.documents += 1);
         let parse = parser::parse(source);
 
         if !parse.errors.is_empty() {
+            let reported = parse.errors.iter().unique_by(|e| e.range).count();
+            self.record_stats(|stats| stats.diagnostics_syntax += reported);
             if !self.compact {
                 self.print_parse_errors(&SimpleFile::new(file_path, source), &parse.errors)
                     .await?;
@@ -133,11 +137,14 @@ impl<E: Environment> Taplo<E> {
         let dom = parse.into_dom();
 
         if let Err(errors) = dom.validate() {
+            let errors = errors.collect::<Vec<_>>();
+            let reported = errors.len();
+            self.record_stats(|stats| stats.diagnostics_semantic += reported);
             if !self.compact {
-                self.print_semantic_errors(&SimpleFile::new(file_path, source), errors)
+                self.print_semantic_errors(&SimpleFile::new(file_path, source), errors.into_iter())
                     .await?;
             } else {
-                self.print_semantic_errors_compact(file_path, source, errors, cwd)
+                self.print_semantic_errors_compact(file_path, source, errors.into_iter(), cwd)
                     .await?;
             }
 
@@ -190,6 +197,8 @@ impl<E: Environment> Taplo<E> {
             let errors = self.schemas()?.validate_root(&schema_url, &dom).await?;
 
             if !errors.is_empty() {
+                let reported = errors.len();
+                self.record_stats(|stats| stats.diagnostics_schema += reported);
                 if !self.compact {
                     self.print_schema_errors(&SimpleFile::new(file_path, source), &errors)
                         .await?;

@@ -25,6 +25,12 @@ on:
     branches:
       - main
 
+# Nothing CI runs reports anonymous usage statistics: `plxt` and the tools it
+# drives honour DO_NOT_TRACK. The reporting tests set their own environment and
+# post only to a loopback capture server.
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   auto_tag:
     name: Tag Releases
