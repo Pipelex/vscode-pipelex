@@ -344,8 +344,8 @@ mod tests {
                 "http://127.0.0.1:9",
             ),
             (
-                &[(contract::ENV_ENDPOINT_OVERRIDE, "http://localhost:8080/")][..],
-                "http://localhost:8080",
+                &[(contract::ENV_ENDPOINT_OVERRIDE, "http://[::1]:8080")][..],
+                "http://[::1]:8080",
             ),
         ] {
             let origin = origin_resolved_from(vars);

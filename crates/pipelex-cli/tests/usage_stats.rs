@@ -1458,6 +1458,8 @@ fn the_endpoint_override_must_be_a_loopback_origin() {
                 "https://eu.i.posthog.com",
                 "http://example.com:80",
                 "http://127.0.0.1:9/batch/",
+                "http://127.0.0.1:9/",
+                " http://127.0.0.1:9 ",
                 "",
             ],
         ),

@@ -67,10 +67,10 @@ impl Endpoint {
 }
 
 /// `http://127.0.0.1:<port>`, `http://localhost:<port>` or `http://[::1]:<port>`,
-/// with no path; a single trailing slash is the empty path and is dropped.
+/// with no path, taken verbatim. Unlike a switch value, the override is not trimmed,
+/// and a trailing slash is a path: either makes it invalid, as it is for pipelex and
+/// `mthds`, so the same value sends from every tool or from none.
 fn loopback_origin(value: &str) -> Option<String> {
-    let value = value.trim();
-    let value = value.strip_suffix('/').unwrap_or(value);
     let rest = value.strip_prefix("http://")?;
     let port = ["127.0.0.1:", "localhost:", "[::1]:"]
         .iter()
@@ -251,13 +251,10 @@ mod tests {
             "http://127.0.0.1:9",
             "http://localhost:8080",
             "http://[::1]:443",
-            "http://127.0.0.1:9/",
         ] {
-            assert!(
-                matches!(
-                    Endpoint::from_context(&context(&[(contract::ENV_ENDPOINT_OVERRIDE, value)])),
-                    Endpoint::Loopback(_)
-                ),
+            assert_eq!(
+                Endpoint::from_context(&context(&[(contract::ENV_ENDPOINT_OVERRIDE, value)])),
+                Endpoint::Loopback(value.to_string()),
                 "{value:?}"
             );
         }
@@ -266,7 +263,14 @@ mod tests {
             "https://example.com",
             "https://127.0.0.1:9",
             "http://127.0.0.1",
+            "http://127.0.0.1:9/",
+            "http://localhost:8080/",
             "http://127.0.0.1:9/batch/",
+            " http://127.0.0.1:9",
+            "http://127.0.0.1:9 ",
+            "http://127.0.0.1:9\n",
+            "HTTP://127.0.0.1:9",
+            "http://LOCALHOST:9",
             "http://127.0.0.1:0",
             "http://127.0.0.1:70000",
             "http://127.0.0.2:9",
