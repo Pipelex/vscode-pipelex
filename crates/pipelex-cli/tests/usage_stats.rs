@@ -1484,6 +1484,18 @@ fn the_endpoint_override_must_be_a_loopback_origin() {
             );
         }
     }
+    // The text status says what the value must be, so a loopback value refused for its
+    // trailing slash is not explained as "not a loopback address".
+    let output = sandbox.plxt("http://localhost:8080/", &["usage-stats", "status"], &[]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(
+            "invalid_endpoint_override (PIPELEX_USAGE_STATS_ENDPOINT must be exactly \
+             http://127.0.0.1:<port>, http://localhost:<port> or http://[::1]:<port>, \
+             with no path and no surrounding whitespace)"
+        ),
+        "{stdout}"
+    );
 }
 
 /// No suite starts `plxt` outside the isolated command: naming the binary anywhere but
