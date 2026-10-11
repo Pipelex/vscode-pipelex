@@ -218,6 +218,13 @@ fn next_batch(
 
 /// Start the detached sender: this binary, with no terminal and no output, in a
 /// process group of its own so that a Ctrl-C at the terminal does not reach it.
+///
+/// It must hold none of the command's own standard streams: a caller reading `plxt`'s
+/// output to its end, as `subprocess.run` or `Command::output` do, would otherwise
+/// wait for the sender too. Its stdio is null on every platform; on POSIX nothing else
+/// is inherited, since the standard library opens every other descriptor
+/// close-on-exec, but Windows passes every inheritable handle to a child, and the
+/// pipes a caller gave `plxt` usually are, so they are made non-inheritable first.
 pub fn start_detached_sender(state_dir: &Path) -> io::Result<()> {
     let executable = std::env::current_exe()?;
     let mut command = Command::new(executable);
@@ -239,6 +246,36 @@ pub fn start_detached_sender(state_dir: &Path) -> io::Result<()> {
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
+        keep_standard_handles_from_children();
     }
     command.spawn().map(drop)
+}
+
+/// Clear the inherit flag of this process's standard handles, so that no child it
+/// starts from now on holds them. `plxt` starts the sender as the last thing it does.
+#[cfg(windows)]
+fn keep_standard_handles_from_children() {
+    use std::os::windows::io::AsRawHandle;
+
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn SetHandleInformation(handle: *mut std::ffi::c_void, mask: u32, flags: u32) -> i32;
+    }
+    const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
+
+    for handle in [
+        io::stdin().as_raw_handle(),
+        io::stdout().as_raw_handle(),
+        io::stderr().as_raw_handle(),
+    ] {
+        if handle.is_null() {
+            continue;
+        }
+        // SAFETY: the handle is one of this process's standard handles, and the call
+        // only clears its inherit flag. It fails harmlessly on a handle that cannot be
+        // inherited anyway, such as a console's or an invalid one.
+        unsafe {
+            SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0);
+        }
+    }
 }
