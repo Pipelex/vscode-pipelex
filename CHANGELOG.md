@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Vendored MTHDS Test Corpus follows pipelex v0.87.0**: the vocabulary of the corpus that `plxt` and the `pipelex_tools` library are held to now says a `PipeFunc` names its function by its import path in the method tree when it explains why the corpus has no `PipeFunc` entry, and declares as left out the `pipe_func_function_refused` error, which only a `PipeFunc` step produces, and the advisory `template_check_warning`, which never makes a verdict. No entry changes, so what the toolchain is held to stays the same; the bundled MTHDS schema follows pipelex v0.87.0 in a later release, once mthds.ai serves it.
+
 ## [0.20.0] - 2026-10-12
 
 ### Added
