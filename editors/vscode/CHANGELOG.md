@@ -3,6 +3,13 @@
 
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [0.21.0] - 2026-10-16
+
+### Changed
+
+- **Bundled MTHDS schema holds a PipeFunc's `function_name` to an import path (Breaking)**: `plxt`, the editor, `pipelex-tools-py` and `@pipelex/tools-wasm` now flag a `PipeFunc` whose `function_name` holds no dot or an empty segment, such as a bare `capitalize`, since it names the function by its import path from the root of the method tree: the module's dotted path, then the function's name, such as `funcs.totals.compute_totals` for the function `compute_totals` of `funcs/totals.py`. Write the full import path of a function a bare name used to name. The editor's hover also describes a `PipeDocGen`'s `template_file` as lying inside its bundle and written with forward slashes. (plxt 0.12.0, pipelex-tools-py 0.6.0, @pipelex/tools-wasm 0.6.0)
+- **Bundled MTHDS schema and vendored MTHDS Test Corpus follow pipelex v0.87.0**: the vocabulary of the corpus that `plxt` and the `pipelex_tools` library are held to now says a `PipeFunc` names its function by its import path in the method tree when it explains why the corpus has no `PipeFunc` entry, and declares as left out the `pipe_func_function_refused` error, which only a `PipeFunc` step produces, and the advisory `template_check_warning`, which never makes a verdict. No corpus entry changes, and every entry lints under the refreshed schema as it did before, since the schema adds only the `function_name` rule above. (plxt 0.12.0, pipelex-tools-py 0.6.0, @pipelex/tools-wasm 0.6.0)
+
 ## [0.20.0] - 2026-10-12
 
 ### Added
