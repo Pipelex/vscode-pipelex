@@ -51,8 +51,8 @@ vi.mock('../validation/bundleGather', () => ({
 // Isolate the test from the real diagnostics resolver (needs vscode.Range / sourceLocator):
 // place each run's errors on its own primary URI so we can observe which run's write won.
 vi.mock('../validation/crossFileDiagnostics', () => ({
-    buildBundleDiagnostics: vi.fn(({ errors, primaryUri }: any) => [
-        { uri: primaryUri, diagnostics: errors.map((e: any) => ({ message: e.message })) },
+    buildBundleDiagnostics: vi.fn(({ errors, warnings, primaryUri }: any) => [
+        { uri: primaryUri, diagnostics: [...errors, ...(warnings ?? [])].map((e: any) => ({ message: e.detail })) },
     ]),
 }));
 
@@ -105,11 +105,11 @@ describe('PipelexValidator — per-directory generation gate', () => {
         await flush();
 
         // The newer save (B) resolves first and publishes its diagnostics...
-        deferredB.resolve({ validation: { ok: false, errors: [{ category: 'x', message: 'B-error' }] } });
+        deferredB.resolve({ validation: { ok: false, errors: [{ code: 'method.invalid', detail: 'B-error' }] } });
         await pB;
 
         // ...then the older sibling run (A) resolves last with its own (now stale) set.
-        deferredA.resolve({ validation: { ok: false, errors: [{ category: 'x', message: 'A-error' }] } });
+        deferredA.resolve({ validation: { ok: false, errors: [{ code: 'method.invalid', detail: 'A-error' }] } });
         await pA;
 
         // B's diagnostics survive; A's late write is dropped (generation no longer current).
@@ -147,7 +147,7 @@ describe('PipelexValidator — per-directory generation gate', () => {
         expect(capturedSignal?.aborted).toBe(true);
 
         // 3. When the now-superseded analysis resolves, it publishes nothing.
-        deferred.resolve({ validation: { ok: false, errors: [{ category: 'x', message: 'stale' }] } });
+        deferred.resolve({ validation: { ok: false, errors: [{ code: 'method.invalid', detail: 'stale' }] } });
         await p1;
         expect(mockState.diagStore.has('file:///proj/x.mthds')).toBe(false);
         expect(mockState.setCalls).not.toContain('file:///proj/x.mthds');
@@ -185,7 +185,7 @@ describe('PipelexValidator — per-directory generation gate', () => {
         expect(signalA?.aborted).toBe(true);
 
         // 3. A resolves after validation was disabled — it must publish nothing.
-        deferredA.resolve({ validation: { ok: false, errors: [{ category: 'x', message: 'A-stale' }] } });
+        deferredA.resolve({ validation: { ok: false, errors: [{ code: 'method.invalid', detail: 'A-stale' }] } });
         await pA;
         expect(mockState.diagStore.has('file:///proj/a.mthds')).toBe(false);
         expect(mockState.setCalls).not.toContain('file:///proj/a.mthds');
@@ -201,7 +201,7 @@ describe('PipelexValidator — per-directory generation gate', () => {
 
         const p = mockState.onSaveHandler!(mkDoc('/proj/solo.mthds'));
         await flush();
-        deferred.resolve({ validation: { ok: false, errors: [{ category: 'x', message: 'solo-error' }] } });
+        deferred.resolve({ validation: { ok: false, errors: [{ code: 'method.invalid', detail: 'solo-error' }] } });
         await p;
 
         expect(mockState.diagStore.get('file:///proj/solo.mthds')).toEqual([{ message: 'solo-error' }]);
@@ -261,7 +261,7 @@ describe('PipelexValidator — per-directory generation gate', () => {
             analyze: () => Promise.resolve({
                 validation: {
                     ok: false,
-                    errors: [{ category: 'dry_run', message: 'Dry run failed' }],
+                    errors: [{ code: 'method.invalid', detail: 'Dry run failed' }],
                 },
                 graph: null,
             }),
@@ -291,6 +291,25 @@ describe('PipelexValidator — per-directory generation gate', () => {
             primaryUri: bundleUri,
             primaryDocument: undefined,
         }));
+
+        validator.dispose();
+    });
+
+    it("publishes a valid verdict's warnings, and clears the directory when it has none", async () => {
+        const warning = { code: 'method.hint_invalid', detail: 'odd hint' };
+        let analysis: any = { validation: { ok: true, errors: [], warnings: [warning] } };
+        const backend = { kind: 'api', analyze: () => Promise.resolve(analysis) };
+        const validator = new PipelexValidator({ appendLine: vi.fn() } as any, { getBackend: () => backend } as any);
+        const doc = mkDoc('/proj/main.mthds');
+        mockState.bundleFiles = [{ uri: doc.uri, name: 'main.mthds', content: 'domain = "d"\n' }];
+
+        await mockState.onSaveHandler!(doc);
+        expect(buildBundleDiagnostics).toHaveBeenLastCalledWith(expect.objectContaining({ errors: [], warnings: [warning] }));
+        expect(mockState.diagStore.get('file:///proj/main.mthds')).toEqual([{ message: 'odd hint' }]);
+
+        analysis = { validation: { ok: true, errors: [] } };
+        await mockState.onSaveHandler!(doc);
+        expect(mockState.diagStore.has('file:///proj/main.mthds')).toBe(false);
 
         validator.dispose();
     });

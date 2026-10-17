@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { ValidationErrorItem } from './types';
+import type { ProblemItem } from './types';
 
 /**
  * The backend seam for MTHDS bundle analysis.
@@ -23,7 +23,7 @@ export interface BundleFile {
     uri: vscode.Uri;
     /**
      * The name sent to the backend (API `mthds_sources[]` entry) and matched against
-     * an error's `source`. Stable across backends so cross-file mapping is uniform.
+     * an item's `location.file`. Stable across backends so cross-file mapping is uniform.
      */
     name: string;
     /** File text. v1 reads from disk (CLI `--library-dir` parity). */
@@ -50,7 +50,8 @@ export interface AnalyzeOptions {
 
 /**
  * The validation half of an analysis. `ok` is the verdict; `errors` carries the
- * structured per-error list both backends normalize to (empty when `ok`).
+ * verdict's faults as the problem items both backends read (empty when `ok`),
+ * and `warnings` its advisory findings, which never make a verdict invalid.
  *
  * Kept as a flat shape (rather than a discriminated union) because the extension
  * tsconfig runs with `strict:false`, where boolean-literal discriminants do not
@@ -58,7 +59,9 @@ export interface AnalyzeOptions {
  */
 export interface ValidationOutcome {
     ok: boolean;
-    errors: ValidationErrorItem[];
+    errors: ProblemItem[];
+    /** Advisory findings; absent or empty when the validator reported none. */
+    warnings?: ProblemItem[];
 }
 
 export interface BundleAnalysis {

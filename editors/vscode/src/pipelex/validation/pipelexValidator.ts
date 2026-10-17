@@ -201,12 +201,16 @@ export class PipelexValidator implements vscode.Disposable {
     ): void {
         const dir = path.dirname(document.uri.fsPath);
         const validation = analysis.validation;
-        if (validation.ok) {
+        const warnings = validation.warnings ?? [];
+        if (validation.ok && warnings.length === 0) {
             this.setDiagnosticsForDir(dir, []);
             return;
         }
+        // A valid verdict publishes its advisory findings as warnings; an invalid
+        // one its faults as errors, beside any warnings it also carries.
         const fileDiags = buildBundleDiagnostics({
-            errors: validation.errors,
+            errors: validation.ok ? [] : validation.errors,
+            warnings,
             files,
             primaryUri: analysisPrimaryUri,
             diagnosticSource: DIAGNOSTIC_SOURCE,

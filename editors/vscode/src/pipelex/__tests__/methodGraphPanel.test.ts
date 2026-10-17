@@ -1499,15 +1499,15 @@ describe('MethodGraphPanel', () => {
         mockState.errorLocations = [
             {
                 error: {
-                    category: 'pipe_validation',
-                    message: 'missing concept Foo',
-                    pipe_code: 'my_pipe',
+                    code: 'method.concept_unresolved',
+                    detail: 'missing concept Foo',
+                    location: { pipe: 'my_pipe' },
                     suggested_fix: { fix_code: 'declare-concept', description: 'Declare [concept.Foo].', ops: [] },
                 },
                 uri,
                 range,
             },
-            { error: { category: 'concept_validation', message: 'unknown concept Bar', concept_code: 'Bar' }, uri, range },
+            { error: { code: 'method.concept_invalid', detail: 'unknown concept Bar', params: { concept: 'Bar' } }, uri, range },
         ];
         await panel.applyAnalysis(uri, invalidAnalysis(), uri);
 
@@ -1541,7 +1541,7 @@ describe('MethodGraphPanel', () => {
 
         const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
         mockState.errorLocations = [
-            { error: { category: 'pipe_validation', message: 'still shown despite gather failure' }, uri, range },
+            { error: { code: 'method.invalid', detail: 'still shown despite gather failure' }, uri, range },
         ];
 
         // The validator calls applyAnalysis fire-and-forget, so a gather failure must
@@ -1568,7 +1568,7 @@ describe('MethodGraphPanel', () => {
 
         const range = { start: { line: 3, character: 0 }, end: { line: 3, character: 0 } };
         mockState.errorLocations = [
-            { error: { category: 'pipe_validation', message: 'helper broke', pipe_code: 'helper' }, uri: siblingUri, range },
+            { error: { code: 'pipe.failed', detail: 'helper broke', location: { pipe: 'helper' } }, uri: siblingUri, range },
         ];
         await panel.applyAnalysis(uri, invalidAnalysis(), uri);
 
@@ -1656,7 +1656,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it('applyAnalysis infers a bare pipe_code through the static registry, never guessing on collisions', async () => {
+    it("applyAnalysis qualifies an item's pipe by its declaring file, else through the static registry, never guessing on collisions", async () => {
         const uri = makeUri('/project/methods/screening.mthds');
         const helpersUri = makeUri('/project/methods/helpers.mthds');
         seedCollidingBundle(uri, helpersUri);
@@ -1668,12 +1668,13 @@ describe('MethodGraphPanel', () => {
         const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
         mockState.errorLocations = [
             // `main` exists in exactly one domain → inferred `screening.main`.
-            { error: { category: 'pipe_validation', message: 'root broke', pipe_code: 'main' }, uri, range },
+            { error: { code: 'pipe.failed', detail: 'root broke', location: { pipe: 'main' } }, uri, range },
             // `analyze` exists in two domains → stays untargeted.
-            { error: { category: 'pipe_validation', message: 'which one?', pipe_code: 'analyze' }, uri, range },
-            // The wire's domain_code wins outright, and the chip qualifies
-            // because the error lives outside the shown file's domain.
-            { error: { category: 'pipe_validation', message: 'sibling broke', pipe_code: 'analyze', domain_code: 'helpers' }, uri, range },
+            { error: { code: 'pipe.failed', detail: 'which one?', location: { pipe: 'analyze' } }, uri, range },
+            // The declaring file's domain, which the resolver found from the file
+            // the item names, wins outright, and the chip qualifies because the
+            // item lives outside the shown file's domain.
+            { error: { code: 'pipe.failed', detail: 'sibling broke', location: { pipe: 'analyze', file: 'helpers.mthds' } }, uri: helpersUri, range, pipeDomain: 'helpers' },
         ];
         await panel.applyAnalysis(uri, invalidAnalysis(), uri);
 
@@ -1744,6 +1745,81 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
+    it("a valid verdict lists its own advisory warnings ahead of the static ones", async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        (panel as any).staticIssues = [
+            { severity: 'warning', message: 'static warning', origin: 'static' },
+            { severity: 'error', message: 'static error the verdict contradicts', origin: 'static' },
+        ];
+        (panel as any).staticTargets = [undefined, undefined];
+        const range = { start: { line: 3, character: 0 }, end: { line: 3, character: 9 } };
+        const warning = { code: 'method.hint_invalid', detail: 'odd hint', location: { pipe: 'my_pipe' } };
+        mockState.errorLocations = [{ error: warning, uri, range, pipeDomain: 'demo' }];
+
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [], warnings: [warning] } } as any, uri);
+
+        const validation = currentValidationPayload(panel);
+        expect(validation.state).toBe('valid');
+        expect(validation.issues).toEqual([
+            expect.objectContaining({ severity: 'warning', message: 'odd hint', origin: 'validator', pipeRef: 'demo.my_pipe' }),
+            expect.objectContaining({ severity: 'warning', message: 'static warning', origin: 'static' }),
+        ]);
+        // The validator's warning is navigable, aligned with its row.
+        expect((panel as any).errorTargets).toEqual([{ uri, range }, undefined]);
+        panel.dispose();
+    });
+
+    it("a static rebuild after a valid verdict keeps the verdict's warnings", async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri); // clean bundle → the rebuild yields no static warnings
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        const warning = { code: 'method.hint_invalid', detail: 'validator warning' };
+        mockState.errorLocations = [{ error: warning, uri, range }];
+        mockState.onSaveHandler!({ uri });
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [], warnings: [warning] } } as any, uri);
+
+        await new Promise(r => setTimeout(r, 30));
+
+        const validation = (panel as any).pendingData?.validation ?? currentValidationPayload(panel);
+        expect(validation.state).toBe('valid');
+        expect(validation.issues).toEqual([
+            expect.objectContaining({ severity: 'warning', message: 'validator warning' }),
+        ]);
+        expect((panel as any).errorTargets).toEqual([{ uri, range }]);
+        panel.dispose();
+    });
+
+    it('an invalid verdict lists its errors, then its warnings', async () => {
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        const error = { code: 'method.syntax', detail: 'broken', location: { line: 1 } };
+        const warning = { code: 'method.hint_invalid', detail: 'odd hint' };
+        mockState.errorLocations = [{ error, uri, range }, { error: warning, uri, range }];
+
+        await panel.applyAnalysis(uri, { validation: { ok: false, errors: [error], warnings: [warning] }, graph: null } as any, uri);
+
+        const validation = currentValidationPayload(panel);
+        expect(validation.state).toBe('invalid');
+        expect(validation.issues.map((issue: any) => [issue.severity, issue.message])).toEqual([
+            ['error', 'broken'],
+            ['warning', 'odd hint'],
+        ]);
+        expect((panel as any).errorTargets).toHaveLength(2);
+        panel.dispose();
+    });
+
     it('a static rebuild finishing after applySkipped refreshes the static tail behind the lead', async () => {
         const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
         const uri = makeUri('/project/methods/main.mthds');
@@ -1780,7 +1856,7 @@ describe('MethodGraphPanel', () => {
 
         const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
         mockState.errorLocations = [
-            { error: { category: 'pipe_validation', message: 'real validator error', pipe_code: 'greet' }, uri, range },
+            { error: { code: 'pipe.failed', detail: 'real validator error', location: { pipe: 'greet' } }, uri, range },
         ];
         // The user saves (validating + async rebuild), and the invalid verdict
         // lands BEFORE the rebuild's file reads complete.
@@ -1818,7 +1894,7 @@ describe('MethodGraphPanel', () => {
         );
         const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
         mockState.errorLocations = [
-            { error: { category: 'pipe_validation', message: 'stale invalid verdict' }, uri, range },
+            { error: { code: 'method.invalid', detail: 'stale invalid verdict' }, uri, range },
         ];
         const stale = panel.applyAnalysis(uri, invalidAnalysis(), uri);
 
@@ -1968,7 +2044,7 @@ describe('MethodGraphPanel', () => {
 
         const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
         mockState.errorLocations = [
-            { error: { category: 'dry_run', message: 'Dry run failed' }, uri: primaryUri, range },
+            { error: { code: 'method.invalid', detail: 'Dry run failed' }, uri: primaryUri, range },
         ];
         await panel.applyAnalysis(uri, invalidAnalysis(), primaryUri);
 
@@ -2081,7 +2157,7 @@ describe('MethodGraphPanel', () => {
 
         const range = { start: { line: 3, character: 0 }, end: { line: 3, character: 5 } };
         mockState.errorLocations = [
-            { error: { category: 'pipe_validation', message: 'helper broke', pipe_code: 'helper' }, uri: siblingUri, range },
+            { error: { code: 'pipe.failed', detail: 'helper broke', location: { pipe: 'helper' } }, uri: siblingUri, range },
         ];
         await panel.applyAnalysis(uri, invalidAnalysis(), uri);
 
@@ -2109,7 +2185,7 @@ describe('MethodGraphPanel', () => {
 
         const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
         mockState.errorLocations = [
-            { error: { category: 'x', message: 'only one' }, uri, range },
+            { error: { code: 'method.invalid', detail: 'only one' }, uri, range },
         ];
         await panel.applyAnalysis(uri, invalidAnalysis(), uri);
 

@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { PipelexApiClient, ApiResponseError, ApiUnreachableError, PipelineRequestError } from '@pipelex/sdk';
-import type { PipelexInvalidReport, PipelexValidationReport, PipelexValidationResult } from '@pipelex/sdk';
+import type { PipelexValidationReport, PipelexValidationResult } from '@pipelex/sdk';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
-import type { ValidationErrorItem } from './types';
+import { asSentence, readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
 import { isHostedPipelexApi, type ApiCapabilityGate } from './apiCapabilityGate';
 import { PIPELEX_PLATFORM_URL, SET_API_KEY_COMMAND } from './apiKey';
 
@@ -26,15 +26,19 @@ export interface ApiBackendDeps {
  * API backend — one `POST /v1/validate` per `analyze()` always returns both the
  * validation verdict and (when asked) the graph. `/validate` is 200-diagnostic:
  * the produced verdict rides the response body discriminated on `is_valid`. An
- * `is_valid: false` body carries the structured `validation_errors[]` (mapped to
- * the same diagnostics shape the CLI path produces); a valid bundle with pending
- * signatures is `is_valid: true` / `is_runnable: false` — a runnability fact, not
- * an error (the `--allow-signatures` sweep tolerates them).
+ * `is_valid: false` body carries its faults as problem items in `errors[]` (the
+ * same items the CLI path reads), and either arm may carry advisory findings as
+ * problem items in `warnings[]`; a valid bundle with pending signatures is
+ * `is_valid: true` / `is_runnable: false` — a runnability fact, not an error
+ * (the `--allow-signatures` sweep tolerates them). A runner that still writes
+ * the shape problem items replace (the hosted plane's, until it runs a pipelex
+ * that writes problems) is read through `problemItems.ts`.
  *
  * Transport / no-verdict failures (server unreachable, non-`problem+json`, auth,
  * a request-shape 422, timeout, unparseable) never become diagnostics: they
  * surface a {@link BackendError} so the consumer notifies, clears stale
- * diagnostics, and does NOT fall back to the CLI.
+ * diagnostics, and does NOT fall back to the CLI. A no-verdict answer is a
+ * problem document, and its detail and next step are what the user is shown.
  */
 export class ApiValidationBackend implements ValidationBackend {
     readonly kind = 'api' as const;
@@ -119,7 +123,7 @@ export class ApiValidationBackend implements ValidationBackend {
         // body slips through as `report` — and reading `report.is_valid` below would
         // throw a TypeError that escapes `handleError` to the generic error path.
         // Treat a non-object body as a malformed (no-verdict) response, mirroring the
-        // missing-`validation_errors` contract violation handled further down.
+        // missing-`errors` contract violation handled further down.
         if (report === null || typeof report !== 'object') {
             throw new BackendError({
                 kind: 'api-error',
@@ -132,27 +136,27 @@ export class ApiValidationBackend implements ValidationBackend {
         // bundle is a produced verdict (`is_valid: false`), not a transport error.
         // (The extension tsconfig is `strict:false`, where boolean-literal
         // discriminants don't narrow — read `is_valid` and cast the arm explicitly.)
+        // The SDK types the shape problem items replace, so the items are read
+        // loosely off the body itself.
+        const body = report as unknown as Record<string, unknown>;
+        const warnings = readProblemItems(body.warnings);
         if (report.is_valid === false) {
-            const invalid = report as PipelexInvalidReport;
-            const errors = invalid.validation_errors;
+            const errors = readVerdictErrors(body);
             // The runtime's structured-info invariant is total: an invalid verdict
-            // ALWAYS carries a non-empty `validation_errors[]` (the CLI path enforces
-            // the same in `parseFailure`). An `is_valid: false` body with an empty or
-            // missing list is a backend/contract violation, NOT an empty invalid
-            // verdict — surface it as a no-verdict BackendError so the consumer clears
-            // stale diagnostics, instead of silently publishing zero diagnostics (which
-            // would read as a falsely-clean bundle and a "No Graph Available" panel).
-            if (!Array.isArray(errors) || errors.length === 0) {
+            // ALWAYS carries a non-empty `errors[]` (the CLI path enforces the same
+            // in `parseFailure`). An `is_valid: false` body with no readable item is
+            // a backend/contract violation, NOT an empty invalid verdict — surface it
+            // as a no-verdict BackendError so the consumer clears stale diagnostics,
+            // instead of silently publishing zero diagnostics (which would read as a
+            // falsely-clean bundle and a "No Graph Available" panel).
+            if (errors.length === 0) {
                 throw new BackendError({
                     kind: 'api-error',
-                    logMessage: `Pipelex API returned is_valid:false with no validation_errors at ${baseUrl}`,
+                    logMessage: `Pipelex API returned is_valid:false with no readable errors at ${baseUrl}`,
                     userMessage: apiInvalidContractMessage(baseUrl),
                 });
             }
-            const validation: ValidationOutcome = {
-                ok: false,
-                errors: errors as ValidationErrorItem[],
-            };
+            const validation: ValidationOutcome = { ok: false, errors, warnings };
             return options.withGraph ? { validation, graph: null } : { validation };
         }
 
@@ -160,7 +164,7 @@ export class ApiValidationBackend implements ValidationBackend {
         // `is_runnable: false` fact on the success path — never a fabricated error.
         const valid = report as PipelexValidationReport;
         const graph = options.withGraph ? (valid.graph_spec ?? null) : undefined;
-        return { validation: { ok: true, errors: [] }, graph };
+        return { validation: { ok: true, errors: [], warnings }, graph };
     }
 
     /**
@@ -213,9 +217,15 @@ export class ApiValidationBackend implements ValidationBackend {
             // not "unreachable". An auth rejection (401/403) gets its own kind +
             // one-click remedies; everything else (a request-shape 422, a bad
             // request, a 5xx) is a generic api-error.
-            // The request id is what finds the server's log lines for this request.
-            const requestId = err.requestId ? ` (request ${err.requestId})` : '';
-            const logMessage = `Pipelex API ${err.status} at ${baseUrl}: ${err.serverMessage ?? err.statusText}${requestId}`;
+            // The body is a problem document: its code names the situation, and the
+            // request id is what finds the server's log lines for this request.
+            const problem = readProblemSummary(err.problemDocument);
+            const facts = [
+                problem?.code ? `code ${problem.code}` : undefined,
+                err.requestId ? `request ${err.requestId}` : undefined,
+            ].filter(fact => fact !== undefined);
+            const factsNote = facts.length > 0 ? ` (${facts.join(', ')})` : '';
+            const logMessage = `Pipelex API ${err.status} at ${baseUrl}: ${err.serverMessage ?? err.statusText}${factsNote}`;
             if (err.status === 401 || err.status === 403) {
                 throw new BackendError({
                     kind: 'auth',
@@ -227,7 +237,7 @@ export class ApiValidationBackend implements ValidationBackend {
             throw new BackendError({
                 kind: 'api-error',
                 logMessage,
-                userMessage: apiResponseMessage(err, baseUrl),
+                userMessage: apiResponseMessage(err, baseUrl, problem?.nextStep),
             });
         }
 
@@ -300,14 +310,18 @@ function unreachableMessage(baseUrl: string): string {
     return `Pipelex API unreachable at ${baseUrl} — is pipelex-api running?`;
 }
 
-/** Non-auth API response (bad request, 5xx). Auth (401/403) is handled by {@link authMessage}. */
-function apiResponseMessage(err: ApiResponseError, baseUrl: string): string {
-    return `Pipelex API error at ${baseUrl} (HTTP ${err.status}): ${err.serverMessage ?? err.statusText}.`;
+/**
+ * Non-auth API response (bad request, 5xx), with the next step its problem
+ * document gives. Auth (401/403) is handled by {@link authMessage}.
+ */
+function apiResponseMessage(err: ApiResponseError, baseUrl: string, nextStep: string | undefined): string {
+    const sentence = asSentence(`Pipelex API error at ${baseUrl} (HTTP ${err.status}): ${err.serverMessage ?? err.statusText}`);
+    return withNextStep(sentence, nextStep);
 }
 
 /**
- * Guidance for an `is_valid:false` body that omitted the required
- * `validation_errors[]`. The server WAS reached and returned a 200, but the
+ * Guidance for an `is_valid:false` body that carried no readable item in its
+ * required `errors[]`. The server WAS reached and returned a 200, but the
  * verdict is unusable — a backend/protocol breakdown, surfaced as an api-error.
  */
 function apiInvalidContractMessage(baseUrl: string): string {
@@ -320,7 +334,7 @@ function apiInvalidContractMessage(baseUrl: string): string {
  * Guidance for a 200 `/validate` body that is not a JSON object (e.g. literal
  * `null` or a primitive). The server was reached and returned 200, but the body
  * is not a verdict at all — a backend/protocol breakdown, surfaced as an api-error
- * like the missing-`validation_errors` case above.
+ * like the missing-`errors` case above.
  */
 function apiMalformedBodyMessage(baseUrl: string): string {
     return `Pipelex API at ${baseUrl} returned a malformed validation response (not a JSON verdict) — ` +

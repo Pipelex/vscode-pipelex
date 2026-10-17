@@ -1,30 +1,66 @@
 import * as vscode from 'vscode';
-import type { ValidationErrorItem } from './types';
+import type { ProblemItem } from './types';
+import { itemConcept, itemField, itemPipe } from './problemItems';
 
 /**
- * Map a validation error to the best-effort source range in a document.
+ * Map a problem item to a source range in a document.
  *
  * Strategy:
- * 1. Determine a target code: use pipe_code, concept_code, or extract from message
- * 2. Search for the matching `[pipe.<code>]` or `[concept.<code>]` table header
- * 3. If field_path is present, search for `<field> =` within that table section
- * 4. Fallback to line 0
+ * 1. When `exact` and the item carries its own `location.line` (1-based, with
+ *    an optional 1-based `location.column`), that position is the range: from
+ *    the column, or the line's start, to the end of the line. `exact` says the
+ *    document is the file the item names, so its line means this text.
+ * 2. Otherwise determine a target code: the item's `location.pipe`, its
+ *    `concept` parameter, or one extracted from its detail
+ * 3. Search for the matching `[pipe.<code>]` or `[concept.<code>]` table header
+ * 4. If the item names a field, search for `<field> =` within that table section
+ * 5. Fallback to line 0
  *
  * The matching core operates on an array of line strings (`findErrorLine`) so the
  * same placement logic serves an open `TextDocument` (the saved file) and a
  * sibling file that is only read from disk (cross-file diagnostics, never opened).
  */
-export function locateError(error: ValidationErrorItem, document: vscode.TextDocument): vscode.Range {
+export function locateError(error: ProblemItem, document: vscode.TextDocument, exact = false): vscode.Range {
     const lines = documentLines(document);
+    if (exact) {
+        const range = locateLineColumn(error, lines);
+        if (range) {
+            return range;
+        }
+    }
     const line = findErrorLine(error, lines);
     const safeLine = Math.min(line, document.lineCount - 1);
     return document.lineAt(safeLine).range;
 }
 
 /** Same placement logic against raw text — for files that are not open as documents. */
-export function locateErrorInLines(error: ValidationErrorItem, lines: string[]): vscode.Range {
+export function locateErrorInLines(error: ProblemItem, lines: string[], exact = false): vscode.Range {
+    if (exact) {
+        const range = locateLineColumn(error, lines);
+        if (range) {
+            return range;
+        }
+    }
     const line = findErrorLine(error, lines);
     return fullLineRange(lines, line);
+}
+
+/**
+ * The range an item's own `location.line` and `location.column` name, or
+ * undefined when it names no line or a line the text does not have. The range
+ * runs from the column to the end of the line, or covers the whole line when
+ * there is no column or the column lies at or past the line's end (a fault
+ * at the end of a line, such as a missing closing bracket).
+ */
+export function locateLineColumn(error: ProblemItem, lines: string[]): vscode.Range | undefined {
+    const line = error.location?.line;
+    if (line === undefined || line < 1 || line > lines.length) {
+        return undefined;
+    }
+    const text = lines[line - 1];
+    const column = error.location?.column;
+    const start = column !== undefined && column >= 1 && column - 1 < text.length ? column - 1 : 0;
+    return new vscode.Range(line - 1, start, line - 1, text.length);
 }
 
 /** Split document text into line strings (cheaper than repeated `lineAt`). */
@@ -36,10 +72,10 @@ function documentLines(document: vscode.TextDocument): string[] {
     return out;
 }
 
-/** The matching core: returns the 0-based target line for an error, or 0 as fallback. */
-export function findErrorLine(error: ValidationErrorItem, lines: string[]): number {
-    const pipeCode = error.pipe_code ?? extractCodeFromMessage(error.message, 'pipe');
-    const conceptCode = error.concept_code ?? extractCodeFromMessage(error.message, 'concept');
+/** The matching core: returns the 0-based target line for an item, or 0 as fallback. */
+export function findErrorLine(error: ProblemItem, lines: string[]): number {
+    const pipeCode = itemPipe(error) ?? extractCodeFromMessage(error.detail, 'pipe');
+    const conceptCode = itemConcept(error) ?? extractCodeFromMessage(error.detail, 'concept');
 
     let headerLine = -1;
 
@@ -50,8 +86,9 @@ export function findErrorLine(error: ValidationErrorItem, lines: string[]): numb
         headerLine = findTableHeaderInLines(lines, 'concept', conceptCode);
     }
 
-    if (headerLine !== -1 && error.field_path) {
-        const fieldKey = error.field_path.split('.').pop()!;
+    const field = itemField(error);
+    if (headerLine !== -1 && field) {
+        const fieldKey = field.split('.').pop()!;
         const fieldLine = findFieldInSection(lines, headerLine, fieldKey);
         if (fieldLine !== -1) {
             return fieldLine;
@@ -67,9 +104,9 @@ export function findErrorLine(error: ValidationErrorItem, lines: string[]): numb
 }
 
 /**
- * Try to extract `pipe.X` or `concept.X` codes from the error message text.
- * Many blueprint_validation errors encode references like "pipe 'my_pipe'" or
- * "concept 'MyConcept'" in the message string.
+ * Try to extract `pipe.X` or `concept.X` codes from an item's detail, for an
+ * item whose location and parameters name neither: a sentence may quote a
+ * reference like "pipe 'my_pipe'" or "concept 'MyConcept'".
  */
 function extractCodeFromMessage(message: string, kind: 'pipe' | 'concept'): string | null {
     // Match patterns like: pipe 'my_pipe', pipe "my_pipe", pipe `my_pipe`

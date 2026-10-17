@@ -10,36 +10,28 @@ import {
     errorContext,
     inferPipeRefFromRegistry,
     parseStaticIssueContext,
-    validationErrorsToIssues,
+    problemItemsToIssues,
 } from '../graph/validationStatus';
 
 describe('errorContext', () => {
     it('prefers the pipe chip, then the concept chip, then nothing', () => {
-        expect(errorContext({ category: 'x', message: 'm', pipe_code: 'my_pipe' })).toBe('pipe.my_pipe');
-        expect(errorContext({ category: 'x', message: 'm', concept_code: 'Foo' })).toBe('concept.Foo');
-        expect(errorContext({ category: 'x', message: 'm', pipe_code: 'my_pipe', concept_code: 'Foo' })).toBe('pipe.my_pipe');
-        expect(errorContext({ category: 'x', message: 'm' })).toBeUndefined();
+        expect(errorContext({ detail: 'm', location: { pipe: 'my_pipe' } })).toBe('pipe.my_pipe');
+        expect(errorContext({ detail: 'm', params: { concept: 'Foo' } })).toBe('concept.Foo');
+        expect(errorContext({ detail: 'm', location: { pipe: 'my_pipe' }, params: { concept: 'Foo' } })).toBe('pipe.my_pipe');
+        expect(errorContext({ detail: 'm' })).toBeUndefined();
     });
 
-    it('keeps the pipe chip bare when the error lives in the shown domain', () => {
-        expect(errorContext(
-            { category: 'x', message: 'm', pipe_code: 'my_pipe', domain_code: 'screening' },
-            'screening',
-        )).toBe('pipe.my_pipe');
+    it("keeps the pipe chip bare when the pipe lives in the shown file's domain", () => {
+        expect(errorContext({ detail: 'm', location: { pipe: 'my_pipe' } }, 'screening', 'screening')).toBe('pipe.my_pipe');
     });
 
-    it('qualifies the pipe chip when the error lives in another domain', () => {
-        expect(errorContext(
-            { category: 'x', message: 'm', pipe_code: 'my_pipe', domain_code: 'helpers' },
-            'screening',
-        )).toBe('pipe.helpers.my_pipe');
+    it('qualifies the pipe chip when the pipe lives in another domain', () => {
+        expect(errorContext({ detail: 'm', location: { pipe: 'my_pipe' } }, 'screening', 'helpers')).toBe('pipe.helpers.my_pipe');
     });
 
     it('stays bare when either domain is unknown', () => {
-        expect(errorContext({ category: 'x', message: 'm', pipe_code: 'my_pipe' }, 'screening'))
-            .toBe('pipe.my_pipe');
-        expect(errorContext({ category: 'x', message: 'm', pipe_code: 'my_pipe', domain_code: 'helpers' }))
-            .toBe('pipe.my_pipe');
+        expect(errorContext({ detail: 'm', location: { pipe: 'my_pipe' } }, 'screening')).toBe('pipe.my_pipe');
+        expect(errorContext({ detail: 'm', location: { pipe: 'my_pipe' } }, undefined, 'helpers')).toBe('pipe.my_pipe');
     });
 });
 
@@ -62,20 +54,19 @@ describe('inferPipeRefFromRegistry', () => {
     });
 });
 
-describe('validationErrorsToIssues', () => {
-    it('projects message, chip, owning file, and the suggested-fix description', () => {
-        const issues = validationErrorsToIssues(
+describe('problemItemsToIssues', () => {
+    it('projects detail, chip, owning file, and the suggested-fix description', () => {
+        const issues = problemItemsToIssues(
             [
                 {
-                    category: 'pipe_validation',
-                    message: 'output mismatch',
-                    pipe_code: 'analyze',
-                    domain_code: 'demo',
+                    code: 'method.output_concept_mismatch',
+                    detail: 'output mismatch',
+                    location: { pipe: 'analyze', file: 'main.mthds' },
                     suggested_fix: { fix_code: 'match-sequence-output', description: 'Align the output.', ops: [] },
                 },
-                { category: 'concept_validation', message: 'unknown concept', concept_code: 'Bar' },
+                { code: 'method.concept_unresolved', detail: 'unknown concept', params: { concept: 'Bar' } },
             ],
-            { ownerFiles: [undefined, 'concepts.mthds'] },
+            { ownerFiles: [undefined, 'concepts.mthds'], pipeDomains: ['demo', undefined] },
         );
 
         expect(issues).toEqual([
@@ -100,67 +91,72 @@ describe('validationErrorsToIssues', () => {
         ]);
     });
 
-    it('tolerates a null suggested_fix and missing context', () => {
-        const issues = validationErrorsToIssues([
-            { category: 'x', message: 'm', suggested_fix: null },
-        ]);
+    it('gives advisory findings the warning severity', () => {
+        const issues = problemItemsToIssues([{ code: 'method.hint_invalid', detail: 'odd hint' }], {}, 'warning');
+        expect(issues[0].severity).toBe('warning');
+    });
+
+    it('tolerates a missing suggested fix and missing context', () => {
+        const issues = problemItemsToIssues([{ code: 'method.invalid', detail: 'm' }]);
         expect(issues[0].suggestedFix).toBeUndefined();
         expect(issues[0].file).toBeUndefined();
     });
 
-    it('builds pipeRef from domain_code + pipe_code, tolerating nulls', () => {
-        const issues = validationErrorsToIssues([
-            { category: 'x', message: 'm', pipe_code: 'my_pipe', domain_code: 'demo' },
-            { category: 'x', message: 'm', pipe_code: null, domain_code: 'demo' },
-            { category: 'x', message: 'm', concept_code: 'Foo' },
-        ]);
-        expect(issues.map(issue => issue.pipeRef)).toEqual(['demo.my_pipe', undefined, undefined]);
+    it("builds pipeRef from the pipe and its declaring file's domain", () => {
+        const issues = problemItemsToIssues(
+            [
+                { detail: 'm', location: { pipe: 'my_pipe' } },
+                { detail: 'm', params: { concept: 'Foo' } },
+            ],
+            { pipeDomains: ['demo', 'demo'] },
+        );
+        expect(issues.map(issue => issue.pipeRef)).toEqual(['demo.my_pipe', undefined]);
     });
 
-    it('infers the domain from the registry when only pipe_code arrives', () => {
+    it("infers the domain from the registry when the pipe's declaring file is not known", () => {
         const registryRefs = ['screening.analyze', 'screening.main', 'helpers.analyze'];
-        const issues = validationErrorsToIssues(
+        const issues = problemItemsToIssues(
             [
-                { category: 'x', message: 'm', pipe_code: 'main' },
+                { detail: 'm', location: { pipe: 'main' } },
                 // Colliding code: two domains declare `analyze` — never guess.
-                { category: 'x', message: 'm', pipe_code: 'analyze' },
+                { detail: 'm', location: { pipe: 'analyze' } },
             ],
             { pipeRegistryRefs: registryRefs },
         );
         expect(issues.map(issue => issue.pipeRef)).toEqual(['screening.main', undefined]);
+        // An inferred domain qualifies the chip as a known one does.
+        expect(problemItemsToIssues(
+            [{ detail: 'm', location: { pipe: 'main' } }],
+            { pipeRegistryRefs: registryRefs, shownDomain: 'helpers' },
+        )[0].context).toBe('pipe.screening.main');
     });
 
-    it('leaves a bare pipe_code untargeted without a registry', () => {
-        const issues = validationErrorsToIssues([
-            { category: 'x', message: 'm', pipe_code: 'my_pipe' },
-        ]);
+    it('leaves a bare pipe untargeted without a domain or a registry', () => {
+        const issues = problemItemsToIssues([{ detail: 'm', location: { pipe: 'my_pipe' } }]);
         expect(issues[0].pipeRef).toBeUndefined();
     });
 
-    it('prefers the wire domain_code over registry inference', () => {
-        // The registry knows `analyze` only under `screening`, but the error
-        // says `helpers` — the wire is authoritative.
-        const issues = validationErrorsToIssues(
-            [{ category: 'x', message: 'm', pipe_code: 'analyze', domain_code: 'helpers' }],
-            { pipeRegistryRefs: ['screening.analyze'] },
+    it("prefers the declaring file's domain over registry inference", () => {
+        // The registry knows `analyze` only under `screening`, but the file the
+        // item resolved declares `helpers` — the file is authoritative.
+        const issues = problemItemsToIssues(
+            [{ detail: 'm', location: { pipe: 'analyze' } }],
+            { pipeRegistryRefs: ['screening.analyze'], pipeDomains: ['helpers'], shownDomain: 'screening' },
         );
         expect(issues[0].pipeRef).toBe('helpers.analyze');
+        expect(issues[0].context).toBe('pipe.helpers.analyze');
     });
 
     it('coerces boundary fields to strings so a malformed response cannot crash the React renderer', () => {
-        // The wire types promise strings but the wire itself doesn't — a
+        // The types promise strings but a caller may not hold to them — a
         // non-string rendered as a React child throws inside GraphViewer.
-        const issues = validationErrorsToIssues([
+        const issues = problemItemsToIssues([
             {
-                category: 'x',
-                message: { unexpected: 'object' },
-                pipe_code: 42,
-                domain_code: 7,
+                detail: { unexpected: 'object' },
                 suggested_fix: { fix_code: 'f', description: ['not', 'a', 'string'] },
             } as any,
         ]);
         expect(typeof issues[0].message).toBe('string');
-        expect(issues[0].pipeRef).toBe('7.42');
         expect(typeof issues[0].suggestedFix).toBe('string');
     });
 });

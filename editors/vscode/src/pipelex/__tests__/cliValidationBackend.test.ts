@@ -73,41 +73,131 @@ describe('CliValidationBackend', () => {
         expect(args).toEqual(expect.arrayContaining(['validate', 'bundle', '/project/methods/main.mthds', '--library-dir', '/project/methods', '--allow-signatures', '--view', '--format', 'json']));
     });
 
-    it('maps exit 1 with validation_errors to a not-ok outcome', async () => {
+    it('reads the advisory warnings of a valid verdict from stdout', async () => {
+        cliState.spawnResolve = {
+            stdout: JSON.stringify({
+                success: true,
+                is_valid: true,
+                warnings: [{ category: 'hint_lint', error_type: 'hint_unknown_key', message: 'Unknown hint key.', pipe_code: 'main', source: '/project/methods/main.mthds' }],
+            }),
+            stderr: '',
+        };
+        const analysis = await analyze(false);
+        expect(analysis.validation.ok).toBe(true);
+        expect(analysis.validation.warnings).toEqual([
+            { detail: 'Unknown hint key.', location: { pipe: 'main', file: '/project/methods/main.mthds' } },
+        ]);
+    });
+
+    it('reads no warnings from a stdout that holds none', async () => {
+        cliState.spawnResolve = { stdout: 'not json', stderr: '' };
+        const analysis = await analyze(false);
+        expect(analysis.validation.warnings).toEqual([]);
+    });
+
+    it("maps exit 1 with the method.invalid problem to a not-ok outcome holding its items", async () => {
+        const item = {
+            code: 'method.syntax',
+            detail: 'The file main.mthds is not valid TOML.',
+            params: { finding: 'TOML syntax error' },
+            location: { file: '/project/methods/main.mthds', line: 3, column: 7 },
+        };
+        cliState.spawnReject = {
+            exitCode: 1,
+            stderr: JSON.stringify({
+                type: 'https://mthds.ai/errors/method.invalid',
+                title: 'The method does not validate',
+                code: 'method.invalid',
+                domain: 'method',
+                retry: 'no',
+                detail: 'The method does not validate.',
+                next_step: { kind: 'change_method', detail: "Fix each fault the problem's errors list, then validate the method again." },
+                errors: [item],
+                message: 'Bundle validation failed',
+                is_valid: false,
+                bundle_path: '/project/methods/main.mthds',
+            }),
+        };
+        const analysis = await analyze();
+        expect(analysis.validation.ok).toBe(false);
+        expect(analysis.validation.errors).toEqual([item]);
+    });
+
+    it('returns graph:null beside the errors when the graph was asked for', async () => {
+        cliState.spawnReject = {
+            exitCode: 1,
+            stderr: JSON.stringify({ code: 'method.invalid', detail: 'The method does not validate.', is_valid: false, errors: [{ code: 'pipe.input_unresolved', detail: "Pipe 'main' could not read 'text', which an earlier step should have produced.", location: { pipe: 'main' } }] }),
+        };
+        const analysis = await analyze(true);
+        expect(analysis.validation.ok).toBe(false);
+        expect(analysis.graph).toBeNull();
+    });
+
+    it('reads the verdict a CLI older than the problem document writes as validation_errors', async () => {
         cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'ValidateBundleError', message: 'invalid', validation_errors: [{ category: 'pipe_validation', message: 'bad pipe', pipe_code: 'x' }] }) };
         const analysis = await analyze();
         expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toHaveLength(1);
-        expect(analysis.validation.errors[0].message).toBe('bad pipe');
+        expect(analysis.validation.errors).toEqual([{ detail: 'bad pipe', location: { pipe: 'x' } }]);
     });
 
-    it('consumes a dry_run residual item directly — no fabricated category', async () => {
-        // The runtime's structured-info invariant is total, so a dry-run failure rides
-        // a real `dry_run` item (no source). The backend passes it through verbatim;
-        // the old `blueprint_validation` synthesis for empty lists is gone.
-        cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'ValidateBundleError', message: 'invalid', validation_errors: [{ category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...' }] }) };
-        const analysis = await analyze();
-        expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toEqual([{ category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...' }]);
-    });
-
-    it('treats an exit-1 with an empty validation_errors[] as infra, not a fabricated diagnostic', async () => {
-        // With the structured-info invariant total, the real CLI never emits an empty
+    it('treats an exit-1 verdict with no readable item as infra, not a fabricated diagnostic', async () => {
+        // With the structured-info invariant total, the real CLI never writes an empty
         // list for a content verdict. If it somehow does, surface it as infra rather
-        // than synthesizing a stand-in `blueprint_validation` item.
+        // than synthesizing a stand-in item.
         cliState.version = [0, 34, 0];
         cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'MthdsParserError', error_domain: 'input', message: 'Missing required fields', validation_errors: [] }) };
         const err = await analyze().catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('infra');
+        expect(err.userMessage).toBeUndefined();
     });
 
-    it('surfaces a config-domain failure (no list) as an infra BackendError', async () => {
+    it("shows a problem that produced no verdict with its detail and next step", async () => {
+        cliState.spawnReject = {
+            exitCode: 1,
+            stderr: 'WARNING: something\n' + JSON.stringify({
+                type: 'https://docs.pipelex.com/errors/pipelex.config.invalid',
+                title: "The runtime's configuration is invalid",
+                code: 'pipelex.config.invalid',
+                domain: 'operator',
+                retry: 'no',
+                detail: "The runtime's configuration is invalid, so it cannot serve this request.",
+                next_step: {
+                    kind: 'fix_configuration',
+                    detail: "Correct the setting 'default' in the file 'routing_profiles.toml' of the backends configuration, then restart the runtime.",
+                },
+            }),
+        };
+        const err = await analyze().catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('infra');
+        expect(err.userMessage).toBe(
+            "pipelex-agent could not validate this method: The runtime's configuration is invalid, so it cannot serve this request. " +
+            "Next step: Correct the setting 'default' in the file 'routing_profiles.toml' of the backends configuration, then restart the runtime.",
+        );
+        expect(err.logMessage).toContain('pipelex.config.invalid');
+    });
+
+    it('reads a problem on stderr whatever the exit code', async () => {
+        cliState.spawnReject = {
+            exitCode: 2,
+            stderr: JSON.stringify({ code: 'client.argument_invalid', detail: "The argument '--nope' was refused before any request left (reason: unknown).", next_step: { kind: 'change_input', detail: "Correct the argument '--nope', then try again." } }),
+        };
+        const err = await analyze().catch(e => e);
+        expect(err.kind).toBe('infra');
+        expect(err.userMessage).toBe(
+            "pipelex-agent could not validate this method: The argument '--nope' was refused before any request left (reason: unknown). " +
+            "Next step: Correct the argument '--nope', then try again.",
+        );
+    });
+
+    it('surfaces a failure of the envelope problems replace (no list) as a silent infra BackendError', async () => {
         cliState.version = [0, 34, 0];
         cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'PipelexSetupError', error_domain: 'config', message: 'setup needed', validation_errors: [] }) };
         const err = await analyze().catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('infra');
+        expect(err.userMessage).toBeUndefined();
     });
 
     it('detects an outdated CLI that argparse-errors on an unknown flag', async () => {

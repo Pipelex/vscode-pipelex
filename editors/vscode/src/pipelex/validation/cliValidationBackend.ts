@@ -4,8 +4,8 @@ import { spawnCli } from './processUtils';
 import { extractJson } from './cliOutput';
 import { getAgentCliVersion, compareSemver, formatSemver, MIN_AGENT_VERSION } from './agentCliVersion';
 import { AnalyzeAbortError, BackendError } from './backend';
-import type { AnalyzeOptions, BundleAnalysis, BundleRequest, ValidationBackend } from './backend';
-import type { ValidationErrorItem, ValidationFailure } from './types';
+import type { AnalyzeOptions, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
+import { readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
 
 /**
  * CLI backend — spawns `pipelex-agent validate bundle`.
@@ -15,12 +15,22 @@ import type { ValidationErrorItem, ValidationFailure } from './types';
  * graph-on-success or errors-on-failure):
  *
  * - `withGraph:false` → `validate bundle … --allow-signatures --format json`.
- *   exit 0 → valid; exit 1 → parse `validation_errors` from stderr JSON.
+ *   exit 0 → valid, its advisory `warnings` read from stdout JSON; exit 1 →
+ *   the invalid verdict read from the problem on stderr.
  * - `withGraph:true`  → adds `--view --direction <dir>`. exit 0 → parse the
  *   `graphspec` from stdout JSON; exit 1 → errors + `graph:null`.
  *
  * `--format json` makes both streams machine-readable (the agent CLI otherwise
  * defaults error output to markdown).
+ *
+ * `pipelex-agent` reports every failure as a problem document on stderr. The
+ * invalid verdict is the `method.invalid` problem with `is_valid: false`, its
+ * faults the problem items of its `errors[]`. Any other problem means no
+ * verdict was produced (a configuration the runtime cannot boot with, an
+ * unreadable bundle, …), and it surfaces as a {@link BackendError} whose
+ * message is the problem's detail and next step. A CLI older than the pipelex
+ * release that writes problems reports the verdict as `validation_errors[]`,
+ * which is read into the same items (`problemItems.ts`).
  */
 export class CliValidationBackend implements ValidationBackend {
     readonly kind = 'cli' as const;
@@ -65,16 +75,30 @@ export class CliValidationBackend implements ValidationBackend {
         try {
             const { stdout } = await spawnCli(resolved.command, args, request.timeout, signal, request.cwd);
             // exit 0 → valid bundle.
+            const validation: ValidationOutcome = { ok: true, errors: [], warnings: this.parseWarnings(stdout) };
             if (options.withGraph) {
                 const graph = this.parseGraphspec(stdout);
-                return { validation: { ok: true, errors: [] }, graph };
+                return { validation, graph };
             }
-            return { validation: { ok: true, errors: [] } };
+            return { validation };
         } catch (err: any) {
             if (signal.aborted) {
                 throw new AnalyzeAbortError();
             }
             return this.handleSpawnError(err, options);
+        }
+    }
+
+    /** The advisory findings of a valid verdict, from its stdout JSON; none when it cannot be read. */
+    private parseWarnings(stdout: string): ValidationOutcome['warnings'] {
+        const json = extractJson(stdout);
+        if (!json) {
+            return [];
+        }
+        try {
+            return readProblemItems(JSON.parse(json)?.warnings);
+        } catch {
+            return [];
         }
     }
 
@@ -97,22 +121,38 @@ export class CliValidationBackend implements ValidationBackend {
      * (including one that argparse-errors on an unknown flag) never reaches here.
      */
     private handleSpawnError(err: any, options: AnalyzeOptions): BundleAnalysis {
-        if (err.exitCode === 1 && typeof err.stderr === 'string') {
-            const json = extractJson(err.stderr);
-            if (json) {
-                const outcome = this.parseFailure(json);
-                if (outcome) {
-                    return options.withGraph ? { validation: outcome, graph: null } : { validation: outcome };
-                }
+        const stderr = typeof err.stderr === 'string' ? err.stderr : undefined;
+        const json = stderr !== undefined ? extractJson(stderr) : null;
+        const body = json ? parseObject(json) : undefined;
+
+        if (err.exitCode === 1 && body) {
+            const outcome = this.parseFailure(body);
+            if (outcome) {
+                return options.withGraph ? { validation: outcome, graph: null } : { validation: outcome };
             }
-            // exit 1 but the stderr is not a parseable validation failure.
+        }
+
+        // No verdict. When the CLI said why as a problem document, its detail and
+        // next step are what the user is shown.
+        const problem = readProblemSummary(body);
+        if (problem?.detail) {
+            const code = problem.code ? ` (${problem.code})` : '';
             throw new BackendError({
                 kind: 'infra',
-                logMessage: `pipelex-agent: ${err.stderr.slice(0, 500)}`,
+                logMessage: `pipelex-agent${code}: ${problem.detail}`,
+                userMessage: withNextStep(`pipelex-agent could not validate this method: ${problem.detail}`, problem.nextStep),
             });
         }
 
-        // Non-exit-1 failure (spawn error, timeout, …).
+        if (stderr !== undefined && err.exitCode === 1) {
+            // exit 1 but the stderr is neither a verdict nor a problem.
+            throw new BackendError({
+                kind: 'infra',
+                logMessage: `pipelex-agent: ${stderr.slice(0, 500)}`,
+            });
+        }
+
+        // Any other failure (spawn error, timeout, …).
         throw new BackendError({
             kind: 'infra',
             logMessage: `pipelex-agent error: ${err.message ?? err}`,
@@ -120,30 +160,25 @@ export class CliValidationBackend implements ValidationBackend {
     }
 
     /**
-     * Parse the exit-1 stderr JSON into a validation outcome.
-     * Returns `undefined` when it is an infrastructural error (not a bundle problem),
-     * so the caller can surface it as a {@link BackendError} instead.
+     * Read the exit-1 stderr problem as an invalid verdict. Returns `undefined`
+     * when it is not one (a problem that produced no verdict), so the caller can
+     * surface it as a {@link BackendError} instead.
      *
-     * The runtime's structured-info invariant is total: every invalid-bundle verdict
-     * carries a non-empty `validation_errors[]` (a parse-level failure yields one
-     * source-less `blueprint_validation` residual; a dry-run failure a `dry_run` item).
-     * So we consume that list directly — no per-category synthesis here. An exit-1
-     * envelope with an empty list is therefore NOT a bundle verdict but an infra
-     * error, surfaced as a {@link BackendError} by the caller.
+     * The runtime's structured-info invariant is total: every invalid verdict
+     * carries a non-empty `errors[]` (a parse-level failure yields one located
+     * syntax item; a dry-run failure one item per failed pipe). So the list is
+     * consumed directly — no synthesis here. A CLI that still writes the shape
+     * problem items replace reports the verdict as a non-empty
+     * `validation_errors[]`, read into the same items. A problem with no item is
+     * therefore NOT a bundle verdict.
      */
-    private parseFailure(json: string): { ok: false; errors: ValidationErrorItem[] } | undefined {
-        let failure: ValidationFailure;
-        try {
-            failure = JSON.parse(json);
-        } catch {
-            return undefined;
+    private parseFailure(body: Record<string, unknown>): ValidationOutcome | undefined {
+        if (body.is_valid === false || body.validation_errors !== undefined) {
+            const errors = readVerdictErrors(body);
+            if (errors.length > 0) {
+                return { ok: false, errors };
+            }
         }
-
-        const errors = failure.validation_errors;
-        if (Array.isArray(errors) && errors.length > 0) {
-            return { ok: false, errors };
-        }
-
         return undefined;
     }
 
@@ -166,5 +201,17 @@ export class CliValidationBackend implements ValidationBackend {
                     `(needs ≥ ${formatSemver(MIN_AGENT_VERSION)}).`,
             });
         }
+    }
+}
+
+/** The JSON object a text holds, or undefined when it holds none. */
+function parseObject(json: string): Record<string, unknown> | undefined {
+    try {
+        const value: unknown = JSON.parse(json);
+        return typeof value === 'object' && value !== null && !Array.isArray(value)
+            ? value as Record<string, unknown>
+            : undefined;
+    } catch {
+        return undefined;
     }
 }
