@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::{args::LintCommand, Taplo};
+use crate::{args::LintCommand, DiagnosticKind, Taplo};
 use anyhow::{anyhow, Context};
 use codespan_reporting::files::SimpleFile;
 use itertools::Itertools;
@@ -123,7 +123,7 @@ impl<E: Environment> Taplo<E> {
 
         if !parse.errors.is_empty() {
             let reported = parse.errors.iter().unique_by(|e| e.range).count();
-            self.record_stats(|stats| stats.diagnostics_syntax += reported);
+            self.record_diagnostics(Path::new(file_path), DiagnosticKind::Syntax, reported);
             if !self.compact {
                 self.print_parse_errors(&SimpleFile::new(file_path, source), &parse.errors)
                     .await?;
@@ -139,7 +139,7 @@ impl<E: Environment> Taplo<E> {
         if let Err(errors) = dom.validate() {
             let errors = errors.collect::<Vec<_>>();
             let reported = errors.len();
-            self.record_stats(|stats| stats.diagnostics_semantic += reported);
+            self.record_diagnostics(Path::new(file_path), DiagnosticKind::Semantic, reported);
             if !self.compact {
                 self.print_semantic_errors(&SimpleFile::new(file_path, source), errors.into_iter())
                     .await?;
@@ -198,7 +198,7 @@ impl<E: Environment> Taplo<E> {
 
             if !errors.is_empty() {
                 let reported = errors.len();
-                self.record_stats(|stats| stats.diagnostics_schema += reported);
+                self.record_diagnostics(Path::new(file_path), DiagnosticKind::Schema, reported);
                 if !self.compact {
                     self.print_schema_errors(&SimpleFile::new(file_path, source), &errors)
                         .await?;

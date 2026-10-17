@@ -29,7 +29,7 @@ use pipelex_cli::{
     args::PlxtArgs,
     usage_stats::{
         contract,
-        event::{self, CommandCompleted, Common, Outcome},
+        event::{self, CommandCompleted, Common, ErrorCode, Outcome},
         sender,
     },
 };
@@ -657,7 +657,7 @@ fn sample_command(outcome: Outcome) -> CommandCompleted {
     CommandCompleted {
         command: "lint",
         outcome,
-        error_domain: Some("input"),
+        error: Some(ErrorCode::METHOD_SYNTAX),
         duration_ms: 42,
         files: 3,
         invocation: "terminal",
@@ -687,7 +687,9 @@ fn built_events_pass_the_gate() {
                 let envelope = event::command_completed(SAMPLE_ID, &common, &completed).unwrap();
                 assert_envelope_shape(&envelope);
                 gate(&schema, &envelope).unwrap_or_else(|reason| panic!("{reason}: {envelope}"));
+                let has_code = envelope["properties"].get("error_code").is_some();
                 let has_domain = envelope["properties"].get("error_domain").is_some();
+                assert_eq!(has_code, outcome == Outcome::Failed, "{envelope}");
                 assert_eq!(has_domain, outcome == Outcome::Failed, "{envelope}");
             }
         }
@@ -701,6 +703,46 @@ fn built_events_pass_the_gate() {
     };
     let envelope = event::command_completed(SAMPLE_ID, &sample_common(), &huge).unwrap();
     gate(&schema, &envelope).unwrap_or_else(|reason| panic!("{reason}: {envelope}"));
+    // Every code `plxt` sends passes the gate, and a failure it cannot name sends
+    // neither the code nor the domain.
+    for error in ErrorCode::ALL.map(Some).into_iter().chain([None]) {
+        let completed = CommandCompleted {
+            error,
+            ..sample_command(Outcome::Failed)
+        };
+        let envelope = event::command_completed(SAMPLE_ID, &sample_common(), &completed).unwrap();
+        gate(&schema, &envelope).unwrap_or_else(|reason| panic!("{reason}: {envelope}"));
+        let properties = &envelope["properties"];
+        assert_eq!(
+            properties.get("error_code").and_then(Value::as_str),
+            error.map(|error| error.code)
+        );
+        assert_eq!(
+            properties.get("error_domain").and_then(Value::as_str),
+            error.map(|error| error.domain)
+        );
+    }
+}
+
+/// The MTHDS core error registry, vendored byte for byte from the `mthds`
+/// repository's `docs/spec/openapi/mthds-error-registry.json`.
+fn core_error_registry() -> Value {
+    let text = fs::read_to_string(repo_root().join("test-data/mthds-error-registry.json"))
+        .expect("the vendored core error registry should be readable");
+    serde_json::from_str(&text).expect("the vendored core error registry should be JSON")
+}
+
+#[test]
+fn every_error_code_plxt_sends_is_a_core_code_of_its_domain() {
+    let registry = core_error_registry();
+    let codes = registry["codes"].as_array().unwrap();
+    for error in ErrorCode::ALL {
+        let entry = codes
+            .iter()
+            .find(|entry| entry["code"] == error.code)
+            .unwrap_or_else(|| panic!("{} is not a code of the core registry", error.code));
+        assert_eq!(entry["domain"], error.domain, "{}", error.code);
+    }
 }
 
 #[test]
@@ -746,6 +788,14 @@ fn the_gate_check_is_not_vacuous() {
         (
             "bounds",
             Box::new(|event| event["properties"]["notice_version"] = json!(2)),
+        ),
+        (
+            "error code pattern",
+            Box::new(|event| event["properties"]["error_code"] = json!("Method.Syntax")),
+        ),
+        (
+            "error domain",
+            Box::new(|event| event["properties"]["error_domain"] = json!("config")),
         ),
     ];
     for (case, mutate) in broken {
@@ -823,23 +873,72 @@ fn diagnostics_are_counted_by_kind() {
     sandbox.write("syntax.toml", "a = \n");
     sandbox.write("semantic.toml", "a = 1\na = 2\n");
     sandbox.write("clean.toml", "a = 1\n");
+    sandbox.write("syntax.mthds", "a = \n");
+    sandbox.write("semantic.mthds", "a = 1\na = 2\n");
     fs::copy(
         repo_root().join("test-data/mthds/lint/invalid_schema.mthds"),
         sandbox.project.join("schema.mthds"),
     )
     .unwrap();
-    let cases: &[(&[&str], &str, [u64; 3])] = &[
-        (&["lint", "syntax.toml"], "lint", [1, 0, 0]),
-        (&["lint", "semantic.toml"], "lint", [0, 1, 0]),
-        (&["lint", "schema.mthds"], "lint", [0, 0, 1]),
+    // The error a failure names comes from its method files alone: `plxt` also
+    // lints plain TOML, which no code of the registry is about.
+    /// The arguments, the command reported, the syntax, semantic and schema
+    /// counts, and the error code named.
+    type Case = (
+        &'static [&'static str],
+        &'static str,
+        [u64; 3],
+        Option<&'static str>,
+    );
+    let cases: &[Case] = &[
+        (
+            &["lint", "syntax.mthds"],
+            "lint",
+            [1, 0, 0],
+            Some("method.syntax"),
+        ),
+        (
+            &["lint", "semantic.mthds"],
+            "lint",
+            [0, 1, 0],
+            Some("method.syntax"),
+        ),
+        (
+            &["lint", "schema.mthds"],
+            "lint",
+            [0, 0, 1],
+            Some("method.schema_violation"),
+        ),
+        (
+            &["format", "--check", "syntax.mthds"],
+            "format",
+            [1, 0, 0],
+            Some("method.syntax"),
+        ),
+        (&["lint", "syntax.toml"], "lint", [1, 0, 0], None),
+        (&["lint", "semantic.toml"], "lint", [0, 1, 0], None),
         (
             &["lint", "syntax.toml", "semantic.toml", "clean.toml"],
             "lint",
             [1, 1, 0],
+            None,
         ),
-        (&["format", "--check", "syntax.toml"], "format", [1, 0, 0]),
+        (
+            &["format", "--check", "syntax.toml"],
+            "format",
+            [1, 0, 0],
+            None,
+        ),
+        // A syntax error in plain TOML beside a method's schema violation: the
+        // method's fault is the one named.
+        (
+            &["lint", "syntax.toml", "schema.mthds"],
+            "lint",
+            [1, 0, 1],
+            Some("method.schema_violation"),
+        ),
     ];
-    for (args, command, [syntax, semantic, schema_count]) in cases {
+    for (args, command, [syntax, semantic, schema_count], error_code) in cases {
         let (output, events) = sandbox.debug_events(args, &[]);
         assert!(!output.status.success(), "{args:?}");
         assert_eq!(events.len(), 1, "{args:?}: {output:?}");
@@ -847,7 +946,16 @@ fn diagnostics_are_counted_by_kind() {
         gate(&schema, &events[0]).unwrap_or_else(|reason| panic!("{args:?}: {reason}"));
         assert_eq!(properties["command"], *command);
         assert_eq!(properties["outcome"], "failed");
-        assert_eq!(properties["error_domain"], "input");
+        assert_eq!(
+            properties.get("error_code").and_then(Value::as_str),
+            *error_code,
+            "{args:?}: {properties}"
+        );
+        assert_eq!(
+            properties.get("error_domain").and_then(Value::as_str),
+            error_code.map(|_| "method"),
+            "{args:?}: {properties}"
+        );
         assert!(
             properties["diagnostics_syntax"].as_u64().unwrap() >= *syntax,
             "{args:?}: {properties}"
@@ -871,6 +979,17 @@ fn diagnostics_are_counted_by_kind() {
     let (_, events) =
         sandbox.debug_events(&["lint", "syntax.toml", "semantic.toml", "clean.toml"], &[]);
     assert_eq!(events[0]["properties"]["files_bucket"], "2-10");
+
+    // A file that is valid but not formatted fails `format --check` with no
+    // diagnostic, and the registry has no code for it: the event names no error.
+    sandbox.write("unformatted.toml", "a   =   1\n");
+    let (output, events) = sandbox.debug_events(&["format", "--check", "unformatted.toml"], &[]);
+    assert!(!output.status.success(), "{output:?}");
+    let properties = &events[0]["properties"];
+    gate(&schema, &events[0]).unwrap_or_else(|reason| panic!("{reason}"));
+    assert_eq!(properties["outcome"], "failed");
+    assert!(properties.get("error_code").is_none(), "{properties}");
+    assert!(properties.get("error_domain").is_none(), "{properties}");
 }
 
 #[test]

@@ -7,7 +7,7 @@
 //! refresh that changes one of them fails until this file follows.
 
 /// The version of the event schema every event follows (`schema_version`).
-pub const SCHEMA_VERSION: u64 = 1;
+pub const SCHEMA_VERSION: u64 = 2;
 /// The reporting tool, and its only surface.
 pub const TOOL: &str = "plxt";
 pub const SURFACE: &str = "plxt";

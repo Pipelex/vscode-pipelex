@@ -76,7 +76,8 @@ describe('extractJson', () => {
 // ---------- locateError tests ----------
 
 import { locateError } from '../validation/sourceLocator';
-import type { ValidationErrorItem } from '../validation/types';
+import { readProblemItems } from '../validation/problemItems';
+import type { ProblemItem } from '../validation/types';
 
 function makeDocument(lines: string[]) {
     return {
@@ -92,7 +93,7 @@ function makeDocument(lines: string[]) {
 }
 
 describe('locateError', () => {
-    it('locates a pipe table header by pipe_code', () => {
+    it('locates a pipe table header by location.pipe', () => {
         const doc = makeDocument([
             '[concept.Input]',
             'definition = "Some input"',
@@ -101,29 +102,27 @@ describe('locateError', () => {
             'type = "PipeLLM"',
             'output = "Result"',
         ]);
-        const error: ValidationErrorItem = {
-            category: 'pipe_validation',
-            error_type: 'invalid_output',
-            pipe_code: 'my_pipe',
-            message: 'Invalid output type',
+        const error: ProblemItem = {
+            code: 'method.output_concept_mismatch',
+            detail: 'Invalid output type',
+            location: { pipe: 'my_pipe' },
         };
 
         const range = locateError(error, doc);
         expect(range.start.line).toBe(3);
     });
 
-    it('locates a concept table header by concept_code', () => {
+    it('locates a concept table header by the concept parameter', () => {
         const doc = makeDocument([
             '[concept.MyType]',
             'definition = "A type"',
             '',
             '[pipe.test]',
         ]);
-        const error: ValidationErrorItem = {
-            category: 'concept_validation',
-            error_type: 'missing_field',
-            concept_code: 'MyType',
-            message: 'Missing required field',
+        const error: ProblemItem = {
+            code: 'method.concept_invalid',
+            detail: 'Missing required field',
+            params: { concept: 'MyType' },
         };
 
         const range = locateError(error, doc);
@@ -139,46 +138,82 @@ describe('locateError', () => {
             '',
             '[pipe.other]',
         ]);
-        const error: ValidationErrorItem = {
-            category: 'pipe_validation',
-            error_type: 'invalid_output',
-            pipe_code: 'my_pipe',
-            field_path: 'output',
-            message: 'Invalid output reference',
+        const error: ProblemItem = {
+            code: 'method.concept_unresolved',
+            detail: 'Invalid output reference',
+            location: { pipe: 'my_pipe', field: 'output' },
         };
 
         const range = locateError(error, doc);
         expect(range.start.line).toBe(2);
     });
 
-    it('extracts pipe code from message when pipe_code is null', () => {
+    it('reads the field from the field_path parameter when the location names none', () => {
+        const doc = makeDocument([
+            '[pipe.my_pipe]',
+            'type = "PipeLLM"',
+            'output = "BadRef"',
+        ]);
+        const error: ProblemItem = {
+            code: 'method.field_path_unresolved',
+            detail: 'Bad path',
+            params: { field_path: 'pipe.my_pipe.output' },
+            location: { pipe: 'my_pipe' },
+        };
+
+        const range = locateError(error, doc);
+        expect(range.start.line).toBe(2);
+    });
+
+    it('extracts the pipe code from the detail when the item names no pipe', () => {
         const doc = makeDocument([
             '[pipe.broken_pipe]',
             'type = "PipeLLM"',
         ]);
-        const error: ValidationErrorItem = {
-            category: 'blueprint_validation',
-            error_type: 'invalid_pipe',
-            message: "pipe 'broken_pipe' has invalid configuration",
+        const error: ProblemItem = {
+            code: 'method.invalid',
+            detail: "pipe 'broken_pipe' has invalid configuration",
         };
 
         const range = locateError(error, doc);
         expect(range.start.line).toBe(0);
     });
 
-    it('extracts concept code from message when concept_code is null', () => {
+    it('extracts the concept code from the detail when the item names no concept', () => {
         const doc = makeDocument([
             '[concept.BadConcept]',
             'definition = "Broken"',
         ]);
-        const error: ValidationErrorItem = {
-            category: 'blueprint_validation',
-            error_type: 'invalid_concept',
-            message: "concept 'BadConcept' is invalid",
+        const error: ProblemItem = {
+            code: 'method.invalid',
+            detail: "concept 'BadConcept' is invalid",
         };
 
         const range = locateError(error, doc);
         expect(range.start.line).toBe(0);
+    });
+
+    it('goes on to the concept the detail quotes when the concept parameter is a missing one', () => {
+        const doc = makeDocument([
+            '[pipe.extract]',
+            'type = "PipeLLM"',
+            '',
+            '[concept.Invoice]',
+            'description = "An invoice"',
+            'refines = "Document"',
+        ]);
+        // A validation item of the shape problem items replace: its missing concept
+        // becomes the concept parameter, and has no header by definition.
+        const [error] = readProblemItems([{
+            category: 'concept_validation',
+            error_type: 'missing_concept',
+            message: "concept 'Invoice' refines concept 'Document', which no domain declares",
+            missing_concept_code: 'Document',
+        }]);
+        expect(error.params).toEqual({ concept: 'Document' });
+
+        const range = locateError(error, doc);
+        expect(range.start.line).toBe(3);
     });
 
     it('falls back to line 0 when nothing matches', () => {
@@ -186,17 +221,16 @@ describe('locateError', () => {
             '[pipe.something]',
             'type = "PipeLLM"',
         ]);
-        const error: ValidationErrorItem = {
-            category: 'general',
-            error_type: 'unknown',
-            message: 'Some generic error',
+        const error: ProblemItem = {
+            code: 'method.invalid',
+            detail: 'Some generic error',
         };
 
         const range = locateError(error, doc);
         expect(range.start.line).toBe(0);
     });
 
-    it('does not search past the next table header for field_path', () => {
+    it('does not search past the next table header for the field', () => {
         const doc = makeDocument([
             '[pipe.first]',
             'type = "PipeLLM"',
@@ -204,15 +238,52 @@ describe('locateError', () => {
             '[pipe.second]',
             'output = "Something"',
         ]);
-        const error: ValidationErrorItem = {
-            category: 'pipe_validation',
-            error_type: 'missing_output',
-            pipe_code: 'first',
-            field_path: 'output',
-            message: 'Missing output',
+        const error: ProblemItem = {
+            code: 'method.schema_violation',
+            detail: 'Missing output',
+            location: { pipe: 'first', field: 'output' },
         };
 
         // output = is in [pipe.second], not [pipe.first], so should fall back to header line
+        const range = locateError(error, doc);
+        expect(range.start.line).toBe(0);
+    });
+
+    it('places an exact item at its own line and column', () => {
+        const doc = makeDocument([
+            '[pipe.first]',
+            'type = "PipeLLM',
+        ]);
+        const error: ProblemItem = {
+            code: 'method.syntax',
+            detail: 'Unterminated string',
+            location: { pipe: 'first', line: 2, column: 8 },
+        };
+
+        const range = locateError(error, doc, true);
+        expect(range.start).toEqual({ line: 1, character: 7 });
+        expect(range.end).toEqual({ line: 1, character: 'type = "PipeLLM'.length });
+    });
+
+    it('covers the whole line when the column lies at the end of the line', () => {
+        const doc = makeDocument(['[pipe.first']);
+        const error: ProblemItem = { code: 'method.syntax', detail: 'Missing ]', location: { line: 1, column: 12 } };
+
+        const range = locateError(error, doc, true);
+        expect(range.start).toEqual({ line: 0, character: 0 });
+    });
+
+    it('ignores the line and column of an item not known to belong to this document', () => {
+        const doc = makeDocument([
+            '[pipe.first]',
+            'type = "PipeLLM"',
+        ]);
+        const error: ProblemItem = {
+            code: 'method.syntax',
+            detail: 'Somewhere else',
+            location: { pipe: 'first', line: 2, column: 1 },
+        };
+
         const range = locateError(error, doc);
         expect(range.start.line).toBe(0);
     });

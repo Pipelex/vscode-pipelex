@@ -119,6 +119,31 @@ export function findDeclaringFileByScan(
     return candidates[0];
 }
 
+/**
+ * The domain `[kind.code]` lives in, when the gathered files say it without
+ * ambiguity: the one domain every file declaring that header declares.
+ * Undefined when no file declares it, when the declaring files declare
+ * different domains, or when one of them declares none — a bare code that
+ * several domains declare names no domain, and choosing one would be a guess.
+ */
+export function soleDeclaringDomain(
+    kind: DeclarationKind,
+    code: string,
+    files: BundleFile[],
+    getLines: (file: BundleFile) => string[],
+): string | undefined {
+    const domains = new Set(
+        files
+            .filter(f => findTableHeaderInLines(getLines(f), kind, code) !== -1)
+            .map(f => fileDeclaredDomain(getLines(f))),
+    );
+    if (domains.size !== 1) {
+        return undefined;
+    }
+    const [domain] = domains;
+    return domain;
+}
+
 /** Whether a file's lines declare a top-level `domain = "<domainCode>"`. */
 function fileDeclaresDomain(lines: string[], domainCode: string): boolean {
     return fileDeclaredDomain(lines) === domainCode;

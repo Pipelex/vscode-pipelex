@@ -10,7 +10,7 @@
  * Dependency-free on purpose: the browser build and the tests import it.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const TOOL = 'vscode-pipelex';
 export const SURFACE = 'extension';
 

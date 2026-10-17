@@ -19,11 +19,13 @@ vi.mock('@pipelex/sdk', () => {
     // Mirror the real `@pipelex/sdk` constructor signatures (message-first, then the
     // trailing options bag) so the call sites below type-check against the imported
     // real classes, while the backend still reads `.status`/`.serverMessage`/
-    // `.statusText`/`.code`/`.requestId`. Like the real class, `requestId` comes
-    // from `options.problem`, where the client puts the body's `request_id` or the
-    // `X-Request-ID` header.
+    // `.statusText`/`.requestId`/`.problemDocument`. Like the real class,
+    // `requestId` comes from `options.problem`, where the client puts the body's
+    // `request_id` or the `X-Request-ID` header, and `problemDocument` is the
+    // decoded body whole.
     class ApiResponseError extends Error {
         public requestId: string | undefined;
+        public problemDocument: Record<string, unknown> | undefined;
         constructor(
             message: string,
             public apiUrl: string,
@@ -34,11 +36,12 @@ vi.mock('@pipelex/sdk', () => {
             public serverMessage: string | undefined,
             public validationErrors: any[] | undefined,
             public code: string | undefined,
-            options?: { problem?: { requestId?: string } },
+            options?: { problem?: { requestId?: string }; problemDocument?: Record<string, unknown> },
         ) {
             super(message);
             this.name = 'ApiResponseError';
             this.requestId = options?.problem?.requestId;
+            this.problemDocument = options?.problemDocument;
         }
     }
     class ApiUnreachableError extends Error {
@@ -111,11 +114,12 @@ type _ClientSurface = Pick<RealPipelexApiClient, 'validate' | 'version'>;
 // Constructor option keys the backend passes must be the real option keys.
 type _ClientOptions = Required<Pick<PipelexApiClientOptions, 'baseUrl' | 'apiKey'>>;
 // Error fields the backend reads off these classes must exist on the real classes.
-type _ResponseErrorFields = Pick<RealApiResponseError, 'status' | 'statusText' | 'serverMessage' | 'code' | 'requestId'>;
+type _ResponseErrorFields = Pick<RealApiResponseError, 'status' | 'statusText' | 'serverMessage' | 'requestId' | 'problemDocument'>;
 type _UnreachableErrorFields = Pick<RealApiUnreachableError, 'code'>;
 
 import { ApiCapabilityGate } from '../validation/apiCapabilityGate';
 import { BackendError } from '../validation/backend';
+import { UNDESCRIBED_ITEM_DETAIL } from '../validation/problemItems';
 
 function mockOutput() {
     return { appendLine: vi.fn() } as any;
@@ -181,29 +185,44 @@ describe('ApiValidationBackend', () => {
         expect(apiState.lastConstructorOptions).toEqual({ baseUrl: 'http://localhost:8081', apiKey: 'secret-token' });
     });
 
-    it('maps a 200 invalid verdict (is_valid:false) to a not-ok outcome with the structured errors', async () => {
+    it('maps a 200 invalid verdict (is_valid:false) to a not-ok outcome holding its problem items', async () => {
         // 200-diagnostic: an invalid bundle is a produced verdict in the body, not a throw.
+        const item = {
+            code: 'model.unknown',
+            detail: "The method names the llm model 'no-such-model', which no catalog knows.",
+            params: { model: 'no-such-model', model_type: 'llm' },
+            location: { pipe: 'echo', field: 'model', file: 'a.mthds' },
+        };
         apiState.validate = async () => ({
             is_valid: false,
-            validation_errors: [{ category: 'pipe_validation', message: 'bad', source: 'a.mthds' }],
+            errors: [item],
             pending_signatures: [],
             is_runnable: false,
-            message: 'MTHDS validation found errors',
+            message: 'The method does not validate.',
         });
         const analysis = await analyze(makeBackend(), true);
         expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toHaveLength(1);
-        expect(analysis.validation.errors[0].source).toBe('a.mthds');
+        expect(analysis.validation.errors).toEqual([item]);
         expect(analysis.graph).toBeNull();
     });
 
-    it('consumes a dry_run residual item directly — no fabricated category', async () => {
-        // The runtime's structured-info invariant is total: a dry-run failure rides
-        // a `dry_run` item (no source). The backend passes it through verbatim — the
-        // old `blueprint_validation` synthesis is gone.
+    it("reads a valid verdict's advisory warnings as problem items", async () => {
+        const warning = {
+            code: 'pipelex.docgen.template_warning',
+            detail: "The document template 'invoice.xlsx' may be faulty: a cell reads an unknown name.",
+            params: { template: 'invoice.xlsx', finding: 'a cell reads an unknown name' },
+            location: { pipe: 'print_invoice' },
+        };
+        apiState.validate = async () => ({ is_valid: true, warnings: [warning] });
+        const analysis = await analyze(makeBackend());
+        expect(analysis.validation.ok).toBe(true);
+        expect(analysis.validation.warnings).toEqual([warning]);
+    });
+
+    it('reads the verdict of a runner that still writes validation_errors, as the hosted plane does', async () => {
         apiState.validate = async () => ({
             is_valid: false,
-            validation_errors: [{ category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...' }],
+            validation_errors: [{ category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...', pipe_code: 'main', domain_code: 'd', source: 'a.mthds' }],
             pending_signatures: [],
             is_runnable: false,
             message: 'MTHDS validation found errors',
@@ -211,33 +230,62 @@ describe('ApiValidationBackend', () => {
         const analysis = await analyze(makeBackend());
         expect(analysis.validation.ok).toBe(false);
         expect(analysis.validation.errors).toEqual([
-            { category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...' },
+            {
+                detail: 'Dry run failed: ...',
+                location: { pipe: 'main', file: 'a.mthds' },
+                legacy: { domainCode: 'd', errorType: 'DryRunError' },
+            },
         ]);
     });
 
-    it('treats is_valid:false with an empty validation_errors as an api-error BackendError (contract violation)', async () => {
-        // The runtime invariant is total: an invalid verdict ALWAYS carries a
-        // non-empty validation_errors[] (mirrors the CLI parseFailure guard). An
-        // empty list during a server regression must NOT publish zero diagnostics —
-        // it is a no-verdict backend error so stale diagnostics are cleared, not hidden.
+    it('keeps a verdict item of the shape problem items replace whose message is empty', async () => {
+        // That shape allows an empty message; its fault is still the verdict's,
+        // so it must not read as an invalid verdict with no item.
         apiState.validate = async () => ({
             is_valid: false,
-            validation_errors: [],
+            validation_errors: [
+                { category: 'dry_run', error_type: 'DryRunError', message: '', pipe_code: 'main', source: 'a.mthds' },
+                { category: 'pipe_validation', pipe_code: 'other' },
+            ],
             is_runnable: false,
-            message: 'MTHDS validation found errors',
+        });
+        const analysis = await analyze(makeBackend());
+        expect(analysis.validation.ok).toBe(false);
+        expect(analysis.validation.errors).toEqual([
+            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'main', file: 'a.mthds' }, legacy: { errorType: 'DryRunError' } },
+            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'other' } },
+        ]);
+    });
+
+    it('treats is_valid:false with an empty errors list as an api-error BackendError (contract violation)', async () => {
+        // The runtime invariant is total: an invalid verdict ALWAYS carries a
+        // non-empty errors[]. This body is no problem document, so it has no
+        // code and detail of its own to stand for the faults. An empty list
+        // during a server regression must NOT publish zero diagnostics — it is a
+        // no-verdict backend error so stale diagnostics are cleared, not hidden.
+        apiState.validate = async () => ({
+            is_valid: false,
+            errors: [],
+            is_runnable: false,
+            message: 'The method does not validate.',
         });
         const err = await analyze(makeBackend(), true).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('api-error');
         // No empty invalid outcome leaked through.
-        expect(err.logMessage).toMatch(/no validation_errors/);
+        expect(err.logMessage).toMatch(/no readable errors/);
     });
 
-    it('treats is_valid:false with a missing validation_errors as an api-error BackendError', async () => {
-        apiState.validate = async () => ({ is_valid: false, is_runnable: false, message: 'x' });
-        const err = await analyze(makeBackend()).catch(e => e);
-        expect(err).toBeInstanceOf(BackendError);
-        expect(err.kind).toBe('api-error');
+    it('treats is_valid:false with missing or unreadable errors as an api-error BackendError', async () => {
+        for (const body of [
+            { is_valid: false, is_runnable: false, message: 'x' },
+            { is_valid: false, errors: [{ code: 'method.syntax' }, 'text'], message: 'x' },
+        ]) {
+            apiState.validate = async () => body;
+            const err = await analyze(makeBackend()).catch(e => e);
+            expect(err).toBeInstanceOf(BackendError);
+            expect(err.kind).toBe('api-error');
+        }
     });
 
     it('treats a non-object 200 body (literal null) as an api-error BackendError, not a TypeError', async () => {
@@ -335,6 +383,42 @@ describe('ApiValidationBackend', () => {
         expect(err.logMessage).not.toMatch(/request /);
     });
 
+    it('shows the next step of the problem document a no-verdict answer carries', async () => {
+        apiState.validate = async () => {
+            throw new ApiResponseError(
+                "The request's field 'mthds_sources' does not match the route's schema.",
+                'http://localhost:8081', 422, 'Unprocessable Entity', '', undefined,
+                "The request's field 'mthds_sources' does not match the route's schema.", undefined, 'request.invalid',
+                {
+                    problem: { requestId: 'req_9' },
+                    problemDocument: {
+                        type: 'https://mthds.ai/errors/request.invalid',
+                        title: "The request does not match the route's schema",
+                        status: 422,
+                        code: 'request.invalid',
+                        domain: 'input',
+                        retry: 'no',
+                        detail: "The request's field 'mthds_sources' does not match the route's schema.",
+                        next_step: { kind: 'change_input', detail: "Correct the field 'mthds_sources' as the route's schema requires, then send the request again." },
+                        request_id: 'req_9',
+                    },
+                },
+            );
+        };
+        const err = await analyze(makeBackend()).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        expect(err.userMessage).toBe(
+            "Pipelex API error at http://localhost:8081 (HTTP 422): The request's field 'mthds_sources' does not match the route's schema. " +
+            "Next step: Correct the field 'mthds_sources' as the route's schema requires, then send the request again.",
+        );
+        // The code and the request id are for the log.
+        expect(err.logMessage).toBe(
+            "Pipelex API 422 at http://localhost:8081: The request's field 'mthds_sources' does not match the route's schema. " +
+            '(code request.invalid, request req_9)',
+        );
+    });
+
     it("logs the server's request id with an API error, for support", async () => {
         apiState.validate = async () => {
             throw new ApiResponseError('internal error', 'https://api.pipelex.com', 500, 'Internal Server Error', '', undefined, 'internal error', undefined, undefined, { problem: { requestId: 'req_7f3a' } });
@@ -345,6 +429,16 @@ describe('ApiValidationBackend', () => {
         expect(err.logMessage).toBe('Pipelex API 500 at https://api.pipelex.com: internal error (request req_7f3a)');
         // The id is for the log, not the toast.
         expect(err.userMessage).not.toContain('req_7f3a');
+    });
+
+    it("logs the problem document's request id when the error carries none of its own", async () => {
+        apiState.validate = async () => {
+            throw new ApiResponseError('internal error', 'https://api.pipelex.com', 500, 'Internal Server Error', '', undefined, 'internal error', undefined, undefined, {
+                problemDocument: { code: 'runtime.unexpected', detail: 'internal error', request_id: 'req_body' },
+            });
+        };
+        const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
+        expect(err.logMessage).toBe('Pipelex API 500 at https://api.pipelex.com: internal error (code runtime.unexpected, request req_body)');
     });
 
     it('maps ApiUnreachableError to a transport BackendError', async () => {

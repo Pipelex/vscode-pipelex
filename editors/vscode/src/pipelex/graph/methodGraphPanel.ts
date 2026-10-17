@@ -17,7 +17,7 @@ import { parseGraphspecFile } from './graphspecDetector';
 import { readRunArtifacts } from './runArtifacts';
 import type { RunArtifacts } from './runArtifacts';
 import { escapeHtml } from '../htmlEscape';
-import { describeBackendErrorIssue, parseStaticIssueContext, validationErrorsToIssues } from './validationStatus';
+import { describeBackendErrorIssue, parseStaticIssueContext, problemItemsToIssues } from './validationStatus';
 import { recordFeatureUse } from '../usageStats/recorder';
 import type { GraphValidationIssue, GraphValidationPayload } from './validationStatus';
 
@@ -86,6 +86,13 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      */
     private staticIssues: GraphValidationIssue[] = [];
     private staticTargets: (ErrorTarget | undefined)[] = [];
+    /**
+     * The advisory findings of the last valid verdict (+ aligned jump targets),
+     * kept so a static rebuild finishing after that verdict can re-compose the
+     * `valid` list as the verdict's warnings, then the fresh static warnings.
+     */
+    private validatorWarnings: GraphValidationIssue[] = [];
+    private validatorWarningTargets: (ErrorTarget | undefined)[] = [];
     /**
      * The validation payload the webview currently shows (state + issues).
      * Single source of truth: `setData` embeds it and `setValidationStatus`
@@ -494,7 +501,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             // discard this result so it doesn't overwrite the new file's status.
             if (this.currentUri?.toString() !== uri.toString()) return;
 
-            await this.applyAnalysis(uri, analysis, graphPrimary.primaryUri);
+            // The validated files: what the API was sent, or, for the CLI, which
+            // reads the directory itself, the gather made for this request.
+            await this.applyAnalysis(uri, analysis, graphPrimary.primaryUri, graphPrimary.files);
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
@@ -591,9 +600,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
                 this.currentValidation = next.payload;
                 this.errorTargets = next.targets;
             } else if (current.state === 'valid') {
-                const kept = this.keptStaticWarnings();
-                this.currentValidation = { state: 'valid', issues: kept.issues };
-                this.errorTargets = kept.targets;
+                const next = this.composeValid();
+                this.currentValidation = next.payload;
+                this.errorTargets = next.targets;
             } else if (current.state === 'error' && this.leadIssue) {
                 const next = this.composeError(this.leadIssue);
                 this.currentValidation = next.payload;
@@ -662,6 +671,20 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         };
     }
 
+    /**
+     * The `valid` widget payload: the verdict's own advisory findings, then the
+     * static warnings (static errors are dropped, contradicted by the
+     * authoritative verdict). Same single-composer rationale as
+     * {@link composeValidating}.
+     */
+    private composeValid(): { payload: GraphValidationPayload; targets: (ErrorTarget | undefined)[] } {
+        const kept = this.keptStaticWarnings();
+        return {
+            payload: { state: 'valid', issues: [...this.validatorWarnings, ...kept.issues] },
+            targets: [...this.validatorWarningTargets, ...kept.targets],
+        };
+    }
+
     /** The static warnings (+ aligned targets) the `valid` state keeps visible. */
     private keptStaticWarnings(): { issues: GraphValidationIssue[]; targets: (ErrorTarget | undefined)[] } {
         const kept = this.staticIssues
@@ -722,14 +745,16 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * NOT touched — since the static-first flow, the rendered graph is the
      * static one and stays on screen whatever the verdict.
      *
-     * Issue policy per state: `invalid` shows the validator's errors only (the
-     * static analyzer would double-report the same problems); `valid` keeps
-     * static warnings but drops static errors (contradicted by the
-     * authoritative verdict).
+     * Issue policy per state: `invalid` shows the validator's errors, then its
+     * warnings, and nothing static (the static analyzer would double-report the
+     * same problems); `valid` shows the validator's warnings, then the static
+     * warnings, and drops static errors (contradicted by the authoritative
+     * verdict).
      *
-     * Async because the invalid branch resolves each error to its owning file +
-     * range (a few sibling-file reads) so the issue rows can be clickable;
-     * callers may fire-and-forget — a gather failure never rejects.
+     * Async because the validator's items are each resolved to their owning
+     * file + range so the issue rows can be clickable, against the bundle's
+     * files read again after the verdict (a few file reads); callers may
+     * fire-and-forget — a read failure never rejects.
      *
      * `uri` is the SHOWN file (staleness checks + owning-file labels are
      * relative to it); `analysisPrimaryUri` is the bundle file the analysis
@@ -737,8 +762,17 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * the shown file is a helper). An error that resolves to no owning file
      * falls back to that primary, matching the Problems-panel placement, so a
      * bundle-level error never lands on the helper the user happens to view.
+     * `validatedFiles` are the files the analysis validated: the owners are
+     * resolved against them, and an item's own line and column apply only to
+     * a file whose current text is still theirs, the rule the Problems panel
+     * follows (`resolveErrorLocations`).
      */
-    async applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis, analysisPrimaryUri: vscode.Uri): Promise<void> {
+    async applyAnalysis(
+        uri: vscode.Uri,
+        analysis: BundleAnalysis,
+        analysisPrimaryUri: vscode.Uri,
+        validatedFiles: BundleFile[],
+    ): Promise<void> {
         if (!this.panel) return;
         if (this.sourceKind !== 'mthds') return;
         if (this.currentUri?.toString() !== uri.toString()) return;
@@ -750,32 +784,32 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const seq = this.renderSequence;
 
         const validation = analysis.validation;
+        const warnings = validation.warnings ?? [];
         this.leadIssue = undefined;
         // Any produced verdict means the backend recovered — clear the
         // failure-toast dedupe so a later failure notifies again.
         this.lastNotifiedMessage = undefined;
-        if (validation.ok) {
-            const kept = this.keptStaticWarnings();
-            this.postValidationStatus(
-                { state: 'valid', issues: kept.issues },
-                kept.targets,
-            );
+        if (validation.ok && warnings.length === 0) {
+            this.validatorWarnings = [];
+            this.validatorWarningTargets = [];
+            const next = this.composeValid();
+            this.postValidationStatus(next.payload, next.targets);
             return;
         }
 
-        // Invalid: place each error on its owning file + range (reusing the
-        // diagnostics resolver, so the widget and the Problems panel can never
-        // disagree). The CLI path resolves siblings itself, so they are gathered
-        // here; a gather failure falls back to no siblings, which places every
-        // error on the primary file rather than rejecting.
-        let files: BundleFile[];
+        // Place each item on its owning file + range (reusing the diagnostics
+        // resolver, so the widget and the Problems panel can never disagree):
+        // owners among the validated files, ranges against the files as they
+        // are now, read here. A read failure leaves no current text, so every
+        // item is placed by the declaration scan rather than rejecting.
+        let currentFiles: BundleFile[];
         try {
-            files = await gatherBundleFiles(uri);
+            currentFiles = await gatherBundleFiles(uri);
         } catch (err) {
             this.output.appendLine(
                 `pipelex graph: could not gather bundle files for the validation issues: ${String(err)}`,
             );
-            files = [];
+            currentFiles = [];
         }
         // Re-check staleness: the gather above is async, so the user may have switched
         // files (or closed the panel) while sibling contents were read from disk — and
@@ -787,29 +821,57 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const primaryDocument = vscode.workspace.textDocuments.find(
             d => d.uri.toString() === analysisPrimaryUri.toString(),
         );
+        // Errors first, then warnings, resolved in one pass; `errorCount` splits them back.
+        const errors = validation.ok ? [] : validation.errors;
+        const errorCount = errors.length;
+        const items = [...errors, ...warnings];
         const locations = resolveErrorLocations({
-            errors: validation.errors,
-            files,
+            errors: items,
+            files: validatedFiles,
+            currentFiles,
             primaryUri: analysisPrimaryUri,
             primaryDocument,
         });
-        const shownFile = files.find(f => f.uri.toString() === uri.toString());
-        const issues = validationErrorsToIssues(validation.errors, {
-            // Name the owning file only when it differs from the shown one, so a
-            // single-file bundle (or an error on the file you saved) stays clean.
-            ownerFiles: locations.map(loc => loc.uri.toString() !== uri.toString() ? basename(loc.uri.fsPath) : undefined),
+        const shownFile = currentFiles.find(f => f.uri.toString() === uri.toString())
+            ?? validatedFiles.find(f => f.uri.toString() === uri.toString());
+        // Name the owning file only when it differs from the shown one, so a
+        // single-file bundle (or an item on the file you saved) stays clean.
+        const ownerFiles = locations.map(loc => loc.uri.toString() !== uri.toString() ? basename(loc.uri.fsPath) : undefined);
+        const pipeDomains = locations.map(loc => loc.pipeDomain);
+        const targets = locations.map(loc => ({ uri: loc.uri, range: loc.range }));
+        const context = {
             // The static graphspec's registry keys are the inference pool for
-            // errors that arrive with a bare `pipe_code` and no `domain_code`.
+            // items whose pipe's declaring file is not known.
             pipeRegistryRefs: this.currentPipeRegistryRefs(),
             // The shown file's domain drives the chip policy: a pipe chip is
-            // domain-qualified only when the error lives in another domain.
+            // domain-qualified only when the item lives in another domain.
             shownDomain: shownFile
                 ? fileDeclaredDomain(shownFile.content.split(/\r\n|\r|\n/))
                 : undefined,
-        });
+        };
+        const errorIssues = problemItemsToIssues(items.slice(0, errorCount), {
+            ...context,
+            ownerFiles: ownerFiles.slice(0, errorCount),
+            pipeDomains: pipeDomains.slice(0, errorCount),
+        }, 'error');
+        const warningIssues = problemItemsToIssues(items.slice(errorCount), {
+            ...context,
+            ownerFiles: ownerFiles.slice(errorCount),
+            pipeDomains: pipeDomains.slice(errorCount),
+        }, 'warning');
+
+        if (validation.ok) {
+            this.validatorWarnings = warningIssues;
+            this.validatorWarningTargets = targets.slice(errorCount);
+            const next = this.composeValid();
+            this.postValidationStatus(next.payload, next.targets);
+            return;
+        }
+        this.validatorWarnings = [];
+        this.validatorWarningTargets = [];
         this.postValidationStatus(
-            { state: 'invalid', issues },
-            locations.map(loc => ({ uri: loc.uri, range: loc.range })),
+            { state: 'invalid', issues: [...errorIssues, ...warningIssues] },
+            targets,
         );
     }
 
@@ -1095,6 +1157,8 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         this.staticTargets = [];
         this.currentValidation = undefined;
         this.leadIssue = undefined;
+        this.validatorWarnings = [];
+        this.validatorWarningTargets = [];
     }
 
     private buildWebviewHtml(): string | undefined {

@@ -7,8 +7,8 @@ import { childProcessEnv } from '../usageStats/childEnv';
  * for the lifetime of the extension host.
  *
  * Used to give actionable error messages when an installed `pipelex-agent`
- * predates a feature the extension relies on (e.g. the structured
- * `validation_errors[]` fields, which landed in 0.34.0).
+ * predates a feature the extension relies on (e.g. the validation items
+ * carrying the file each lives in, which landed in 0.34.0).
  */
 
 export type Semver = readonly [number, number, number];
@@ -20,6 +20,9 @@ export type Semver = readonly [number, number, number];
  * - `validate bundle --allow-signatures` (landed in 0.31.0)
  * - structured `validation_errors[]` carrying `source` / `field_name` (landed in
  *   0.34.0) — needed for cross-file diagnostics and parity with the API backend.
+ *   The pipelex release that speaks the problem document replaces them with the
+ *   problem items of the `method.invalid` problem, carrying `location.file`;
+ *   the CLI backend reads both until this floor reaches that release.
  *
  * This is a compatibility-floor break: an older `pipelex-agent` is reported as
  * too old (the extension's behavior is otherwise unchanged).
