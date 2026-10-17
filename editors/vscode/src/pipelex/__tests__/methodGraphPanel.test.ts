@@ -1509,7 +1509,7 @@ describe('MethodGraphPanel', () => {
             },
             { error: { code: 'method.concept_invalid', detail: 'unknown concept Bar', params: { concept: 'Bar' } }, uri, range },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri, mockState.bundleFiles);
 
         const validation = currentValidationPayload(panel);
         expect(validation.state).toBe('invalid');
@@ -1547,7 +1547,7 @@ describe('MethodGraphPanel', () => {
         // The validator calls applyAnalysis fire-and-forget, so a gather failure must
         // resolve (not reject) — otherwise the rejection is unhandled and the widget
         // keeps showing a stale state instead of the verdict.
-        await expect(panel.applyAnalysis(uri, invalidAnalysis(), uri)).resolves.toBeUndefined();
+        await expect(panel.applyAnalysis(uri, invalidAnalysis(), uri, mockState.bundleFiles)).resolves.toBeUndefined();
 
         const validation = currentValidationPayload(panel);
         expect(validation.state).toBe('invalid');
@@ -1570,7 +1570,7 @@ describe('MethodGraphPanel', () => {
         mockState.errorLocations = [
             { error: { code: 'pipe.failed', detail: 'helper broke', location: { pipe: 'helper' } }, uri: siblingUri, range },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri, mockState.bundleFiles);
 
         const validation = currentValidationPayload(panel);
         expect(validation.issues[0].file).toBe('concepts.mthds');
@@ -1676,7 +1676,7 @@ describe('MethodGraphPanel', () => {
             // item lives outside the shown file's domain.
             { error: { code: 'pipe.failed', detail: 'sibling broke', location: { pipe: 'analyze', file: 'helpers.mthds' } }, uri: helpersUri, range, pipeDomain: 'helpers' },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri, mockState.bundleFiles);
 
         const validation = currentValidationPayload(panel);
         expect(validation.issues.map((issue: any) => issue.pipeRef)).toEqual([
@@ -1705,7 +1705,7 @@ describe('MethodGraphPanel', () => {
         ];
         (panel as any).staticTargets = [undefined, undefined];
 
-        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any, uri);
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any, uri, mockState.bundleFiles);
 
         // The verdict is authoritative: static errors are dropped, warnings kept.
         const validation = currentValidationPayload(panel);
@@ -1731,7 +1731,7 @@ describe('MethodGraphPanel', () => {
         // …the user saves (flips to validating + starts the async rebuild), and
         // the verdict lands BEFORE the rebuild's file reads complete.
         mockState.onSaveHandler!({ uri });
-        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any, uri);
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any, uri, mockState.bundleFiles);
         expect(currentValidationPayload(panel).issues).toEqual([
             expect.objectContaining({ message: 'stale warning from previous render' }),
         ]);
@@ -1760,7 +1760,7 @@ describe('MethodGraphPanel', () => {
         const warning = { code: 'method.hint_invalid', detail: 'odd hint', location: { pipe: 'my_pipe' } };
         mockState.errorLocations = [{ error: warning, uri, range, pipeDomain: 'demo' }];
 
-        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [], warnings: [warning] } } as any, uri);
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [], warnings: [warning] } } as any, uri, mockState.bundleFiles);
 
         const validation = currentValidationPayload(panel);
         expect(validation.state).toBe('valid');
@@ -1784,7 +1784,7 @@ describe('MethodGraphPanel', () => {
         const warning = { code: 'method.hint_invalid', detail: 'validator warning' };
         mockState.errorLocations = [{ error: warning, uri, range }];
         mockState.onSaveHandler!({ uri });
-        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [], warnings: [warning] } } as any, uri);
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [], warnings: [warning] } } as any, uri, mockState.bundleFiles);
 
         await new Promise(r => setTimeout(r, 30));
 
@@ -1808,7 +1808,7 @@ describe('MethodGraphPanel', () => {
         const warning = { code: 'method.hint_invalid', detail: 'odd hint' };
         mockState.errorLocations = [{ error, uri, range }, { error: warning, uri, range }];
 
-        await panel.applyAnalysis(uri, { validation: { ok: false, errors: [error], warnings: [warning] }, graph: null } as any, uri);
+        await panel.applyAnalysis(uri, { validation: { ok: false, errors: [error], warnings: [warning] }, graph: null } as any, uri, mockState.bundleFiles);
 
         const validation = currentValidationPayload(panel);
         expect(validation.state).toBe('invalid');
@@ -1861,7 +1861,7 @@ describe('MethodGraphPanel', () => {
         // The user saves (validating + async rebuild), and the invalid verdict
         // lands BEFORE the rebuild's file reads complete.
         mockState.onSaveHandler!({ uri });
-        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri, mockState.bundleFiles);
         expect(currentValidationPayload(panel).state).toBe('invalid');
 
         await new Promise(r => setTimeout(r, 30));
@@ -1896,7 +1896,7 @@ describe('MethodGraphPanel', () => {
         mockState.errorLocations = [
             { error: { code: 'method.invalid', detail: 'stale invalid verdict' }, uri, range },
         ];
-        const stale = panel.applyAnalysis(uri, invalidAnalysis(), uri);
+        const stale = panel.applyAnalysis(uri, invalidAnalysis(), uri, mockState.bundleFiles);
 
         // A newer save claims the panel (validating + fresh render sequence)…
         mockState.onSaveHandler!({ uri });
@@ -2026,7 +2026,7 @@ describe('MethodGraphPanel', () => {
             warningTarget,
         ];
 
-        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any, uri);
+        await panel.applyAnalysis(uri, { validation: { ok: true, errors: [] } } as any, uri, mockState.bundleFiles);
 
         const validation = currentValidationPayload(panel);
         expect(validation.issues).toEqual([expect.objectContaining({ message: 'kept warning' })]);
@@ -2046,7 +2046,7 @@ describe('MethodGraphPanel', () => {
         mockState.errorLocations = [
             { error: { code: 'method.invalid', detail: 'Dry run failed' }, uri: primaryUri, range },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis(), primaryUri);
+        await panel.applyAnalysis(uri, invalidAnalysis(), primaryUri, mockState.bundleFiles);
 
         // The resolver anchors on the analysis primary — where the Problems
         // panel also places source-less errors — never the shown helper.
@@ -2056,6 +2056,59 @@ describe('MethodGraphPanel', () => {
         // The owning-file label stays relative to the SHOWN file.
         const validation = currentValidationPayload(panel);
         expect(validation.issues[0].file).toBe('bundle.mthds');
+        panel.dispose();
+    });
+
+    it('places the items on the files that were validated, the files read after the verdict being their current text', async () => {
+        const crossFile = await import('../validation/crossFileDiagnostics');
+        const bundleGather = await import('../validation/bundleGather');
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri());
+        const uri = makeUri('/project/methods/main.mthds');
+        const helperUri = makeUri('/project/methods/helper.mthds');
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 20));
+
+        // The helper changed on disk between the request and the verdict.
+        const validated = [
+            { uri, name: 'main.mthds', content: VALID_BUNDLE },
+            { uri: helperUri, name: 'helper.mthds', content: 'domain = "demo"\n[pipe.helper]\n' },
+        ];
+        const current = [validated[0], { ...validated[1], content: '# a note\ndomain = "demo"\n[pipe.helper]\n' }];
+        vi.mocked(bundleGather.gatherBundleFiles).mockResolvedValueOnce(current);
+        const range = { start: { line: 2, character: 0 }, end: { line: 2, character: 0 } };
+        mockState.errorLocations = [
+            { error: { code: 'method.syntax', detail: 'bad helper', location: { file: 'helper.mthds', line: 2, column: 1 } }, uri: helperUri, range },
+        ];
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri, validated);
+
+        // The resolver gets both, and applies the item's own line only to a file
+        // whose current text is the validated one, as the Problems panel does.
+        expect(vi.mocked(crossFile.resolveErrorLocations)).toHaveBeenLastCalledWith(
+            expect.objectContaining({ files: validated, currentFiles: current }),
+        );
+        panel.dispose();
+    });
+
+    it("hands its own analysis's gathered files to the placement, even to the CLI, which is sent none", async () => {
+        const crossFile = await import('../validation/crossFileDiagnostics');
+        const uri = makeUri('/project/methods/main.mthds');
+        seedBundle(uri);
+        const validated = mockState.bundleFiles;
+        const backend = {
+            kind: 'cli',
+            analyze: vi.fn(() => Promise.resolve({ validation: { ok: false, errors: [{ code: 'method.invalid', detail: 'broken' }] } })),
+        } as any;
+        const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+        mockState.errorLocations = [{ error: { code: 'method.invalid', detail: 'broken' }, uri, range }];
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri(), () => backend);
+        panel.show(uri);
+        await new Promise(r => setTimeout(r, 30));
+
+        expect(backend.analyze.mock.calls[0][0].files).toEqual([]);
+        expect(vi.mocked(crossFile.resolveErrorLocations)).toHaveBeenLastCalledWith(
+            expect.objectContaining({ files: validated }),
+        );
         panel.dispose();
     });
 
@@ -2159,7 +2212,7 @@ describe('MethodGraphPanel', () => {
         mockState.errorLocations = [
             { error: { code: 'pipe.failed', detail: 'helper broke', location: { pipe: 'helper' } }, uri: siblingUri, range },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri, mockState.bundleFiles);
 
         vi.mocked(vscode.workspace.openTextDocument).mockClear();
         const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];
@@ -2187,7 +2240,7 @@ describe('MethodGraphPanel', () => {
         mockState.errorLocations = [
             { error: { code: 'method.invalid', detail: 'only one' }, uri, range },
         ];
-        await panel.applyAnalysis(uri, invalidAnalysis(), uri);
+        await panel.applyAnalysis(uri, invalidAnalysis(), uri, mockState.bundleFiles);
 
         vi.mocked(vscode.workspace.openTextDocument).mockClear();
         const messageHandler = mockState.mockWebview.onDidReceiveMessage.mock.calls[0][0];

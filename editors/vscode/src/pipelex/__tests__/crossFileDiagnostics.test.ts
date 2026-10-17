@@ -475,6 +475,58 @@ describe('resolveErrorLocations — when an item\'s line and column apply', () =
         expect(loc.range.start).toEqual({ line: 2, character: 7 });
     });
 
+    // `[pipe.helper]` is line 4 of the validated sibling, `type = "PipeLLM"` line 5.
+    const SIBLING_ITEM: ProblemItem = { code: 'method.syntax', detail: 'bad helper', location: { file: 'concepts.mthds', pipe: 'helper', line: 5, column: 8 } };
+
+    it('applies the line and column on a sibling whose current text is the validated text', () => {
+        const [loc] = resolveErrorLocations({
+            errors: [SIBLING_ITEM],
+            files: [PRIMARY, SIBLING],
+            currentFiles: [PRIMARY, makeFile('concepts.mthds', SIBLING.content)],
+            primaryUri: PRIMARY.uri as any,
+        });
+        expect(loc.uri.toString()).toBe(SIBLING.uri.toString());
+        expect(loc.range.start).toEqual({ line: 4, character: 7 });
+    });
+
+    it('scans the current text of a sibling changed between the request and the verdict', () => {
+        // Two lines written at the top of the sibling after it was validated:
+        // line 5 of the validated text is now line 7.
+        const changed = makeFile('concepts.mthds', '# a note\n# another\n' + SIBLING.content);
+        const [loc] = resolveErrorLocations({
+            errors: [SIBLING_ITEM],
+            files: [PRIMARY, SIBLING],
+            currentFiles: [PRIMARY, changed],
+            primaryUri: PRIMARY.uri as any,
+        });
+        expect(loc.uri.toString()).toBe(SIBLING.uri.toString());
+        // The scan finds `[pipe.helper]` where it is now, rather than line 5.
+        expect(loc.range.start).toEqual({ line: 5, character: 0 });
+    });
+
+    it('places the Problems panel diagnostic of a changed sibling by the same rule', () => {
+        const changed = makeFile('concepts.mthds', '# a note\n# another\n' + SIBLING.content);
+        const [fileDiags] = buildBundleDiagnostics({
+            errors: [SIBLING_ITEM],
+            files: [PRIMARY, SIBLING],
+            currentFiles: [PRIMARY, changed],
+            primaryUri: PRIMARY.uri as any,
+            diagnosticSource: 'pipelex',
+        });
+        expect(fileDiags.diagnostics[0].range.start).toEqual({ line: 5, character: 0 });
+    });
+
+    it('scans the validated text of a sibling that can no longer be read, without its line', () => {
+        const [loc] = resolveErrorLocations({
+            errors: [SIBLING_ITEM],
+            files: [PRIMARY, SIBLING],
+            currentFiles: [PRIMARY],
+            primaryUri: PRIMARY.uri as any,
+        });
+        expect(loc.uri.toString()).toBe(SIBLING.uri.toString());
+        expect(loc.range.start).toEqual({ line: 3, character: 0 });
+    });
+
     it('falls back to the header scan on an open document edited since the validated save', () => {
         // Two lines typed at the top since the save: line 3 of the validated text is now line 5.
         const edited = '# a note\n# another\n' + PRIMARY.content;

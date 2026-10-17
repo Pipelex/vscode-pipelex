@@ -94,9 +94,16 @@ export interface GraphAnalysisSink {
      * `uri` is the shown/saved file; `analysisPrimaryUri` is the bundle file the
      * analysis anchored on (the graph primary — a sibling when `uri` is a
      * helper). Errors that resolve to no owning file fall back to the primary,
-     * matching where the Problems panel places them.
+     * matching where the Problems panel places them. `validatedFiles` are the
+     * bundle's files as the request carried them (or, for the CLI, as they
+     * were gathered for it): the text the verdict's items speak of.
      */
-    applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis, analysisPrimaryUri: vscode.Uri): void | Promise<void>;
+    applyAnalysis(
+        uri: vscode.Uri,
+        analysis: BundleAnalysis,
+        analysisPrimaryUri: vscode.Uri,
+        validatedFiles: BundleFile[],
+    ): void | Promise<void>;
     /**
      * The on-save analysis threw (backend / transport error). The widget flips
      * to its `error` state, or to `unvalidated` when the error is a declined

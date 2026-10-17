@@ -245,11 +245,13 @@ describe('PipelexValidator — per-directory generation gate', () => {
         expect(capturedRequest.primaryUri.fsPath).toBe('/proj/bundle.mthds');
         expect(capturedRequest.files.map((file: any) => file.name)).toEqual(['bundle.mthds', 'helper.mthds']);
         // The sink receives BOTH the shown file (staleness + labels) and the
-        // analysis anchor (fallback owner for unattributed errors).
+        // analysis anchor (fallback owner for unattributed errors), and the
+        // files that were validated, which its items speak of.
         expect(graphSink.applyAnalysis).toHaveBeenCalledWith(
             helper.uri,
             expect.objectContaining({ validation: { ok: true, errors: [] } }),
             expect.objectContaining({ fsPath: '/proj/bundle.mthds' }),
+            capturedRequest.files,
         );
 
         validator.dispose();
@@ -292,6 +294,32 @@ describe('PipelexValidator — per-directory generation gate', () => {
             primaryDocument: undefined,
         }));
 
+        validator.dispose();
+    });
+
+    it('places the items on the files that were validated, against the files as they are once the verdict arrives', async () => {
+        const doc = mkDoc('/proj/main.mthds');
+        const helperUri = { scheme: 'file', fsPath: '/proj/helper.mthds', toString: () => 'file:///proj/helper.mthds' };
+        const validated = [
+            { uri: doc.uri, name: 'main.mthds', content: 'domain = "d"\n' },
+            { uri: helperUri, name: 'helper.mthds', content: 'domain = "d"\n[pipe.helper]\n' },
+        ];
+        const current = [validated[0], { ...validated[1], content: '# a note\ndomain = "d"\n[pipe.helper]\n' }];
+        const backend = {
+            kind: 'api',
+            analyze: vi.fn(async (_request: any) => {
+                // The helper changes on disk while the validator works.
+                mockState.bundleFiles = current;
+                return { validation: { ok: false, errors: [{ code: 'method.syntax', detail: 'bad helper', location: { file: 'helper.mthds', line: 2 } }] } };
+            }),
+        };
+        const validator = new PipelexValidator({ appendLine: vi.fn() } as any, { getBackend: () => backend } as any);
+        mockState.bundleFiles = validated;
+
+        await mockState.onSaveHandler!(doc);
+
+        expect(backend.analyze.mock.calls[0][0].files).toEqual(validated);
+        expect(buildBundleDiagnostics).toHaveBeenLastCalledWith(expect.objectContaining({ files: validated, currentFiles: current }));
         validator.dispose();
     });
 

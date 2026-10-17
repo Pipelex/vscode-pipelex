@@ -501,7 +501,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             // discard this result so it doesn't overwrite the new file's status.
             if (this.currentUri?.toString() !== uri.toString()) return;
 
-            await this.applyAnalysis(uri, analysis, graphPrimary.primaryUri);
+            // The validated files: what the API was sent, or, for the CLI, which
+            // reads the directory itself, the gather made for this request.
+            await this.applyAnalysis(uri, analysis, graphPrimary.primaryUri, graphPrimary.files);
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
             if (this.currentUri?.toString() !== uri.toString()) return;
@@ -750,8 +752,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * verdict).
      *
      * Async because the validator's items are each resolved to their owning
-     * file + range (a few sibling-file reads) so the issue rows can be
-     * clickable; callers may fire-and-forget — a gather failure never rejects.
+     * file + range so the issue rows can be clickable, against the bundle's
+     * files read again after the verdict (a few file reads); callers may
+     * fire-and-forget — a read failure never rejects.
      *
      * `uri` is the SHOWN file (staleness checks + owning-file labels are
      * relative to it); `analysisPrimaryUri` is the bundle file the analysis
@@ -759,8 +762,17 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
      * the shown file is a helper). An error that resolves to no owning file
      * falls back to that primary, matching the Problems-panel placement, so a
      * bundle-level error never lands on the helper the user happens to view.
+     * `validatedFiles` are the files the analysis validated: the owners are
+     * resolved against them, and an item's own line and column apply only to
+     * a file whose current text is still theirs, the rule the Problems panel
+     * follows (`resolveErrorLocations`).
      */
-    async applyAnalysis(uri: vscode.Uri, analysis: BundleAnalysis, analysisPrimaryUri: vscode.Uri): Promise<void> {
+    async applyAnalysis(
+        uri: vscode.Uri,
+        analysis: BundleAnalysis,
+        analysisPrimaryUri: vscode.Uri,
+        validatedFiles: BundleFile[],
+    ): Promise<void> {
         if (!this.panel) return;
         if (this.sourceKind !== 'mthds') return;
         if (this.currentUri?.toString() !== uri.toString()) return;
@@ -786,18 +798,18 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         }
 
         // Place each item on its owning file + range (reusing the diagnostics
-        // resolver, so the widget and the Problems panel can never disagree).
-        // The CLI path resolves siblings itself, so they are gathered here; a
-        // gather failure falls back to no siblings, which places every item on
-        // the primary file rather than rejecting.
-        let files: BundleFile[];
+        // resolver, so the widget and the Problems panel can never disagree):
+        // owners among the validated files, ranges against the files as they
+        // are now, read here. A read failure leaves no current text, so every
+        // item is placed by the declaration scan rather than rejecting.
+        let currentFiles: BundleFile[];
         try {
-            files = await gatherBundleFiles(uri);
+            currentFiles = await gatherBundleFiles(uri);
         } catch (err) {
             this.output.appendLine(
                 `pipelex graph: could not gather bundle files for the validation issues: ${String(err)}`,
             );
-            files = [];
+            currentFiles = [];
         }
         // Re-check staleness: the gather above is async, so the user may have switched
         // files (or closed the panel) while sibling contents were read from disk — and
@@ -815,11 +827,13 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
         const items = [...errors, ...warnings];
         const locations = resolveErrorLocations({
             errors: items,
-            files,
+            files: validatedFiles,
+            currentFiles,
             primaryUri: analysisPrimaryUri,
             primaryDocument,
         });
-        const shownFile = files.find(f => f.uri.toString() === uri.toString());
+        const shownFile = currentFiles.find(f => f.uri.toString() === uri.toString())
+            ?? validatedFiles.find(f => f.uri.toString() === uri.toString());
         // Name the owning file only when it differs from the shown one, so a
         // single-file bundle (or an item on the file you saved) stays clean.
         const ownerFiles = locations.map(loc => loc.uri.toString() !== uri.toString() ? basename(loc.uri.fsPath) : undefined);

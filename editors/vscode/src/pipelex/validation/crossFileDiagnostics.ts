@@ -55,33 +55,46 @@ interface ItemResolution {
  *    item read from the shape problem items replace names, when it names one.
  * 3. Fallback — the saved (primary) file, so an unresolved item is never lost.
  *
+ * `files` are the files as they were validated: the contents sent to the API,
+ * or the gather made for the request when the CLI read the directory itself.
+ * The owner is resolved against them, since the item speaks of that text.
+ *
  * The range is the item's own `location.line` and `location.column` when they
  * mean the owner's text: the owner is the file the item names, or the item
- * names no file and the bundle has no other one. On the open primary document
- * they also need its text to be the text that was validated, the gathered
- * content of the primary file: an edit since the save would shift them.
+ * names no file and the bundle has no other one. They also need the owner's
+ * current text to be the text that was validated, since an edit made after
+ * the request would shift them: the open primary document's text, and every
+ * other file's text in `currentFiles`, read after the verdict arrived.
  * Otherwise the range comes from the `sourceLocator` scan for the item's pipe,
- * concept and field, which reads the text as it is now. The open primary
- * document is used when available, siblings are located against their
- * on-disk text.
+ * concept and field, which reads the current text. A file `currentFiles` does
+ * not hold (gone, or unreadable now) has no known current text, so it is
+ * scanned as it was validated. Without `currentFiles`, the validated files
+ * are taken as the current text.
  */
 export function resolveErrorLocations(args: {
     errors: ProblemItem[];
     files: BundleFile[];
+    currentFiles?: BundleFile[];
     primaryUri: vscode.Uri;
     primaryDocument?: vscode.TextDocument;
 }): ErrorLocation[] {
-    const { errors, files, primaryUri, primaryDocument } = args;
+    const { errors, files, currentFiles, primaryUri, primaryDocument } = args;
 
-    const linesCache = new Map<string, string[]>();
+    // The text of a gathered file, split once: a validated file's, or a current one's.
+    const linesCache = new Map<BundleFile, string[]>();
     const getLines = (file: BundleFile): string[] => {
-        const key = file.uri.toString();
-        let lines = linesCache.get(key);
+        let lines = linesCache.get(file);
         if (!lines) {
             lines = file.content.split(/\r\n|\r|\n/);
-            linesCache.set(key, lines);
+            linesCache.set(file, lines);
         }
         return lines;
+    };
+    // The current text of a validated file, or undefined when it is not known.
+    const currentByUri = new Map((currentFiles ?? files).map(file => [file.uri.toString(), file]));
+    const getCurrentLines = (file: BundleFile): string[] | undefined => {
+        const current = currentByUri.get(file.uri.toString());
+        return current ? getLines(current) : undefined;
     };
 
     const primaryFile = files.find(f => f.uri.toString() === primaryUri.toString());
@@ -112,7 +125,10 @@ export function resolveErrorLocations(args: {
         if (ownerUri.toString() === primaryUri.toString() && primaryDocument) {
             range = locateError(error, primaryDocument, exact && documentHoldsValidatedText(primaryDocument));
         } else if (owner) {
-            range = locateErrorInLines(error, getLines(owner), exact);
+            const validated = getLines(owner);
+            const current = getCurrentLines(owner);
+            const unchanged = current !== undefined && sameLines(current, validated);
+            range = locateErrorInLines(error, current ?? validated, exact && unchanged);
         } else {
             range = new vscode.Range(0, 0, 0, 0);
         }
@@ -134,14 +150,15 @@ export function buildBundleDiagnostics(args: {
     errors: ProblemItem[];
     warnings?: ProblemItem[];
     files: BundleFile[];
+    currentFiles?: BundleFile[];
     primaryUri: vscode.Uri;
     diagnosticSource: string;
     primaryDocument?: vscode.TextDocument;
 }): FileDiagnostics[] {
-    const { errors, files, primaryUri, diagnosticSource, primaryDocument } = args;
+    const { errors, files, currentFiles, primaryUri, diagnosticSource, primaryDocument } = args;
     const warnings = args.warnings ?? [];
 
-    const locations = resolveErrorLocations({ errors: [...errors, ...warnings], files, primaryUri, primaryDocument });
+    const locations = resolveErrorLocations({ errors: [...errors, ...warnings], files, currentFiles, primaryUri, primaryDocument });
 
     const byUri = new Map<string, FileDiagnostics>();
     locations.forEach(({ error, uri, range }, index) => {
