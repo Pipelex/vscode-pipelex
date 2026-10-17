@@ -98,10 +98,12 @@ impl Session {
             internal: self.state.is_internal(),
             notice_version: self.state.notice_version(),
         };
+        // Only a method file's diagnostics name an error: the registry's codes
+        // are about methods, and `plxt` also lints plain TOML.
         let error = ErrorCode::of_diagnostics(
-            stats.diagnostics_syntax,
-            stats.diagnostics_semantic,
-            stats.diagnostics_schema,
+            stats.method_diagnostics_syntax,
+            stats.method_diagnostics_semantic,
+            stats.method_diagnostics_schema,
         );
         let command = CommandCompleted {
             command: self.command,

@@ -873,36 +873,69 @@ fn diagnostics_are_counted_by_kind() {
     sandbox.write("syntax.toml", "a = \n");
     sandbox.write("semantic.toml", "a = 1\na = 2\n");
     sandbox.write("clean.toml", "a = 1\n");
+    sandbox.write("syntax.mthds", "a = \n");
+    sandbox.write("semantic.mthds", "a = 1\na = 2\n");
     fs::copy(
         repo_root().join("test-data/mthds/lint/invalid_schema.mthds"),
         sandbox.project.join("schema.mthds"),
     )
     .unwrap();
-    let cases: &[(&[&str], &str, [u64; 3], &str)] = &[
-        (&["lint", "syntax.toml"], "lint", [1, 0, 0], "method.syntax"),
+    // The error a failure names comes from its method files alone: `plxt` also
+    // lints plain TOML, which no code of the registry is about.
+    /// The arguments, the command reported, the syntax, semantic and schema
+    /// counts, and the error code named.
+    type Case = (
+        &'static [&'static str],
+        &'static str,
+        [u64; 3],
+        Option<&'static str>,
+    );
+    let cases: &[Case] = &[
         (
-            &["lint", "semantic.toml"],
+            &["lint", "syntax.mthds"],
+            "lint",
+            [1, 0, 0],
+            Some("method.syntax"),
+        ),
+        (
+            &["lint", "semantic.mthds"],
             "lint",
             [0, 1, 0],
-            "method.syntax",
+            Some("method.syntax"),
         ),
         (
             &["lint", "schema.mthds"],
             "lint",
             [0, 0, 1],
-            "method.schema_violation",
+            Some("method.schema_violation"),
         ),
+        (
+            &["format", "--check", "syntax.mthds"],
+            "format",
+            [1, 0, 0],
+            Some("method.syntax"),
+        ),
+        (&["lint", "syntax.toml"], "lint", [1, 0, 0], None),
+        (&["lint", "semantic.toml"], "lint", [0, 1, 0], None),
         (
             &["lint", "syntax.toml", "semantic.toml", "clean.toml"],
             "lint",
             [1, 1, 0],
-            "method.syntax",
+            None,
         ),
         (
             &["format", "--check", "syntax.toml"],
             "format",
             [1, 0, 0],
-            "method.syntax",
+            None,
+        ),
+        // A syntax error in plain TOML beside a method's schema violation: the
+        // method's fault is the one named.
+        (
+            &["lint", "syntax.toml", "schema.mthds"],
+            "lint",
+            [1, 0, 1],
+            Some("method.schema_violation"),
         ),
     ];
     for (args, command, [syntax, semantic, schema_count], error_code) in cases {
@@ -913,8 +946,16 @@ fn diagnostics_are_counted_by_kind() {
         gate(&schema, &events[0]).unwrap_or_else(|reason| panic!("{args:?}: {reason}"));
         assert_eq!(properties["command"], *command);
         assert_eq!(properties["outcome"], "failed");
-        assert_eq!(properties["error_code"], *error_code, "{args:?}");
-        assert_eq!(properties["error_domain"], "method", "{args:?}");
+        assert_eq!(
+            properties.get("error_code").and_then(Value::as_str),
+            *error_code,
+            "{args:?}: {properties}"
+        );
+        assert_eq!(
+            properties.get("error_domain").and_then(Value::as_str),
+            error_code.map(|_| "method"),
+            "{args:?}: {properties}"
+        );
         assert!(
             properties["diagnostics_syntax"].as_u64().unwrap() >= *syntax,
             "{args:?}: {properties}"

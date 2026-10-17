@@ -1,8 +1,8 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, path::Path};
 
 use crate::{
     args::{GetCommand, OutputFormat},
-    Taplo,
+    DiagnosticKind, Taplo,
 };
 use anyhow::anyhow;
 use codespan_reporting::files::SimpleFile;
@@ -36,10 +36,12 @@ impl<E: Environment> Taplo<E> {
         };
 
         self.record_stats(|stats| stats.documents += 1);
+        // Standard input has no path, so it counts as no method file.
+        let stats_path = cmd.file_path.as_deref().unwrap_or(Path::new("-"));
         let parse = parser::parse(&source);
         if !parse.errors.is_empty() {
             let reported = parse.errors.iter().unique_by(|e| e.range).count();
-            self.record_stats(|stats| stats.diagnostics_syntax += reported);
+            self.record_diagnostics(stats_path, DiagnosticKind::Syntax, reported);
         }
 
         let file_path = cmd
@@ -60,7 +62,7 @@ impl<E: Environment> Taplo<E> {
         if let Err(errors) = node.validate() {
             let errors = errors.collect::<Vec<_>>();
             let reported = errors.len();
-            self.record_stats(|stats| stats.diagnostics_semantic += reported);
+            self.record_diagnostics(stats_path, DiagnosticKind::Semantic, reported);
             self.print_semantic_errors(&SimpleFile::new(&file_path, &source), errors.into_iter())
                 .await?;
 
