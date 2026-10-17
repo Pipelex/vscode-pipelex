@@ -13,7 +13,7 @@ use taplo_cli::RunStats;
 use super::{
     context::Context,
     contract, detect,
-    event::{self, CommandCompleted, Common, Outcome},
+    event::{self, CommandCompleted, Common, ErrorCode, Outcome},
     sender::{self, PostOutcome, Poster, PrePost},
     spool::Spool,
     state::{Identity, StateDir},
@@ -98,13 +98,15 @@ impl Session {
             internal: self.state.is_internal(),
             notice_version: self.state.notice_version(),
         };
-        let diagnostics =
-            stats.diagnostics_syntax + stats.diagnostics_semantic + stats.diagnostics_schema;
-        let error_domain = (diagnostics > 0 || stats.unformatted > 0).then_some("input");
+        let error = ErrorCode::of_diagnostics(
+            stats.diagnostics_syntax,
+            stats.diagnostics_semantic,
+            stats.diagnostics_schema,
+        );
         let command = CommandCompleted {
             command: self.command,
             outcome,
-            error_domain,
+            error,
             duration_ms: u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX),
             files: stats.documents,
             invocation: detect::invocation(&self.context, ci),
