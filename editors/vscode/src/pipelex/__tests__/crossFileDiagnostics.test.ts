@@ -28,6 +28,8 @@ vi.mock('vscode', () => {
 
 import * as vscode from 'vscode';
 import { buildBundleDiagnostics, resolveErrorLocations } from '../validation/crossFileDiagnostics';
+import { readProblemItems } from '../validation/problemItems';
+import { problemItemsToIssues } from '../graph/validationStatus';
 import type { BundleFile } from '../validation/backend';
 import type { ProblemItem } from '../validation/types';
 
@@ -302,5 +304,187 @@ describe('resolveErrorLocations — owner + range, order-preserving', () => {
         expect(loc.uri.toString()).toBe(PRIMARY.uri.toString());
         expect(loc.range.start.line).toBe(1);
         expect(loc.range.end.character).toBe(999);
+    });
+});
+
+/** Two files whose domains both declare `[pipe.process]`, alpha first in gather order. */
+const ALPHA = makeFile('alpha.mthds', 'domain = "alpha"\n[pipe.process]\ntype = "PipeLLM"\n[concept.Shared]\ndescription = "alpha"\n');
+const BETA = makeFile('beta.mthds', 'domain = "beta"\n[pipe.process]\ntype = "PipeLLM"\n[concept.Shared]\ndescription = "beta"\n');
+
+function resolveColliding(errors: ProblemItem[]) {
+    return resolveErrorLocations({ errors, files: [ALPHA, BETA], primaryUri: ALPHA.uri as any });
+}
+
+describe('resolveErrorLocations — the domain of a code several domains declare', () => {
+    it('places a source-less legacy item in the domain it names, through the legacy reader', () => {
+        const errors = readProblemItems([
+            { category: 'pipe_factory', message: 'beta process broke', pipe_code: 'process', domain_code: 'beta' },
+        ]);
+        const [loc] = resolveColliding(errors);
+        expect(loc.uri.toString()).toBe(BETA.uri.toString());
+        expect(loc.range.start.line).toBe(1);
+        expect(loc.pipeDomain).toBe('beta');
+    });
+
+    it("scans a legacy item's concept within the domain it names", () => {
+        const errors = readProblemItems([
+            { category: 'pipe_factory', message: 'Shared is wrong in beta', concept_code: 'Shared', domain_code: 'beta' },
+        ]);
+        const [loc] = resolveColliding(errors);
+        expect(loc.uri.toString()).toBe(BETA.uri.toString());
+        expect(loc.range.start.line).toBe(3);
+        expect(loc.pipeDomain).toBeUndefined();
+    });
+
+    it('lands a legacy item on the Problems panel file of its own domain', () => {
+        const errors = readProblemItems([
+            { category: 'pipe_factory', message: 'beta process broke', pipe_code: 'process', domain_code: 'beta' },
+        ]);
+        const result = buildBundleDiagnostics({ errors, files: [ALPHA, BETA], primaryUri: ALPHA.uri as any, diagnosticSource: 'pipelex' });
+        expect(result.map(entry => entry.uri.toString())).toEqual([BETA.uri.toString()]);
+    });
+
+    it('qualifies the pipe of a legacy item no file declares by the domain it names', () => {
+        const errors = readProblemItems([
+            { category: 'pipe_factory', message: 'nowhere broke', pipe_code: 'nowhere', domain_code: 'beta' },
+        ]);
+        const [loc] = resolveColliding(errors);
+        expect(loc.uri.toString()).toBe(ALPHA.uri.toString());
+        expect(loc.pipeDomain).toBe('beta');
+    });
+
+    it('gives no pipe domain to a file-less item whose pipe several domains declare', () => {
+        const [loc] = resolveColliding([{ code: 'pipe.failed', detail: 'process broke', location: { pipe: 'process' } }]);
+        // The scan still places the item, on the first declaring file, but its
+        // domain is not the pipe's: either domain could be.
+        expect(loc.uri.toString()).toBe(ALPHA.uri.toString());
+        expect(loc.pipeDomain).toBeUndefined();
+    });
+
+    it('leaves that item off every graph node, where the domain it was placed in would mark alpha', () => {
+        const items: ProblemItem[] = [{ code: 'pipe.failed', detail: 'process broke', location: { pipe: 'process' } }];
+        const locations = resolveColliding(items);
+        const [issue] = problemItemsToIssues(items, {
+            pipeDomains: locations.map(loc => loc.pipeDomain),
+            pipeRegistryRefs: ['alpha.process', 'beta.process'],
+        });
+        expect(issue.pipeRef).toBeUndefined();
+    });
+
+    it('gives the pipe domain when every file declaring the pipe declares the same domain', () => {
+        const signature = makeFile('signatures.mthds', 'domain = "beta"\n[pipe.process]\ntype = "PipeSignature"\n');
+        const [loc] = resolveErrorLocations({
+            errors: [{ code: 'pipe.failed', detail: 'process broke', location: { pipe: 'process' } }],
+            files: [signature, BETA],
+            primaryUri: signature.uri as any,
+        });
+        expect(loc.uri.toString()).toBe(BETA.uri.toString());
+        expect(loc.pipeDomain).toBe('beta');
+    });
+
+    it('keeps the domain of the file an item names, whoever else declares the pipe', () => {
+        const [loc] = resolveColliding([{ code: 'pipe.failed', detail: 'x', location: { pipe: 'process', file: 'beta.mthds' } }]);
+        expect(loc.pipeDomain).toBe('beta');
+    });
+});
+
+describe('buildBundleDiagnostics — the code of a legacy item', () => {
+    it("shows a legacy item's error type as its diagnostic code, linked to no page", () => {
+        const errors = readProblemItems([
+            { category: 'pipe_validation', error_type: 'missing_input_variable', message: 'x', source: 'main.mthds' },
+        ]);
+        const diag = build(errors)[0].diagnostics[0];
+        expect(diag.code).toBe('missing_input_variable');
+    });
+
+    it('prefers the registry code when an item has one', () => {
+        const diag = build([{ code: 'method.wiring_invalid', detail: 'x', location: { file: 'main.mthds' }, legacy: { errorType: 'ignored' } }])[0].diagnostics[0];
+        expect((diag.code as any).value).toBe('method.wiring_invalid');
+    });
+});
+
+describe('resolveErrorLocations — when an item\'s line and column apply', () => {
+    it('does not apply the line of a file the item names that is not gathered, even in a bundle of one file', () => {
+        // A Python module of the method: its line 2 is not the bundle file's line 2.
+        const [loc] = resolveErrorLocations({
+            errors: [{ code: 'method.syntax', detail: 'bad module', location: { file: 'funcs/totals.py', line: 2, column: 5 } }],
+            files: [PRIMARY],
+            primaryUri: PRIMARY.uri as any,
+        });
+        expect(loc.uri.toString()).toBe(PRIMARY.uri.toString());
+        expect(loc.range.start).toEqual({ line: 0, character: 0 });
+    });
+
+    it('applies the line of the only file when the item names it', () => {
+        const [loc] = resolveErrorLocations({
+            errors: [{ code: 'method.syntax', detail: 'bad', location: { file: 'main.mthds', line: 2, column: 2 } }],
+            files: [PRIMARY],
+            primaryUri: PRIMARY.uri as any,
+        });
+        expect(loc.range.start).toEqual({ line: 1, character: 1 });
+    });
+
+    it('reads the column as a count of code points, which an emoji before it makes two UTF-16 units', () => {
+        const file = makeFile('emoji.mthds', 'domain = "d"\ndescription = "\u{1F600} x" y\n');
+        const line = (file.content as string).split('\n')[1];
+        const utf16Offset = line.indexOf('y');
+        // pipelex counts code points: the emoji is one of the points before `y`.
+        const column = [...line.slice(0, utf16Offset)].length + 1;
+        // Read as a UTF-16 offset, the column would land one unit short, on the space.
+        expect(line[column - 1]).toBe(' ');
+        const [loc] = resolveErrorLocations({
+            errors: [{ code: 'method.syntax', detail: 'bad', location: { file: 'emoji.mthds', line: 2, column } }],
+            files: [file],
+            primaryUri: file.uri as any,
+        });
+        expect(loc.range.start).toEqual({ line: 1, character: utf16Offset });
+    });
+
+    it('covers the whole line when the code-point column lies past its end', () => {
+        const file = makeFile('emoji.mthds', 'domain = "d"\nname = "\u{1F600}"\n');
+        const [loc] = resolveErrorLocations({
+            errors: [{ code: 'method.syntax', detail: 'bad', location: { file: 'emoji.mthds', line: 2, column: 11 } }],
+            files: [file],
+            primaryUri: file.uri as any,
+        });
+        expect(loc.range.start).toEqual({ line: 1, character: 0 });
+    });
+
+    /** An open document holding `content`, its ranges as VS Code builds them. */
+    function openDocument(content: string) {
+        const lines = content.split('\n');
+        return {
+            lineCount: lines.length,
+            lineAt: (i: number) => ({
+                text: lines[i] ?? '',
+                range: new (vscode as any).Range(i, 0, i, (lines[i] ?? '').length),
+            }),
+        };
+    }
+
+    // `[pipe.main_pipe]` is line 2 of the validated primary, `type = "PipeLLM"` line 3.
+    const EXACT_ITEM: ProblemItem = { code: 'method.syntax', detail: 'bad type', location: { file: 'main.mthds', pipe: 'main_pipe', line: 3, column: 8 } };
+
+    it('applies the line and column on the open document while it holds the validated text', () => {
+        const [loc] = resolveErrorLocations({
+            errors: [EXACT_ITEM],
+            files: [PRIMARY, SIBLING],
+            primaryUri: PRIMARY.uri as any,
+            primaryDocument: openDocument(PRIMARY.content) as any,
+        });
+        expect(loc.range.start).toEqual({ line: 2, character: 7 });
+    });
+
+    it('falls back to the header scan on an open document edited since the validated save', () => {
+        // Two lines typed at the top since the save: line 3 of the validated text is now line 5.
+        const edited = '# a note\n# another\n' + PRIMARY.content;
+        const [loc] = resolveErrorLocations({
+            errors: [EXACT_ITEM],
+            files: [PRIMARY, SIBLING],
+            primaryUri: PRIMARY.uri as any,
+            primaryDocument: openDocument(edited) as any,
+        });
+        // The scan finds `[pipe.main_pipe]` where it is now, rather than line 3.
+        expect(loc.range.start).toEqual({ line: 3, character: 0 });
     });
 });

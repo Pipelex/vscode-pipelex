@@ -5,7 +5,7 @@ import { extractJson } from './cliOutput';
 import { getAgentCliVersion, compareSemver, formatSemver, MIN_AGENT_VERSION } from './agentCliVersion';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
-import { readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
+import { isRecord, problemFacts, readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
 
 /**
  * CLI backend — spawns `pipelex-agent validate bundle`.
@@ -133,13 +133,13 @@ export class CliValidationBackend implements ValidationBackend {
         }
 
         // No verdict. When the CLI said why as a problem document, its detail and
-        // next step are what the user is shown.
+        // next step are what the user is shown, and the log line carries its code
+        // and its request id when it has one, as the API path's does.
         const problem = readProblemSummary(body);
         if (problem?.detail) {
-            const code = problem.code ? ` (${problem.code})` : '';
             throw new BackendError({
                 kind: 'infra',
-                logMessage: `pipelex-agent${code}: ${problem.detail}`,
+                logMessage: `pipelex-agent: ${problem.detail}${problemFacts(problem.code, problem.requestId)}`,
                 userMessage: withNextStep(`pipelex-agent could not validate this method: ${problem.detail}`, problem.nextStep),
             });
         }
@@ -208,9 +208,7 @@ export class CliValidationBackend implements ValidationBackend {
 function parseObject(json: string): Record<string, unknown> | undefined {
     try {
         const value: unknown = JSON.parse(json);
-        return typeof value === 'object' && value !== null && !Array.isArray(value)
-            ? value as Record<string, unknown>
-            : undefined;
+        return isRecord(value) ? value : undefined;
     } catch {
         return undefined;
     }

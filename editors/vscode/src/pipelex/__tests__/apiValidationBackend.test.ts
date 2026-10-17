@@ -229,7 +229,11 @@ describe('ApiValidationBackend', () => {
         const analysis = await analyze(makeBackend());
         expect(analysis.validation.ok).toBe(false);
         expect(analysis.validation.errors).toEqual([
-            { detail: 'Dry run failed: ...', location: { pipe: 'main', file: 'a.mthds' } },
+            {
+                detail: 'Dry run failed: ...',
+                location: { pipe: 'main', file: 'a.mthds' },
+                legacy: { domainCode: 'd', errorType: 'DryRunError' },
+            },
         ]);
     });
 
@@ -404,6 +408,16 @@ describe('ApiValidationBackend', () => {
         expect(err.logMessage).toBe('Pipelex API 500 at https://api.pipelex.com: internal error (request req_7f3a)');
         // The id is for the log, not the toast.
         expect(err.userMessage).not.toContain('req_7f3a');
+    });
+
+    it("logs the problem document's request id when the error carries none of its own", async () => {
+        apiState.validate = async () => {
+            throw new ApiResponseError('internal error', 'https://api.pipelex.com', 500, 'Internal Server Error', '', undefined, 'internal error', undefined, undefined, {
+                problemDocument: { code: 'runtime.unexpected', detail: 'internal error', request_id: 'req_body' },
+            });
+        };
+        const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
+        expect(err.logMessage).toBe('Pipelex API 500 at https://api.pipelex.com: internal error (code runtime.unexpected, request req_body)');
     });
 
     it('maps ApiUnreachableError to a transport BackendError', async () => {

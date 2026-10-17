@@ -3,7 +3,7 @@ import { PipelexApiClient, ApiResponseError, ApiUnreachableError, PipelineReques
 import type { PipelexValidationReport, PipelexValidationResult } from '@pipelex/sdk';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
-import { asSentence, readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
+import { asSentence, problemFacts, readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
 import { isHostedPipelexApi, type ApiCapabilityGate } from './apiCapabilityGate';
 import { PIPELEX_PLATFORM_URL, SET_API_KEY_COMMAND } from './apiKey';
 
@@ -220,12 +220,8 @@ export class ApiValidationBackend implements ValidationBackend {
             // The body is a problem document: its code names the situation, and the
             // request id is what finds the server's log lines for this request.
             const problem = readProblemSummary(err.problemDocument);
-            const facts = [
-                problem?.code ? `code ${problem.code}` : undefined,
-                err.requestId ? `request ${err.requestId}` : undefined,
-            ].filter(fact => fact !== undefined);
-            const factsNote = facts.length > 0 ? ` (${facts.join(', ')})` : '';
-            const logMessage = `Pipelex API ${err.status} at ${baseUrl}: ${err.serverMessage ?? err.statusText}${factsNote}`;
+            const facts = problemFacts(problem?.code, err.requestId ?? problem?.requestId);
+            const logMessage = `Pipelex API ${err.status} at ${baseUrl}: ${err.serverMessage ?? err.statusText}${facts}`;
             if (err.status === 401 || err.status === 403) {
                 throw new BackendError({
                     kind: 'auth',

@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import type { BundleFile } from './backend';
 import type { ProblemItem } from './types';
-import { locateError, locateErrorInLines, findTableHeaderInLines } from './sourceLocator';
-import { matchSourceFile, findDeclaringFileByScan, fileDeclaredDomain } from './bundleResolution';
+import { documentLines, locateError, locateErrorInLines, findTableHeaderInLines } from './sourceLocator';
+import { matchSourceFile, findDeclaringFileByScan, fileDeclaredDomain, soleDeclaringDomain } from './bundleResolution';
 import { itemConcept, itemPipe, problemTypeUri } from './problemItems';
 
 /** Diagnostics computed for one file in the bundle. */
@@ -19,16 +19,22 @@ export interface ErrorLocation {
     /** The range within the owning file: the item's own line and column, else a best-effort one. */
     range: vscode.Range;
     /**
-     * The domain the item's pipe lives in: the declared domain of the owning
-     * file, when the item itself resolved that file (not the primary fallback)
-     * and the file declares `[pipe.<location.pipe>]`. Undefined otherwise, and
-     * the graph then qualifies the pipe through its registry, or not at all.
+     * The domain the item's pipe lives in, when it is known without guessing:
+     * the domain an item read from the shape problem items replace named;
+     * else the declared domain of the file the item names, when that file
+     * declares `[pipe.<location.pipe>]`; else, when the item names no file,
+     * the one domain every file declaring that pipe declares. Undefined
+     * otherwise, several domains declaring the code included, and the graph
+     * then qualifies the pipe through its registry, or not at all.
      */
     pipeDomain?: string;
 }
 
-/** How an item's owning file was found. */
-type OwnerResolution = { file: BundleFile; by: 'file' | 'pipe' | 'concept' };
+/** What an item resolved to: its owning file and how it was found, and the domain its pipe lives in. */
+interface ItemResolution {
+    owner?: { file: BundleFile; by: 'file' | 'pipe' | 'concept' };
+    pipeDomain?: string;
+}
 
 /**
  * Resolve each problem item to its owning file + range, preserving input
@@ -45,15 +51,19 @@ type OwnerResolution = { file: BundleFile; by: 'file' | 'pipe' | 'concept' };
  * 2. Declaration scan — for an item naming no file, find the file that
  *    declares the item's `[pipe.<location.pipe>]`, else its
  *    `[concept.<params.concept>]`. Among several declaring files the first
- *    concrete one wins (gather order: primary first).
+ *    concrete one wins (gather order: primary first), within the domain an
+ *    item read from the shape problem items replace names, when it names one.
  * 3. Fallback — the saved (primary) file, so an unresolved item is never lost.
  *
- * The range is the item's own `location.line` and `location.column` when the
- * owner is the file the item names (or the bundle's only file), since only
- * then does its line mean that text. Otherwise it comes from the
- * `sourceLocator` scan for the item's pipe, concept and field. The open
- * primary document is used when available, siblings are located against
- * their on-disk text.
+ * The range is the item's own `location.line` and `location.column` when they
+ * mean the owner's text: the owner is the file the item names, or the item
+ * names no file and the bundle has no other one. On the open primary document
+ * they also need its text to be the text that was validated, the gathered
+ * content of the primary file: an edit since the save would shift them.
+ * Otherwise the range comes from the `sourceLocator` scan for the item's pipe,
+ * concept and field, which reads the text as it is now. The open primary
+ * document is used when available, siblings are located against their
+ * on-disk text.
  */
 export function resolveErrorLocations(args: {
     errors: ProblemItem[];
@@ -76,17 +86,31 @@ export function resolveErrorLocations(args: {
 
     const primaryFile = files.find(f => f.uri.toString() === primaryUri.toString());
 
+    // Whether the open primary document still holds the text that was
+    // validated, decided once and only when an exact placement asks.
+    let documentIsValidatedText: boolean | undefined;
+    const documentHoldsValidatedText = (document: vscode.TextDocument): boolean => {
+        if (documentIsValidatedText === undefined) {
+            documentIsValidatedText = primaryFile !== undefined
+                && sameLines(documentLines(document), getLines(primaryFile));
+        }
+        return documentIsValidatedText;
+    };
+
     return errors.map(error => {
-        const resolved = resolveOwner(error, files, getLines);
+        const { owner: resolved, pipeDomain } = resolveItem(error, files, getLines);
         const owner = resolved?.file ?? primaryFile;
         const ownerUri = owner?.uri ?? primaryUri;
         // The item's line and column mean the text of the file it names: trust
-        // them only on that file, or when the bundle has no other file.
-        const exact = resolved?.by === 'file' || files.length === 1;
+        // them only on that file, or, when it names none, on the only file of
+        // the bundle. A file it names that is not gathered (a Python module of
+        // the method, a file outside the directory) lends its line to no file.
+        const exact = resolved?.by === 'file'
+            || (error.location?.file === undefined && files.length === 1 && owner === files[0]);
 
         let range: vscode.Range;
         if (ownerUri.toString() === primaryUri.toString() && primaryDocument) {
-            range = locateError(error, primaryDocument, exact);
+            range = locateError(error, primaryDocument, exact && documentHoldsValidatedText(primaryDocument));
         } else if (owner) {
             range = locateErrorInLines(error, getLines(owner), exact);
         } else {
@@ -94,9 +118,8 @@ export function resolveErrorLocations(args: {
         }
 
         const location: ErrorLocation = { error, uri: ownerUri, range };
-        const pipe = itemPipe(error);
-        if (resolved && pipe && findTableHeaderInLines(getLines(resolved.file), 'pipe', pipe) !== -1) {
-            location.pipeDomain = fileDeclaredDomain(getLines(resolved.file));
+        if (pipeDomain !== undefined) {
+            location.pipeDomain = pipeDomain;
         }
         return location;
     });
@@ -137,50 +160,80 @@ export function buildBundleDiagnostics(args: {
 
 /**
  * Resolve a problem item to its owning file, in priority order:
- * `location.file` → `location.pipe` declaration → `concept` declaration.
+ * `location.file` → `location.pipe` declaration → `concept` declaration, and
+ * the domain its pipe lives in (see {@link ErrorLocation.pipeDomain}).
  *
  * The matching primitives are shared with the method-graph pipe-node navigation
  * path ({@link resolveDeclaringFile}) so the two surfaces can never disagree on
  * how a source path is matched or how a declaration header is found. The item
  * path keeps its own file→pipe→concept ordering (an item may name both a pipe
  * and a concept); the navigation path resolves a single kind.
+ *
+ * An item read from the shape problem items replace may name its domain. That
+ * domain constrains both declaration scans, so of two domains declaring the
+ * same code the item lands in its own, and it is its pipe's domain outright.
  */
-function resolveOwner(
+function resolveItem(
     error: ProblemItem,
     files: BundleFile[],
     getLines: (file: BundleFile) => string[],
-): OwnerResolution | undefined {
+): ItemResolution {
+    const pipeCode = itemPipe(error);
+    const namedDomain = error.legacy?.domainCode;
+    // The pipe's domain, given what the resolution found: the named domain
+    // first, and nothing for an item that names no pipe.
+    const withPipeDomain = (owner: ItemResolution['owner'], found?: string): ItemResolution => ({
+        owner,
+        pipeDomain: pipeCode === undefined ? undefined : namedDomain ?? found,
+    });
+
     const file = error.location?.file;
     if (file) {
         const match = matchSourceFile(file, files);
         if (match) {
-            return { file: match, by: 'file' };
+            const declaresPipe = pipeCode !== undefined
+                && findTableHeaderInLines(getLines(match), 'pipe', pipeCode) !== -1;
+            return withPipeDomain(
+                { file: match, by: 'file' },
+                declaresPipe ? fileDeclaredDomain(getLines(match)) : undefined,
+            );
         }
     }
 
-    const pipeCode = itemPipe(error);
     if (pipeCode) {
-        const match = findDeclaringFileByScan('pipe', pipeCode, files, undefined, getLines);
+        const match = findDeclaringFileByScan('pipe', pipeCode, files, namedDomain, getLines);
         if (match) {
-            return { file: match, by: 'pipe' };
+            // The scan settles on one file even when several domains declare
+            // the code; its domain is the pipe's only when no other domain does.
+            return withPipeDomain(
+                { file: match, by: 'pipe' },
+                soleDeclaringDomain('pipe', pipeCode, files, getLines),
+            );
         }
     }
 
     const conceptCode = itemConcept(error);
     if (conceptCode) {
-        const match = findDeclaringFileByScan('concept', conceptCode, files, undefined, getLines);
+        const match = findDeclaringFileByScan('concept', conceptCode, files, namedDomain, getLines);
         if (match) {
-            return { file: match, by: 'concept' };
+            return withPipeDomain({ file: match, by: 'concept' });
         }
     }
 
-    return undefined;
+    return withPipeDomain(undefined);
+}
+
+/** Whether two texts, split into lines, are the same text. */
+function sameLines(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((line, index) => line === b[index]);
 }
 
 /**
  * A diagnostic for one item: its detail as the message, and its code as the
  * diagnostic's code, linked to the code's page (its type URI), which says
- * what the code means and what to do about it.
+ * what the code means and what to do about it. An item read from the shape
+ * problem items replace has no code: its `error_type` is the diagnostic's
+ * code, unlinked, since it is no registry code and has no page.
  */
 function makeDiagnostic(
     error: ProblemItem,
@@ -192,6 +245,8 @@ function makeDiagnostic(
     diag.source = source;
     if (error.code) {
         diag.code = { value: error.code, target: vscode.Uri.parse(problemTypeUri(error.code)) };
+    } else if (error.legacy?.errorType) {
+        diag.code = error.legacy.errorType;
     }
     return diag;
 }

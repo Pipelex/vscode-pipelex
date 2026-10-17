@@ -28,9 +28,9 @@ export interface GraphValidationIssue {
      * the renderer decorates every node invoking exactly this pipe (severity
      * ring + count badge). Always qualified, never a bare code: two domains
      * may declare the same pipe code, and a bare match would ring both. Built
-     * here from the item's `location.pipe` and the domain of the file that
-     * declares it (with a registry-based inference when that file is not
-     * known); static issues get theirs from the mthds-ui mapper.
+     * here from the item's `location.pipe` and the domain its pipe lives in
+     * when that is known without guessing (with a registry-based inference
+     * otherwise); static issues get theirs from the mthds-ui mapper.
      */
     pipeRef?: string;
     /** Graph target: one precise invocation node id (static walk diagnostics only). */
@@ -90,8 +90,8 @@ export interface ValidationIssueContext {
     ownerFiles?: (string | undefined)[];
     /**
      * Index-aligned with the items (from `resolveErrorLocations`): the domain
-     * of the file that declares the item's pipe, when the item resolved that
-     * file itself. It qualifies the item's pipe outright.
+     * the item's pipe lives in, when it is known without guessing (its
+     * `ErrorLocation.pipeDomain`). It qualifies the item's pipe outright.
      */
     pipeDomains?: (string | undefined)[];
     /**
@@ -107,8 +107,9 @@ export interface ValidationIssueContext {
 /**
  * Project the validator's problem items onto widget issues: its faults with
  * `severity` `error`, its advisory findings with `warning`. An item carries no
- * domain, so its pipe is qualified by the domain of the file that declares it,
- * else through the static registry when exactly one domain declares that code.
+ * domain, so its pipe is qualified by the domain `resolveErrorLocations` found
+ * for it, else through the static registry when exactly one domain declares
+ * that code; with several, the issue stays untargeted.
  */
 export function problemItemsToIssues(
     items: ProblemItem[],

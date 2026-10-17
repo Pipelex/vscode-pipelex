@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     asSentence,
+    problemFacts,
     problemTypeUri,
     readProblemItems,
     readProblemSummary,
@@ -29,14 +30,12 @@ describe('readProblemItems', () => {
         expect(readProblemItems([SYNTAX_ITEM, MODEL_ITEM])).toEqual([SYNTAX_ITEM, MODEL_ITEM]);
     });
 
-    it('reads suggestions and a suggested fix, whose edited file is `file`', () => {
+    it('reads a suggested fix, whose edited file is `file`', () => {
         const [item] = readProblemItems([{
             code: 'method.concept_unresolved',
             detail: 'Unknown concept Foo.',
-            suggestions: ['Fo', 42],
             suggested_fix: { fix_code: 'declare-concept', description: 'Declare [concept.Foo].', safety: 'safe', file: 'a.mthds', ops: [] },
         }]);
-        expect(item.suggestions).toEqual(['Fo']);
         expect(item.suggested_fix).toEqual({
             fix_code: 'declare-concept',
             description: 'Declare [concept.Foo].',
@@ -63,7 +62,7 @@ describe('readProblemItems', () => {
         expect(item).toEqual({ detail: 'Something is wrong.', location: { file: 'a.mthds' } });
     });
 
-    it('reads the validation item problem items replace into the same members, with no code', () => {
+    it('reads the validation item problem items replace into the same members, keeping its domain and error type', () => {
         const [item] = readProblemItems([{
             category: 'pipe_validation',
             error_type: 'missing_concept',
@@ -81,7 +80,18 @@ describe('readProblemItems', () => {
             params: { concept: 'Foo', field_path: 'pipe.x.output' },
             location: { pipe: 'x', field: 'output', file: '/project/methods/main.mthds' },
             suggested_fix: { fix_code: 'declare-concept', description: 'Declare it.', safety: 'safe', file: 'main.mthds', ops: [] },
+            legacy: { domainCode: 'demo', errorType: 'missing_concept' },
         });
+        expect(item.code).toBeUndefined();
+    });
+
+    it('keeps no legacy facts on a problem item, nor on a validation item naming neither', () => {
+        const [problem, validation] = readProblemItems([
+            { ...MODEL_ITEM, domain_code: 'demo', error_type: 'unknown_model' },
+            { category: 'pipe_validation', message: 'Pipe x is broken.', pipe_code: 'x' },
+        ]);
+        expect(problem.legacy).toBeUndefined();
+        expect(validation.legacy).toBeUndefined();
     });
 
     it('reads a list mixing both shapes element by element', () => {
@@ -123,7 +133,6 @@ describe('readProblemSummary', () => {
             request_id: 'req_1',
         })).toEqual({
             code: 'request.malformed',
-            title: 'The request body cannot be parsed',
             detail: 'The runner cannot parse the request body (reason: not_json).',
             nextStep: 'Fix the body so that it parses, then send the request again.',
             requestId: 'req_1',
@@ -141,6 +150,21 @@ describe('problemTypeUri', () => {
     it('joins a core code to the core base URL, and a Pipelex code to its own', () => {
         expect(problemTypeUri('method.syntax')).toBe('https://mthds.ai/errors/method.syntax');
         expect(problemTypeUri('pipelex.config.invalid')).toBe('https://docs.pipelex.com/errors/pipelex.config.invalid');
+    });
+
+    it("reads a prefix naming a member every object inherits as a core code's", () => {
+        for (const prefix of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) {
+            expect(problemTypeUri(`${prefix}.x`)).toBe(`https://mthds.ai/errors/${prefix}.x`);
+        }
+    });
+});
+
+describe('problemFacts', () => {
+    it('names the code and the request id that are known, or nothing', () => {
+        expect(problemFacts('request.malformed', 'req_1')).toBe(' (code request.malformed, request req_1)');
+        expect(problemFacts('request.malformed', undefined)).toBe(' (code request.malformed)');
+        expect(problemFacts(undefined, 'req_1')).toBe(' (request req_1)');
+        expect(problemFacts(undefined, undefined)).toBe('');
     });
 });
 

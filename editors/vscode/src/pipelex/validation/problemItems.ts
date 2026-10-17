@@ -1,4 +1,4 @@
-import type { ProblemItem, ProblemLocation, SuggestedFix } from './types';
+import type { LegacyItemFacts, ProblemItem, ProblemLocation, SuggestedFix } from './types';
 
 /**
  * Reading what a validator writes: a verdict's problem items, and the problem
@@ -11,14 +11,15 @@ import type { ProblemItem, ProblemLocation, SuggestedFix } from './types';
  * Two item shapes are read, element by element:
  *
  * - **The problem item** (`code`, `detail`, `params`, `location`,
- *   `suggestions`, `suggested_fix`), which pipelex's runner and `pipelex-agent`
- *   write from the release that speaks the problem document.
+ *   `suggested_fix`), which pipelex's runner and `pipelex-agent` write from the
+ *   release that speaks the problem document.
  * - **The validation item it replaces** (`category`, `message`, `pipe_code`,
  *   `concept_code`, `source`, `field_path`, …), which the hosted plane's runner
  *   and a `pipelex-agent` older than that release still write. It is read into
- *   the problem item's members, with no code. This reader goes once the hosted
- *   plane runs a pipelex that writes problems and the CLI floor
- *   (`MIN_AGENT_VERSION`) reaches that release.
+ *   the problem item's members, with no code, and keeps its `domain_code` and
+ *   `error_type` in `legacy`. This reader goes once the hosted plane runs a
+ *   pipelex that writes problems and the CLI floor (`MIN_AGENT_VERSION`)
+ *   reaches that release.
  */
 
 /** The core registry's base URL: a core code's type URI is this, a slash, then the code. */
@@ -27,11 +28,12 @@ const CORE_ERRORS_BASE_URL = 'https://mthds.ai/errors';
 /**
  * The extension prefixes the core registry registers, each with the base URL
  * its codes' pages live under. A code whose first segment is not one of them
- * is a core code.
+ * is a core code. A `Map`, so a prefix such as `constructor` names no
+ * inherited member of an object.
  */
-const EXTENSION_ERRORS_BASE_URLS: Readonly<Record<string, string>> = {
-    pipelex: 'https://docs.pipelex.com/errors',
-};
+const EXTENSION_ERRORS_BASE_URLS: ReadonlyMap<string, string> = new Map([
+    ['pipelex', 'https://docs.pipelex.com/errors'],
+]);
 
 /**
  * The type URI of a code, which is the URL of the page saying what the code
@@ -40,7 +42,7 @@ const EXTENSION_ERRORS_BASE_URLS: Readonly<Record<string, string>> = {
  */
 export function problemTypeUri(code: string): string {
     const prefix = code.split('.', 1)[0];
-    const baseUrl = EXTENSION_ERRORS_BASE_URLS[prefix] ?? CORE_ERRORS_BASE_URL;
+    const baseUrl = EXTENSION_ERRORS_BASE_URLS.get(prefix) ?? CORE_ERRORS_BASE_URL;
     return `${baseUrl}/${code}`;
 }
 
@@ -72,13 +74,13 @@ export function readVerdictErrors(body: Record<string, unknown>): ProblemItem[] 
     return readProblemItems(body.validation_errors);
 }
 
-/** The members of a problem document the extension shows when a validator produced no verdict. */
+/** The members of a problem document the extension shows or logs when a validator produced no verdict. */
 export interface ProblemSummary {
     code?: string;
-    title?: string;
     detail?: string;
     /** `next_step.detail`: what the reader should do now. */
     nextStep?: string;
+    /** The request that carried the failure, which finds its server's log lines. */
     requestId?: string;
 }
 
@@ -92,12 +94,23 @@ export function readProblemSummary(raw: unknown): ProblemSummary | undefined {
     }
     const summary: ProblemSummary = {
         code: text(raw.code),
-        title: text(raw.title),
         detail: text(raw.detail),
         nextStep: isRecord(raw.next_step) ? text(raw.next_step.detail) : undefined,
         requestId: text(raw.request_id),
     };
     return summary.code !== undefined || summary.detail !== undefined ? summary : undefined;
+}
+
+/**
+ * The facts a log line about a failure carries, so its reader can look it up:
+ * ` (code <code>, request <id>)`, either part only when known, or nothing.
+ */
+export function problemFacts(code: string | undefined, requestId: string | undefined): string {
+    const facts = [
+        code ? `code ${code}` : undefined,
+        requestId ? `request ${requestId}` : undefined,
+    ].filter(fact => fact !== undefined);
+    return facts.length > 0 ? ` (${facts.join(', ')})` : '';
 }
 
 /** A sentence followed by the next step, when there is one. */
@@ -149,10 +162,6 @@ function fromProblemItem(raw: Record<string, unknown>): ProblemItem {
     if (isRecord(raw.params)) item.params = raw.params;
     const location = readLocation(raw.location);
     if (location) item.location = location;
-    const suggestions = Array.isArray(raw.suggestions)
-        ? raw.suggestions.filter((s): s is string => typeof s === 'string')
-        : [];
-    if (suggestions.length > 0) item.suggestions = suggestions;
     const fix = readSuggestedFix(raw.suggested_fix, 'file');
     if (fix) item.suggested_fix = fix;
     return item;
@@ -163,7 +172,9 @@ function fromProblemItem(raw: Record<string, unknown>): ProblemItem {
  * way pipelex builds a problem item from it: the pipe and the file from
  * `pipe_code` and `source`, the field from `field_name` or `field_path`, the
  * concept parameter from `concept_code` or `missing_concept_code`. Its
- * `domain_code` is not read: the owning file's declared domain says the same.
+ * `domain_code` and `error_type` have no member there, so they are kept in
+ * `legacy`: the domain tells apart two domains declaring the same pipe code
+ * when the item names no file, and the error type is the diagnostic's code.
  */
 function fromValidationItem(raw: Record<string, unknown>): ProblemItem {
     const item: ProblemItem = { detail: text(raw.message)! };
@@ -181,6 +192,12 @@ function fromValidationItem(raw: Record<string, unknown>): ProblemItem {
     if (location) item.location = location;
     const fix = readSuggestedFix(raw.suggested_fix, 'source');
     if (fix) item.suggested_fix = fix;
+    const legacy: LegacyItemFacts = {};
+    const domainCode = text(raw.domain_code);
+    if (domainCode !== undefined) legacy.domainCode = domainCode;
+    const errorType = text(raw.error_type);
+    if (errorType !== undefined) legacy.errorType = errorType;
+    if (Object.keys(legacy).length > 0) item.legacy = legacy;
     return item;
 }
 
@@ -220,7 +237,8 @@ function readSuggestedFix(raw: unknown, fileKey: 'file' | 'source'): SuggestedFi
     return fix;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+/** Whether a value read off the wire is a JSON object. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 

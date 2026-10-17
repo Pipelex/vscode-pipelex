@@ -51,6 +51,11 @@ export function locateErrorInLines(error: ProblemItem, lines: string[], exact = 
  * runs from the column to the end of the line, or covers the whole line when
  * there is no column or the column lies at or past the line's end (a fault
  * at the end of a line, such as a missing closing bracket).
+ *
+ * The column counts Unicode code points, as pipelex does (the MTHDS standard
+ * says only that it counts from 1), while a VS Code position counts UTF-16
+ * code units, so a character beyond the Basic Multilingual Plane before the
+ * column, such as an emoji, moves the start by two units.
  */
 export function locateLineColumn(error: ProblemItem, lines: string[]): vscode.Range | undefined {
     const line = error.location?.line;
@@ -59,12 +64,28 @@ export function locateLineColumn(error: ProblemItem, lines: string[]): vscode.Ra
     }
     const text = lines[line - 1];
     const column = error.location?.column;
-    const start = column !== undefined && column >= 1 && column - 1 < text.length ? column - 1 : 0;
+    const offset = column !== undefined && column >= 1 ? codePointColumnOffset(text, column) : undefined;
+    const start = offset !== undefined && offset < text.length ? offset : 0;
     return new vscode.Range(line - 1, start, line - 1, text.length);
 }
 
+/**
+ * The UTF-16 offset in `text` of the 1-based code-point `column`, or undefined
+ * when the column lies past the end of the text.
+ */
+function codePointColumnOffset(text: string, column: number): number | undefined {
+    let offset = 0;
+    for (let point = 1; point < column; point++) {
+        if (offset >= text.length) {
+            return undefined;
+        }
+        offset += text.codePointAt(offset)! > 0xffff ? 2 : 1;
+    }
+    return offset;
+}
+
 /** Split document text into line strings (cheaper than repeated `lineAt`). */
-function documentLines(document: vscode.TextDocument): string[] {
+export function documentLines(document: vscode.TextDocument): string[] {
     const out: string[] = [];
     for (let i = 0; i < document.lineCount; i++) {
         out.push(document.lineAt(i).text);

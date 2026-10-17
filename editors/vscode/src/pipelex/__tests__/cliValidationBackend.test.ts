@@ -85,7 +85,7 @@ describe('CliValidationBackend', () => {
         const analysis = await analyze(false);
         expect(analysis.validation.ok).toBe(true);
         expect(analysis.validation.warnings).toEqual([
-            { detail: 'Unknown hint key.', location: { pipe: 'main', file: '/project/methods/main.mthds' } },
+            { detail: 'Unknown hint key.', location: { pipe: 'main', file: '/project/methods/main.mthds' }, legacy: { errorType: 'hint_unknown_key' } },
         ]);
     });
 
@@ -175,7 +175,25 @@ describe('CliValidationBackend', () => {
             "pipelex-agent could not validate this method: The runtime's configuration is invalid, so it cannot serve this request. " +
             "Next step: Correct the setting 'default' in the file 'routing_profiles.toml' of the backends configuration, then restart the runtime.",
         );
-        expect(err.logMessage).toContain('pipelex.config.invalid');
+        expect(err.logMessage).toBe(
+            "pipelex-agent: The runtime's configuration is invalid, so it cannot serve this request. (code pipelex.config.invalid)",
+        );
+    });
+
+    it('logs the request id of a problem that carries one beside its code, as the API path does', async () => {
+        cliState.spawnReject = {
+            exitCode: 1,
+            stderr: JSON.stringify({
+                code: 'model.unavailable',
+                detail: "The model 'gpt-x' cannot be reached.",
+                request_id: 'req_cli_1',
+            }),
+        };
+        const err = await analyze().catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.logMessage).toBe("pipelex-agent: The model 'gpt-x' cannot be reached. (code model.unavailable, request req_cli_1)");
+        // The id is for the log, not the toast.
+        expect(err.userMessage).not.toContain('req_cli_1');
     });
 
     it('reads a problem on stderr whatever the exit code', async () => {
