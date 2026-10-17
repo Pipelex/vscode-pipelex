@@ -119,6 +119,7 @@ type _UnreachableErrorFields = Pick<RealApiUnreachableError, 'code'>;
 
 import { ApiCapabilityGate } from '../validation/apiCapabilityGate';
 import { BackendError } from '../validation/backend';
+import { UNDESCRIBED_ITEM_DETAIL } from '../validation/problemItems';
 
 function mockOutput() {
     return { appendLine: vi.fn() } as any;
@@ -237,9 +238,29 @@ describe('ApiValidationBackend', () => {
         ]);
     });
 
+    it('keeps a verdict item of the shape problem items replace whose message is empty', async () => {
+        // That shape allows an empty message; its fault is still the verdict's,
+        // so it must not read as an invalid verdict with no item.
+        apiState.validate = async () => ({
+            is_valid: false,
+            validation_errors: [
+                { category: 'dry_run', error_type: 'DryRunError', message: '', pipe_code: 'main', source: 'a.mthds' },
+                { category: 'pipe_validation', pipe_code: 'other' },
+            ],
+            is_runnable: false,
+        });
+        const analysis = await analyze(makeBackend());
+        expect(analysis.validation.ok).toBe(false);
+        expect(analysis.validation.errors).toEqual([
+            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'main', file: 'a.mthds' }, legacy: { errorType: 'DryRunError' } },
+            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'other' } },
+        ]);
+    });
+
     it('treats is_valid:false with an empty errors list as an api-error BackendError (contract violation)', async () => {
         // The runtime invariant is total: an invalid verdict ALWAYS carries a
-        // non-empty errors[] (mirrors the CLI parseFailure guard). An empty list
+        // non-empty errors[]. This body is no problem document, so it has no
+        // code and detail of its own to stand for the faults. An empty list
         // during a server regression must NOT publish zero diagnostics — it is a
         // no-verdict backend error so stale diagnostics are cleared, not hidden.
         apiState.validate = async () => ({

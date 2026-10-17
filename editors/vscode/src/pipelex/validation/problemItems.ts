@@ -5,8 +5,11 @@ import type { LegacyItemFacts, ProblemItem, ProblemLocation, SuggestedFix } from
  * document a validator answers when it produces no verdict.
  *
  * Every reader here is loose on purpose. A wire body is untrusted, so a member
- * of the wrong type reads as absent rather than as a wrong value, and an item
- * with no sentence is dropped rather than shown empty.
+ * of the wrong type reads as absent rather than as a wrong value, and a problem
+ * item with no sentence is dropped rather than shown empty. The validation
+ * item problem items replace may carry an empty `message`, which its shape
+ * allows, so such an item is kept with {@link UNDESCRIBED_ITEM_DETAIL} as its
+ * sentence: its fault is still a fault of the verdict.
  *
  * Two item shapes are read, element by element:
  *
@@ -142,6 +145,13 @@ export function itemField(item: ProblemItem): string | undefined {
     return item.location?.field ?? text(item.params?.field_path);
 }
 
+/**
+ * The sentence of a validation item, of the shape problem items replace,
+ * whose `message` is empty or missing. That shape always carries its
+ * `category`, which is how such an item is recognized.
+ */
+export const UNDESCRIBED_ITEM_DETAIL = 'The validator reported this without describing it.';
+
 function readProblemItem(raw: unknown): ProblemItem | undefined {
     if (!isRecord(raw)) {
         return undefined;
@@ -149,7 +159,7 @@ function readProblemItem(raw: unknown): ProblemItem | undefined {
     if (text(raw.detail) !== undefined) {
         return fromProblemItem(raw);
     }
-    if (text(raw.message) !== undefined) {
+    if (text(raw.message) !== undefined || text(raw.category) !== undefined) {
         return fromValidationItem(raw);
     }
     return undefined;
@@ -169,7 +179,8 @@ function fromProblemItem(raw: Record<string, unknown>): ProblemItem {
 
 /**
  * The validation item problem items replace, read into the same members the
- * way pipelex builds a problem item from it: the pipe and the file from
+ * way pipelex builds a problem item from it: the detail from `message`, or
+ * {@link UNDESCRIBED_ITEM_DETAIL} when it is empty, the pipe and the file from
  * `pipe_code` and `source`, the field from `field_name` or `field_path`, the
  * concept parameter from `concept_code` or `missing_concept_code`. Its
  * `domain_code` and `error_type` have no member there, so they are kept in
@@ -177,7 +188,7 @@ function fromProblemItem(raw: Record<string, unknown>): ProblemItem {
  * when the item names no file, and the error type is the diagnostic's code.
  */
 function fromValidationItem(raw: Record<string, unknown>): ProblemItem {
-    const item: ProblemItem = { detail: text(raw.message)! };
+    const item: ProblemItem = { detail: text(raw.message) ?? UNDESCRIBED_ITEM_DETAIL };
     const params: Record<string, unknown> = {};
     const concept = text(raw.concept_code) ?? text(raw.missing_concept_code);
     if (concept !== undefined) params.concept = concept;

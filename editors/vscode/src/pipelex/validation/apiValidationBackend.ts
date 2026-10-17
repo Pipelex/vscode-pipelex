@@ -143,12 +143,13 @@ export class ApiValidationBackend implements ValidationBackend {
         if (report.is_valid === false) {
             const errors = readVerdictErrors(body);
             // The runtime's structured-info invariant is total: an invalid verdict
-            // ALWAYS carries a non-empty `errors[]` (the CLI path enforces the same
-            // in `parseFailure`). An `is_valid: false` body with no readable item is
-            // a backend/contract violation, NOT an empty invalid verdict — surface it
-            // as a no-verdict BackendError so the consumer clears stale diagnostics,
-            // instead of silently publishing zero diagnostics (which would read as a
-            // falsely-clean bundle and a "No Graph Available" panel).
+            // ALWAYS carries a non-empty `errors[]`. An `is_valid: false` body with
+            // no readable item is a backend/contract violation, NOT an empty invalid
+            // verdict — surface it as a no-verdict BackendError so the consumer
+            // clears stale diagnostics, instead of silently publishing zero
+            // diagnostics (which would read as a falsely-clean bundle). Unlike the
+            // CLI's verdict, which is a problem document whose own code and detail
+            // can stand for its faults (`parseFailure`), this body has neither.
             if (errors.length === 0) {
                 throw new BackendError({
                     kind: 'api-error',

@@ -6,6 +6,7 @@ import { getAgentCliVersion, compareSemver, formatSemver, MIN_AGENT_VERSION } fr
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
 import { isRecord, problemFacts, readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
+import type { ProblemItem } from './types';
 
 /**
  * CLI backend — spawns `pipelex-agent validate bundle`.
@@ -16,7 +17,8 @@ import { isRecord, problemFacts, readProblemItems, readProblemSummary, readVerdi
  *
  * - `withGraph:false` → `validate bundle … --allow-signatures --format json`.
  *   exit 0 → valid, its advisory `warnings` read from stdout JSON; exit 1 →
- *   the invalid verdict read from the problem on stderr.
+ *   the invalid verdict, and any `warnings` beside it, read from the problem
+ *   on stderr.
  * - `withGraph:true`  → adds `--view --direction <dir>`. exit 0 → parse the
  *   `graphspec` from stdout JSON; exit 1 → errors + `graph:null`.
  *
@@ -160,23 +162,38 @@ export class CliValidationBackend implements ValidationBackend {
     }
 
     /**
-     * Read the exit-1 stderr problem as an invalid verdict. Returns `undefined`
-     * when it is not one (a problem that produced no verdict), so the caller can
-     * surface it as a {@link BackendError} instead.
+     * Read the exit-1 stderr problem as an invalid verdict, with the advisory
+     * `warnings[]` it may carry beside its faults, as either arm of a verdict
+     * may. Returns `undefined` when it is not one (a problem that produced no
+     * verdict), so the caller can surface it as a {@link BackendError} instead.
      *
      * The runtime's structured-info invariant is total: every invalid verdict
      * carries a non-empty `errors[]` (a parse-level failure yields one located
      * syntax item; a dry-run failure one item per failed pipe). So the list is
-     * consumed directly — no synthesis here. A CLI that still writes the shape
-     * problem items replace reports the verdict as a non-empty
-     * `validation_errors[]`, read into the same items. A problem with no item is
-     * therefore NOT a bundle verdict.
+     * consumed directly. A CLI that still writes the shape problem items
+     * replace reports the verdict as a non-empty `validation_errors[]`, read
+     * into the same items.
+     *
+     * Should an `is_valid: false` problem hold no readable item, it is still
+     * the verdict that the method is invalid, never a failure to validate it:
+     * its own code and detail become its one fault, which, naming no location,
+     * lands on the bundle's primary file. Only a body that is neither, such as
+     * the envelope problems replace with an empty list, is NOT a verdict.
      */
     private parseFailure(body: Record<string, unknown>): ValidationOutcome | undefined {
+        const warnings = readProblemItems(body.warnings);
         if (body.is_valid === false || body.validation_errors !== undefined) {
             const errors = readVerdictErrors(body);
             if (errors.length > 0) {
-                return { ok: false, errors };
+                return { ok: false, errors, warnings };
+            }
+        }
+        if (body.is_valid === false) {
+            const problem = readProblemSummary(body);
+            if (problem?.detail) {
+                const fault: ProblemItem = { detail: problem.detail };
+                if (problem.code) fault.code = problem.code;
+                return { ok: false, errors: [fault], warnings };
             }
         }
         return undefined;

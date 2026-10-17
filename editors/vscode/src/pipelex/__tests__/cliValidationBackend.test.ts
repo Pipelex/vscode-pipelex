@@ -23,6 +23,7 @@ vi.mock('../validation/agentCliVersion', async (importOriginal) => {
 
 import { CliValidationBackend } from '../validation/cliValidationBackend';
 import { BackendError } from '../validation/backend';
+import { UNDESCRIBED_ITEM_DETAIL } from '../validation/problemItems';
 
 const PRIMARY = { fsPath: '/project/methods/main.mthds', toString: () => 'file:///project/methods/main.mthds' } as any;
 
@@ -133,6 +134,50 @@ describe('CliValidationBackend', () => {
         expect(analysis.graph).toBeNull();
     });
 
+    it('keeps the warnings an invalid verdict carries beside its errors', async () => {
+        const error = { code: 'pipe.input_unresolved', detail: "Pipe 'main' could not read 'text'.", location: { pipe: 'main' } };
+        const warning = { code: 'method.hint_invalid', detail: "The hint 'intent' of input 'notes' is unknown.", location: { pipe: 'main', field: 'inputs' } };
+        cliState.spawnReject = {
+            exitCode: 1,
+            stderr: JSON.stringify({ code: 'method.invalid', detail: 'The method does not validate.', is_valid: false, errors: [error], warnings: [warning] }),
+        };
+        const analysis = await analyze();
+        expect(analysis.validation.ok).toBe(false);
+        expect(analysis.validation.errors).toEqual([error]);
+        expect(analysis.validation.warnings).toEqual([warning]);
+    });
+
+    it('keeps a verdict item of the shape problem items replace whose message is empty', async () => {
+        cliState.spawnReject = {
+            exitCode: 1,
+            stderr: JSON.stringify({ error: true, error_type: 'ValidateBundleError', message: 'invalid', validation_errors: [{ category: 'pipe_validation', error_type: 'missing_input', message: '', pipe_code: 'x' }] }),
+        };
+        const analysis = await analyze();
+        expect(analysis.validation.ok).toBe(false);
+        expect(analysis.validation.errors).toEqual([
+            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'x' }, legacy: { errorType: 'missing_input' } },
+        ]);
+    });
+
+    it('reads an invalid verdict whose items cannot be read as its own code and detail, not as a failure to validate', async () => {
+        cliState.spawnReject = {
+            exitCode: 1,
+            stderr: JSON.stringify({
+                code: 'method.invalid',
+                detail: 'The method does not validate.',
+                next_step: { kind: 'change_method', detail: "Fix each fault the problem's errors list, then validate the method again." },
+                is_valid: false,
+                errors: [{ unreadable: true }],
+                warnings: [{ code: 'method.hint_invalid', detail: 'odd hint' }],
+            }),
+        };
+        const analysis = await analyze(true);
+        expect(analysis.validation.ok).toBe(false);
+        expect(analysis.validation.errors).toEqual([{ code: 'method.invalid', detail: 'The method does not validate.' }]);
+        expect(analysis.validation.warnings).toEqual([{ code: 'method.hint_invalid', detail: 'odd hint' }]);
+        expect(analysis.graph).toBeNull();
+    });
+
     it('reads the verdict a CLI older than the problem document writes as validation_errors', async () => {
         cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'ValidateBundleError', message: 'invalid', validation_errors: [{ category: 'pipe_validation', message: 'bad pipe', pipe_code: 'x' }] }) };
         const analysis = await analyze();
@@ -140,10 +185,11 @@ describe('CliValidationBackend', () => {
         expect(analysis.validation.errors).toEqual([{ detail: 'bad pipe', location: { pipe: 'x' } }]);
     });
 
-    it('treats an exit-1 verdict with no readable item as infra, not a fabricated diagnostic', async () => {
+    it('treats an exit-1 envelope of the shape problems replace with no item as infra, not a fabricated diagnostic', async () => {
         // With the structured-info invariant total, the real CLI never writes an empty
-        // list for a content verdict. If it somehow does, surface it as infra rather
-        // than synthesizing a stand-in item.
+        // list for a content verdict. If one that predates problems somehow does, it
+        // has no problem of its own to show, so surface it as infra rather than
+        // synthesizing a stand-in item.
         cliState.version = [0, 34, 0];
         cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'MthdsParserError', error_domain: 'input', message: 'Missing required fields', validation_errors: [] }) };
         const err = await analyze().catch(e => e);

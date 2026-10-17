@@ -6,6 +6,7 @@ import {
     readProblemItems,
     readProblemSummary,
     readVerdictErrors,
+    UNDESCRIBED_ITEM_DETAIL,
     withNextStep,
 } from '../validation/problemItems';
 
@@ -92,6 +93,17 @@ describe('readProblemItems', () => {
         ]);
         expect(problem.legacy).toBeUndefined();
         expect(validation.legacy).toBeUndefined();
+    });
+
+    it('keeps a validation item whose message is empty or missing, with a neutral sentence', () => {
+        const items = readProblemItems([
+            { category: 'pipe_validation', error_type: 'missing_input', message: '', pipe_code: 'x' },
+            { category: 'dry_run' },
+        ]);
+        expect(items).toEqual([
+            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'x' }, legacy: { errorType: 'missing_input' } },
+            { detail: UNDESCRIBED_ITEM_DETAIL },
+        ]);
     });
 
     it('reads a list mixing both shapes element by element', () => {
