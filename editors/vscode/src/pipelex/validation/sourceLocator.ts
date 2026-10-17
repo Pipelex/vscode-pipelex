@@ -10,9 +10,11 @@ import { itemConcept, itemField, itemPipe } from './problemItems';
  *    an optional 1-based `location.column`), that position is the range: from
  *    the column, or the line's start, to the end of the line. `exact` says the
  *    document is the file the item names, so its line means this text.
- * 2. Otherwise determine a target code: the item's `location.pipe`, its
- *    `concept` parameter, or one extracted from its detail
- * 3. Search for the matching `[pipe.<code>]` or `[concept.<code>]` table header
+ * 2. Otherwise determine a target code: the item's `location.pipe` or a pipe
+ *    its detail quotes, else its `concept` parameter, else a concept its
+ *    detail quotes
+ * 3. Search for the matching `[pipe.<code>]` or `[concept.<code>]` table
+ *    header, moving to the next candidate when one has none
  * 4. If the item names a field, search for `<field> =` within that table section
  * 5. Fallback to line 0
  *
@@ -93,18 +95,30 @@ export function documentLines(document: vscode.TextDocument): string[] {
     return out;
 }
 
-/** The matching core: returns the 0-based target line for an item, or 0 as fallback. */
+/**
+ * The matching core: returns the 0-based target line for an item, or 0 as fallback.
+ *
+ * The concept is searched by the item's `concept` parameter, then by a concept
+ * its detail quotes. The parameter may name the concept the fault is that it is
+ * missing (a validation item's `missing_concept_code`, which pipelex also puts
+ * there), which by definition has no header, so it must not stop the search at
+ * the concept the detail quotes.
+ */
 export function findErrorLine(error: ProblemItem, lines: string[]): number {
     const pipeCode = itemPipe(error) ?? extractCodeFromMessage(error.detail, 'pipe');
-    const conceptCode = itemConcept(error) ?? extractCodeFromMessage(error.detail, 'concept');
 
     let headerLine = -1;
 
     if (pipeCode) {
         headerLine = findTableHeaderInLines(lines, 'pipe', pipeCode);
     }
-    if (headerLine === -1 && conceptCode) {
-        headerLine = findTableHeaderInLines(lines, 'concept', conceptCode);
+    for (const conceptCode of [itemConcept(error), extractCodeFromMessage(error.detail, 'concept')]) {
+        if (headerLine !== -1) {
+            break;
+        }
+        if (conceptCode) {
+            headerLine = findTableHeaderInLines(lines, 'concept', conceptCode);
+        }
     }
 
     const field = itemField(error);

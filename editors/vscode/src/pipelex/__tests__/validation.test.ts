@@ -76,6 +76,7 @@ describe('extractJson', () => {
 // ---------- locateError tests ----------
 
 import { locateError } from '../validation/sourceLocator';
+import { readProblemItems } from '../validation/problemItems';
 import type { ProblemItem } from '../validation/types';
 
 function makeDocument(lines: string[]) {
@@ -190,6 +191,29 @@ describe('locateError', () => {
 
         const range = locateError(error, doc);
         expect(range.start.line).toBe(0);
+    });
+
+    it('goes on to the concept the detail quotes when the concept parameter is a missing one', () => {
+        const doc = makeDocument([
+            '[pipe.extract]',
+            'type = "PipeLLM"',
+            '',
+            '[concept.Invoice]',
+            'description = "An invoice"',
+            'refines = "Document"',
+        ]);
+        // A validation item of the shape problem items replace: its missing concept
+        // becomes the concept parameter, and has no header by definition.
+        const [error] = readProblemItems([{
+            category: 'concept_validation',
+            error_type: 'missing_concept',
+            message: "concept 'Invoice' refines concept 'Document', which no domain declares",
+            missing_concept_code: 'Document',
+        }]);
+        expect(error.params).toEqual({ concept: 'Document' });
+
+        const range = locateError(error, doc);
+        expect(range.start.line).toBe(3);
     });
 
     it('falls back to line 0 when nothing matches', () => {
