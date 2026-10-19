@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{args::FormatCommand, Taplo};
+use crate::{args::FormatCommand, DiagnosticKind, Taplo};
 use anyhow::anyhow;
 use codespan_reporting::files::SimpleFile;
 use itertools::Itertools;
@@ -45,7 +45,7 @@ impl<E: Environment> Taplo<E> {
 
         if !p.errors.is_empty() {
             let reported = p.errors.iter().unique_by(|e| e.range).count();
-            self.record_stats(|stats| stats.diagnostics_syntax += reported);
+            self.record_diagnostics(&display_path, DiagnosticKind::Syntax, reported);
             self.print_parse_errors(
                 &SimpleFile::new(&display_path.to_string_lossy(), source.as_str()),
                 &p.errors,
@@ -235,7 +235,7 @@ impl<E: Environment> Taplo<E> {
 
             if !p.errors.is_empty() {
                 let reported = p.errors.iter().unique_by(|e| e.range).count();
-                self.record_stats(|stats| stats.diagnostics_syntax += reported);
+                self.record_diagnostics(&path, DiagnosticKind::Syntax, reported);
                 self.print_parse_errors(
                     &SimpleFile::new(&*path.to_string_lossy(), source.as_str()),
                     &p.errors,

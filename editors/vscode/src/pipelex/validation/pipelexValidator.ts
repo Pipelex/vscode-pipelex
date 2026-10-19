@@ -6,7 +6,7 @@ import { resolveGraphPrimaryBundle } from './graphPrimary';
 import { buildBundleDiagnostics } from './crossFileDiagnostics';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { BackendFactory } from './backendFactory';
-import type { BackendErrorAction, BundleAnalysis, GraphAnalysisSink } from './backend';
+import type { BackendErrorAction, BundleAnalysis, BundleFile, GraphAnalysisSink } from './backend';
 import { recordFeatureUse } from '../usageStats/recorder';
 
 const DIAGNOSTIC_SOURCE = 'pipelex';
@@ -161,20 +161,24 @@ export class PipelexValidator implements vscode.Disposable {
             );
             if (controller.signal.aborted) return;
 
+            if (panelShowing) {
+                // Fire-and-forget: the widget update (incl. the async invalid
+                // branch) is independent of publishing diagnostics for this save.
+                // It places the items on the files that were validated, as the
+                // diagnostics below do.
+                void this.graphSink?.applyAnalysis(document.uri, analysis, analysisPrimaryUri, files);
+            }
+
             // Drop the diagnostics write if a newer save for this directory has started
             // (a sibling save is not cancelled by our per-URI abort). The graph is
             // per-file and guarded separately by the panel's own currentUri check, so it
             // still updates for the file the user is viewing.
-            if (this.dirGeneration.get(dir) === myGen) {
-                this.applyValidation(document, analysisPrimaryUri, files, analysis);
-                this.lastNotifiedMessage = undefined;
-            }
-
-            if (panelShowing) {
-                // Fire-and-forget: the widget update (incl. the async invalid
-                // branch) is independent of publishing diagnostics for this save.
-                void this.graphSink?.applyAnalysis(document.uri, analysis, analysisPrimaryUri);
-            }
+            if (this.dirGeneration.get(dir) !== myGen) return;
+            const currentFiles = hasItems(analysis) ? await this.readCurrentFiles(analysisPrimaryUri) : files;
+            // Reading the files is async: the save may have been superseded meanwhile.
+            if (controller.signal.aborted || this.dirGeneration.get(dir) !== myGen) return;
+            this.applyValidation(document, analysisPrimaryUri, files, currentFiles, analysis);
+            this.lastNotifiedMessage = undefined;
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
             // Same generation gate as the success path: a stale sibling run must not clear
@@ -193,21 +197,46 @@ export class PipelexValidator implements vscode.Disposable {
         }
     }
 
+    /**
+     * The bundle's files as they are now, read after the verdict arrived, so
+     * an item's own line and column are applied only to a file whose text is
+     * still the text that was validated (`resolveErrorLocations`). None when
+     * they cannot be read, which leaves every item to the declaration scan.
+     */
+    private async readCurrentFiles(primaryUri: vscode.Uri): Promise<BundleFile[]> {
+        try {
+            return await gatherBundleFiles(primaryUri);
+        } catch (err) {
+            this.output.appendLine(`pipelex: could not read the bundle files again to place the validation items: ${String(err)}`);
+            return [];
+        }
+    }
+
+    /**
+     * Publish a verdict's items as diagnostics. `files` are the files as they
+     * were validated, `currentFiles` as they are now.
+     */
     private applyValidation(
         document: vscode.TextDocument,
         analysisPrimaryUri: vscode.Uri,
-        files: { uri: vscode.Uri; name: string; content: string }[],
+        files: BundleFile[],
+        currentFiles: BundleFile[],
         analysis: BundleAnalysis,
     ): void {
         const dir = path.dirname(document.uri.fsPath);
         const validation = analysis.validation;
-        if (validation.ok) {
+        const warnings = validation.warnings ?? [];
+        if (validation.ok && warnings.length === 0) {
             this.setDiagnosticsForDir(dir, []);
             return;
         }
+        // A valid verdict publishes its advisory findings as warnings; an invalid
+        // one its faults as errors, beside any warnings it also carries.
         const fileDiags = buildBundleDiagnostics({
-            errors: validation.errors,
+            errors: validation.ok ? [] : validation.errors,
+            warnings,
             files,
+            currentFiles,
             primaryUri: analysisPrimaryUri,
             diagnosticSource: DIAGNOSTIC_SOURCE,
             primaryDocument: document.uri.toString() === analysisPrimaryUri.toString() ? document : undefined,
@@ -299,6 +328,11 @@ export class PipelexValidator implements vscode.Disposable {
     private clearDir(dir: string): void {
         this.setDiagnosticsForDir(dir, []);
     }
+}
+
+/** Whether a verdict has any item to place: a fault, or an advisory finding. */
+function hasItems(analysis: BundleAnalysis): boolean {
+    return !analysis.validation.ok || (analysis.validation.warnings?.length ?? 0) > 0;
 }
 
 export { extractJson } from './cliOutput';

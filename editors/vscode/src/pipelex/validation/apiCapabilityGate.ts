@@ -28,7 +28,7 @@ import { type Semver, compareSemver, formatSemver } from './agentCliVersion';
  *
  * It is an early, friendlier warning. The guarantee lives in
  * `apiValidationBackend`, which rejects an `is_valid: false` verdict carrying no
- * `validation_errors[]` and says so with its own remedy — ground truth, from the
+ * readable `errors[]` and says so with its own remedy — ground truth, from the
  * response, at the moment it matters. Anything this gate gets wrong still fails
  * safe there. That is what licenses the lenient policy above.
  *
@@ -73,8 +73,10 @@ export interface CapabilityRequirement {
 }
 
 /**
- * Structured `validation_errors[]` carrying `source` — what the API backend maps
- * into cross-file diagnostics.
+ * Structured per-error diagnostics carrying the file each lives in — what the
+ * API backend maps into cross-file diagnostics: `validation_errors[]` with
+ * `source`, which the problem items of `errors[]` with `location.file` replace
+ * from the pipelex release that speaks the problem document.
  */
 export const STRUCTURED_VALIDATION_DIAGNOSTICS: CapabilityRequirement = {
     capability: 'structured validation diagnostics',
