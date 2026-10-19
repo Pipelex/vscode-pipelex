@@ -1,6 +1,6 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
-## [Unreleased]
+## [0.21.1] - 2026-10-19
 
 ### Added
 
@@ -10,7 +10,7 @@
 ### Changed
 
 - **Validation verdicts are read as MTHDS problem items**: both backends read the faults of an invalid verdict from its `errors[]`, the Pipelex API's `/validate` body or the `method.invalid` problem `pipelex-agent` writes (whose own code and detail stand as the one fault when it lists none the extension can read), and place each item on the file its `location.file` names, at its `location.line` and `location.column` when it gives them and the file's text is still the text that was validated, the column counting code points as pipelex writes it. Each diagnostic carries the item's code, linked to the code's page on mthds.ai or docs.pipelex.com, and the graph widget's row shows its `detail` and its `suggested_fix`. An item naming a pipe that several domains declare, and no file, marks no node of the graph. A validator that still writes the `validation_errors[]` problem items replace, as the hosted Pipelex API does until it runs a pipelex release that writes problems, is read as before: its `error_type` is the diagnostic's code, its `domain_code` places the item in its own domain, and an item whose `message` is empty shows a neutral sentence instead of nothing.
-- **`plxt` usage statistics follow schema 2 and name the error (Breaking)**: a failed `format` or `lint` now sends `error_code`, the problem registry's code for what its diagnostics found in a method file, `method.syntax` for one that does not parse and `method.schema_violation` for one that breaks its JSON Schema, and `error_domain` is that code's domain, `method`, instead of `input`. A failure on plain TOML alone, such as a `Cargo.toml` that does not parse, and a `format --check` that found only valid but unformatted files name no error, and the events carry `schema_version` 2.
+- **`plxt` usage statistics follow schema 2 and name the error (Breaking)**: a failed `format` or `lint` now sends `error_code`, the problem registry's code for what its diagnostics found in a method file, `method.syntax` for one that does not parse and `method.schema_violation` for one that breaks its JSON Schema, and `error_domain` is that code's domain, `method`, instead of `input`. A failure on plain TOML alone, such as a `Cargo.toml` that does not parse, and a `format --check` that found only valid but unformatted files name no error, and the events carry `schema_version` 2. (plxt 0.13.0)
 
 ## [0.21.0] - 2026-10-16
 
