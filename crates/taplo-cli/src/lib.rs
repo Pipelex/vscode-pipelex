@@ -26,8 +26,34 @@ pub struct RunStats {
     pub diagnostics_semantic: usize,
     /// Schema validation errors found.
     pub diagnostics_schema: usize,
+    /// The part of `diagnostics_syntax` reported on method files (see
+    /// [`is_method_file`]), so a caller can tell a fault in a method from one
+    /// in plain TOML such as a `Cargo.toml`.
+    pub method_diagnostics_syntax: usize,
+    /// The part of `diagnostics_semantic` reported on method files.
+    pub method_diagnostics_semantic: usize,
+    /// The part of `diagnostics_schema` reported on method files.
+    pub method_diagnostics_schema: usize,
     /// Documents a `format --check` found not properly formatted.
     pub unformatted: usize,
+}
+
+/// A kind of diagnostic [`RunStats`] counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DiagnosticKind {
+    Syntax,
+    Semantic,
+    /// Found only by `lint`, which a build without the `lint` feature lacks.
+    #[cfg(feature = "lint")]
+    Schema,
+}
+
+/// Whether a path names a method file: an MTHDS file, by the `.mthds`
+/// extension the built-in MTHDS schema association matches. Standard input
+/// read without a file path to name it (`-`) is not one.
+pub fn is_method_file(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|extension| extension == "mthds")
 }
 
 pub struct Taplo<E: Environment> {
@@ -75,6 +101,33 @@ impl<E: Environment> Taplo<E> {
             Ok(mut stats) => update(&mut stats),
             Err(poisoned) => update(&mut poisoned.into_inner()),
         }
+    }
+
+    /// Count `reported` diagnostics of one kind found in the document at
+    /// `path`, and among those on method files when it is one.
+    pub(crate) fn record_diagnostics(&self, path: &Path, kind: DiagnosticKind, reported: usize) {
+        let method = is_method_file(path);
+        self.record_stats(|stats| {
+            let (all, on_methods) = match kind {
+                DiagnosticKind::Syntax => (
+                    &mut stats.diagnostics_syntax,
+                    &mut stats.method_diagnostics_syntax,
+                ),
+                DiagnosticKind::Semantic => (
+                    &mut stats.diagnostics_semantic,
+                    &mut stats.method_diagnostics_semantic,
+                ),
+                #[cfg(feature = "lint")]
+                DiagnosticKind::Schema => (
+                    &mut stats.diagnostics_schema,
+                    &mut stats.method_diagnostics_schema,
+                ),
+            };
+            *all += reported;
+            if method {
+                *on_methods += reported;
+            }
+        });
     }
 
     #[cfg(feature = "lint")]

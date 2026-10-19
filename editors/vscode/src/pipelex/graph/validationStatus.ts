@@ -1,6 +1,7 @@
 import { makePipeRef, parsePipeRef } from '@pipelex/mthds-ui/static-graph';
 import { BackendError } from '../validation/backend';
-import type { ValidationErrorItem } from '../validation/types';
+import type { ProblemItem } from '../validation/types';
+import { itemConcept, itemPipe } from '../validation/problemItems';
 
 /**
  * Presentation shapes for the graph toolbar's validation widget.
@@ -27,9 +28,9 @@ export interface GraphValidationIssue {
      * the renderer decorates every node invoking exactly this pipe (severity
      * ring + count badge). Always qualified, never a bare code: two domains
      * may declare the same pipe code, and a bare match would ring both. Built
-     * from the validator's `domain_code` + `pipe_code` here (with a
-     * registry-based inference when only `pipe_code` arrives); static issues
-     * get theirs from the mthds-ui mapper.
+     * here from the item's `location.pipe` and the domain its pipe lives in
+     * when that is known without guessing (with a registry-based inference
+     * otherwise); static issues get theirs from the mthds-ui mapper.
      */
     pipeRef?: string;
     /** Graph target: one precise invocation node id (static walk diagnostics only). */
@@ -43,20 +44,21 @@ export interface GraphValidationPayload {
 }
 
 /**
- * The `pipe.<code>` / `concept.<code>` chip for an error, or undefined when it
+ * The `pipe.<code>` / `concept.<code>` chip for an item, or undefined when it
  * names neither. Mirrors the owning-file-label policy: the pipe chip is
- * domain-qualified (`pipe.<domain>.<code>`) only when the error's domain is
+ * domain-qualified (`pipe.<domain>.<code>`) only when the pipe's domain is
  * known AND differs from the shown file's — the obvious, local case stays
  * clean, a cross-domain issue announces where it lives.
  */
-export function errorContext(error: ValidationErrorItem, shownDomain?: string): string | undefined {
-    if (error.pipe_code) {
-        const domain = error.domain_code != null ? String(error.domain_code) : undefined;
-        return domain && shownDomain !== undefined && domain !== shownDomain
-            ? `pipe.${domain}.${error.pipe_code}`
-            : `pipe.${error.pipe_code}`;
+export function errorContext(item: ProblemItem, shownDomain?: string, pipeDomain?: string): string | undefined {
+    const pipe = itemPipe(item);
+    if (pipe) {
+        return pipeDomain && shownDomain !== undefined && pipeDomain !== shownDomain
+            ? `pipe.${pipeDomain}.${pipe}`
+            : `pipe.${pipe}`;
     }
-    return error.concept_code ? `concept.${error.concept_code}` : undefined;
+    const concept = itemConcept(item);
+    return concept ? `concept.${concept}` : undefined;
 }
 
 /**
@@ -78,47 +80,62 @@ export function inferPipeRefFromRegistry(
     return matches.length === 1 ? matches[0] : undefined;
 }
 
-/** Host-side context {@link validationErrorsToIssues} projects errors against. */
+/** Host-side context {@link problemItemsToIssues} projects items against. */
 export interface ValidationIssueContext {
     /**
-     * Index-aligned with `errors` (from `resolveErrorLocations`, which
+     * Index-aligned with the items (from `resolveErrorLocations`, which
      * preserves input order): the owning-file basename, or undefined when the
-     * error lives in the shown file itself (kept unlabeled to stay clean).
+     * item lives in the shown file itself (kept unlabeled to stay clean).
      */
     ownerFiles?: (string | undefined)[];
     /**
+     * Index-aligned with the items (from `resolveErrorLocations`): the domain
+     * the item's pipe lives in, when it is known without guessing (its
+     * `ErrorLocation.pipeDomain`). It qualifies the item's pipe outright.
+     */
+    pipeDomains?: (string | undefined)[];
+    /**
      * Qualified refs (`domain.code`) keying the static graphspec's
-     * `pipe_registry` — the inference pool for errors that arrive with a bare
-     * `pipe_code` and no `domain_code`.
+     * `pipe_registry` — the inference pool for items whose pipe's domain is
+     * not known from its file.
      */
     pipeRegistryRefs?: readonly string[];
     /** The shown file's declared domain — drives the chip-qualification policy. */
     shownDomain?: string;
 }
 
-/** Project the backend's structured validation errors onto widget issues. */
-export function validationErrorsToIssues(
-    errors: ValidationErrorItem[],
+/**
+ * Project the validator's problem items onto widget issues: its faults with
+ * `severity` `error`, its advisory findings with `warning`. An item carries no
+ * domain, so its pipe is qualified by the domain `resolveErrorLocations` found
+ * for it, else through the static registry when exactly one domain declares
+ * that code; with several, the issue stays untargeted.
+ */
+export function problemItemsToIssues(
+    items: ProblemItem[],
     context: ValidationIssueContext = {},
+    severity: 'error' | 'warning' = 'error',
 ): GraphValidationIssue[] {
-    return errors.map((error, index) => {
-        const pipeCode = error.pipe_code != null ? String(error.pipe_code) : undefined;
-        const domainCode = error.domain_code != null ? String(error.domain_code) : undefined;
-        const pipeRef = pipeCode !== undefined
-            ? domainCode !== undefined
-                ? makePipeRef(domainCode, pipeCode)
-                : inferPipeRefFromRegistry(pipeCode, context.pipeRegistryRefs)
+    return items.map((item, index) => {
+        const pipe = itemPipe(item);
+        const knownDomain = context.pipeDomains?.[index];
+        const pipeRef = pipe !== undefined
+            ? knownDomain !== undefined
+                ? makePipeRef(knownDomain, pipe)
+                : inferPipeRefFromRegistry(pipe, context.pipeRegistryRefs)
             : undefined;
+        const pipeDomain = pipeRef !== undefined ? parsePipeRef(pipeRef)?.domainPath ?? undefined : undefined;
         return {
-            severity: 'error' as const,
+            severity,
             // Coerced at the trust boundary: these strings cross into the React
             // webview as render children, where a non-string from a malformed
             // backend response would throw inside GraphViewer (blank webview, no
-            // error boundary). The types say string; the wire doesn't promise it.
-            message: String(error.message),
-            context: errorContext(error, context.shownDomain),
+            // error boundary). The reader keeps only strings; this guards any
+            // other caller.
+            message: String(item.detail),
+            context: errorContext(item, context.shownDomain, pipeDomain),
             file: context.ownerFiles?.[index],
-            suggestedFix: error.suggested_fix?.description != null ? String(error.suggested_fix.description) : undefined,
+            suggestedFix: item.suggested_fix?.description != null ? String(item.suggested_fix.description) : undefined,
             origin: 'validator' as const,
             pipeRef,
         };
