@@ -88,7 +88,7 @@ This repository's own runs never report and never touch the developer's own `~/.
 
 The tests are:
 
-- `crates/pipelex-cli/tests/usage_stats.rs`: the constants against the vendored schema, every built event through a port of the PostHog gate, every error code `plxt` sends against the MTHDS core error registry (vendored byte for byte from the `mthds` repository's `docs/spec/openapi/mthds-error-registry.json` at [`test-data/mthds-error-registry.json`](../../test-data/mthds-error-registry.json)), aliases, diagnostics by kind and the error they name, the switches, the group, and delivery to a capture server;
+- `crates/pipelex-cli/tests/usage_stats.rs`: the constants against the vendored schema, every built event through a port of the PostHog gate, every error code `plxt` sends against the MTHDS core error registry (vendored byte for byte from the `mthds` repository's `docs/spec/openapi/mthds-error-registry.json` as the standard released it at v8.0.0, at [`test-data/mthds-error-registry.json`](../../test-data/mthds-error-registry.json)), aliases, diagnostics by kind and the error they name, the switches, the group, and delivery to a capture server;
 - `editors/vscode/src/pipelex/__tests__/usageStats*.test.ts`: the same for the extension, the service under a mocked VS Code whose telemetry logger behaves like the real one, and `usageStatsSpawnEnv.test.ts`, which asserts `PIPELEX_USAGE_STATS=0` at every spawn site and fails when a new one appears untested.
 
 The conformance repository verifies `plxt` against the contract from outside, with its `tests/usage_stats` arm (`CONFORMANCE_CLI_PLXT=<path to plxt>`).

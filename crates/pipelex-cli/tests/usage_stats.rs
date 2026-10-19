@@ -725,7 +725,7 @@ fn built_events_pass_the_gate() {
 }
 
 /// The MTHDS core error registry, vendored byte for byte from the `mthds`
-/// repository's `docs/spec/openapi/mthds-error-registry.json`.
+/// repository's `docs/spec/openapi/mthds-error-registry.json` at the v8.0.0 release.
 fn core_error_registry() -> Value {
     let text = fs::read_to_string(repo_root().join("test-data/mthds-error-registry.json"))
         .expect("the vendored core error registry should be readable");
