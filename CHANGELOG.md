@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Security
+
+- **Dependencies past their security advisories**: `plxt`, `pipelex-tools-py`, `@pipelex/tools-wasm` and the extension's language server are built with `bytes` 1.12.1, `tokio` 1.38.2, `tracing-subscriber` 0.3.20 and `url` 2.5.4 with `idna` 1.1.0, `plxt` and `pipelex-tools-py` also with `ring` 0.17.14, and the extension bundles `smol-toml` 1.9.1 and `axios` 1.20.0, releases that fix the advisories raised against the versions they replace.
+
 ## [0.21.1] - 2026-10-19
 
 ### Added
