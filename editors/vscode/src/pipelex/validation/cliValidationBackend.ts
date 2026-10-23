@@ -5,7 +5,7 @@ import { extractJson } from './cliOutput';
 import { getAgentCliVersion, compareSemver, formatSemver, MIN_AGENT_VERSION } from './agentCliVersion';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
-import { isRecord, problemFacts, readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
+import { isRecord, problemFacts, readProblemItems, readProblemSummary, withNextStep } from './problemItems';
 import type { ProblemItem } from './types';
 
 /**
@@ -30,9 +30,9 @@ import type { ProblemItem } from './types';
  * faults the problem items of its `errors[]`. Any other problem means no
  * verdict was produced (a configuration the runtime cannot boot with, an
  * unreadable bundle, …), and it surfaces as a {@link BackendError} whose
- * message is the problem's detail and next step. A CLI older than the pipelex
- * release that writes problems reports the verdict as `validation_errors[]`,
- * which is read into the same items (`problemItems.ts`).
+ * message is the problem's detail and next step. A CLI older than pipelex
+ * 0.90.0, which reported the verdict as `validation_errors[]`, is refused by
+ * the version floor before it is run (`MIN_AGENT_VERSION`).
  */
 export class CliValidationBackend implements ValidationBackend {
     readonly kind = 'cli' as const;
@@ -49,13 +49,13 @@ export class CliValidationBackend implements ValidationBackend {
             });
         }
 
-        // Enforce the version floor BEFORE trusting the CLI's output. The structured
-        // `source` / `field_name` fields cross-file diagnostics rely on only exist from
-        // MIN_AGENT_VERSION; a CLI in [0.31.0, 0.34.0) still exits 0 / emits a structured
-        // error list, just without those fields. Checking only on a spawn failure (the
-        // earlier behavior) let such a CLI through silently, degrading cross-file mapping
-        // with no "too old" warning. The version probe is cached per command, so only the
-        // first analysis of a session pays for it.
+        // Enforce the version floor BEFORE trusting the CLI's output. The problem items
+        // an invalid verdict is read from only exist from MIN_AGENT_VERSION; an older CLI
+        // still exits 0 on a valid method, but reports an invalid one as the
+        // `validation_errors[]` envelope this backend no longer reads. Checking only on a
+        // spawn failure would let such a CLI through with no "too old" warning. The
+        // version probe is cached per command, so only the first analysis of a session
+        // pays for it.
         await this.throwIfTooOld(resolved, request, signal);
 
         const primaryPath = request.primaryUri.fsPath;
@@ -170,31 +170,29 @@ export class CliValidationBackend implements ValidationBackend {
      * The runtime's structured-info invariant is total: every invalid verdict
      * carries a non-empty `errors[]` (a parse-level failure yields one located
      * syntax item; a dry-run failure one item per failed pipe). So the list is
-     * consumed directly. A CLI that still writes the shape problem items
-     * replace reports the verdict as a non-empty `validation_errors[]`, read
-     * into the same items.
+     * consumed directly.
      *
      * Should an `is_valid: false` problem hold no readable item, it is still
      * the verdict that the method is invalid, never a failure to validate it:
      * its own code and detail become its one fault, which, naming no location,
      * lands on the bundle's primary file. Only a body that is neither, such as
-     * the envelope problems replace with an empty list, is NOT a verdict.
+     * the envelope problems replaced, whose `validation_errors[]` is not read,
+     * is NOT a verdict.
      */
     private parseFailure(body: Record<string, unknown>): ValidationOutcome | undefined {
-        const warnings = readProblemItems(body.warnings);
-        if (body.is_valid === false || body.validation_errors !== undefined) {
-            const errors = readVerdictErrors(body);
-            if (errors.length > 0) {
-                return { ok: false, errors, warnings };
-            }
+        if (body.is_valid !== false) {
+            return undefined;
         }
-        if (body.is_valid === false) {
-            const problem = readProblemSummary(body);
-            if (problem?.detail) {
-                const fault: ProblemItem = { detail: problem.detail };
-                if (problem.code) fault.code = problem.code;
-                return { ok: false, errors: [fault], warnings };
-            }
+        const warnings = readProblemItems(body.warnings);
+        const errors = readProblemItems(body.errors);
+        if (errors.length > 0) {
+            return { ok: false, errors, warnings };
+        }
+        const problem = readProblemSummary(body);
+        if (problem?.detail) {
+            const fault: ProblemItem = { detail: problem.detail };
+            if (problem.code) fault.code = problem.code;
+            return { ok: false, errors: [fault], warnings };
         }
         return undefined;
     }

@@ -190,11 +190,11 @@ describe('describeBackendErrorIssue', () => {
         const issue = describeBackendErrorIssue(new BackendError({
             kind: 'too-old',
             logMessage: 'x',
-            installedVersion: '0.30.0',
-            minVersion: '0.34.0',
+            installedVersion: '0.89.0',
+            minVersion: '0.90.0',
         }));
-        expect(issue.message).toContain('0.30.0');
-        expect(issue.message).toContain('0.34.0');
+        expect(issue.message).toContain('0.89.0');
+        expect(issue.message).toContain('0.90.0');
     });
 
     it.each(['api-error', 'no-key'] as const)('prefers the userMessage for API-side failures (%s)', kind => {

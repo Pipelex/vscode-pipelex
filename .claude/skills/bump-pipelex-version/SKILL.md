@@ -13,7 +13,7 @@ description: >
 
 The extension cannot enforce a Python package version at install time — `pipelex` lives in the user's environment (often a per-project `uv` env). Instead it probes `pipelex-agent --version` at runtime and gates features that need a newer CLI, surfacing an actionable upgrade message when the installed CLI is too old. The whole mechanism rests on one constant.
 
-**Single source of truth:** the exported minimum-version constant in `editors/vscode/src/pipelex/validation/agentCliVersion.ts` (currently `MIN_FORMAT_JSON_VERSION`). It is a `Semver` tuple `[major, minor, patch]`, not a string.
+**Single source of truth:** the exported minimum-version constant in `editors/vscode/src/pipelex/validation/agentCliVersion.ts` (`MIN_AGENT_VERSION`). It is a `Semver` tuple `[major, minor, patch]`, not a string.
 
 ## Workflow
 
@@ -44,10 +44,10 @@ If the motivating feature affects the diagnostics validator (`validation/pipelex
 
 ### 4. Changelog
 
-Add an entry to `CHANGELOG.md` under `## [Unreleased]` (create that section right below the title if it doesn't exist), in a `### Changed` block:
+Add an entry to `CHANGELOG.md` under `## [Unreleased]` (create that section right below the title if it doesn't exist), in its `### Changed` block, in the shape the workspace's changelog rule gives every entry. A raised floor refuses every older CLI, so it is breaking:
 
 ```
-- Minimum supported `pipelex-agent` raised to X.Y.Z — required for <feature>
+- **`pipelex-agent` X.Y.Z or later (Breaking)**: the `cli` backend now needs <feature>, which landed in X.Y.Z, and reports an older `pipelex-agent` as too old; upgrade pipelex.
 ```
 
 ### 5. Verify

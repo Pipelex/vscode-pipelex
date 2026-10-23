@@ -10,16 +10,16 @@
  * `problemItems.ts` reads them off the wire.
  *
  * An item carries no domain and no next step: those belong to the problem
- * document as a whole (an item read from the shape problem items replace
- * keeps the domain that shape named, in {@link ProblemItem.legacy}). What to do about one item is the page its code's type
+ * document as a whole. What to do about one item is the page its code's type
  * URI names ({@link problemTypeUri}), and its `suggested_fix` when the runtime's
  * fix planner derived one.
  */
 export interface ProblemItem {
     /**
-     * The registry code, such as `method.unknown_pipe` or `pipelex.…`. Absent
-     * only on an item read from the shape the hosted plane's runner and an
-     * older `pipelex-agent` still write, which has no code.
+     * The registry code, such as `method.unknown_pipe` or `pipelex.…`. The
+     * protocol gives every item one; it is absent only when the wire item's is
+     * missing or not a string, which the reader reads as absent rather than
+     * dropping the item.
      */
     code?: string;
     /** The sentence the code renders for this occurrence. */
@@ -28,30 +28,6 @@ export interface ProblemItem {
     params?: Record<string, unknown>;
     location?: ProblemLocation;
     suggested_fix?: SuggestedFix;
-    /**
-     * What only the validation item problem items replace carries, kept when
-     * an item is read from that shape. Absent on a problem item. It goes with
-     * that reader.
-     */
-    legacy?: LegacyItemFacts;
-}
-
-/**
- * The members of the validation item problem items replace that a problem
- * item has no place for, and that the extension still uses.
- */
-export interface LegacyItemFacts {
-    /**
-     * The `domain_code` the item named: the domain its pipe or concept lives
-     * in. It constrains the declaration scan for its owning file and
-     * qualifies its pipe in the method graph.
-     */
-    domainCode?: string;
-    /**
-     * The `error_type` the item named, which the Problems panel shows as the
-     * diagnostic's code. It is no registry code, so it links to no page.
-     */
-    errorType?: string;
 }
 
 /** Where a problem item points: the members of the protocol's location the extension reads. */
