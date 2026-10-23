@@ -141,7 +141,7 @@ fn gate(schema: &Value, envelope: &Value) -> Result<(), String> {
         }
         if rule
             .get("when")
-            .map_or(true, |condition| condition_holds(condition, properties))
+            .is_none_or(|condition| condition_holds(condition, properties))
         {
             return Err(format!("missing required {name}"));
         }
