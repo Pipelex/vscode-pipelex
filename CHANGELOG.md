@@ -5,6 +5,7 @@
 ### Changed
 
 - **The `api` backend validates the saved file's method tree (Breaking)**: on each save the extension sends, through `@pipelex/sdk` 0.50.0, the tree a run of the method would send, every file the MTHDS membership rule keeps under the nearest directory holding a `METHODS.toml`, or else under the saved file's directory, its templates and Python modules included, instead of that directory's `.mthds` files alone, inline when it is small and otherwise by hash, uploading only the files the API lacks. A saved file its own tree keeps out, a tree holding a symbolic link or past the API's limits, and a file that could not be uploaded are reported rather than validated, and a self-hosted Pipelex API server that predates method trees answers a `422` until it is upgraded. The consent prompt now describes this send and is shown once more for a host that granted the earlier one.
+- **Pinned development Python**: `.python-version` names the Python that the Makefile's Python targets build `.venv` on, with `maturin` installed in it, rebuilding one made on another version, and that the CI jobs testing the Python bindings run on, so the Python side no longer follows whichever interpreter is newest on the machine; `PYTHON_VERSION=<version> make test-all` tries another one, and the release jobs keep naming their own.
 
 ### Security
 

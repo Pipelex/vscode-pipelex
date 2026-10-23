@@ -110,12 +110,13 @@ jobs:
         run: rustup toolchain install --no-self-update
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Install Python
-        # Pin the interpreter (matches the Makefile's PYTHON_VERSION) so this
-        # e2e guard doesn't break when ubuntu-latest bumps its default python3
-        # outside the wheel's requires-python range.
+        # The development interpreter, the one .python-version names and the
+        # Makefile builds .venv on, so this e2e guard doesn't break when
+        # ubuntu-latest bumps its default python3 outside the wheel's
+        # requires-python range.
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: "3.13"
+          python-version-file: .python-version
       - name: Build the wheel, install it, and run the import smoke test
         # End-to-end against the shipped artifact: build the actual
         # `pipelex-tools-py` wheel with maturin (which turns on the `python`
