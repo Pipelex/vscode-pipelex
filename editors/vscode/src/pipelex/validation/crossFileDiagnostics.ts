@@ -45,9 +45,10 @@ interface ItemResolution {
  * A directory-wide validation can surface an item that belongs to a sibling
  * file. Each item is placed on its OWNING file, resolved in priority order:
  *
- * 1. `location.file` — the file at fault (CLI: a real path; API: the
- *    per-content `mthds_sources` name). Matched against the gathered files by
- *    name / path / basename. This is the populated-whenever-possible path.
+ * 1. `location.file` — the file at fault (CLI: a real path; API: its path in
+ *    the method tree, `sub/x.mthds` when the tree is rooted above the saved
+ *    file's directory). Matched against the gathered files by name / path /
+ *    basename / path suffix. This is the populated-whenever-possible path.
  * 2. Declaration scan — for an item naming no file, find the file that
  *    declares the item's `[pipe.<location.pipe>]`, else its
  *    `[concept.<params.concept>]`. Among several declaring files the first
@@ -55,9 +56,10 @@ interface ItemResolution {
  *    item read from the shape problem items replace names, when it names one.
  * 3. Fallback — the saved (primary) file, so an unresolved item is never lost.
  *
- * `files` are the files as they were validated: the contents sent to the API,
- * or the gather made for the request when the CLI read the directory itself.
- * The owner is resolved against them, since the item speaks of that text.
+ * `files` are the files as they were validated: the directory's `.mthds` files
+ * as gathered for the request, which the API's method tree holds and the CLI
+ * read itself. The owner is resolved against them, since the item speaks of
+ * that text.
  *
  * The range is the item's own `location.line` and `location.column` when they
  * mean the owner's text: the owner is the file the item names, or the item
