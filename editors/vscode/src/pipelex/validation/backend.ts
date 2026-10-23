@@ -33,8 +33,19 @@ export interface BundleFile {
 }
 
 export interface BundleRequest {
-    /** The saved/active file the analysis is anchored on (errors with no owner land here). */
+    /**
+     * The file the analysis is anchored on (errors with no owner land here): the
+     * saved or opened file, or, when the method graph panel shows an ancillary
+     * file, the graph primary that declares the directory's `main_pipe`.
+     */
     primaryUri: vscode.Uri;
+    /**
+     * The file that was saved, or opened in the method graph panel, which is not
+     * `primaryUri` when that is the graph primary. The API backend validates this
+     * file's method tree and refuses one that does not hold it, since a verdict on
+     * the tree would say nothing about the file.
+     */
+    savedUri: vscode.Uri;
     /**
      * Every `.mthds` file in the primary's directory, including the primary itself:
      * the files a verdict's items are placed against. Neither backend sends them:

@@ -243,6 +243,10 @@ describe('PipelexValidator — per-directory generation gate', () => {
         // the verdict handed to the widget matches the graph.
         expect(capturedOptions.withGraph).toBe(false);
         expect(capturedRequest.primaryUri.fsPath).toBe('/proj/bundle.mthds');
+        // The file whose tree is validated, and which that tree must hold, is
+        // still the one saved: a helper the tree keeps out is not validated
+        // through the main bundle.
+        expect(capturedRequest.savedUri).toBe(helper.uri);
         expect(capturedRequest.files.map((file: any) => file.name)).toEqual(['bundle.mthds', 'helper.mthds']);
         // The sink receives BOTH the shown file (staleness + labels) and the
         // analysis anchor (fallback owner for unattributed errors), and the

@@ -31,7 +31,7 @@ function analyze(withGraph = false) {
     const backend = new CliValidationBackend();
     const controller = new AbortController();
     return backend.analyze(
-        { primaryUri: PRIMARY, files: [], cwd: '/project', timeout: 30000 },
+        { primaryUri: PRIMARY, savedUri: PRIMARY, files: [], cwd: '/project', timeout: 30000 },
         { withGraph, direction: 'top_down' },
         controller.signal,
     );

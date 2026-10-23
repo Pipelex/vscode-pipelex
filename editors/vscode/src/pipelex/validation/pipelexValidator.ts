@@ -154,8 +154,10 @@ export class PipelexValidator implements vscode.Disposable {
             const analysisPrimaryUri = graphPrimary?.primaryUri ?? document.uri;
             const files = graphPrimary?.files ?? await gatherBundleFiles(document.uri);
             recordFeatureUse('validation');
+            // The analysis anchors on the graph primary, but the file whose method
+            // tree is validated, and which that tree must hold, is the one saved.
             const analysis = await backend.analyze(
-                { primaryUri: analysisPrimaryUri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
+                { primaryUri: analysisPrimaryUri, savedUri: document.uri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
                 { withGraph: false },
                 controller.signal,
             );

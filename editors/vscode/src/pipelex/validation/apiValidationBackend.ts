@@ -46,7 +46,10 @@ export interface ApiBackendDeps {
  * deployment announces. The client sends it inline when small and by hash
  * otherwise, uploading only the files the API lacks. The saved file must be a
  * file of that tree: one the rule keeps out is not validated at all, since a
- * verdict on the tree would say nothing about it. `request.files`, the
+ * verdict on the tree would say nothing about it. The saved file is
+ * `request.savedUri`, the file saved or opened, and never the graph primary
+ * the analysis may be anchored on, which the tree can hold when the saved file
+ * is kept out. `request.files`, the
  * directory's `.mthds` gather, is not what is sent; the verdict's items, which
  * name a file by its tree path, are placed against it by its caller.
  *
@@ -211,7 +214,7 @@ export class ApiValidationBackend implements ValidationBackend {
         signal: AbortSignal,
         deadline: number,
     ): Promise<PipelexValidationResult> {
-        const savedPath = request.primaryUri.fsPath;
+        const savedPath = request.savedUri.fsPath;
         const limits = await client.methodTreeLimits();
         if (signal.aborted) {
             throw new AnalyzeAbortError();

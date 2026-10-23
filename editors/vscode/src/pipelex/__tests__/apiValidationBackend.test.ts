@@ -207,10 +207,10 @@ function makeBackend(opts?: { baseUrl?: string; confirmRemote?: () => Promise<bo
     });
 }
 
-function analyze(backend: ApiValidationBackend, withGraph = false, primaryPath = FILES[0].uri.fsPath) {
+function analyze(backend: ApiValidationBackend, withGraph = false, savedPath = FILES[0].uri.fsPath) {
     const controller = new AbortController();
     return backend.analyze(
-        { primaryUri: fileUri(primaryPath), files: FILES, timeout: 30000 },
+        { primaryUri: fileUri(savedPath), savedUri: fileUri(savedPath), files: FILES, timeout: 30000 },
         { withGraph },
         controller.signal,
     );
@@ -291,6 +291,33 @@ describe('ApiValidationBackend', () => {
         expect(apiState.lastValidateArgs).toBeNull();
     });
 
+    it('checks the saved file against its tree, not the graph primary the analysis is anchored on', async () => {
+        // With the method graph showing an ancillary file, the analysis anchors on
+        // the directory's main bundle, which the tree holds. The file saved is a
+        // scratch file a .gitignore keeps out, so it is still refused, and nothing
+        // is sent, as it is with the panel closed.
+        const dir = writeTree({
+            'bundle.mthds': 'domain="d"\nmain_pipe="main"',
+            'scratch.mthds': 'domain="d"',
+            '.gitignore': 'scratch.mthds\n',
+        });
+        apiState.validate = async () => ({ is_valid: true });
+        const err = await makeBackend().analyze(
+            {
+                primaryUri: fileUri(path.join(dir, 'bundle.mthds')),
+                savedUri: fileUri(path.join(dir, 'scratch.mthds')),
+                files: FILES,
+                timeout: 30000,
+            },
+            { withGraph: false },
+            new AbortController().signal,
+        ).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('tree');
+        expect(err.userMessage).toContain(`scratch.mthds was not validated: it is not a file of its method tree, rooted at ${dir}`);
+        expect(apiState.lastValidateArgs).toBeNull();
+    });
+
     it('refuses a tree the standard refuses, such as one holding a symbolic link, before sending', async () => {
         const dir = writeTree({ 'a.mthds': 'domain="d"', 'target.txt': 'x' });
         fs.symlinkSync(path.join(dir, 'target.txt'), path.join(dir, 'link.txt'));
@@ -349,7 +376,7 @@ describe('ApiValidationBackend', () => {
         apiState.validate = async () => ({ is_valid: true });
         const controller = new AbortController();
         const pending = makeBackend().analyze(
-            { primaryUri: FILES[0].uri, files: FILES, timeout: 30000 },
+            { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 30000 },
             { withGraph: false },
             controller.signal,
         );
@@ -375,7 +402,7 @@ describe('ApiValidationBackend', () => {
             };
             apiState.validate = async () => ({ is_valid: true });
             await makeBackend().analyze(
-                { primaryUri: FILES[0].uri, files: FILES, timeout: 12000 },
+                { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 12000 },
                 { withGraph: false },
                 new AbortController().signal,
             );
@@ -394,7 +421,7 @@ describe('ApiValidationBackend', () => {
         });
         const controller = new AbortController();
         const pending = makeBackend().analyze(
-            { primaryUri: FILES[0].uri, files: FILES, timeout: 30000 },
+            { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 30000 },
             { withGraph: false },
             controller.signal,
         );
@@ -415,7 +442,7 @@ describe('ApiValidationBackend', () => {
         apiState.validate = async () => ({ is_valid: true });
         const controller = new AbortController();
         const err = await makeBackend().analyze(
-            { primaryUri: FILES[0].uri, files: FILES, timeout: 30 },
+            { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 30 },
             { withGraph: false },
             controller.signal,
         ).catch(e => e);
@@ -435,7 +462,7 @@ describe('ApiValidationBackend', () => {
             options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), { once: true });
         });
         const err = await makeBackend().analyze(
-            { primaryUri: FILES[0].uri, files: FILES, timeout: 50 },
+            { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 50 },
             { withGraph: false },
             new AbortController().signal,
         ).catch(e => e);
