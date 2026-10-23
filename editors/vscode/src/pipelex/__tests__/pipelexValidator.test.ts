@@ -247,15 +247,16 @@ describe('PipelexValidator — per-directory generation gate', () => {
         // still the one saved: a helper the tree keeps out is not validated
         // through the main bundle.
         expect(capturedRequest.savedUri).toBe(helper.uri);
-        expect(capturedRequest.files.map((file: any) => file.name)).toEqual(['bundle.mthds', 'helper.mthds']);
         // The sink receives BOTH the shown file (staleness + labels) and the
         // analysis anchor (fallback owner for unattributed errors), and the
-        // files that were validated, which its items speak of.
+        // files that were validated, which its items speak of: the directory's
+        // gather, the graph primary first.
+        const [gatheredHelper, gatheredBundle] = mockState.bundleFiles;
         expect(graphSink.applyAnalysis).toHaveBeenCalledWith(
             helper.uri,
             expect.objectContaining({ validation: { ok: true, errors: [] } }),
             expect.objectContaining({ fsPath: '/proj/bundle.mthds' }),
-            capturedRequest.files,
+            [gatheredBundle, gatheredHelper],
         );
 
         validator.dispose();
@@ -322,7 +323,7 @@ describe('PipelexValidator — per-directory generation gate', () => {
 
         await mockState.onSaveHandler!(doc);
 
-        expect(backend.analyze.mock.calls[0][0].files).toEqual(validated);
+        // The gather made before the request, not the one read after the verdict.
         expect(buildBundleDiagnostics).toHaveBeenLastCalledWith(expect.objectContaining({ files: validated, currentFiles: current }));
         validator.dispose();
     });

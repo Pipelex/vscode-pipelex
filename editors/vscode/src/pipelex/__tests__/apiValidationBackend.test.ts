@@ -184,7 +184,7 @@ function fileUri(fsPath: string) {
 
 /** The single-file method most tests validate. */
 const METHOD_DIR = writeTree({ 'a.mthds': 'domain="d"' });
-const FILES = [{ uri: fileUri(path.join(METHOD_DIR, 'a.mthds')), name: 'a.mthds', content: 'domain="d"' }];
+const SAVED = fileUri(path.join(METHOD_DIR, 'a.mthds'));
 
 /** The tree paths of the tree the client was handed. */
 function sentTreePaths(): string[] {
@@ -207,10 +207,10 @@ function makeBackend(opts?: { baseUrl?: string; confirmRemote?: () => Promise<bo
     });
 }
 
-function analyze(backend: ApiValidationBackend, withGraph = false, savedPath = FILES[0].uri.fsPath) {
+function analyze(backend: ApiValidationBackend, withGraph = false, savedPath = SAVED.fsPath) {
     const controller = new AbortController();
     return backend.analyze(
-        { primaryUri: fileUri(savedPath), savedUri: fileUri(savedPath), files: FILES, timeout: 30000 },
+        { primaryUri: fileUri(savedPath), savedUri: fileUri(savedPath), timeout: 30000 },
         { withGraph },
         controller.signal,
     );
@@ -306,7 +306,6 @@ describe('ApiValidationBackend', () => {
             {
                 primaryUri: fileUri(path.join(dir, 'bundle.mthds')),
                 savedUri: fileUri(path.join(dir, 'scratch.mthds')),
-                files: FILES,
                 timeout: 30000,
             },
             { withGraph: false },
@@ -376,7 +375,7 @@ describe('ApiValidationBackend', () => {
         apiState.validate = async () => ({ is_valid: true });
         const controller = new AbortController();
         const pending = makeBackend().analyze(
-            { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 30000 },
+            { primaryUri: SAVED, savedUri: SAVED, timeout: 30000 },
             { withGraph: false },
             controller.signal,
         );
@@ -402,7 +401,7 @@ describe('ApiValidationBackend', () => {
             };
             apiState.validate = async () => ({ is_valid: true });
             await makeBackend().analyze(
-                { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 12000 },
+                { primaryUri: SAVED, savedUri: SAVED, timeout: 12000 },
                 { withGraph: false },
                 new AbortController().signal,
             );
@@ -421,7 +420,7 @@ describe('ApiValidationBackend', () => {
         });
         const controller = new AbortController();
         const pending = makeBackend().analyze(
-            { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 30000 },
+            { primaryUri: SAVED, savedUri: SAVED, timeout: 30000 },
             { withGraph: false },
             controller.signal,
         );
@@ -442,7 +441,7 @@ describe('ApiValidationBackend', () => {
         apiState.validate = async () => ({ is_valid: true });
         const controller = new AbortController();
         const err = await makeBackend().analyze(
-            { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 30 },
+            { primaryUri: SAVED, savedUri: SAVED, timeout: 30 },
             { withGraph: false },
             controller.signal,
         ).catch(e => e);
@@ -462,7 +461,7 @@ describe('ApiValidationBackend', () => {
             options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), { once: true });
         });
         const err = await makeBackend().analyze(
-            { primaryUri: FILES[0].uri, savedUri: FILES[0].uri, files: FILES, timeout: 50 },
+            { primaryUri: SAVED, savedUri: SAVED, timeout: 50 },
             { withGraph: false },
             new AbortController().signal,
         ).catch(e => e);

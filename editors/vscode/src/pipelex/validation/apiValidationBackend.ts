@@ -49,9 +49,8 @@ export interface ApiBackendDeps {
  * verdict on the tree would say nothing about it. The saved file is
  * `request.savedUri`, the file saved or opened, and never the graph primary
  * the analysis may be anchored on, which the tree can hold when the saved file
- * is kept out. `request.files`, the
- * directory's `.mthds` gather, is not what is sent; the verdict's items, which
- * name a file by its tree path, are placed against it by its caller.
+ * is kept out. The verdict's items, which name a file by its tree path, are
+ * placed by the caller against the directory's `.mthds` files it gathered.
  *
  * `/validate` is 200-diagnostic:
  * the produced verdict rides the response body discriminated on `is_valid`. An

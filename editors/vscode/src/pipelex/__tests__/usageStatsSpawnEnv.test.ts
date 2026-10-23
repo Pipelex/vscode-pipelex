@@ -109,7 +109,7 @@ describe('every process the extension starts runs with usage statistics off', ()
         const backend = new CliValidationBackend();
         const main = { fsPath: '/project/main.mthds', toString: () => 'file:///project/main.mthds' } as any;
         await backend.analyze(
-            { primaryUri: main, savedUri: main, files: [], cwd: '/project', timeout: 1000 },
+            { primaryUri: main, savedUri: main, cwd: '/project', timeout: 1000 },
             { withGraph: false },
             new AbortController().signal,
         );

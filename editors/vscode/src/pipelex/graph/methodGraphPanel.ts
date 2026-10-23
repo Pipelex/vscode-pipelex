@@ -487,15 +487,11 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
         try {
             const backend = this.getBackend(uri);
-            // Neither backend sends these files: the CLI reads siblings via `--library-dir`,
-            // and the API backend lists and sends the primary's method tree. They are the
-            // files the API verdict's items are placed against.
-            const files = backend.kind === 'api' ? graphPrimary.files : [];
             recordFeatureUse('validation');
             // The analysis anchors on the graph primary, but the file whose method
             // tree is validated, and which that tree must hold, is the one opened.
             const analysis = await backend.analyze(
-                { primaryUri: graphPrimary.primaryUri, savedUri: uri, files, cwd: workspaceFolder?.uri.fsPath, timeout },
+                { primaryUri: graphPrimary.primaryUri, savedUri: uri, cwd: workspaceFolder?.uri.fsPath, timeout },
                 { withGraph: false },
                 controller.signal,
             );

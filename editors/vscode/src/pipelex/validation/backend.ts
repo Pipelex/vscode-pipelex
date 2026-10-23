@@ -46,13 +46,6 @@ export interface BundleRequest {
      * the tree would say nothing about the file.
      */
     savedUri: vscode.Uri;
-    /**
-     * Every `.mthds` file in the primary's directory, including the primary itself:
-     * the files a verdict's items are placed against. Neither backend sends them:
-     * the CLI reads the directory itself, and the API backend lists and sends the
-     * primary's method tree, which holds them.
-     */
-    files: BundleFile[];
     /** Working directory for the CLI spawn (the owning workspace folder). */
     cwd?: string;
     /** Per-call timeout in milliseconds. */

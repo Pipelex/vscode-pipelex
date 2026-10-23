@@ -2089,7 +2089,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it("hands its own analysis's gathered files to the placement, even to the CLI, which is sent none", async () => {
+    it("hands its own analysis's gathered files to the placement, whichever backend validated", async () => {
         const crossFile = await import('../validation/crossFileDiagnostics');
         const uri = makeUri('/project/methods/main.mthds');
         seedBundle(uri);
@@ -2105,7 +2105,6 @@ describe('MethodGraphPanel', () => {
         panel.show(uri);
         await new Promise(r => setTimeout(r, 30));
 
-        expect(backend.analyze.mock.calls[0][0].files).toEqual([]);
         expect(vi.mocked(crossFile.resolveErrorLocations)).toHaveBeenLastCalledWith(
             expect.objectContaining({ files: validated }),
         );
