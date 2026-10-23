@@ -181,9 +181,13 @@ jobs:
           pattern: plxt-wheels-*
           path: wheels
           merge-multiple: true
+      # Pin the newest Python the wheel's requires-python admits, never a
+      # floating "3": that follows each runner image to the newest CPython,
+      # which can fall outside the range and make pip refuse the wheel, which
+      # blocks the publish job below. Move it with the cap in pyproject.toml.
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: "3"
+          python-version: "3.14"
       - run: pip install pipelex-tools --no-index --find-links wheels/
       - run: plxt help
 
@@ -269,9 +273,11 @@ jobs:
       # working-tree clean. The repo ships no `pipelex_tools` Python package, so
       # `import pipelex_tools` resolves to the installed wheel, not the source tree.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      # Pinned like the plxt wheel test above, to the newest Python that
+      # crates/pipelex-py/pyproject.toml's requires-python admits.
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: "3"
+          python-version: "3.14"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: pipelex-lib-wheels-*
