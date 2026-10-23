@@ -165,6 +165,10 @@ The name filter is load-bearing. A release commit collects dozens of check runs 
 
 A tag's run uses the workflow file at the tagged commit, so a tag cut before the name filter landed keeps the unfiltered query when it is re-run. While `main` still points at the tagged commit, it can be rescued: dispatch `ci.yaml` on `main` (`gh workflow run ci.yaml --ref main`; its `auto_tag` finds every tag already present and creates none), which puts a fresh `Test on Rust stable` check at the top of page 1, then re-run the failed `Releases` run with `gh run rerun <run-id> --failed`.
 
+### The wheel tests run on a pinned Python
+
+Each PyPI publish job waits on its wheel test job (`pypi_publish_plxt` on `pypi_test_plxt`, `pypi_publish_pipelex_lib` on `pypi_test_pipelex_lib`), which installs the built wheels with `pip` on Windows, Linux and macOS. Both packages declare `requires-python = ">=3.8,<3.15"`, so those test jobs pin `actions/setup-python` to the newest Python inside that range, `3.14`, rather than a floating `"3"`. A floating version follows each runner image to the newest CPython it ships: once the hosted runners began offering CPython 3.15.0, `pip` refused both wheels on whichever runners resolved to it, the test jobs failed by runner, and a release tag whose test landed on such a runner would have published nothing to PyPI. When the `<3.15` cap moves in the root `pyproject.toml` and `crates/pipelex-py/pyproject.toml`, move the two `python-version` pins in `releases.yaml` with it.
+
 ---
 
 ## Dry run
