@@ -6,7 +6,7 @@ import { MethodTreeError } from 'mthds';
 
 // ---------- Hoisted mock state ----------
 const apiState = vi.hoisted(() => ({
-    validate: null as null | ((source: any, allow: boolean) => Promise<any>),
+    validate: null as null | ((source: any, allow: boolean, options?: { timeoutMs?: number; signal?: AbortSignal }) => Promise<any>),
     version: null as null | (() => Promise<any>),
     limits: null as null | (() => Promise<any>),
     lastValidateArgs: null as any,
@@ -100,7 +100,7 @@ vi.mock('@pipelex/sdk', () => {
         async validate(source: any, allow: boolean, options?: { timeoutMs?: number; signal?: AbortSignal }) {
             apiState.lastValidateArgs = [source, allow];
             apiState.lastValidateOptions = options;
-            return apiState.validate!(source, allow);
+            return apiState.validate!(source, allow, options);
         }
         async methodTreeLimits() {
             return apiState.limits ? apiState.limits() : {};
@@ -362,17 +362,88 @@ describe('ApiValidationBackend', () => {
         expect(apiState.lastValidateArgs).toBeNull();
     });
 
-    it("hands the client the save's own signal and timeout, so an abandoned request is cancelled", async () => {
-        // Without them the SDK's 20-minute default governs, and a superseded or
-        // timed-out save keeps its request (and the uploaded bundle) in flight.
-        apiState.validate = async () => ({ is_valid: true });
+    it("gives the request the time left of the save's one timeout, not a fresh one", async () => {
+        // Without a timeout the SDK's 20-minute default governs; with a fresh one, a
+        // slow handshake would let the request run past the save's own timeout.
+        let now = 1_000_000;
+        const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+        try {
+            // The handshake takes four seconds of the save's twelve.
+            apiState.limits = async () => {
+                now += 4000;
+                return {};
+            };
+            apiState.validate = async () => ({ is_valid: true });
+            await makeBackend().analyze(
+                { primaryUri: FILES[0].uri, files: FILES, timeout: 12000 },
+                { withGraph: false },
+                new AbortController().signal,
+            );
+            expect(apiState.lastValidateOptions.timeoutMs).toBe(8000);
+            expect(apiState.lastValidateOptions.signal).toBeInstanceOf(AbortSignal);
+        } finally {
+            clock.mockRestore();
+        }
+    });
+
+    it('cancels the uploads and the request of a save superseded while they run', async () => {
+        // The client holds a signal the save's own abort reaches, so a superseded
+        // save does not keep uploading the method's files.
+        apiState.validate = (_source, _allow, options) => new Promise((_resolve, reject) => {
+            options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), { once: true });
+        });
         const controller = new AbortController();
-        await makeBackend().analyze(
-            { primaryUri: FILES[0].uri, files: FILES, timeout: 12345 },
+        const pending = makeBackend().analyze(
+            { primaryUri: FILES[0].uri, files: FILES, timeout: 30000 },
             { withGraph: false },
             controller.signal,
         );
-        expect(apiState.lastValidateOptions).toEqual({ timeoutMs: 12345, signal: controller.signal });
+        await vi.waitFor(() => expect(apiState.lastValidateOptions).not.toBeNull());
+        const sent: AbortSignal = apiState.lastValidateOptions.signal;
+        expect(sent.aborted).toBe(false);
+        controller.abort();
+        await expect(pending).rejects.toBeInstanceOf(AnalyzeAbortError);
+        expect(sent.aborted).toBe(true);
+    });
+
+    it('stops at the handshake when the timeout runs out during it, and never sends the tree', async () => {
+        // The handshake takes no signal, so it answers after the save was told it
+        // failed: the validation must stop there rather than send the tree under a
+        // fresh timeout.
+        let releaseLimits: (() => void) | undefined;
+        apiState.limits = () => new Promise(resolve => { releaseLimits = () => resolve({}); });
+        apiState.validate = async () => ({ is_valid: true });
+        const controller = new AbortController();
+        const err = await makeBackend().analyze(
+            { primaryUri: FILES[0].uri, files: FILES, timeout: 30 },
+            { withGraph: false },
+            controller.signal,
+        ).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('unreachable');
+        expect(err.logMessage).toBe('Pipelex API request timed out after 30ms');
+        releaseLimits!();
+        // Let the late handshake settle, with time enough to list the tree: it must
+        // not go on to list and send it.
+        await new Promise(resolve => setTimeout(resolve, 250));
+        expect(apiState.lastValidateArgs).toBeNull();
+        expect(controller.signal.aborted).toBe(false);
+    });
+
+    it('cancels the uploads still running when the timeout runs out', async () => {
+        apiState.validate = (_source, _allow, options) => new Promise((_resolve, reject) => {
+            options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), { once: true });
+        });
+        const err = await makeBackend().analyze(
+            { primaryUri: FILES[0].uri, files: FILES, timeout: 50 },
+            { withGraph: false },
+            new AbortController().signal,
+        ).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('unreachable');
+        // The uploads see an aborted signal, so none keeps running after the save
+        // was told it failed.
+        expect(apiState.lastValidateOptions.signal.aborted).toBe(true);
     });
 
     it('passes the resolved token to the client constructor (SecretStorage precedence)', async () => {

@@ -119,21 +119,16 @@ export class ApiValidationBackend implements ValidationBackend {
         // at a single timeout. The probe still carries the same signal/timeout (a
         // superseded save abandons it) and `ensureCapable` swallows every fault internally.
         void this.deps.capabilityGate.ensureCapable(client, baseUrl, signal, request.timeout);
-        // Abort BEFORE initiating the validation: the consent modal / token resolution
-        // above were awaited, so the save may have been superseded meanwhile. The
-        // validation is evaluated eagerly (it starts the handshake) before
-        // `runWithAbort` wraps it, so without this guard a stale save would still
-        // list the tree and ship it to the remote.
-        if (signal.aborted) {
-            throw new AnalyzeAbortError();
-        }
 
         let report: PipelexValidationResult;
         try {
             // One timeout for the whole validation: the handshake, the listing, the
             // uploads and the request together, as a save's wait was always capped.
+            // The consent modal and the token read above were awaited, so the save
+            // may have been superseded meanwhile: `runWithAbort` then settles before
+            // starting the validation, which never lists or ships a stale tree.
             report = await this.runWithAbort(
-                this.validateMethodTree(client, request, signal),
+                (operationSignal, deadline) => this.validateMethodTree(client, request, operationSignal, deadline),
                 signal,
                 request.timeout,
                 baseUrl,
@@ -199,15 +194,22 @@ export class ApiValidationBackend implements ValidationBackend {
      * is the one the client then reads to choose between inline and by hash. A
      * saved file the tree does not hold is refused before anything is sent.
      *
-     * The client gets the save's signal and timeout, so a superseded or timed-out
-     * save cancels the uploads and the request themselves. Without them the SDK's
-     * own 20-minute default governs, and every abandoned save keeps its upload in
-     * flight.
+     * `signal` is the one {@link runWithAbort} hands it, which the save's own
+     * signal and its timeout both abort, and `deadline` the moment that timeout
+     * runs out. The client gets that signal for the blob check, the uploads and
+     * the request, and the time left before the deadline as the request's own
+     * timeout, so a superseded or timed-out save cancels the uploads and the
+     * request themselves, and the request never outlives the save's one timeout.
+     * Without them the SDK's own 20-minute default governs, and every abandoned
+     * save keeps its upload in flight. The handshake takes no signal, so a save
+     * abandoned while it is asked stops as soon as it answers, before the tree is
+     * listed.
      */
     private async validateMethodTree(
         client: PipelexApiClient,
         request: BundleRequest,
         signal: AbortSignal,
+        deadline: number,
     ): Promise<PipelexValidationResult> {
         const savedPath = request.primaryUri.fsPath;
         const limits = await client.methodTreeLimits();
@@ -226,17 +228,33 @@ export class ApiValidationBackend implements ValidationBackend {
         if (signal.aborted) {
             throw new AnalyzeAbortError();
         }
-        return client.validate({ tree }, true, { timeoutMs: request.timeout, signal });
+        return client.validate({ tree }, true, { timeoutMs: remainingMs(deadline), signal });
     }
 
     /**
-     * Race the client request against the abort signal and a timeout. The request
-     * carries the same signal and timeout, so the SDK cancels the fetch as well; the
-     * race is what settles the save with our own outcome — an {@link AnalyzeAbortError}
-     * or an `unreachable` {@link BackendError} — whichever way the SDK reports its end.
+     * Run one validation under the save's signal and one deadline, `timeout` from
+     * now, and race it against both. The operation is handed a signal of its own,
+     * which the save's signal aborts and so does the deadline, so whatever it still
+     * has in flight when the save is superseded or times out, an upload or the
+     * request, is cancelled rather than orphaned: the caller drops its controller
+     * once the save settles, and nothing could cancel it later. The race is what
+     * settles the save with our own outcome — an {@link AnalyzeAbortError} or an
+     * `unreachable` {@link BackendError} — whichever way the operation reports its
+     * end. A save already superseded settles before the operation starts.
      */
-    private runWithAbort<T>(promise: Promise<T>, signal: AbortSignal, timeout: number, baseUrl: string): Promise<T> {
+    private runWithAbort<T>(
+        operation: (signal: AbortSignal, deadline: number) => Promise<T>,
+        signal: AbortSignal,
+        timeout: number,
+        baseUrl: string,
+    ): Promise<T> {
         return new Promise<T>((resolve, reject) => {
+            if (signal.aborted) {
+                reject(new AnalyzeAbortError());
+                return;
+            }
+            const deadline = Date.now() + timeout;
+            const controller = new AbortController();
             const cleanup = () => {
                 clearTimeout(timer);
                 signal.removeEventListener('abort', onAbort);
@@ -244,22 +262,21 @@ export class ApiValidationBackend implements ValidationBackend {
             const onAbort = () => {
                 cleanup();
                 reject(new AnalyzeAbortError());
+                controller.abort(signal.reason);
             };
             const timer = setTimeout(() => {
                 cleanup();
-                reject(new BackendError({
+                const timedOut = new BackendError({
                     kind: 'unreachable',
                     logMessage: `Pipelex API request timed out after ${timeout}ms`,
                     userMessage: unreachableMessage(baseUrl),
-                }));
+                });
+                reject(timedOut);
+                controller.abort(timedOut);
             }, timeout);
 
-            if (signal.aborted) {
-                onAbort();
-                return;
-            }
             signal.addEventListener('abort', onAbort, { once: true });
-            promise.then(
+            operation(controller.signal, deadline).then(
                 value => { cleanup(); resolve(value); },
                 error => { cleanup(); reject(error); },
             );
@@ -380,6 +397,15 @@ function invalidBaseUrlMessage(baseUrl: string): string {
     return `Invalid Pipelex API base URL "${baseUrl}" — it must be host-only (no path, query, or ` +
         `credentials), e.g. https://api.pipelex.com or http://localhost:8081. ` +
         `Fix \`pipelex.api.baseUrl\` in settings, or switch \`pipelex.backend\` to \`cli\`.`;
+}
+
+/**
+ * The time left before `deadline`, in milliseconds, and never less than one: the
+ * SDK refuses a timeout that is not positive, and a deadline just past is the
+ * race's to report, its timer being due.
+ */
+function remainingMs(deadline: number): number {
+    return Math.max(1, deadline - Date.now());
 }
 
 /**
