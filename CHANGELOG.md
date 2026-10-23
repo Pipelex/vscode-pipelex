@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Pinned development Python**: `.python-version` names the Python that `make` builds `.venv` on, rebuilding one made on another version, and that the CI jobs testing the Python bindings run on, so the Python side no longer follows whichever interpreter is newest on the machine; `PYTHON_VERSION=<version> make test-all` tries another one, and the release jobs keep naming their own.
+- **Pinned development Python**: `.python-version` names the Python that the Makefile's Python targets build `.venv` on, with `maturin` installed in it, rebuilding one made on another version, and that the CI jobs testing the Python bindings run on, so the Python side no longer follows whichever interpreter is newest on the machine; `PYTHON_VERSION=<version> make test-all` tries another one, and the release jobs keep naming their own.
 
 ### Security
 
