@@ -279,6 +279,7 @@ export class PipelexValidator implements vscode.Disposable {
                 return;
             case 'unreachable':
             case 'api-error':
+            case 'tree':
             case 'infra':
                 if (err.userMessage) {
                     this.notifyOnce(err.userMessage);

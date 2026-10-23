@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The `api` backend validates the saved file's method tree (Breaking)**: on each save the extension sends, through `@pipelex/sdk` 0.50.0, the tree a run of the method would send, every file the MTHDS membership rule keeps under the nearest directory holding a `METHODS.toml`, or else under the saved file's directory, its templates and Python modules included, instead of that directory's `.mthds` files alone, inline when it is small and otherwise by hash, uploading only the files the API lacks. A saved file its own tree keeps out, a tree holding a symbolic link or past the API's limits, and a file that could not be uploaded are reported rather than validated, and a self-hosted Pipelex API server that predates method trees answers a `422` until it is upgraded. The consent prompt now describes this send and is shown once more for a host that granted the earlier one.
+
 ### Security
 
 - **Dependencies past their security advisories**: `plxt`, `pipelex-tools-py`, `@pipelex/tools-wasm` and the extension's language server are built with `bytes` 1.12.1, `tokio` 1.38.2, `tracing-subscriber` 0.3.20 and `url` 2.5.4 with `idna` 1.1.0, `plxt` and `pipelex-tools-py` also with `ring` 0.17.14, and the extension bundles `smol-toml` 1.9.1 and `axios` 1.20.0, releases that fix the advisories raised against the versions they replace.

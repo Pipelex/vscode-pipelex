@@ -1,6 +1,17 @@
 import * as vscode from 'vscode';
-import { PipelexApiClient, ApiResponseError, ApiUnreachableError, PipelineRequestError } from '@pipelex/sdk';
+import * as fs from 'fs';
+import * as path from 'path';
+import {
+    PipelexApiClient,
+    ApiResponseError,
+    ApiUnreachableError,
+    MethodFileTransferError,
+    PipelineRequestError,
+    RequestArgumentError,
+} from '@pipelex/sdk';
 import type { PipelexValidationReport, PipelexValidationResult } from '@pipelex/sdk';
+import { listMethodTree, MethodTreeError, TreeLimitExceededError } from 'mthds';
+import type { MethodTree } from 'mthds';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
 import { asSentence, problemFacts, readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
@@ -24,7 +35,22 @@ export interface ApiBackendDeps {
 
 /**
  * API backend — one `POST /v1/validate` per `analyze()` always returns both the
- * validation verdict and (when asked) the graph. `/validate` is 200-diagnostic:
+ * validation verdict and (when asked) the graph.
+ *
+ * What it validates is the saved file's **method tree**, the tree a run of the
+ * method would send: the saved file's directory listed by the `mthds` package's
+ * lister under the MTHDS standard's membership rule, so it is rooted at the
+ * nearest `METHODS.toml` at or above that directory, else at the directory
+ * itself, and holds every file the rule keeps (every bundle, and every file a
+ * step reads, such as a `PipeDocGen` step's template), under the limits the
+ * deployment announces. The client sends it inline when small and by hash
+ * otherwise, uploading only the files the API lacks. The saved file must be a
+ * file of that tree: one the rule keeps out is not validated at all, since a
+ * verdict on the tree would say nothing about it. `request.files`, the
+ * directory's `.mthds` gather, is not what is sent; the verdict's items, which
+ * name a file by its tree path, are placed against it by its caller.
+ *
+ * `/validate` is 200-diagnostic:
  * the produced verdict rides the response body discriminated on `is_valid`. An
  * `is_valid: false` body carries its faults as problem items in `errors[]` (the
  * same items the CLI path reads), and either arm may carry advisory findings as
@@ -35,10 +61,11 @@ export interface ApiBackendDeps {
  * that writes problems) is read through `problemItems.ts`.
  *
  * Transport / no-verdict failures (server unreachable, non-`problem+json`, auth,
- * a request-shape 422, timeout, unparseable) never become diagnostics: they
- * surface a {@link BackendError} so the consumer notifies, clears stale
- * diagnostics, and does NOT fall back to the CLI. A no-verdict answer is a
- * problem document, and its detail and next step are what the user is shown.
+ * a request-shape 422, timeout, unparseable, a tree that cannot be listed or
+ * sent) never become diagnostics: they surface a {@link BackendError} so the
+ * consumer notifies, clears stale diagnostics, and does NOT fall back to the
+ * CLI. A no-verdict answer is a problem document, and its detail and next step
+ * are what the user is shown.
  */
 export class ApiValidationBackend implements ValidationBackend {
     readonly kind = 'api' as const;
@@ -92,24 +119,21 @@ export class ApiValidationBackend implements ValidationBackend {
         // at a single timeout. The probe still carries the same signal/timeout (a
         // superseded save abandons it) and `ensureCapable` swallows every fault internally.
         void this.deps.capabilityGate.ensureCapable(client, baseUrl, signal, request.timeout);
-        // Abort BEFORE initiating validate(): the consent modal / token resolution above
-        // were awaited, so the save may have been superseded meanwhile. `client.validate()`
-        // is evaluated eagerly (it initiates the request) before `runWithAbort` wraps it,
-        // so without this guard a stale save would still ship the bundle to the remote.
+        // Abort BEFORE initiating the validation: the consent modal / token resolution
+        // above were awaited, so the save may have been superseded meanwhile. The
+        // validation is evaluated eagerly (it starts the handshake) before
+        // `runWithAbort` wraps it, so without this guard a stale save would still
+        // list the tree and ship it to the remote.
         if (signal.aborted) {
             throw new AnalyzeAbortError();
         }
 
-        const names = request.files.map(f => f.name);
-        const contents = request.files.map(f => f.content);
-
         let report: PipelexValidationResult;
         try {
-            // Hand the client the save's signal and timeout so a superseded or timed-out
-            // save cancels the request itself. Without them the SDK's own 20-minute
-            // default governs, and every abandoned save keeps its upload in flight.
+            // One timeout for the whole validation: the handshake, the listing, the
+            // uploads and the request together, as a save's wait was always capped.
             report = await this.runWithAbort(
-                client.validate(contents, true, names, undefined, undefined, { timeoutMs: request.timeout, signal }),
+                this.validateMethodTree(client, request, signal),
                 signal,
                 request.timeout,
                 baseUrl,
@@ -166,6 +190,43 @@ export class ApiValidationBackend implements ValidationBackend {
         const valid = report as PipelexValidationReport;
         const graph = options.withGraph ? (valid.graph_spec ?? null) : undefined;
         return { validation: { ok: true, errors: [], warnings }, graph };
+    }
+
+    /**
+     * List the saved file's method tree and validate it. The tree is listed under
+     * the limits the deployment announces, so one it would refuse for its size is
+     * refused here, before any file is hashed; the handshake that announces them
+     * is the one the client then reads to choose between inline and by hash. A
+     * saved file the tree does not hold is refused before anything is sent.
+     *
+     * The client gets the save's signal and timeout, so a superseded or timed-out
+     * save cancels the uploads and the request themselves. Without them the SDK's
+     * own 20-minute default governs, and every abandoned save keeps its upload in
+     * flight.
+     */
+    private async validateMethodTree(
+        client: PipelexApiClient,
+        request: BundleRequest,
+        signal: AbortSignal,
+    ): Promise<PipelexValidationResult> {
+        const savedPath = request.primaryUri.fsPath;
+        const limits = await client.methodTreeLimits();
+        if (signal.aborted) {
+            throw new AnalyzeAbortError();
+        }
+        const tree = await listMethodTree(path.dirname(savedPath), { limits });
+        const treePath = await treePathOf(savedPath, tree.root);
+        if (treePath === undefined || !tree.has(treePath)) {
+            throw new BackendError({
+                kind: 'tree',
+                logMessage: `${savedPath} is not a file of its method tree rooted at ${tree.root ?? path.dirname(savedPath)}`,
+                userMessage: outsideTreeMessage(savedPath, tree),
+            });
+        }
+        if (signal.aborted) {
+            throw new AnalyzeAbortError();
+        }
+        return client.validate({ tree }, true, { timeoutMs: request.timeout, signal });
     }
 
     /**
@@ -246,6 +307,39 @@ export class ApiValidationBackend implements ValidationBackend {
             });
         }
 
+        // A file of the tree the API lacked could not be uploaded to the storage it
+        // named, so the request was not sent. The message carries neither the
+        // signed link nor storage's body, by the SDK's own rule.
+        if (err instanceof MethodFileTransferError) {
+            throw new BackendError({
+                kind: err.code === 'unreachable' ? 'unreachable' : 'api-error',
+                logMessage: `Pipelex API at ${baseUrl}: uploading a file of the method tree failed ` +
+                    `(${err.code}${err.status === undefined ? '' : `, HTTP ${err.status}`}): ${err.message}`,
+                userMessage: asSentence(`Pipelex API at ${baseUrl}: ${err.message}`),
+            });
+        }
+
+        // The tree could not be listed (a symbolic link or a special file in it, a
+        // directory it cannot read, a tree past the API's limits, no file at all), or
+        // a file of it changed between the listing and the sending.
+        if (err instanceof MethodTreeError) {
+            throw new BackendError({
+                kind: 'tree',
+                logMessage: `the method tree could not be sent to ${baseUrl} (${err.code}): ${err.message}`,
+                userMessage: treeRefusalMessage(err),
+            });
+        }
+
+        // The client refused the tree before sending it, such as one heavier than an
+        // API with no blob store takes inline. Nothing was sent.
+        if (err instanceof RequestArgumentError) {
+            throw new BackendError({
+                kind: 'tree',
+                logMessage: `the Pipelex API client refused the method tree for ${baseUrl}: ${err.message}`,
+                userMessage: asSentence(`The method tree could not be sent to the Pipelex API at ${baseUrl}: ${err.message}`),
+            });
+        }
+
         // Unparseable body / non-problem+json / unknown — treat as a transport failure.
         const message = err instanceof Error ? err.message : String(err);
         throw new BackendError({
@@ -286,6 +380,52 @@ function invalidBaseUrlMessage(baseUrl: string): string {
     return `Invalid Pipelex API base URL "${baseUrl}" — it must be host-only (no path, query, or ` +
         `credentials), e.g. https://api.pipelex.com or http://localhost:8081. ` +
         `Fix \`pipelex.api.baseUrl\` in settings, or switch \`pipelex.backend\` to \`cli\`.`;
+}
+
+/**
+ * The saved file's tree path under `root`: its real path relative to the root,
+ * with forward slashes, in NFC, as the lister names the files it lists from the
+ * root's real path. `undefined` when it lies outside the root, or when `root` is
+ * null (the one-file tree of a file named alone, which a directory never is).
+ */
+async function treePathOf(savedPath: string, root: string | null): Promise<string | undefined> {
+    if (root === null) return undefined;
+    let real: string;
+    try {
+        real = await fs.promises.realpath(savedPath);
+    } catch {
+        return undefined;
+    }
+    const relativePath = path.relative(root, real);
+    if (relativePath === '' || relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+        return undefined;
+    }
+    return relativePath.split(path.sep).join('/').normalize('NFC');
+}
+
+/** Why the saved file was not validated: its method tree does not hold it. */
+function outsideTreeMessage(savedPath: string, tree: MethodTree): string {
+    const root = tree.root ?? path.dirname(savedPath);
+    return `${path.basename(savedPath)} was not validated: it is not a file of its method tree, rooted at ${root}, ` +
+        `since the MTHDS membership rule keeps it out, by a name starting with a dot, a .gitignore pattern inside ` +
+        `the tree, the manifest's exclude, or a directory such as node_modules or a virtual environment. ` +
+        `The Pipelex API validates the tree a run would send, so move the file into the tree to validate it.`;
+}
+
+/**
+ * Plain-text guidance for a tree the lister refused, or one of whose files
+ * changed while it was being sent. The lister's own message names the file or
+ * the limit; a tree past a limit also gets the ways to make it smaller, since
+ * the commonest cause is a saved file whose directory, or whose `METHODS.toml`,
+ * roots far more than the method.
+ */
+function treeRefusalMessage(err: MethodTreeError): string {
+    if (err instanceof TreeLimitExceededError) {
+        return `The method tree rooted at ${err.root} is too large for the Pipelex API: ${asSentence(err.message)} ` +
+            `Keep the files a run does not need out of the tree with a .gitignore inside it or the exclude of ` +
+            `METHODS.toml, or give the method a directory of its own.`;
+    }
+    return `The method tree could not be sent for validation: ${asSentence(err.message)}`;
 }
 
 /** Localhost / loopback host → privacy confirmation is skipped. */

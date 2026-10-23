@@ -487,7 +487,9 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
 
         try {
             const backend = this.getBackend(uri);
-            // The CLI reads siblings via `--library-dir` itself; only the API path needs contents.
+            // Neither backend sends these files: the CLI reads siblings via `--library-dir`,
+            // and the API backend lists and sends the primary's method tree. They are the
+            // files the API verdict's items are placed against.
             const files = backend.kind === 'api' ? graphPrimary.files : [];
             recordFeatureUse('validation');
             const analysis = await backend.analyze(
@@ -501,8 +503,8 @@ export class MethodGraphPanel implements vscode.Disposable, GraphAnalysisSink {
             // discard this result so it doesn't overwrite the new file's status.
             if (this.currentUri?.toString() !== uri.toString()) return;
 
-            // The validated files: what the API was sent, or, for the CLI, which
-            // reads the directory itself, the gather made for this request.
+            // The validated files: the directory's `.mthds` files as gathered for this
+            // request, which the API's method tree holds and the CLI read itself.
             await this.applyAnalysis(uri, analysis, graphPrimary.primaryUri, graphPrimary.files);
         } catch (err: unknown) {
             if (controller.signal.aborted || err instanceof AnalyzeAbortError) return;
