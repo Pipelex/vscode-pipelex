@@ -31,7 +31,11 @@ JS_LSP_DIR        := js/lsp
 JS_TOOLS_WASM_DIR := js/tools-wasm
 VSIX              := $(EXT_DIR)/pipelex.vsix
 VIRTUAL_ENV       := $(CURDIR)/.venv
-PYTHON_VERSION    ?= 3.13
+
+# The interpreter is the one .python-version names, unless PYTHON_VERSION or UV_PYTHON asks for another.
+# Exporting it hands the same version to every uv command, so `uv sync` never rebuilds .venv on the pin.
+PYTHON_VERSION ?= $(or $(UV_PYTHON),$(shell cat .python-version))
+export UV_PYTHON := $(PYTHON_VERSION)
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
@@ -52,7 +56,14 @@ cli: ## Build the plxt CLI (release mode)
 	cargo build -p pipelex-cli --release
 	@echo "Binary: target/release/plxt"
 
-env: ## Create Python virtual env (if missing)
+# No `uv sync` runs here to move an existing .venv onto the requested version, so
+# `env` does it: it rebuilds a .venv whose interpreter is not the X.Y or X.Y.Z that
+# PYTHON_VERSION names (or that no longer runs), and leaves one alone otherwise. A
+# request that is not a plain version number, such as `pypy@3.10`, keeps the
+# existing .venv.
+ENV_PYTHON_MATCHES = "$(VIRTUAL_ENV)/bin/python" -c 'import re, sys; want = sys.argv[1]; got = ".".join(map(str, sys.version_info[: want.count(".") + 1])); sys.exit(bool(re.fullmatch(r"[0-9]+(\.[0-9]+)*", want)) and got != want)' "$(PYTHON_VERSION)"
+
+env: ## Create the Python virtual env on PYTHON_VERSION (from .python-version), rebuilding one made on another Python
 	@command -v uv >/dev/null 2>&1 || { \
 		echo "uv not found – installing latest …"; \
 		curl -LsSf https://astral.sh/uv/install.sh | sh; \
@@ -61,6 +72,9 @@ env: ## Create Python virtual env (if missing)
 	if [ ! -d "$(VIRTUAL_ENV)" ]; then \
 		echo "Creating Python virtual env in \`$(VIRTUAL_ENV)\`"; \
 		uv venv "$(VIRTUAL_ENV)" --python $(PYTHON_VERSION); \
+	elif ! $(ENV_PYTHON_MATCHES) 2>/dev/null; then \
+		echo "Rebuilding Python virtual env in \`$(VIRTUAL_ENV)\` on Python $(PYTHON_VERSION)"; \
+		uv venv --clear "$(VIRTUAL_ENV)" --python $(PYTHON_VERSION); \
 	fi
 
 pipelex-tools: env ## Build and install the pipelex-tools CLI wheel (native plxt binary, dev)

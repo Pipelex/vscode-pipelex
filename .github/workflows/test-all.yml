@@ -70,9 +70,11 @@ jobs:
         # `make test-all` -> test-pipelex-lib -> pipelex-lib -> env creates
         # ./.venv via uv but does NOT install maturin (devs have it already).
         # Pre-create the venv with maturin so `make env` is a no-op and the
-        # `maturin develop` step resolves.
+        # `maturin develop` step resolves. uv takes the version from
+        # .python-version, as `make env` does, which would otherwise rebuild a
+        # venv on another Python and lose maturin.
         run: |
-          uv venv .venv --python 3.13
+          uv venv .venv
           . .venv/bin/activate
           uv pip install maturin
 

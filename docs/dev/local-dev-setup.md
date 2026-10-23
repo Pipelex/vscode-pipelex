@@ -11,6 +11,8 @@ How to build and install the Pipelex extension and CLI from source for local tes
 
 You do not choose the Rust version: `rust-toolchain.toml` pins the release CI uses, with Clippy, rustfmt and the `wasm32-unknown-unknown` target, and rustup installs it on the first `cargo` command you run inside the repository, so your `make check` lints exactly as CI does. If your rustup does not install it by itself, run `rustup toolchain install` in the repository. Why it is pinned and how the pin moves is in [`ci-and-branch-protection.md`](ci-and-branch-protection.md#the-rust-toolchain).
 
+You do not choose the Python version either. The targets that build the Python wheels into `.venv`, `make pipelex-tools`, `make pipelex-lib` and `make test-all`, first run `make env`, which creates `.venv` with [uv](https://docs.astral.sh/uv/) on the interpreter that `.python-version` at the repository root names, and CI reads the same file. `make env` also rebuilds a `.venv` that was made on another Python, so the next `make` moves an older environment onto the pin. To try another version, run `PYTHON_VERSION=3.12 make test-all` (or set `UV_PYTHON`), and the next plain `make` returns `.venv` to the pin. The release jobs that test the published wheels name their own Python and do not follow this file (see [`release-publishing.md`](release-publishing.md)).
+
 ## Quick Start
 
 ```bash
