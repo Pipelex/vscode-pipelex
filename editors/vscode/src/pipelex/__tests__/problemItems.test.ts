@@ -5,8 +5,6 @@ import {
     problemTypeUri,
     readProblemItems,
     readProblemSummary,
-    readVerdictErrors,
-    UNDESCRIBED_ITEM_DETAIL,
     withNextStep,
 } from '../validation/problemItems';
 
@@ -63,71 +61,29 @@ describe('readProblemItems', () => {
         expect(item).toEqual({ detail: 'Something is wrong.', location: { file: 'a.mthds' } });
     });
 
-    it('reads the validation item problem items replace into the same members, keeping its domain and error type', () => {
-        const [item] = readProblemItems([{
-            category: 'pipe_validation',
-            error_type: 'missing_concept',
-            message: 'Pipe x references an unknown concept.',
-            pipe_code: 'x',
-            domain_code: 'demo',
-            source: '/project/methods/main.mthds',
-            field_path: 'pipe.x.output',
-            field_name: 'output',
-            missing_concept_code: 'Foo',
-            suggested_fix: { fix_code: 'declare-concept', description: 'Declare it.', safety: 'safe', source: 'main.mthds', ops: [] },
-        }]);
-        expect(item).toEqual({
-            detail: 'Pipe x references an unknown concept.',
-            params: { concept: 'Foo', field_path: 'pipe.x.output' },
-            location: { pipe: 'x', field: 'output', file: '/project/methods/main.mthds' },
-            suggested_fix: { fix_code: 'declare-concept', description: 'Declare it.', safety: 'safe', file: 'main.mthds', ops: [] },
-            legacy: { domainCode: 'demo', errorType: 'missing_concept' },
-        });
-        expect(item.code).toBeUndefined();
-    });
-
-    it('keeps no legacy facts on a problem item, nor on a validation item naming neither', () => {
-        const [problem, validation] = readProblemItems([
-            { ...MODEL_ITEM, domain_code: 'demo', error_type: 'unknown_model' },
-            { category: 'pipe_validation', message: 'Pipe x is broken.', pipe_code: 'x' },
-        ]);
-        expect(problem.legacy).toBeUndefined();
-        expect(validation.legacy).toBeUndefined();
-    });
-
-    it('keeps a validation item whose message is empty or missing, with a neutral sentence', () => {
+    it('drops an element of the validation item problem items replaced, which carries no detail', () => {
         const items = readProblemItems([
-            { category: 'pipe_validation', error_type: 'missing_input', message: '', pipe_code: 'x' },
+            MODEL_ITEM,
+            {
+                category: 'pipe_validation',
+                error_type: 'missing_concept',
+                message: 'Pipe x references an unknown concept.',
+                pipe_code: 'x',
+                domain_code: 'demo',
+                source: '/project/methods/main.mthds',
+            },
             { category: 'dry_run' },
         ]);
-        expect(items).toEqual([
-            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'x' }, legacy: { errorType: 'missing_input' } },
-            { detail: UNDESCRIBED_ITEM_DETAIL },
-        ]);
+        expect(items).toEqual([MODEL_ITEM]);
     });
 
-    it('reads a list mixing both shapes element by element', () => {
-        const items = readProblemItems([MODEL_ITEM, { category: 'dry_run', message: 'Dry run failed.' }]);
-        expect(items.map(item => [item.code, item.detail])).toEqual([
-            ['model.unknown', MODEL_ITEM.detail],
-            [undefined, 'Dry run failed.'],
-        ]);
-    });
-});
-
-describe('readVerdictErrors', () => {
-    it("reads the verdict's `errors`", () => {
-        expect(readVerdictErrors({ is_valid: false, errors: [MODEL_ITEM] })).toEqual([MODEL_ITEM]);
-    });
-
-    it('reads `validation_errors` from a validator that still writes them', () => {
-        const errors = readVerdictErrors({ is_valid: false, validation_errors: [{ category: 'x', message: 'old shape' }] });
-        expect(errors).toEqual([{ detail: 'old shape' }]);
-    });
-
-    it('is empty when neither list holds a readable item', () => {
-        expect(readVerdictErrors({ is_valid: false, errors: [] })).toEqual([]);
-        expect(readVerdictErrors({ is_valid: false })).toEqual([]);
+    it('reads a suggested fix naming its file as `source`, the member it replaced, as naming none', () => {
+        const [item] = readProblemItems([{
+            code: 'method.concept_unresolved',
+            detail: 'Unknown concept Foo.',
+            suggested_fix: { fix_code: 'declare-concept', description: 'Declare [concept.Foo].', source: 'a.mthds' },
+        }]);
+        expect(item.suggested_fix).toEqual({ fix_code: 'declare-concept', description: 'Declare [concept.Foo].' });
     });
 });
 
@@ -154,7 +110,7 @@ describe('readProblemSummary', () => {
     it('is undefined for a body that is not a problem document', () => {
         expect(readProblemSummary(undefined)).toBeUndefined();
         expect(readProblemSummary('text')).toBeUndefined();
-        expect(readProblemSummary({ error: true, message: 'the envelope problems replace' })).toBeUndefined();
+        expect(readProblemSummary({ error: true, message: 'the envelope problems replaced' })).toBeUndefined();
     });
 });
 
