@@ -6,10 +6,13 @@ use anyhow::anyhow;
 use arc_swap::ArcSwap;
 use lsp_async_stub::{rpc, util::Mapper, Context, RequestWriter};
 use lsp_types::Url;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::json;
-use std::{str, sync::Arc, time::Duration};
+use std::{
+    str,
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 use taplo::{dom::Node, parser::Parse};
 use taplo_common::{
     config::Config,
@@ -81,7 +84,7 @@ pub struct WorldState<E: Environment> {
     pub(crate) default_config: ArcSwap<Config>,
 }
 
-pub static DEFAULT_WORKSPACE_URL: Lazy<Url> = Lazy::new(|| Url::parse("root:///").unwrap());
+pub static DEFAULT_WORKSPACE_URL: LazyLock<Url> = LazyLock::new(|| Url::parse("root:///").unwrap());
 
 impl<E: Environment> WorldState<E> {
     pub fn new(env: E) -> Self {
