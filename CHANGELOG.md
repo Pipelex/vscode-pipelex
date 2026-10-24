@@ -10,6 +10,7 @@
 ### Security
 
 - **Dependencies past their security advisories**: `plxt`, `pipelex-tools-py`, `@pipelex/tools-wasm` and the extension's language server are built with `bytes` 1.12.1, `time` 0.3.55, `tokio` 1.38.2, `tracing-subscriber` 0.3.20 and `url` 2.5.4 with `idna` 1.1.0, `plxt` and `pipelex-tools-py` also with `ring` 0.17.14, a build that turns on the `native-tls` feature takes `openssl` 0.10.81 with `openssl-sys` 0.9.117, and the extension bundles `smol-toml` 1.9.1 and `axios` 1.20.0, releases that fix the advisories raised against the versions they replace.
+- **Schema downloads on `reqwest` 0.12 and rustls 0.23**: `plxt`, its language server `plxt lsp` included, now downloads JSON schemas through `reqwest` 0.12, `hyper` 1 and rustls 0.23 with `rustls-webpki` 0.103.16, past the `rustls-webpki` 0.101 advisories; a `rustls-tls` build still trusts the bundled webpki roots on the ring provider, a `native-tls` build still uses the platform's TLS, and HTTP/2 and the system proxy settings are kept. The extension's bundled language server still downloads through the editor's own `fetch`, now behind `reqwest` 0.12.
 
 ## [0.21.1] - 2026-10-19
 
