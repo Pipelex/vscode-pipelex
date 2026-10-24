@@ -2,7 +2,7 @@
 
 ## Project Overview
 Fork of [tamasfe/taplo](https://github.com/tamasfe/taplo) (TOML toolkit) extended with MTHDS (the language for AI methods) support.
-Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packages + VitePress docs site.
+Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packages.
 Publishes two PyPI packages from separate `pyproject.toml` files:
 - `pipelex-tools`: native `plxt` CLI, published from the repo-root `pyproject.toml`
 - `pipelex-tools-py`: importable Python library (`import pipelex_tools`), published from `crates/pipelex-py/pyproject.toml`
@@ -129,5 +129,5 @@ When modifying graph rendering, always consult `../pipelex/pipelex/graph/graphsp
 - `ci.yaml` — what the make gates don't cover: release auto-tagging (push to `main`), the e2e `pipelex-tools-py` wheel build/install, `toml-test` conformance, and MSRV (1.74) builds. Triggers on push/PR to `main` **only** (gates the `dev`→`main` boundary, not every feature PR). Not required checks.
 - Releases: `releases.yaml` — PyPI, VS Code Marketplace, Open VSX
 - Auto-tagging via inline shell in `ci.yaml`
-- **Enterprise allowlist:** Pipelex Enterprise restricts third-party actions. Only 4 are allowed (`Swatinem/rust-cache`, `PyO3/maturin-action`, `pypa/gh-action-pypi-publish`, `peaceiris/actions-gh-pages`) — all SHA-pinned in workflows. See `docs/dev/release-publishing.md` for details and allowlist management.
-- **When adding a new third-party action:** either replace with inline shell, or add its `owner/repo@*` pattern to the enterprise allowlist at `github.com/enterprises/Pipelex/settings/actions/policies` and SHA-pin in the workflow.
+- **Enterprise allowlist:** the Pipelex enterprise runs only GitHub-owned actions and the third-party patterns in `github-manager`'s `enterprise/actions.tf`. This repo's workflows use `Swatinem/rust-cache`, `PyO3/maturin-action` and `pypa/gh-action-pypi-publish`, each SHA-pinned. See `docs/dev/release-publishing.md`.
+- **When adding a new third-party action:** either replace it with inline shell, or add its `owner/repo@*` pattern to `enterprise/actions.tf` through a pull request in `github-manager`, and SHA-pin it in the workflow.
