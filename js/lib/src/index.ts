@@ -5,7 +5,10 @@ import {
   FormatterOptions,
   prepareEnv,
 } from "@taplo/core";
-import loadTaplo from "../../../crates/taplo-wasm/Cargo.toml";
+import {
+  module as taploWasm,
+  init as initTaplo,
+} from "../../../crates/taplo-wasm/Cargo.toml?custom";
 import { objectCamel } from "./util";
 
 /**
@@ -93,7 +96,7 @@ export class Taplo {
 
   public static async initialize(env?: Environment): Promise<Taplo> {
     if (typeof Taplo.taplo === "undefined") {
-      Taplo.taplo = await loadTaplo();
+      Taplo.taplo = await initTaplo({ module: taploWasm });
     }
     Taplo.taplo.initialize();
 

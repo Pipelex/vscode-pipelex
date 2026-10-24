@@ -19,11 +19,19 @@ export default {
   plugins: [
     typescript(),
     rust({
-      debug: process.env["RELEASE"] !== "true",
       nodejs: true,
       inlineWasm: true,
-      cargoArgs: ["--frozen"],
       verbose: process.env["VERBOSE"] === "true",
+      optimize: {
+        release: process.env["RELEASE"] === "true",
+        // Off, as the bundles have always shipped: under plugin 2, yarn left
+        // binaryen's wasm-opt off the PATH and the attempt failed silently.
+        // It also keeps binaryen an unprovided optional peer (js/.yarnrc.yml).
+        wasmOpt: false,
+      },
+      extraArgs: {
+        cargo: ["--frozen"],
+      },
     }),
     commonjs(),
     resolve({

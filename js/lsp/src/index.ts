@@ -1,4 +1,7 @@
-import loadPipelex from "../../../crates/pipelex-wasm/Cargo.toml";
+import {
+  module as pipelexWasm,
+  init as initPipelex,
+} from "../../../crates/pipelex-wasm/Cargo.toml?custom";
 import { convertEnv, Environment, Lsp, prepareEnv } from "@taplo/core";
 
 export interface RpcMessage {
@@ -34,7 +37,7 @@ export class PipelexLsp {
     lspInterface: LspInterface
   ): Promise<PipelexLsp> {
     if (typeof PipelexLsp.pipelex === "undefined") {
-      PipelexLsp.pipelex = await loadPipelex();
+      PipelexLsp.pipelex = await initPipelex({ module: pipelexWasm });
     }
     PipelexLsp.pipelex.initialize();
 
