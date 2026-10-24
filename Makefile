@@ -60,10 +60,12 @@ cli: ## Build the plxt CLI (release mode)
 # `env` does it: it rebuilds a .venv whose interpreter is not the X.Y or X.Y.Z that
 # PYTHON_VERSION names (or that no longer runs), and leaves one alone otherwise. A
 # request that is not a plain version number, such as `pypy@3.10`, keeps the
-# existing .venv. Either way it then makes sure .venv holds `maturin`, which the
-# wheel targets run from it: a new or rebuilt .venv has none, and a `maturin`
-# outside it, such as a pyenv shim, follows .python-version too and may not exist
-# on the version the pin moves to.
+# existing .venv. Either way it then makes sure .venv holds `maturin` at the floor
+# `crates/pipelex-py/pyproject.toml` names, which the wheel targets run from it: a
+# new or rebuilt .venv has none, a kept one may hold a maturin too old to set
+# PYO3_BUILD_EXTENSION_MODULE, which PyO3 0.29 needs to leave libpython unlinked,
+# and a `maturin` outside it, such as a pyenv shim, follows .python-version too and
+# may not exist on the version the pin moves to.
 ENV_PYTHON_MATCHES = "$(VIRTUAL_ENV)/bin/python" -c 'import re, sys; want = sys.argv[1]; got = ".".join(map(str, sys.version_info[: want.count(".") + 1])); sys.exit(bool(re.fullmatch(r"[0-9]+(\.[0-9]+)*", want)) and got != want)' "$(PYTHON_VERSION)"
 
 env: ## Create the Python virtual env on PYTHON_VERSION (from .python-version) with maturin, rebuilding one made on another Python
@@ -79,10 +81,7 @@ env: ## Create the Python virtual env on PYTHON_VERSION (from .python-version) w
 		echo "Rebuilding Python virtual env in \`$(VIRTUAL_ENV)\` on Python $(PYTHON_VERSION)"; \
 		uv venv --clear "$(VIRTUAL_ENV)" --python $(PYTHON_VERSION); \
 	fi && \
-	if [ ! -e "$(VIRTUAL_ENV)/bin/maturin" ]; then \
-		echo "Installing maturin into \`$(VIRTUAL_ENV)\`"; \
-		uv pip install --python "$(VIRTUAL_ENV)" maturin; \
-	fi
+	uv pip install --quiet --python "$(VIRTUAL_ENV)" 'maturin>=1.9.4'
 
 pipelex-tools: env ## Build and install the pipelex-tools CLI wheel (native plxt binary, dev)
 	@. "$(VIRTUAL_ENV)/bin/activate" && maturin develop --release
