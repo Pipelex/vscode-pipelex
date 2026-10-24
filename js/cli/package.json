@@ -24,7 +24,7 @@
     "@types/node": "^20.11.9",
     "@types/node-fetch": "^2.6.11",
     "@wasm-tool/rollup-plugin-rust": "^3.1.6",
-    "esbuild": "^0.20.0",
+    "esbuild": "^0.28.2",
     "fast-glob": "^3.3.2",
     "node-fetch": "^3.3.2",
     "rollup": "^4.9.6",
