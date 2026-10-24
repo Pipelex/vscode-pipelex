@@ -10,6 +10,7 @@
 ### Security
 
 - **Dependencies past their security advisories**: `plxt`, `pipelex-tools-py`, `@pipelex/tools-wasm` and the extension's language server are built with `bytes` 1.12.1, `time` 0.3.55, `tokio` 1.38.2, `tracing-subscriber` 0.3.20 and `url` 2.5.4 with `idna` 1.1.0, `plxt` and `pipelex-tools-py` also with `ring` 0.17.14, a build that turns on the `native-tls` feature takes `openssl` 0.10.81 with `openssl-sys` 0.9.117, and the extension bundles `smol-toml` 1.9.1 and `axios` 1.20.0, releases that fix the advisories raised against the versions they replace.
+- **`pipelex-tools-py` builds on PyO3 0.29**: the `pipelex_tools` module is now built with PyO3 0.29 and `pythonize` 0.29 instead of 0.23, past the advisories raised against PyO3's `PyList` and `PyTuple` iterators, `PyCFunction::new_closure` and `PyString::from_object`. Building it from its source distribution now takes maturin 1.9.4 or later, which pip's isolated build fetches by itself.
 
 ## [0.21.1] - 2026-10-19
 

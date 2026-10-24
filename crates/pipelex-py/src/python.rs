@@ -1,9 +1,10 @@
 //! PyO3 glue for the `pipelex_tools` extension module.
 //!
 //! Gated behind the `python` cargo feature. These are thin wrappers: they
-//! marshal Python arguments, release the GIL around the pure Rust impls (FastAPI
-//! calls these from a threadpool), and hand the `#[derive(Serialize)]` results
-//! back via `pythonize`. All the real work lives in [`crate::format`] /
+//! marshal Python arguments, detach from the interpreter around the pure Rust
+//! impls (`Python::detach`, which releases the GIL; FastAPI calls these from a
+//! threadpool), and hand the `#[derive(Serialize)]` results back via
+//! `pythonize`. All the real work lives in [`crate::format`] /
 //! [`crate::lint`] and is unit-tested without a Python interpreter.
 
 use pyo3::exceptions::PyValueError;
@@ -28,7 +29,7 @@ struct LintOutput {
 /// which the Rust parser rejects, so it is mapped to lowercase; everything else
 /// (`int`, `str`, `float`) round-trips through `str()`.
 fn option_value_to_string(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(boolean) = value.downcast::<PyBool>() {
+    if let Ok(boolean) = value.cast::<PyBool>() {
         return Ok(if boolean.is_true() {
             "true".to_owned()
         } else {
@@ -55,10 +56,8 @@ fn options_from_dict(options: Option<&Bound<'_, PyDict>>) -> PyResult<Vec<(Strin
 }
 
 /// Convert a `Serialize` value into a Python object via `pythonize`.
-fn to_py<T: Serialize>(py: Python<'_>, value: &T) -> PyResult<PyObject> {
-    pythonize::pythonize(py, value)
-        .map(pyo3::Bound::unbind)
-        .map_err(|err| PyValueError::new_err(err.to_string()))
+fn to_py<'py, T: Serialize>(py: Python<'py>, value: &T) -> PyResult<Bound<'py, PyAny>> {
+    pythonize::pythonize(py, value).map_err(|err| PyValueError::new_err(err.to_string()))
 }
 
 // ⚠️ PUBLIC PYTHON SURFACE — keep this signature and its return shape in sync
@@ -72,14 +71,14 @@ fn to_py<T: Serialize>(py: Python<'_>, value: &T) -> PyResult<PyObject> {
 /// malformed `options` value (e.g. a non-numeric `column_width`).
 #[pyfunction]
 #[pyo3(signature = (content, *, options=None))]
-fn format_mthds(
-    py: Python<'_>,
+fn format_mthds<'py>(
+    py: Python<'py>,
     content: String,
-    options: Option<&Bound<'_, PyDict>>,
-) -> PyResult<PyObject> {
+    options: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyAny>> {
     let options = options_from_dict(options)?;
     let outcome = py
-        .allow_threads(|| format_mthds_impl(&content, &options))
+        .detach(|| format_mthds_impl(&content, &options))
         .map_err(|err| PyValueError::new_err(format!("{err:#}")))?;
     to_py(py, &outcome)
 }
@@ -95,10 +94,14 @@ fn format_mthds(
 /// filename, so it is accepted for API symmetry but not yet threaded through.
 #[pyfunction]
 #[pyo3(signature = (content, *, source=None))]
-fn lint_mthds(py: Python<'_>, content: String, source: Option<String>) -> PyResult<PyObject> {
+fn lint_mthds<'py>(
+    py: Python<'py>,
+    content: String,
+    source: Option<String>,
+) -> PyResult<Bound<'py, PyAny>> {
     let _ = source;
     let diagnostics = py
-        .allow_threads(|| lint_mthds_impl(&content))
+        .detach(|| lint_mthds_impl(&content))
         .map_err(|err| PyValueError::new_err(format!("{err:#}")))?;
     to_py(py, &LintOutput { diagnostics })
 }
