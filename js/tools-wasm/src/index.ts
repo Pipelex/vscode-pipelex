@@ -20,7 +20,10 @@
  * const { formatted, changed } = formatMthds(mthdsSource);
  * ```
  */
-import loadPipelexTools from "../../../crates/pipelex-tools-wasm/Cargo.toml";
+import {
+  module as pipelexToolsWasm,
+  init as initPipelexTools,
+} from "../../../crates/pipelex-tools-wasm/Cargo.toml?custom";
 
 // ⚠️ PUBLIC BINDING SURFACE — these types mirror `@pipelex/sdk`'s
 // `Diagnostic`/`DiagnosticRange`/`DiagnosticKind`/`LintResponse`/`FormatResponse`
@@ -86,7 +89,7 @@ let wasm: any | undefined;
  */
 export async function initialize(): Promise<void> {
   if (typeof wasm === "undefined") {
-    wasm = await loadPipelexTools();
+    wasm = await initPipelexTools({ module: pipelexToolsWasm });
   }
   wasm.initialize();
 }
