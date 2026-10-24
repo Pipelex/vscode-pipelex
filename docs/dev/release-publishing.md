@@ -87,18 +87,17 @@ Two details this depends on:
 
 The Pipelex Enterprise enforces an actions allowlist. Only GitHub-owned actions (`actions/*`) and explicitly allowed third-party actions can run.
 
-**Allowlist location:** [github.com/enterprises/Pipelex/settings/actions/policies](https://github.com/enterprises/Pipelex/settings/actions/policies) → "Allow enterprise actions, and select non-enterprise actions"
+**Allowlist location:** the `patterns_allowed` list in `enterprise/actions.tf` of the `github-manager` repository. Like every GitHub setting, it changes through a pull request there and never in the enterprise's settings page.
 
-Currently allowed third-party actions (beyond GitHub-owned):
+The third-party actions this repo's workflows use, each allowed by a pattern there:
 
 | Pattern | Action | Why |
 |---------|--------|-----|
 | `Swatinem/rust-cache@*` | Rust build caching | Complex cache key logic, target cleanup |
 | `PyO3/maturin-action@*` | Python wheel builds from Rust | Cross-platform maturin + sccache setup |
 | `pypa/gh-action-pypi-publish@*` | Publish to PyPI via OIDC | Trusted publishing without API tokens |
-| `peaceiris/actions-gh-pages@*` | Deploy to GitHub Pages | Site deployment |
 
-All four are **SHA-pinned** in the workflow files (e.g. `Swatinem/rust-cache@779680da...  # v2.8.2`) so that no one — including the action maintainer — can silently change what code runs. The allowlist uses `@*` wildcards to permit SHA refs. The enterprise setting **"Require actions to be pinned to a full-length commit SHA"** is enabled to enforce this.
+Each is **SHA-pinned** in the workflow files (e.g. `Swatinem/rust-cache@779680da...  # v2.8.2`) so that no one — including the action maintainer — can silently change what code runs. The allowlist uses `@*` wildcards to permit SHA refs. The enterprise setting **"Require actions to be pinned to a full-length commit SHA"** is enabled to enforce this.
 
 Simple actions (`nick-fields/retry`, `lewagon/wait-on-check-action`, `docker/login-action`, `docker/setup-qemu-action`) were replaced with inline shell to avoid unnecessary trust dependencies.
 
