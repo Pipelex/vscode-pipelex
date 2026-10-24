@@ -39,8 +39,6 @@ Publishing here is two stages, and the tag between them is what selects which of
 
 Both PyPI publishes and the npm publish use OIDC trusted publishing, so there is no token secret for them; the two extension marketplaces use `VSCE_TOKEN` and `OPEN_VSX_TOKEN`.
 
-One more publish fires outside those two stages and outside the tag mechanism entirely: `site.yaml` builds the VitePress site under `site/` on a push to `main` and pushes it to GitHub Pages. It is path-filtered to `site/**/*`, so a bump-only release never triggers it — but it is inherited from the Taplo fork and still deploys with `cname: taplo.tamasfe.dev`, a domain this fork does not control, so a release promoting a `site/**` change would publish a website nobody here reads. Raise that with the user rather than letting it ship unremarked.
-
 The landing verifies the publish — the runs, the tags, the registries:
 
 ```bash

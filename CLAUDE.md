@@ -29,7 +29,6 @@ Publishes two PyPI packages from separate `pyproject.toml` files:
 - `editors/vscode/src/pipelex/` - MTHDS-specific extension code
 - `editors/vscode/src/syntax/mthds/` - MTHDS grammar generator (generates mthds.tmLanguage.json)
 - `js/` - npm packages (@taplo/core, @taplo/cli, @taplo/lib, @taplo/lsp)
-- `site/` - Documentation site (VitePress + Tailwind)
 - `test-data/` - Test fixtures for TOML/MTHDS parsing
 - `test-data/mthds/` - MTHDS grammar test fixtures
 - `test-data/mthds-corpus/` - vendored copy of the MTHDS Test Corpus, owned by `pipelex` and synced by the workspace's `mthds-corpus-sync` skill. **Never edit it here** — fix the entry upstream and re-sync. Deliberately outside `test-data/mthds/`, which the wasm suite snapshot-pins

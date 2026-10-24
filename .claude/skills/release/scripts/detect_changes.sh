@@ -55,7 +55,7 @@ categorize() {
     crates/pipelex-cli/*|crates/taplo-cli/*) echo "cli" ;;
     crates/pipelex-py/*) echo "lib" ;;
     crates/pipelex-common/*|crates/pipelex-lsp/*|crates/pipelex-wasm/*|crates/taplo-lsp/*|crates/taplo-common/*|crates/taplo/*|crates/taplo-wasm/*|crates/lsp-async-stub/*) echo "common" ;;
-    .github/*|docs/*|site/*|scripts/*) echo "ci_docs" ;;
+    .github/*|docs/*|scripts/*) echo "ci_docs" ;;
     test-data/*) echo "test_data" ;;
     *.md) echo "ci_docs" ;;
     *) echo "other" ;;
