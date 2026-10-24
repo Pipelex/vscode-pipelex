@@ -885,7 +885,8 @@ impl<E: Environment> Schemas<E> {
 
     #[tracing::instrument(skip_all, fields(%path))]
     #[async_recursion(?Send)]
-    #[must_use]
+    // async-recursion marks the boxed future it returns `#[must_use]`, which Clippy 1.99 reports as `double_must_use`.
+    #[allow(clippy::double_must_use)]
     async fn collect_schemas(
         &self,
         root_url: &Url,
