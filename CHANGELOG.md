@@ -4,11 +4,12 @@
 
 ### Changed
 
+- **Minimum supported Rust version is 1.88 (Breaking)**: building `plxt`, `pipelex-tools-py` or any crate of the workspace from source, a `pip install` from the `pipelex-tools` or `pipelex-tools-py` source distribution included, now needs Rust 1.88 or later instead of 1.74, the version the patched `time` releases require; the prebuilt wheels, `@pipelex/tools-wasm` and the extension are unaffected.
 - **Pinned development Python**: `.python-version` names the Python that the Makefile's Python targets build `.venv` on, with `maturin` installed in it, rebuilding one made on another version, and that the CI jobs testing the Python bindings run on, so the Python side no longer follows whichever interpreter is newest on the machine; `PYTHON_VERSION=<version> make test-all` tries another one, and the release jobs keep naming their own.
 
 ### Security
 
-- **Dependencies past their security advisories**: `plxt`, `pipelex-tools-py`, `@pipelex/tools-wasm` and the extension's language server are built with `bytes` 1.12.1, `tokio` 1.38.2, `tracing-subscriber` 0.3.20 and `url` 2.5.4 with `idna` 1.1.0, `plxt` and `pipelex-tools-py` also with `ring` 0.17.14, and the extension bundles `smol-toml` 1.9.1 and `axios` 1.20.0, releases that fix the advisories raised against the versions they replace.
+- **Dependencies past their security advisories**: `plxt`, `pipelex-tools-py`, `@pipelex/tools-wasm` and the extension's language server are built with `bytes` 1.12.1, `time` 0.3.55, `tokio` 1.38.2, `tracing-subscriber` 0.3.20 and `url` 2.5.4 with `idna` 1.1.0, `plxt` and `pipelex-tools-py` also with `ring` 0.17.14, a build that turns on the `native-tls` feature takes `openssl` 0.10.81 with `openssl-sys` 0.9.117, and the extension bundles `smol-toml` 1.9.1 and `axios` 1.20.0, releases that fix the advisories raised against the versions they replace.
 - **WASM packages build with `@wasm-tool/rollup-plugin-rust` 3**: `@pipelex/tools-wasm`, the extension's language server `@pipelex/lsp`, `@taplo/lib` and `@taplo/cli` are now built with the plugin's version 3, which leaves `tar` 6 and its advisories for `tar` 7.5. Each package still ships one bundle with its Wasm inlined and the same exports, and loading it no longer prints wasm-bindgen's warning about deprecated initialization parameters.
 
 ## [0.21.1] - 2026-10-19
