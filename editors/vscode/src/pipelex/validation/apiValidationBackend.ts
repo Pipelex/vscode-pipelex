@@ -1,10 +1,22 @@
 import * as vscode from 'vscode';
-import { PipelexApiClient, ApiResponseError, ApiUnreachableError, PipelineRequestError } from '@pipelex/sdk';
+import * as fs from 'fs';
+import * as path from 'path';
+import {
+    PipelexApiClient,
+    ApiResponseError,
+    ApiUnreachableError,
+    MethodFileTransferError,
+    PipelineRequestError,
+    RequestArgumentError,
+} from '@pipelex/sdk';
 import type { PipelexValidationReport, PipelexValidationResult } from '@pipelex/sdk';
+import { listMethodTree, MethodTreeError, TreeLimitExceededError } from 'mthds';
+import type { MethodTree } from 'mthds';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
-import { asSentence, problemFacts, readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
-import { isHostedPipelexApi, type ApiCapabilityGate } from './apiCapabilityGate';
+import { asSentence, problemFacts, readProblemItems, readProblemSummary, withNextStep } from './problemItems';
+import { isHostedPipelexApi, PIPELEX_API_PROBLEM_ITEMS_VERSION, type ApiCapabilityGate } from './apiCapabilityGate';
+import { formatSemver } from './agentCliVersion';
 import { PIPELEX_PLATFORM_URL, SET_API_KEY_COMMAND } from './apiKey';
 
 export interface ApiBackendDeps {
@@ -24,21 +36,40 @@ export interface ApiBackendDeps {
 
 /**
  * API backend — one `POST /v1/validate` per `analyze()` always returns both the
- * validation verdict and (when asked) the graph. `/validate` is 200-diagnostic:
+ * validation verdict and (when asked) the graph.
+ *
+ * What it validates is the saved file's **method tree**, the tree a run of the
+ * method would send: the saved file's directory listed by the `mthds` package's
+ * lister under the MTHDS standard's membership rule, so it is rooted at the
+ * nearest `METHODS.toml` at or above that directory, else at the directory
+ * itself, and holds every file the rule keeps (every bundle, and every file a
+ * step reads, such as a `PipeDocGen` step's template), under the limits the
+ * deployment announces. The client sends it inline when small and by hash
+ * otherwise, uploading only the files the API lacks. The saved file must be a
+ * file of that tree: one the rule keeps out is not validated at all, since a
+ * verdict on the tree would say nothing about it. The saved file is
+ * `request.savedUri`, the file saved or opened, and never the graph primary
+ * the analysis may be anchored on, which the tree can hold when the saved file
+ * is kept out. The verdict's items, which name a file by its tree path, are
+ * placed by the caller against the directory's `.mthds` files it gathered.
+ *
+ * `/validate` is 200-diagnostic:
  * the produced verdict rides the response body discriminated on `is_valid`. An
  * `is_valid: false` body carries its faults as problem items in `errors[]` (the
  * same items the CLI path reads), and either arm may carry advisory findings as
  * problem items in `warnings[]`; a valid bundle with pending signatures is
  * `is_valid: true` / `is_runnable: false` — a runnability fact, not an error
- * (the `--allow-signatures` sweep tolerates them). A runner that still writes
- * the shape problem items replace (the hosted plane's, until it runs a pipelex
- * that writes problems) is read through `problemItems.ts`.
+ * (the `--allow-signatures` sweep tolerates them). A runner older than pipelex
+ * 0.90.0 lists an invalid verdict's faults in `validation_errors[]`, which is
+ * not read, so its invalid verdict is refused below as one carrying no
+ * readable item.
  *
  * Transport / no-verdict failures (server unreachable, non-`problem+json`, auth,
- * a request-shape 422, timeout, unparseable) never become diagnostics: they
- * surface a {@link BackendError} so the consumer notifies, clears stale
- * diagnostics, and does NOT fall back to the CLI. A no-verdict answer is a
- * problem document, and its detail and next step are what the user is shown.
+ * a request-shape 422, timeout, unparseable, a tree that cannot be listed or
+ * sent) never become diagnostics: they surface a {@link BackendError} so the
+ * consumer notifies, clears stale diagnostics, and does NOT fall back to the
+ * CLI. A no-verdict answer is a problem document, and its detail and next step
+ * are what the user is shown.
  */
 export class ApiValidationBackend implements ValidationBackend {
     readonly kind = 'api' as const;
@@ -92,24 +123,16 @@ export class ApiValidationBackend implements ValidationBackend {
         // at a single timeout. The probe still carries the same signal/timeout (a
         // superseded save abandons it) and `ensureCapable` swallows every fault internally.
         void this.deps.capabilityGate.ensureCapable(client, baseUrl, signal, request.timeout);
-        // Abort BEFORE initiating validate(): the consent modal / token resolution above
-        // were awaited, so the save may have been superseded meanwhile. `client.validate()`
-        // is evaluated eagerly (it initiates the request) before `runWithAbort` wraps it,
-        // so without this guard a stale save would still ship the bundle to the remote.
-        if (signal.aborted) {
-            throw new AnalyzeAbortError();
-        }
-
-        const names = request.files.map(f => f.name);
-        const contents = request.files.map(f => f.content);
 
         let report: PipelexValidationResult;
         try {
-            // Hand the client the save's signal and timeout so a superseded or timed-out
-            // save cancels the request itself. Without them the SDK's own 20-minute
-            // default governs, and every abandoned save keeps its upload in flight.
+            // One timeout for the whole validation: the handshake, the listing, the
+            // uploads and the request together, as a save's wait was always capped.
+            // The consent modal and the token read above were awaited, so the save
+            // may have been superseded meanwhile: `runWithAbort` then settles before
+            // starting the validation, which never lists or ships a stale tree.
             report = await this.runWithAbort(
-                client.validate(contents, true, names, undefined, undefined, { timeoutMs: request.timeout, signal }),
+                (operationSignal, deadline) => this.validateMethodTree(client, request, operationSignal, deadline),
                 signal,
                 request.timeout,
                 baseUrl,
@@ -136,12 +159,12 @@ export class ApiValidationBackend implements ValidationBackend {
         // bundle is a produced verdict (`is_valid: false`), not a transport error.
         // (The extension tsconfig is `strict:false`, where boolean-literal
         // discriminants don't narrow — read `is_valid` and cast the arm explicitly.)
-        // The SDK types the shape problem items replace, so the items are read
-        // loosely off the body itself.
+        // The SDK still types the invalid arm as the `validation_errors[]` problem
+        // items replaced, so the items are read loosely off the body itself.
         const body = report as unknown as Record<string, unknown>;
         const warnings = readProblemItems(body.warnings);
         if (report.is_valid === false) {
-            const errors = readVerdictErrors(body);
+            const errors = readProblemItems(body.errors);
             // The runtime's structured-info invariant is total: an invalid verdict
             // ALWAYS carries a non-empty `errors[]`. An `is_valid: false` body with
             // no readable item is a backend/contract violation, NOT an empty invalid
@@ -169,13 +192,73 @@ export class ApiValidationBackend implements ValidationBackend {
     }
 
     /**
-     * Race the client request against the abort signal and a timeout. The request
-     * carries the same signal and timeout, so the SDK cancels the fetch as well; the
-     * race is what settles the save with our own outcome — an {@link AnalyzeAbortError}
-     * or an `unreachable` {@link BackendError} — whichever way the SDK reports its end.
+     * List the saved file's method tree and validate it. The tree is listed under
+     * the limits the deployment announces, so one it would refuse for its size is
+     * refused here, before any file is hashed; the handshake that announces them
+     * is the one the client then reads to choose between inline and by hash. A
+     * saved file the tree does not hold is refused before anything is sent.
+     *
+     * `signal` is the one {@link runWithAbort} hands it, which the save's own
+     * signal and its timeout both abort, and `deadline` the moment that timeout
+     * runs out. The client gets that signal for the blob check, the uploads and
+     * the request, and the time left before the deadline as the request's own
+     * timeout, so a superseded or timed-out save cancels the uploads and the
+     * request themselves, and the request never outlives the save's one timeout.
+     * Without them the SDK's own 20-minute default governs, and every abandoned
+     * save keeps its upload in flight. The handshake takes no signal, so a save
+     * abandoned while it is asked stops as soon as it answers, before the tree is
+     * listed.
      */
-    private runWithAbort<T>(promise: Promise<T>, signal: AbortSignal, timeout: number, baseUrl: string): Promise<T> {
+    private async validateMethodTree(
+        client: PipelexApiClient,
+        request: BundleRequest,
+        signal: AbortSignal,
+        deadline: number,
+    ): Promise<PipelexValidationResult> {
+        const savedPath = request.savedUri.fsPath;
+        const limits = await client.methodTreeLimits();
+        if (signal.aborted) {
+            throw new AnalyzeAbortError();
+        }
+        const tree = await listMethodTree(path.dirname(savedPath), { limits });
+        const treePath = await treePathOf(savedPath, tree.root);
+        if (treePath === undefined || !tree.has(treePath)) {
+            throw new BackendError({
+                kind: 'tree',
+                logMessage: `${savedPath} is not a file of its method tree rooted at ${tree.root ?? path.dirname(savedPath)}`,
+                userMessage: outsideTreeMessage(savedPath, tree),
+            });
+        }
+        if (signal.aborted) {
+            throw new AnalyzeAbortError();
+        }
+        return client.validate({ tree }, true, { timeoutMs: remainingMs(deadline), signal });
+    }
+
+    /**
+     * Run one validation under the save's signal and one deadline, `timeout` from
+     * now, and race it against both. The operation is handed a signal of its own,
+     * which the save's signal aborts and so does the deadline, so whatever it still
+     * has in flight when the save is superseded or times out, an upload or the
+     * request, is cancelled rather than orphaned: the caller drops its controller
+     * once the save settles, and nothing could cancel it later. The race is what
+     * settles the save with our own outcome — an {@link AnalyzeAbortError} or an
+     * `unreachable` {@link BackendError} — whichever way the operation reports its
+     * end. A save already superseded settles before the operation starts.
+     */
+    private runWithAbort<T>(
+        operation: (signal: AbortSignal, deadline: number) => Promise<T>,
+        signal: AbortSignal,
+        timeout: number,
+        baseUrl: string,
+    ): Promise<T> {
         return new Promise<T>((resolve, reject) => {
+            if (signal.aborted) {
+                reject(new AnalyzeAbortError());
+                return;
+            }
+            const deadline = Date.now() + timeout;
+            const controller = new AbortController();
             const cleanup = () => {
                 clearTimeout(timer);
                 signal.removeEventListener('abort', onAbort);
@@ -183,22 +266,21 @@ export class ApiValidationBackend implements ValidationBackend {
             const onAbort = () => {
                 cleanup();
                 reject(new AnalyzeAbortError());
+                controller.abort(signal.reason);
             };
             const timer = setTimeout(() => {
                 cleanup();
-                reject(new BackendError({
+                const timedOut = new BackendError({
                     kind: 'unreachable',
                     logMessage: `Pipelex API request timed out after ${timeout}ms`,
                     userMessage: unreachableMessage(baseUrl),
-                }));
+                });
+                reject(timedOut);
+                controller.abort(timedOut);
             }, timeout);
 
-            if (signal.aborted) {
-                onAbort();
-                return;
-            }
             signal.addEventListener('abort', onAbort, { once: true });
-            promise.then(
+            operation(controller.signal, deadline).then(
                 value => { cleanup(); resolve(value); },
                 error => { cleanup(); reject(error); },
             );
@@ -246,6 +328,39 @@ export class ApiValidationBackend implements ValidationBackend {
             });
         }
 
+        // A file of the tree the API lacked could not be uploaded to the storage it
+        // named, so the request was not sent. The message carries neither the
+        // signed link nor storage's body, by the SDK's own rule.
+        if (err instanceof MethodFileTransferError) {
+            throw new BackendError({
+                kind: err.code === 'unreachable' ? 'unreachable' : 'api-error',
+                logMessage: `Pipelex API at ${baseUrl}: uploading a file of the method tree failed ` +
+                    `(${err.code}${err.status === undefined ? '' : `, HTTP ${err.status}`}): ${err.message}`,
+                userMessage: asSentence(`Pipelex API at ${baseUrl}: ${err.message}`),
+            });
+        }
+
+        // The tree could not be listed (a symbolic link or a special file in it, a
+        // directory it cannot read, a tree past the API's limits, no file at all), or
+        // a file of it changed between the listing and the sending.
+        if (err instanceof MethodTreeError) {
+            throw new BackendError({
+                kind: 'tree',
+                logMessage: `the method tree could not be sent to ${baseUrl} (${err.code}): ${err.message}`,
+                userMessage: treeRefusalMessage(err),
+            });
+        }
+
+        // The client refused the tree before sending it, such as one heavier than an
+        // API with no blob store takes inline. Nothing was sent.
+        if (err instanceof RequestArgumentError) {
+            throw new BackendError({
+                kind: 'tree',
+                logMessage: `the Pipelex API client refused the method tree for ${baseUrl}: ${err.message}`,
+                userMessage: asSentence(`The method tree could not be sent to the Pipelex API at ${baseUrl}: ${err.message}`),
+            });
+        }
+
         // Unparseable body / non-problem+json / unknown — treat as a transport failure.
         const message = err instanceof Error ? err.message : String(err);
         throw new BackendError({
@@ -288,6 +403,61 @@ function invalidBaseUrlMessage(baseUrl: string): string {
         `Fix \`pipelex.api.baseUrl\` in settings, or switch \`pipelex.backend\` to \`cli\`.`;
 }
 
+/**
+ * The time left before `deadline`, in milliseconds, and never less than one: the
+ * SDK refuses a timeout that is not positive, and a deadline just past is the
+ * race's to report, its timer being due.
+ */
+function remainingMs(deadline: number): number {
+    return Math.max(1, deadline - Date.now());
+}
+
+/**
+ * The saved file's tree path under `root`: its real path relative to the root,
+ * with forward slashes, in NFC, as the lister names the files it lists from the
+ * root's real path. `undefined` when it lies outside the root, or when `root` is
+ * null (the one-file tree of a file named alone, which a directory never is).
+ */
+async function treePathOf(savedPath: string, root: string | null): Promise<string | undefined> {
+    if (root === null) return undefined;
+    let real: string;
+    try {
+        real = await fs.promises.realpath(savedPath);
+    } catch {
+        return undefined;
+    }
+    const relativePath = path.relative(root, real);
+    if (relativePath === '' || relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+        return undefined;
+    }
+    return relativePath.split(path.sep).join('/').normalize('NFC');
+}
+
+/** Why the saved file was not validated: its method tree does not hold it. */
+function outsideTreeMessage(savedPath: string, tree: MethodTree): string {
+    const root = tree.root ?? path.dirname(savedPath);
+    return `${path.basename(savedPath)} was not validated: it is not a file of its method tree, rooted at ${root}, ` +
+        `since the MTHDS membership rule keeps it out, by a name starting with a dot, a .gitignore pattern inside ` +
+        `the tree, the manifest's exclude, or a directory such as node_modules or a virtual environment. ` +
+        `The Pipelex API validates the tree a run would send, so move the file into the tree to validate it.`;
+}
+
+/**
+ * Plain-text guidance for a tree the lister refused, or one of whose files
+ * changed while it was being sent. The lister's own message names the file or
+ * the limit; a tree past a limit also gets the ways to make it smaller, since
+ * the commonest cause is a saved file whose directory, or whose `METHODS.toml`,
+ * roots far more than the method.
+ */
+function treeRefusalMessage(err: MethodTreeError): string {
+    if (err instanceof TreeLimitExceededError) {
+        return `The method tree rooted at ${err.root} is too large for the Pipelex API: ${asSentence(err.message)} ` +
+            `Keep the files a run does not need out of the tree with a .gitignore inside it or the exclude of ` +
+            `METHODS.toml, or give the method a directory of its own.`;
+    }
+    return `The method tree could not be sent for validation: ${asSentence(err.message)}`;
+}
+
 /** Localhost / loopback host → privacy confirmation is skipped. */
 export function isLocalhost(baseUrl: string): boolean {
     let host: string;
@@ -320,11 +490,22 @@ function apiResponseMessage(err: ApiResponseError, baseUrl: string, nextStep: st
  * Guidance for an `is_valid:false` body that carried no readable item in its
  * required `errors[]`. The server WAS reached and returned a 200, but the
  * verdict is unusable — a backend/protocol breakdown, surfaced as an api-error.
+ * The likeliest cause is a server older than the release that writes problem
+ * items, whose `validation_errors[]` the extension no longer reads, so the
+ * message names that release. Its remedy depends on who runs the server, as
+ * the capability gate's does: a self-hosted operator can upgrade it, a user of
+ * the hosted API cannot.
  */
 function apiInvalidContractMessage(baseUrl: string): string {
-    return `Pipelex API at ${baseUrl} reported the bundle invalid but returned no error details — ` +
-        `the server response is malformed. Retry; if it persists, the pipelex-api server may be out of ` +
-        `date, or switch \`pipelex.backend\` to \`cli\`.`;
+    const release = `pipelex-api ${formatSemver(PIPELEX_API_PROBLEM_ITEMS_VERSION)}`;
+    if (isHostedPipelexApi(baseUrl)) {
+        return `The hosted Pipelex API at ${baseUrl} reported the bundle invalid but returned no error the ` +
+            `extension can read, as a runner older than ${release} does. Switch \`pipelex.backend\` to ` +
+            `\`cli\` to validate locally until it runs that release.`;
+    }
+    return `Pipelex API at ${baseUrl} reported the bundle invalid but returned no error the extension ` +
+        `can read. A server older than ${release} lists its errors in a shape the extension no longer ` +
+        `reads: upgrade the server, or switch \`pipelex.backend\` to \`cli\`.`;
 }
 
 /**

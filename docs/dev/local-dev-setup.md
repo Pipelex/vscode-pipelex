@@ -7,9 +7,12 @@ How to build and install the Pipelex extension and CLI from source for local tes
 - [rustup](https://rustup.rs)
 - Node.js 20+
 - Yarn 4 (via corepack: `corepack enable`)
+- [uv](https://docs.astral.sh/uv/), for the Python wheels only (`make env` installs it with uv's installer script when it is missing)
 - A VS Code-compatible IDE (VS Code, Cursor, Windsurf, etc.)
 
 You do not choose the Rust version: `rust-toolchain.toml` pins the release CI uses, with Clippy, rustfmt and the `wasm32-unknown-unknown` target, and rustup installs it on the first `cargo` command you run inside the repository, so your `make check` lints exactly as CI does. If your rustup does not install it by itself, run `rustup toolchain install` in the repository. Why it is pinned and how the pin moves is in [`ci-and-branch-protection.md`](ci-and-branch-protection.md#the-rust-toolchain).
+
+You do not choose the Python version either. The targets that build the Python wheels into `.venv`, such as `make pipelex-tools`, `make pipelex-lib`, `make test-all` and `make build`, first run `make env`, which creates `.venv` with uv on the interpreter that `.python-version` at the repository root names and installs `maturin` into it, and CI reads the same file. `make env` also rebuilds a `.venv` that was made on another Python, `maturin` included, so the next of those targets you run moves an older environment onto the pin. To try another version, run one of them with `PYTHON_VERSION` set, such as `PYTHON_VERSION=3.12 make test-all` (or set `UV_PYTHON`), and the next one you run without it returns `.venv` to the pin. The release jobs that test the published wheels name their own Python and do not follow this file (see [`release-publishing.md`](release-publishing.md)).
 
 ## Quick Start
 
@@ -34,7 +37,7 @@ Run `make help` to see all targets. Here are the key ones:
 | `make ext-uninstall` | Remove the extension from your IDE |
 | `make test` | Run all fast tests (every Rust crate with tests + extension) and type-check the extension. Aggregates the per-package `test-*` targets |
 | `make test-<package>` | Run one package's tests: `test-taplo`, `test-taplo-common`, `test-taplo-lsp`, `test-lsp-async-stub`, `test-pipelex-common`, `test-pipelex-cli`, `test-pipelex-py`, `test-ext`, `test-pipelex-lib` |
-| `make test-all` | `make test` plus `test-pipelex-lib` (Python smoke test — needs `uv` + a `maturin` build, so it's excluded from plain `make test`) |
+| `make test-all` | `make test` plus `test-pipelex-lib` (Python smoke test — builds the library wheel with the `maturin` that `make env` installs in `.venv`, so it's excluded from plain `make test`) |
 | `make check` | Full quality gate: format + lint + all tests (incl. extension type-check) + compilation checks (CLI + WASM) |
 | `make clean` | Remove all build artifacts |
 

@@ -16,14 +16,17 @@ const MTHDS_GLOB = /\.mthds$/i;
  *
  * The primary file is placed first; siblings follow sorted by name for
  * deterministic ordering. Each file's `name` is its basename — unique within a
- * single directory and what the API threads onto `blueprint.source` so cross-file
- * diagnostics name the owning file.
+ * single directory — and an item's `location.file` is matched against it and
+ * the file's path, so an item naming a file by its path in the method tree
+ * lands on that file.
  *
- * **Known divergence from CLI resolution:** this gather is flat (one directory).
- * It does NOT follow nested directories, configured/installed libraries, or
- * resolve symlinks the way full bundle resolution might. For the common
- * single-directory bundle it matches `--library-dir`; richer resolution is a
- * follow-up.
+ * **Known divergence from what the API validates:** this gather is flat (one
+ * directory), while the API backend sends the saved file's whole method tree,
+ * which may be rooted at a `METHODS.toml` above the directory and hold bundles
+ * in nested directories. An item naming such a bundle is placed by the
+ * declaration scan, else on the primary. For the common single-directory
+ * bundle the two agree, and the gather matches `--library-dir`; placing items
+ * on the tree's own files is a follow-up.
  */
 export async function gatherBundleFiles(primaryUri: vscode.Uri): Promise<BundleFile[]> {
     const primaryPath = primaryUri.fsPath;

@@ -66,15 +66,8 @@ jobs:
           corepack enable
           cd editors/vscode && yarn install --immutable
 
-      - name: Provision the Python venv with maturin
-        # `make test-all` -> test-pipelex-lib -> pipelex-lib -> env creates
-        # ./.venv via uv but does NOT install maturin (devs have it already).
-        # Pre-create the venv with maturin so `make env` is a no-op and the
-        # `maturin develop` step resolves.
-        run: |
-          uv venv .venv --python 3.13
-          . .venv/bin/activate
-          uv pip install maturin
-
       - name: Run make test-all
+        # No Python setup step: `make test-all` -> test-pipelex-lib ->
+        # pipelex-lib -> env creates ./.venv with the uv installed above, on the
+        # version .python-version names, and installs maturin into it.
         run: make test-all

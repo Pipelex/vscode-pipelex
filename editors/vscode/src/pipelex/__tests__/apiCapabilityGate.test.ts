@@ -30,13 +30,16 @@ const HANDSHAKE = {
         runtime_version: null,
         extensions: ['runs', 'method_id'],
     },
-    /** A bare open-source runner (pipelex-api). */
+    /**
+     * A bare open-source runner (pipelex-api), released with pipelex under one
+     * version number, so its runtime version is its own.
+     */
     bareRunner: {
         protocol_version: '0.1.0',
-        runner_version: '0.12.0',
+        runner_version: '0.90.0',
         implementation: 'pipelex-api',
-        implementation_version: '0.12.0',
-        runtime_version: '0.41.0',
+        implementation_version: '0.90.0',
+        runtime_version: '0.90.0',
     },
     /** The local runtime implementation. */
     local: {
@@ -185,6 +188,20 @@ describe('capability requirement declarations', () => {
     // proxy that the handshake never reports on. A floor here would always be a
     // number from the wrong service. Gate the hosted plane with an `extensions`
     // token instead — see the module docstring.
+    it('holds pipelex-api to the release whose /validate writes problem items', () => {
+        const below = assessCapability(STRUCTURED_VALIDATION_DIAGNOSTICS, {
+            implementation: 'pipelex-api',
+            implementationVersion: '0.89.0',
+            extensions: [],
+        });
+        expect(below).toEqual({ capable: false, reason: 'below-floor', floor: [0, 90, 0] });
+        expect(assessCapability(STRUCTURED_VALIDATION_DIAGNOSTICS, {
+            implementation: 'pipelex-api',
+            implementationVersion: '0.90.0',
+            extensions: [],
+        }).reason).toBe('meets-floor');
+    });
+
     it('holds no pipelex-hosted floor for a capability served behind the platform proxy', () => {
         expect(STRUCTURED_VALIDATION_DIAGNOSTICS.floors).not.toHaveProperty('pipelex-hosted');
     });

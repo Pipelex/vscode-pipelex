@@ -20,8 +20,7 @@ export interface ErrorLocation {
     range: vscode.Range;
     /**
      * The domain the item's pipe lives in, when it is known without guessing:
-     * the domain an item read from the shape problem items replace named;
-     * else the declared domain of the file the item names, when that file
+     * the declared domain of the file the item names, when that file
      * declares `[pipe.<location.pipe>]`; else, when the item names no file,
      * the one domain every file declaring that pipe declares. Undefined
      * otherwise, several domains declaring the code included, and the graph
@@ -45,19 +44,20 @@ interface ItemResolution {
  * A directory-wide validation can surface an item that belongs to a sibling
  * file. Each item is placed on its OWNING file, resolved in priority order:
  *
- * 1. `location.file` — the file at fault (CLI: a real path; API: the
- *    per-content `mthds_sources` name). Matched against the gathered files by
- *    name / path / basename. This is the populated-whenever-possible path.
+ * 1. `location.file` — the file at fault (CLI: a real path; API: its path in
+ *    the method tree, `sub/x.mthds` when the tree is rooted above the saved
+ *    file's directory). Matched against the gathered files by name / path /
+ *    basename / path suffix. This is the populated-whenever-possible path.
  * 2. Declaration scan — for an item naming no file, find the file that
  *    declares the item's `[pipe.<location.pipe>]`, else its
  *    `[concept.<params.concept>]`. Among several declaring files the first
- *    concrete one wins (gather order: primary first), within the domain an
- *    item read from the shape problem items replace names, when it names one.
+ *    concrete one wins (gather order: primary first).
  * 3. Fallback — the saved (primary) file, so an unresolved item is never lost.
  *
- * `files` are the files as they were validated: the contents sent to the API,
- * or the gather made for the request when the CLI read the directory itself.
- * The owner is resolved against them, since the item speaks of that text.
+ * `files` are the files as they were validated: the directory's `.mthds` files
+ * as gathered for the request, which the API's method tree holds and the CLI
+ * read itself. The owner is resolved against them, since the item speaks of
+ * that text.
  *
  * The range is the item's own `location.line` and `location.column` when they
  * mean the owner's text: the owner is the file the item names, or the item
@@ -186,9 +186,8 @@ export function buildBundleDiagnostics(args: {
  * path keeps its own file→pipe→concept ordering (an item may name both a pipe
  * and a concept); the navigation path resolves a single kind.
  *
- * An item read from the shape problem items replace may name its domain. That
- * domain constrains both declaration scans, so of two domains declaring the
- * same code the item lands in its own, and it is its pipe's domain outright.
+ * A problem item names no domain, so neither declaration scan is constrained
+ * by one, and the pipe's domain is only what the files say without ambiguity.
  */
 function resolveItem(
     error: ProblemItem,
@@ -196,12 +195,11 @@ function resolveItem(
     getLines: (file: BundleFile) => string[],
 ): ItemResolution {
     const pipeCode = itemPipe(error);
-    const namedDomain = error.legacy?.domainCode;
-    // The pipe's domain, given what the resolution found: the named domain
-    // first, and nothing for an item that names no pipe.
+    // The pipe's domain, given what the resolution found, and nothing for an
+    // item that names no pipe.
     const withPipeDomain = (owner: ItemResolution['owner'], found?: string): ItemResolution => ({
         owner,
-        pipeDomain: pipeCode === undefined ? undefined : namedDomain ?? found,
+        pipeDomain: pipeCode === undefined ? undefined : found,
     });
 
     const file = error.location?.file;
@@ -218,7 +216,7 @@ function resolveItem(
     }
 
     if (pipeCode) {
-        const match = findDeclaringFileByScan('pipe', pipeCode, files, namedDomain, getLines);
+        const match = findDeclaringFileByScan('pipe', pipeCode, files, undefined, getLines);
         if (match) {
             // The scan settles on one file even when several domains declare
             // the code; its domain is the pipe's only when no other domain does.
@@ -231,7 +229,7 @@ function resolveItem(
 
     const conceptCode = itemConcept(error);
     if (conceptCode) {
-        const match = findDeclaringFileByScan('concept', conceptCode, files, namedDomain, getLines);
+        const match = findDeclaringFileByScan('concept', conceptCode, files, undefined, getLines);
         if (match) {
             return withPipeDomain({ file: match, by: 'concept' });
         }
@@ -248,9 +246,8 @@ function sameLines(a: string[], b: string[]): boolean {
 /**
  * A diagnostic for one item: its detail as the message, and its code as the
  * diagnostic's code, linked to the code's page (its type URI), which says
- * what the code means and what to do about it. An item read from the shape
- * problem items replace has no code: its `error_type` is the diagnostic's
- * code, unlinked, since it is no registry code and has no page.
+ * what the code means and what to do about it. An item whose code could not
+ * be read gets no diagnostic code.
  */
 function makeDiagnostic(
     error: ProblemItem,
@@ -262,8 +259,6 @@ function makeDiagnostic(
     diag.source = source;
     if (error.code) {
         diag.code = { value: error.code, target: vscode.Uri.parse(problemTypeUri(error.code)) };
-    } else if (error.legacy?.errorType) {
-        diag.code = error.legacy.errorType;
     }
     return diag;
 }

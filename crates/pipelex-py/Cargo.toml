@@ -1,7 +1,7 @@
 [package]
 name         = "pipelex-py"
 description  = "Python bindings for Pipelex Tools — MTHDS lint & format as an importable library"
-version      = "0.6.0"
+version      = "0.7.0"
 publish      = false
 rust-version = { workspace = true }
 authors      = { workspace = true }
@@ -21,12 +21,11 @@ pipelex-common = { path = "../pipelex-common", features = ["tools"] }
 
 serde = { workspace = true, features = ["derive"] }
 
-pyo3 = { version = "0.23", features = [
-  "abi3-py38",
-  "extension-module",
-  "generate-import-lib",
-], optional = true }
-pythonize = { version = "0.23", optional = true }
+# No `extension-module` or `generate-import-lib` feature: PyO3 0.29 documents both as
+# deprecated. maturin 1.9.4 and later sets `PYO3_BUILD_EXTENSION_MODULE`, which keeps
+# the extension from linking libpython, and Windows links through `raw-dylib`.
+pyo3      = { version = "0.29", features = ["abi3-py38"], optional = true }
+pythonize = { version = "0.29", optional = true }
 
 [features]
 python = ["dep:pyo3", "dep:pythonize"]

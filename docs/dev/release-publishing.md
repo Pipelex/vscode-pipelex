@@ -87,18 +87,17 @@ Two details this depends on:
 
 The Pipelex Enterprise enforces an actions allowlist. Only GitHub-owned actions (`actions/*`) and explicitly allowed third-party actions can run.
 
-**Allowlist location:** [github.com/enterprises/Pipelex/settings/actions/policies](https://github.com/enterprises/Pipelex/settings/actions/policies) → "Allow enterprise actions, and select non-enterprise actions"
+**Allowlist location:** the `patterns_allowed` list in `enterprise/actions.tf` of the `github-manager` repository. Like every GitHub setting, it changes through a pull request there and never in the enterprise's settings page.
 
-Currently allowed third-party actions (beyond GitHub-owned):
+The third-party actions this repo's workflows use, each allowed by a pattern there:
 
 | Pattern | Action | Why |
 |---------|--------|-----|
 | `Swatinem/rust-cache@*` | Rust build caching | Complex cache key logic, target cleanup |
 | `PyO3/maturin-action@*` | Python wheel builds from Rust | Cross-platform maturin + sccache setup |
 | `pypa/gh-action-pypi-publish@*` | Publish to PyPI via OIDC | Trusted publishing without API tokens |
-| `peaceiris/actions-gh-pages@*` | Deploy to GitHub Pages | Site deployment |
 
-All four are **SHA-pinned** in the workflow files (e.g. `Swatinem/rust-cache@779680da...  # v2.8.2`) so that no one — including the action maintainer — can silently change what code runs. The allowlist uses `@*` wildcards to permit SHA refs. The enterprise setting **"Require actions to be pinned to a full-length commit SHA"** is enabled to enforce this.
+Each is **SHA-pinned** in the workflow files (e.g. `Swatinem/rust-cache@779680da...  # v2.8.2`) so that no one — including the action maintainer — can silently change what code runs. The allowlist uses `@*` wildcards to permit SHA refs. The enterprise setting **"Require actions to be pinned to a full-length commit SHA"** is enabled to enforce this.
 
 Simple actions (`nick-fields/retry`, `lewagon/wait-on-check-action`, `docker/login-action`, `docker/setup-qemu-action`) were replaced with inline shell to avoid unnecessary trust dependencies.
 
@@ -164,6 +163,10 @@ Every `releases.yaml` run on a tag push starts with `wait_for_ci`, which polls f
 The name filter is load-bearing. A release commit collects dozens of check runs — every `ci.yaml` and `releases.yaml` job of every tag — and the endpoint returns them 30 per page, newest first. The Rust check is created early, so it falls off the first page while the later tags are still building, and an unfiltered query reads an empty status until it times out on a commit whose check is green. That is how `@pipelex/tools-wasm` 0.3.0 failed to publish on the v0.17.0 release: the last of the four tag runs polled after the check had left page 1.
 
 A tag's run uses the workflow file at the tagged commit, so a tag cut before the name filter landed keeps the unfiltered query when it is re-run. While `main` still points at the tagged commit, it can be rescued: dispatch `ci.yaml` on `main` (`gh workflow run ci.yaml --ref main`; its `auto_tag` finds every tag already present and creates none), which puts a fresh `Test on Rust stable` check at the top of page 1, then re-run the failed `Releases` run with `gh run rerun <run-id> --failed`.
+
+### The wheel tests run on a pinned Python
+
+Each PyPI publish job waits on its wheel test job (`pypi_publish_plxt` on `pypi_test_plxt`, `pypi_publish_pipelex_lib` on `pypi_test_pipelex_lib`), which installs the built wheels with `pip` on Windows, Linux and macOS. Both packages declare `requires-python = ">=3.8,<3.15"`, so those test jobs pin `actions/setup-python` to the newest Python inside that range, `3.14`, rather than a floating `"3"`. A floating version follows each runner image to the newest CPython it ships: once the hosted runners began offering CPython 3.15.0, `pip` refused both wheels on whichever runners resolved to it, the test jobs failed by runner, and a release tag whose test landed on such a runner would have published nothing to PyPI. When the `<3.15` cap moves in the root `pyproject.toml` and `crates/pipelex-py/pyproject.toml`, move the two `python-version` pins in `releases.yaml` with it. They deliberately do not read `.python-version`, which names the development interpreter, and the wheel builds do not read it either, since `PyO3/maturin-action` and maturin find their own interpreters.
 
 ---
 

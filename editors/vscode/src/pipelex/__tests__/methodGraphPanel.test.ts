@@ -2089,7 +2089,7 @@ describe('MethodGraphPanel', () => {
         panel.dispose();
     });
 
-    it("hands its own analysis's gathered files to the placement, even to the CLI, which is sent none", async () => {
+    it("hands its own analysis's gathered files to the placement, whichever backend validated", async () => {
         const crossFile = await import('../validation/crossFileDiagnostics');
         const uri = makeUri('/project/methods/main.mthds');
         seedBundle(uri);
@@ -2105,10 +2105,34 @@ describe('MethodGraphPanel', () => {
         panel.show(uri);
         await new Promise(r => setTimeout(r, 30));
 
-        expect(backend.analyze.mock.calls[0][0].files).toEqual([]);
         expect(vi.mocked(crossFile.resolveErrorLocations)).toHaveBeenLastCalledWith(
             expect.objectContaining({ files: validated }),
         );
+        panel.dispose();
+    });
+
+    it('anchors its analysis of an ancillary file on the graph primary, but names the opened file as the one validated', async () => {
+        // The API backend checks that the opened file's method tree holds it: a
+        // helper a .gitignore keeps out must not be validated through the main
+        // bundle the graph is anchored on.
+        const helperUri = makeUri('/project/methods/helper.mthds');
+        const bundleUri = makeUri('/project/methods/bundle.mthds');
+        mockState.bundleFiles = [
+            { uri: helperUri, name: 'helper.mthds', content: 'domain = "rec"\n[pipe.helper]\n' },
+            { uri: bundleUri, name: 'bundle.mthds', content: 'domain = "rec"\nmain_pipe = "main"\n[pipe.main]\n' },
+        ];
+        const backend = {
+            kind: 'api',
+            analyze: vi.fn(() => Promise.resolve({ validation: { ok: true, errors: [] } })),
+        } as any;
+
+        const panel = new MethodGraphPanel(mockOutput(), makeExtensionUri(), () => backend);
+        panel.show(helperUri);
+        await new Promise(r => setTimeout(r, 30));
+
+        const request = backend.analyze.mock.calls[0][0];
+        expect(request.primaryUri).toBe(bundleUri);
+        expect(request.savedUri).toBe(helperUri);
         panel.dispose();
     });
 

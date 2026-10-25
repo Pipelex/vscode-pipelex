@@ -106,9 +106,11 @@ describe('BackendFactory — remote-send consent', () => {
         const [message, options, ...buttons] = mockState.showWarningMessage.mock.calls[0];
         expect(message).toContain('api.pipelex.com');
         expect(options.modal).toBe(true);
-        // The whole directory is sent, not just the active file — and where to.
-        expect(options.detail).toContain('every .mthds file');
+        // The whole method tree is sent, not just the active file — what it holds, and where to.
+        expect(options.detail).toContain("the saved file's whole method tree");
         expect(options.detail).toContain('not just the active file');
+        expect(options.detail).toContain('templates and Python modules');
+        expect(options.detail).toContain('METHODS.toml');
         expect(options.detail).toContain('https://api.pipelex.com');
         // The way to keep files local.
         expect(options.detail).toContain('pipelex.backend to cli');
@@ -125,7 +127,19 @@ describe('BackendFactory — remote-send consent', () => {
         expect(await confirm('https://api.pipelex.com')).toBe(true);
         expect(await confirm('https://api.pipelex.com')).toBe(true);
         expect(mockState.showWarningMessage).toHaveBeenCalledTimes(1);
-        expect(context.globalState.update).toHaveBeenCalledWith('pipelex.api.remoteConsent.api.pipelex.com', true);
+        expect(context.globalState.update).toHaveBeenCalledWith('pipelex.api.methodTreeConsent.api.pipelex.com', true);
+    });
+
+    it('asks again a host granted only the earlier send of the directory\'s .mthds files', async () => {
+        // That grant covered less than the method tree now sent, so it does not stand for it.
+        const context = makeContext();
+        await context.globalState.update('pipelex.api.remoteConsent.api.pipelex.com', true);
+        context.globalState.update.mockClear();
+        mockState.showWarningMessage.mockResolvedValueOnce(SEND_TO_API_CHOICE);
+
+        expect(await confirmRemoteOf(makeFactory(context))('https://api.pipelex.com')).toBe(true);
+        expect(mockState.showWarningMessage).toHaveBeenCalledTimes(1);
+        expect(context.globalState.update).toHaveBeenCalledWith('pipelex.api.methodTreeConsent.api.pipelex.com', true);
     });
 
     it('remembers a decline for the session only, so the modal does not return on every save', async () => {

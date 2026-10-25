@@ -28,7 +28,6 @@ vi.mock('vscode', () => {
 
 import * as vscode from 'vscode';
 import { buildBundleDiagnostics, resolveErrorLocations } from '../validation/crossFileDiagnostics';
-import { readProblemItems } from '../validation/problemItems';
 import { problemItemsToIssues } from '../graph/validationStatus';
 import type { BundleFile } from '../validation/backend';
 import type { ProblemItem } from '../validation/types';
@@ -126,7 +125,7 @@ describe('buildBundleDiagnostics — owner resolution', () => {
     });
 
     it('leaves the code unset for an item that carries none', () => {
-        const result = build([{ detail: 'read from the shape problem items replace', location: { file: 'main.mthds' } }]);
+        const result = build([{ detail: 'an item whose code could not be read', location: { file: 'main.mthds' } }]);
         expect(result[0].diagnostics[0].code).toBeUndefined();
     });
 
@@ -316,41 +315,11 @@ function resolveColliding(errors: ProblemItem[]) {
 }
 
 describe('resolveErrorLocations — the domain of a code several domains declare', () => {
-    it('places a source-less legacy item in the domain it names, through the legacy reader', () => {
-        const errors = readProblemItems([
-            { category: 'pipe_factory', message: 'beta process broke', pipe_code: 'process', domain_code: 'beta' },
-        ]);
-        const [loc] = resolveColliding(errors);
-        expect(loc.uri.toString()).toBe(BETA.uri.toString());
-        expect(loc.range.start.line).toBe(1);
-        expect(loc.pipeDomain).toBe('beta');
-    });
-
-    it("scans a legacy item's concept within the domain it names", () => {
-        const errors = readProblemItems([
-            { category: 'pipe_factory', message: 'Shared is wrong in beta', concept_code: 'Shared', domain_code: 'beta' },
-        ]);
-        const [loc] = resolveColliding(errors);
-        expect(loc.uri.toString()).toBe(BETA.uri.toString());
+    it('scans the concept of a file-less item within no domain, landing on the first declaring file', () => {
+        const [loc] = resolveColliding([{ code: 'method.concept_invalid', detail: 'Shared is wrong', params: { concept: 'Shared' } }]);
+        expect(loc.uri.toString()).toBe(ALPHA.uri.toString());
         expect(loc.range.start.line).toBe(3);
         expect(loc.pipeDomain).toBeUndefined();
-    });
-
-    it('lands a legacy item on the Problems panel file of its own domain', () => {
-        const errors = readProblemItems([
-            { category: 'pipe_factory', message: 'beta process broke', pipe_code: 'process', domain_code: 'beta' },
-        ]);
-        const result = buildBundleDiagnostics({ errors, files: [ALPHA, BETA], primaryUri: ALPHA.uri as any, diagnosticSource: 'pipelex' });
-        expect(result.map(entry => entry.uri.toString())).toEqual([BETA.uri.toString()]);
-    });
-
-    it('qualifies the pipe of a legacy item no file declares by the domain it names', () => {
-        const errors = readProblemItems([
-            { category: 'pipe_factory', message: 'nowhere broke', pipe_code: 'nowhere', domain_code: 'beta' },
-        ]);
-        const [loc] = resolveColliding(errors);
-        expect(loc.uri.toString()).toBe(ALPHA.uri.toString());
-        expect(loc.pipeDomain).toBe('beta');
     });
 
     it('gives no pipe domain to a file-less item whose pipe several domains declare', () => {
@@ -385,21 +354,6 @@ describe('resolveErrorLocations — the domain of a code several domains declare
     it('keeps the domain of the file an item names, whoever else declares the pipe', () => {
         const [loc] = resolveColliding([{ code: 'pipe.failed', detail: 'x', location: { pipe: 'process', file: 'beta.mthds' } }]);
         expect(loc.pipeDomain).toBe('beta');
-    });
-});
-
-describe('buildBundleDiagnostics — the code of a legacy item', () => {
-    it("shows a legacy item's error type as its diagnostic code, linked to no page", () => {
-        const errors = readProblemItems([
-            { category: 'pipe_validation', error_type: 'missing_input_variable', message: 'x', source: 'main.mthds' },
-        ]);
-        const diag = build(errors)[0].diagnostics[0];
-        expect(diag.code).toBe('missing_input_variable');
-    });
-
-    it('prefers the registry code when an item has one', () => {
-        const diag = build([{ code: 'method.wiring_invalid', detail: 'x', location: { file: 'main.mthds' }, legacy: { errorType: 'ignored' } }])[0].diagnostics[0];
-        expect((diag.code as any).value).toBe('method.wiring_invalid');
     });
 });
 

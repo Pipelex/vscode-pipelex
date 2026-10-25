@@ -4,11 +4,14 @@ import process from "process";
 import path from "path";
 import glob from "fast-glob";
 import fetch, { Headers, Request, Response } from "node-fetch";
-import loadTaplo from "../../../crates/taplo-wasm/Cargo.toml";
+import {
+  module as taploWasm,
+  init as initTaplo,
+} from "../../../crates/taplo-wasm/Cargo.toml?custom";
 import { convertEnv, Environment, prepareEnv } from "@taplo/core";
 
 (async function main() {
-  const taplo = await loadTaplo();
+  const taplo = await initTaplo({ module: taploWasm });
   taplo.initialize();
 
   const env: Environment = {

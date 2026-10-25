@@ -1,9 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { MethodTreeError } from 'mthds';
 
 // ---------- Hoisted mock state ----------
 const apiState = vi.hoisted(() => ({
-    validate: null as null | ((c: string[], a: boolean, n?: string[]) => Promise<any>),
+    validate: null as null | ((source: any, allow: boolean, options?: { timeoutMs?: number; signal?: AbortSignal }) => Promise<any>),
     version: null as null | (() => Promise<any>),
+    limits: null as null | (() => Promise<any>),
     lastValidateArgs: null as any,
     lastValidateOptions: null as any,
     lastConstructorOptions: null as any,
@@ -15,14 +20,17 @@ vi.mock('vscode', () => ({
 }));
 
 // ---------- @pipelex/sdk mock (classes defined inside the hoisted factory) ----------
+// The method tree itself is NOT mocked: `mthds`'s real lister lists the real
+// directories each test writes, so what the backend hands the client is the tree
+// the standard's membership rule yields.
 vi.mock('@pipelex/sdk', () => {
     // Mirror the real `@pipelex/sdk` constructor signatures (message-first, then the
     // trailing options bag) so the call sites below type-check against the imported
     // real classes, while the backend still reads `.status`/`.serverMessage`/
     // `.statusText`/`.requestId`/`.problemDocument`. Like the real class,
-    // `requestId` comes from `options.problem`, where the client puts the body's
-    // `request_id` or the `X-Request-ID` header, and `problemDocument` is the
-    // decoded body whole.
+    // `requestId` comes from `options.details`, the typed members the client
+    // parsed (the body's `request_id` or the `X-Request-ID` header), and
+    // `problemDocument` is the decoded body whole.
     class ApiResponseError extends Error {
         public requestId: string | undefined;
         public problemDocument: Record<string, unknown> | undefined;
@@ -36,11 +44,11 @@ vi.mock('@pipelex/sdk', () => {
             public serverMessage: string | undefined,
             public validationErrors: any[] | undefined,
             public code: string | undefined,
-            options?: { problem?: { requestId?: string }; problemDocument?: Record<string, unknown> },
+            options?: { details?: { requestId?: string }; problemDocument?: Record<string, unknown> },
         ) {
             super(message);
             this.name = 'ApiResponseError';
-            this.requestId = options?.problem?.requestId;
+            this.requestId = options?.details?.requestId;
             this.problemDocument = options?.problemDocument;
         }
     }
@@ -61,6 +69,24 @@ vi.mock('@pipelex/sdk', () => {
             this.name = 'PipelineRequestError';
         }
     }
+    class RequestArgumentError extends PipelineRequestError {
+        constructor(message: string, _options?: { cause?: unknown }) {
+            super(message);
+            this.name = 'RequestArgumentError';
+        }
+    }
+    class MethodFileTransferError extends PipelineRequestError {
+        public operation: string;
+        public code: string;
+        public status: number | undefined;
+        constructor(message: string, details: { operation: string; code: string; sha256?: string; path?: string; status?: number }) {
+            super(message);
+            this.name = 'MethodFileTransferError';
+            this.operation = details.operation;
+            this.code = details.code;
+            this.status = details.status;
+        }
+    }
     class PipelexApiClient {
         constructor(options: any) {
             apiState.lastConstructorOptions = options;
@@ -71,26 +97,29 @@ vi.mock('@pipelex/sdk', () => {
                 throw new PipelineRequestError(`Invalid API base URL "${options.baseUrl}": must be host-only.`);
             }
         }
-        async validate(
-            contents: string[],
-            allow: boolean,
-            names?: string[],
-            _render?: string[],
-            _views?: string[],
-            options?: { timeoutMs?: number; signal?: AbortSignal },
-        ) {
-            apiState.lastValidateArgs = [contents, allow, names];
+        async validate(source: any, allow: boolean, options?: { timeoutMs?: number; signal?: AbortSignal }) {
+            apiState.lastValidateArgs = [source, allow];
             apiState.lastValidateOptions = options;
-            return apiState.validate!(contents, allow, names);
+            return apiState.validate!(source, allow, options);
+        }
+        async methodTreeLimits() {
+            return apiState.limits ? apiState.limits() : {};
         }
         async version() {
             return apiState.version ? apiState.version() : { protocol_version: '1', implementation_version: '0.4.0' };
         }
     }
-    return { PipelexApiClient, ApiResponseError, ApiUnreachableError, PipelineRequestError };
+    return {
+        PipelexApiClient,
+        ApiResponseError,
+        ApiUnreachableError,
+        PipelineRequestError,
+        RequestArgumentError,
+        MethodFileTransferError,
+    };
 });
 
-import { ApiResponseError, ApiUnreachableError } from '@pipelex/sdk';
+import { ApiResponseError, ApiUnreachableError, MethodFileTransferError, RequestArgumentError } from '@pipelex/sdk';
 import { ApiValidationBackend } from '../validation/apiValidationBackend';
 
 // ---------- Compile-time conformance: lock the mock to the real @pipelex/sdk ----------
@@ -106,20 +135,60 @@ import { ApiValidationBackend } from '../validation/apiValidationBackend';
 import type {
     PipelexApiClient as RealPipelexApiClient,
     PipelexApiClientOptions,
+    PipelexValidateSource,
+    ValidateOptions,
     ApiResponseError as RealApiResponseError,
     ApiUnreachableError as RealApiUnreachableError,
+    MethodFileTransferError as RealMethodFileTransferError,
 } from '@pipelex/sdk';
+import type { MethodTree } from 'mthds';
 // Methods the backend invokes on the client must exist on the real client.
-type _ClientSurface = Pick<RealPipelexApiClient, 'validate' | 'version'>;
+type _ClientSurface = Pick<RealPipelexApiClient, 'validate' | 'methodTreeLimits' | 'version'>;
+// The tree the backend lists is a source `validate` takes, with the options it passes.
+type _TreeSource = { tree: MethodTree } extends PipelexValidateSource ? true : never;
+const _treeSource: _TreeSource = true;
+type _ValidateOptions = Required<Pick<ValidateOptions, 'timeoutMs' | 'signal'>>;
 // Constructor option keys the backend passes must be the real option keys.
 type _ClientOptions = Required<Pick<PipelexApiClientOptions, 'baseUrl' | 'apiKey'>>;
 // Error fields the backend reads off these classes must exist on the real classes.
 type _ResponseErrorFields = Pick<RealApiResponseError, 'status' | 'statusText' | 'serverMessage' | 'requestId' | 'problemDocument'>;
 type _UnreachableErrorFields = Pick<RealApiUnreachableError, 'code'>;
+type _TransferErrorFields = Pick<RealMethodFileTransferError, 'code' | 'status'>;
 
 import { ApiCapabilityGate } from '../validation/apiCapabilityGate';
-import { BackendError } from '../validation/backend';
-import { UNDESCRIBED_ITEM_DETAIL } from '../validation/problemItems';
+import { AnalyzeAbortError, BackendError } from '../validation/backend';
+
+// ---------- Method trees on disk ----------
+const tempDirs: string[] = [];
+
+/** Write `files` (tree path → text) under a fresh directory and return its real path. */
+function writeTree(files: Record<string, string>): string {
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pipelex-api-tree-')));
+    tempDirs.push(dir);
+    for (const [treePath, content] of Object.entries(files)) {
+        const target = path.join(dir, ...treePath.split('/'));
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, content);
+    }
+    return dir;
+}
+
+afterAll(() => {
+    for (const dir of tempDirs) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+function fileUri(fsPath: string) {
+    return { fsPath, toString: () => `file://${fsPath}` } as any;
+}
+
+/** The single-file method most tests validate. */
+const METHOD_DIR = writeTree({ 'a.mthds': 'domain="d"' });
+const SAVED = fileUri(path.join(METHOD_DIR, 'a.mthds'));
+
+/** The tree paths of the tree the client was handed. */
+function sentTreePaths(): string[] {
+    return apiState.lastValidateArgs[0].tree.files.map((file: { path: string }) => file.path);
+}
 
 function mockOutput() {
     return { appendLine: vi.fn() } as any;
@@ -137,12 +206,10 @@ function makeBackend(opts?: { baseUrl?: string; confirmRemote?: () => Promise<bo
     });
 }
 
-const FILES = [{ uri: { fsPath: '/p/a.mthds', toString: () => 'file:///p/a.mthds' } as any, name: 'a.mthds', content: 'domain="d"' }];
-
-function analyze(backend: ApiValidationBackend, withGraph = false) {
+function analyze(backend: ApiValidationBackend, withGraph = false, savedPath = SAVED.fsPath) {
     const controller = new AbortController();
     return backend.analyze(
-        { primaryUri: FILES[0].uri, files: FILES, timeout: 30000 },
+        { primaryUri: fileUri(savedPath), savedUri: fileUri(savedPath), timeout: 30000 },
         { withGraph },
         controller.signal,
     );
@@ -152,31 +219,256 @@ describe('ApiValidationBackend', () => {
     beforeEach(() => {
         apiState.validate = null;
         apiState.version = null;
+        apiState.limits = null;
         apiState.lastValidateArgs = null;
         apiState.lastValidateOptions = null;
         apiState.lastConstructorOptions = null;
     });
 
-    it('returns ok + graph on a valid bundle, and sends mthds_sources', async () => {
+    it('returns ok + graph on a valid tree, sent with allowSignatures', async () => {
         apiState.validate = async () => ({ is_valid: true, graph_spec: { nodes: [], edges: [] } });
         const analysis = await analyze(makeBackend(), true);
         expect(analysis.validation.ok).toBe(true);
         expect(analysis.graph).toEqual({ nodes: [], edges: [] });
-        // contents + allowSignatures=true + parallel sources (file names)
-        expect(apiState.lastValidateArgs).toEqual([['domain="d"'], true, ['a.mthds']]);
+        // The saved file's tree, its only source, and allowSignatures=true.
+        expect(Object.keys(apiState.lastValidateArgs[0])).toEqual(['tree']);
+        expect(apiState.lastValidateArgs[1]).toBe(true);
+        expect(sentTreePaths()).toEqual(['a.mthds']);
     });
 
-    it("hands the client the save's own signal and timeout, so an abandoned request is cancelled", async () => {
-        // Without them the SDK's 20-minute default governs, and a superseded or
-        // timed-out save keeps its request (and the uploaded bundle) in flight.
+    it("sends the saved file's method tree: every file the membership rule keeps, not only the bundles", async () => {
+        const dir = writeTree({
+            'a.mthds': 'domain="d"',
+            'b.mthds': 'domain="d"',
+            'templates/letter.html': '<p>{{ name }}</p>',
+            'funcs/totals.py': 'def totals(): ...',
+            '.env': 'KEY=secret',
+            '.gitignore': 'scratch/\n',
+            'scratch/notes.txt': 'kept home',
+            'node_modules/pkg/index.js': '',
+        });
+        apiState.validate = async () => ({ is_valid: true });
+        await analyze(makeBackend(), false, path.join(dir, 'b.mthds'));
+        expect(sentTreePaths()).toEqual(['a.mthds', 'b.mthds', 'funcs/totals.py', 'templates/letter.html']);
+        // The tree carries what each file's bytes are, read back from disk when sent.
+        const tree = apiState.lastValidateArgs[0].tree;
+        expect(new TextDecoder().decode(await tree.readFile('templates/letter.html'))).toBe('<p>{{ name }}</p>');
+    });
+
+    it('roots the tree at the nearest METHODS.toml above the saved file', async () => {
+        const dir = writeTree({
+            'METHODS.toml': '',
+            'shared/concepts.mthds': 'domain="d"',
+            'methods/a.mthds': 'domain="d"',
+        });
+        apiState.validate = async () => ({ is_valid: true });
+        await analyze(makeBackend(), false, path.join(dir, 'methods', 'a.mthds'));
+        expect(sentTreePaths()).toEqual(['METHODS.toml', 'methods/a.mthds', 'shared/concepts.mthds']);
+    });
+
+    it('lists the tree under the limits the API announces, and sends nothing past one', async () => {
+        const dir = writeTree({ 'a.mthds': 'domain="d"', 'b.mthds': 'domain="d"' });
+        apiState.limits = async () => ({ maxFileCount: 1 });
+        apiState.validate = async () => ({ is_valid: true });
+        const err = await analyze(makeBackend(), false, path.join(dir, 'a.mthds')).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('tree');
+        expect(err.userMessage).toContain(`The method tree rooted at ${dir} is too large for the Pipelex API`);
+        expect(err.userMessage).toContain('.gitignore');
+        expect(apiState.lastValidateArgs).toBeNull();
+    });
+
+    it('does not validate a saved file its own tree keeps out, and sends nothing', async () => {
+        // A verdict on the tree would say nothing about the saved file, which a run
+        // of the method would never send either.
+        const dir = writeTree({ 'a.mthds': 'domain="d"', 'scratch.mthds': 'domain="d"', '.gitignore': 'scratch.mthds\n' });
+        apiState.validate = async () => ({ is_valid: true });
+        const err = await analyze(makeBackend(), false, path.join(dir, 'scratch.mthds')).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('tree');
+        expect(err.userMessage).toContain(`scratch.mthds was not validated: it is not a file of its method tree, rooted at ${dir}`);
+        expect(apiState.lastValidateArgs).toBeNull();
+    });
+
+    it('checks the saved file against its tree, not the graph primary the analysis is anchored on', async () => {
+        // With the method graph showing an ancillary file, the analysis anchors on
+        // the directory's main bundle, which the tree holds. The file saved is a
+        // scratch file a .gitignore keeps out, so it is still refused, and nothing
+        // is sent, as it is with the panel closed.
+        const dir = writeTree({
+            'bundle.mthds': 'domain="d"\nmain_pipe="main"',
+            'scratch.mthds': 'domain="d"',
+            '.gitignore': 'scratch.mthds\n',
+        });
+        apiState.validate = async () => ({ is_valid: true });
+        const err = await makeBackend().analyze(
+            {
+                primaryUri: fileUri(path.join(dir, 'bundle.mthds')),
+                savedUri: fileUri(path.join(dir, 'scratch.mthds')),
+                timeout: 30000,
+            },
+            { withGraph: false },
+            new AbortController().signal,
+        ).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('tree');
+        expect(err.userMessage).toContain(`scratch.mthds was not validated: it is not a file of its method tree, rooted at ${dir}`);
+        expect(apiState.lastValidateArgs).toBeNull();
+    });
+
+    it('refuses a tree the standard refuses, such as one holding a symbolic link, before sending', async () => {
+        const dir = writeTree({ 'a.mthds': 'domain="d"', 'target.txt': 'x' });
+        fs.symlinkSync(path.join(dir, 'target.txt'), path.join(dir, 'link.txt'));
+        apiState.validate = async () => ({ is_valid: true });
+        const err = await analyze(makeBackend(), false, path.join(dir, 'a.mthds')).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('tree');
+        expect(err.userMessage).toMatch(/^The method tree could not be sent for validation: .*link\.txt/);
+        expect(apiState.lastValidateArgs).toBeNull();
+    });
+
+    it('maps a file that changed while the tree was being sent to a tree BackendError', async () => {
+        apiState.validate = async () => {
+            throw new MethodTreeError('not_listable', "'a.mthds' changed since the method tree was listed; list it again.", { names: ['a.mthds'] });
+        };
+        const err = await analyze(makeBackend()).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('tree');
+        expect(err.userMessage).toContain("'a.mthds' changed since the method tree was listed");
+    });
+
+    it('maps a tree the client refuses before sending (RequestArgumentError) to a tree BackendError', async () => {
+        apiState.validate = async () => {
+            throw new RequestArgumentError('validate() cannot send the tree inline: its inline map weighs 300000 bytes, past the limit of 262144 bytes.');
+        };
+        const err = await analyze(makeBackend()).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('tree');
+        expect(err.userMessage).toContain('past the limit of 262144 bytes');
+    });
+
+    it("maps a failed upload of the tree's files by its code, without the signed link", async () => {
+        apiState.validate = async () => {
+            throw new MethodFileTransferError('Uploading a file of the method tree failed: storage answered HTTP 503, so validate was not sent.', {
+                operation: 'upload',
+                code: 'storage_error',
+                status: 503,
+            });
+        };
+        const err = await analyze(makeBackend()).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        expect(err.userMessage).toContain('so validate was not sent');
+        expect(err.logMessage).toContain('(storage_error, HTTP 503)');
+
+        apiState.validate = async () => {
+            throw new MethodFileTransferError('Storage gave no answer to an upload, so validate was not sent.', { operation: 'upload', code: 'unreachable' });
+        };
+        const unreachable = await analyze(makeBackend()).catch(e => e);
+        expect(unreachable.kind).toBe('unreachable');
+    });
+
+    it('stops before listing the tree when the save is superseded during the handshake', async () => {
+        let releaseLimits: (() => void) | undefined;
+        apiState.limits = () => new Promise(resolve => { releaseLimits = () => resolve({}); });
         apiState.validate = async () => ({ is_valid: true });
         const controller = new AbortController();
-        await makeBackend().analyze(
-            { primaryUri: FILES[0].uri, files: FILES, timeout: 12345 },
+        const pending = makeBackend().analyze(
+            { primaryUri: SAVED, savedUri: SAVED, timeout: 30000 },
             { withGraph: false },
             controller.signal,
         );
-        expect(apiState.lastValidateOptions).toEqual({ timeoutMs: 12345, signal: controller.signal });
+        await vi.waitFor(() => expect(releaseLimits).toBeDefined());
+        controller.abort();
+        releaseLimits!();
+        await expect(pending).rejects.toBeInstanceOf(AnalyzeAbortError);
+        // Let the abandoned listing settle: it must not go on to send the tree.
+        await new Promise(resolve => setTimeout(resolve, 20));
+        expect(apiState.lastValidateArgs).toBeNull();
+    });
+
+    it("gives the request the time left of the save's one timeout, not a fresh one", async () => {
+        // Without a timeout the SDK's 20-minute default governs; with a fresh one, a
+        // slow handshake would let the request run past the save's own timeout.
+        let now = 1_000_000;
+        const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+        try {
+            // The handshake takes four seconds of the save's twelve.
+            apiState.limits = async () => {
+                now += 4000;
+                return {};
+            };
+            apiState.validate = async () => ({ is_valid: true });
+            await makeBackend().analyze(
+                { primaryUri: SAVED, savedUri: SAVED, timeout: 12000 },
+                { withGraph: false },
+                new AbortController().signal,
+            );
+            expect(apiState.lastValidateOptions.timeoutMs).toBe(8000);
+            expect(apiState.lastValidateOptions.signal).toBeInstanceOf(AbortSignal);
+        } finally {
+            clock.mockRestore();
+        }
+    });
+
+    it('cancels the uploads and the request of a save superseded while they run', async () => {
+        // The client holds a signal the save's own abort reaches, so a superseded
+        // save does not keep uploading the method's files.
+        apiState.validate = (_source, _allow, options) => new Promise((_resolve, reject) => {
+            options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), { once: true });
+        });
+        const controller = new AbortController();
+        const pending = makeBackend().analyze(
+            { primaryUri: SAVED, savedUri: SAVED, timeout: 30000 },
+            { withGraph: false },
+            controller.signal,
+        );
+        await vi.waitFor(() => expect(apiState.lastValidateOptions).not.toBeNull());
+        const sent: AbortSignal = apiState.lastValidateOptions.signal;
+        expect(sent.aborted).toBe(false);
+        controller.abort();
+        await expect(pending).rejects.toBeInstanceOf(AnalyzeAbortError);
+        expect(sent.aborted).toBe(true);
+    });
+
+    it('stops at the handshake when the timeout runs out during it, and never sends the tree', async () => {
+        // The handshake takes no signal, so it answers after the save was told it
+        // failed: the validation must stop there rather than send the tree under a
+        // fresh timeout.
+        let releaseLimits: (() => void) | undefined;
+        apiState.limits = () => new Promise(resolve => { releaseLimits = () => resolve({}); });
+        apiState.validate = async () => ({ is_valid: true });
+        const controller = new AbortController();
+        const err = await makeBackend().analyze(
+            { primaryUri: SAVED, savedUri: SAVED, timeout: 30 },
+            { withGraph: false },
+            controller.signal,
+        ).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('unreachable');
+        expect(err.logMessage).toBe('Pipelex API request timed out after 30ms');
+        releaseLimits!();
+        // Let the late handshake settle, with time enough to list the tree: it must
+        // not go on to list and send it.
+        await new Promise(resolve => setTimeout(resolve, 250));
+        expect(apiState.lastValidateArgs).toBeNull();
+        expect(controller.signal.aborted).toBe(false);
+    });
+
+    it('cancels the uploads still running when the timeout runs out', async () => {
+        apiState.validate = (_source, _allow, options) => new Promise((_resolve, reject) => {
+            options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), { once: true });
+        });
+        const err = await makeBackend().analyze(
+            { primaryUri: SAVED, savedUri: SAVED, timeout: 50 },
+            { withGraph: false },
+            new AbortController().signal,
+        ).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('unreachable');
+        // The uploads see an aborted signal, so none keeps running after the save
+        // was told it failed.
+        expect(apiState.lastValidateOptions.signal.aborted).toBe(true);
     });
 
     it('passes the resolved token to the client constructor (SecretStorage precedence)', async () => {
@@ -219,7 +511,11 @@ describe('ApiValidationBackend', () => {
         expect(analysis.validation.warnings).toEqual([warning]);
     });
 
-    it('reads the verdict of a runner that still writes validation_errors, as the hosted plane does', async () => {
+    it('reads no fault from a runner that still writes validation_errors, and names the release that writes problem items', async () => {
+        // A runner older than pipelex-api 0.90.0 lists its faults in the shape
+        // problem items replaced, which is not read: its invalid verdict carries
+        // no readable item, so it is the contract violation below, never a verdict
+        // with zero diagnostics.
         apiState.validate = async () => ({
             is_valid: false,
             validation_errors: [{ category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...', pipe_code: 'main', domain_code: 'd', source: 'a.mthds' }],
@@ -227,34 +523,28 @@ describe('ApiValidationBackend', () => {
             is_runnable: false,
             message: 'MTHDS validation found errors',
         });
-        const analysis = await analyze(makeBackend());
-        expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toEqual([
-            {
-                detail: 'Dry run failed: ...',
-                location: { pipe: 'main', file: 'a.mthds' },
-                legacy: { domainCode: 'd', errorType: 'DryRunError' },
-            },
-        ]);
+        const err = await analyze(makeBackend()).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        expect(err.logMessage).toMatch(/no readable errors/);
+        expect(err.userMessage).toContain('pipelex-api 0.90.0');
+        expect(err.userMessage).toContain('upgrade the server');
+        expect(err.userMessage).toContain('`pipelex.backend`');
     });
 
-    it('keeps a verdict item of the shape problem items replace whose message is empty', async () => {
-        // That shape allows an empty message; its fault is still the verdict's,
-        // so it must not read as an invalid verdict with no item.
+    it('points a hosted-API user whose runner writes validation_errors at the cli backend, not at an upgrade', async () => {
         apiState.validate = async () => ({
             is_valid: false,
-            validation_errors: [
-                { category: 'dry_run', error_type: 'DryRunError', message: '', pipe_code: 'main', source: 'a.mthds' },
-                { category: 'pipe_validation', pipe_code: 'other' },
-            ],
+            validation_errors: [{ category: 'dry_run', message: 'Dry run failed: ...', pipe_code: 'main' }],
             is_runnable: false,
         });
-        const analysis = await analyze(makeBackend());
-        expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toEqual([
-            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'main', file: 'a.mthds' }, legacy: { errorType: 'DryRunError' } },
-            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'other' } },
-        ]);
+        const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        expect(err.userMessage).toContain('hosted Pipelex API');
+        expect(err.userMessage).toContain('pipelex-api 0.90.0');
+        expect(err.userMessage).not.toContain('upgrade the server');
+        expect(err.userMessage).toContain('`pipelex.backend`');
     });
 
     it('treats is_valid:false with an empty errors list as an api-error BackendError (contract violation)', async () => {
@@ -302,8 +592,8 @@ describe('ApiValidationBackend', () => {
 
     it('maps a request-shape 422 (no verdict) to an api-error BackendError', async () => {
         // `/validate` never 422s a content verdict now — a 422 is a request-shape
-        // problem (e.g. mthds_sources length mismatch), surfaced as api-error.
-        apiState.validate = async () => { throw new ApiResponseError('mthds_sources length must match mthds_contents', 'http://localhost:8081', 422, 'Unprocessable Entity', '', 'ValidationError', 'mthds_sources length must match mthds_contents', undefined, undefined); };
+        // problem (e.g. a `files` key that is not a tree path), surfaced as api-error.
+        apiState.validate = async () => { throw new ApiResponseError("files key 'a\\b.mthds' is not a tree path", 'http://localhost:8081', 422, 'Unprocessable Entity', '', 'ValidationError', "files key 'a\\b.mthds' is not a tree path", undefined, undefined); };
         const err = await analyze(makeBackend()).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('api-error');
@@ -386,11 +676,11 @@ describe('ApiValidationBackend', () => {
     it('shows the next step of the problem document a no-verdict answer carries', async () => {
         apiState.validate = async () => {
             throw new ApiResponseError(
-                "The request's field 'mthds_sources' does not match the route's schema.",
+                "The request's field 'files' does not match the route's schema.",
                 'http://localhost:8081', 422, 'Unprocessable Entity', '', undefined,
-                "The request's field 'mthds_sources' does not match the route's schema.", undefined, 'request.invalid',
+                "The request's field 'files' does not match the route's schema.", undefined, 'request.invalid',
                 {
-                    problem: { requestId: 'req_9' },
+                    details: { requestId: 'req_9' },
                     problemDocument: {
                         type: 'https://mthds.ai/errors/request.invalid',
                         title: "The request does not match the route's schema",
@@ -398,8 +688,8 @@ describe('ApiValidationBackend', () => {
                         code: 'request.invalid',
                         domain: 'input',
                         retry: 'no',
-                        detail: "The request's field 'mthds_sources' does not match the route's schema.",
-                        next_step: { kind: 'change_input', detail: "Correct the field 'mthds_sources' as the route's schema requires, then send the request again." },
+                        detail: "The request's field 'files' does not match the route's schema.",
+                        next_step: { kind: 'change_input', detail: "Correct the field 'files' as the route's schema requires, then send the request again." },
                         request_id: 'req_9',
                     },
                 },
@@ -409,19 +699,19 @@ describe('ApiValidationBackend', () => {
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('api-error');
         expect(err.userMessage).toBe(
-            "Pipelex API error at http://localhost:8081 (HTTP 422): The request's field 'mthds_sources' does not match the route's schema. " +
-            "Next step: Correct the field 'mthds_sources' as the route's schema requires, then send the request again.",
+            "Pipelex API error at http://localhost:8081 (HTTP 422): The request's field 'files' does not match the route's schema. " +
+            "Next step: Correct the field 'files' as the route's schema requires, then send the request again.",
         );
         // The code and the request id are for the log.
         expect(err.logMessage).toBe(
-            "Pipelex API 422 at http://localhost:8081: The request's field 'mthds_sources' does not match the route's schema. " +
+            "Pipelex API 422 at http://localhost:8081: The request's field 'files' does not match the route's schema. " +
             '(code request.invalid, request req_9)',
         );
     });
 
     it("logs the server's request id with an API error, for support", async () => {
         apiState.validate = async () => {
-            throw new ApiResponseError('internal error', 'https://api.pipelex.com', 500, 'Internal Server Error', '', undefined, 'internal error', undefined, undefined, { problem: { requestId: 'req_7f3a' } });
+            throw new ApiResponseError('internal error', 'https://api.pipelex.com', 500, 'Internal Server Error', '', undefined, 'internal error', undefined, undefined, { details: { requestId: 'req_7f3a' } });
         };
         const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);

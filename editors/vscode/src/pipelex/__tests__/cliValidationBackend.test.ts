@@ -23,7 +23,6 @@ vi.mock('../validation/agentCliVersion', async (importOriginal) => {
 
 import { CliValidationBackend } from '../validation/cliValidationBackend';
 import { BackendError } from '../validation/backend';
-import { UNDESCRIBED_ITEM_DETAIL } from '../validation/problemItems';
 
 const PRIMARY = { fsPath: '/project/methods/main.mthds', toString: () => 'file:///project/methods/main.mthds' } as any;
 
@@ -31,7 +30,7 @@ function analyze(withGraph = false) {
     const backend = new CliValidationBackend();
     const controller = new AbortController();
     return backend.analyze(
-        { primaryUri: PRIMARY, files: [], cwd: '/project', timeout: 30000 },
+        { primaryUri: PRIMARY, savedUri: PRIMARY, cwd: '/project', timeout: 30000 },
         { withGraph, direction: 'top_down' },
         controller.signal,
     );
@@ -75,19 +74,18 @@ describe('CliValidationBackend', () => {
     });
 
     it('reads the advisory warnings of a valid verdict from stdout', async () => {
+        const warning = {
+            code: 'method.hint_invalid',
+            detail: "The hint 'intent' of input 'notes' is unknown.",
+            location: { pipe: 'main', field: 'inputs', file: '/project/methods/main.mthds' },
+        };
         cliState.spawnResolve = {
-            stdout: JSON.stringify({
-                success: true,
-                is_valid: true,
-                warnings: [{ category: 'hint_lint', error_type: 'hint_unknown_key', message: 'Unknown hint key.', pipe_code: 'main', source: '/project/methods/main.mthds' }],
-            }),
+            stdout: JSON.stringify({ success: true, is_valid: true, warnings: [warning] }),
             stderr: '',
         };
         const analysis = await analyze(false);
         expect(analysis.validation.ok).toBe(true);
-        expect(analysis.validation.warnings).toEqual([
-            { detail: 'Unknown hint key.', location: { pipe: 'main', file: '/project/methods/main.mthds' }, legacy: { errorType: 'hint_unknown_key' } },
-        ]);
+        expect(analysis.validation.warnings).toEqual([warning]);
     });
 
     it('reads no warnings from a stdout that holds none', async () => {
@@ -147,18 +145,6 @@ describe('CliValidationBackend', () => {
         expect(analysis.validation.warnings).toEqual([warning]);
     });
 
-    it('keeps a verdict item of the shape problem items replace whose message is empty', async () => {
-        cliState.spawnReject = {
-            exitCode: 1,
-            stderr: JSON.stringify({ error: true, error_type: 'ValidateBundleError', message: 'invalid', validation_errors: [{ category: 'pipe_validation', error_type: 'missing_input', message: '', pipe_code: 'x' }] }),
-        };
-        const analysis = await analyze();
-        expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toEqual([
-            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'x' }, legacy: { errorType: 'missing_input' } },
-        ]);
-    });
-
     it('reads an invalid verdict whose items cannot be read as its own code and detail, not as a failure to validate', async () => {
         cliState.spawnReject = {
             exitCode: 1,
@@ -178,24 +164,22 @@ describe('CliValidationBackend', () => {
         expect(analysis.graph).toBeNull();
     });
 
-    it('reads the verdict a CLI older than the problem document writes as validation_errors', async () => {
-        cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'ValidateBundleError', message: 'invalid', validation_errors: [{ category: 'pipe_validation', message: 'bad pipe', pipe_code: 'x' }] }) };
-        const analysis = await analyze();
-        expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toEqual([{ detail: 'bad pipe', location: { pipe: 'x' } }]);
-    });
-
-    it('treats an exit-1 envelope of the shape problems replace with no item as infra, not a fabricated diagnostic', async () => {
-        // With the structured-info invariant total, the real CLI never writes an empty
-        // list for a content verdict. If one that predates problems somehow does, it
-        // has no problem of its own to show, so surface it as infra rather than
-        // synthesizing a stand-in item.
-        cliState.version = [0, 34, 0];
-        cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'MthdsParserError', error_domain: 'input', message: 'Missing required fields', validation_errors: [] }) };
-        const err = await analyze().catch(e => e);
-        expect(err).toBeInstanceOf(BackendError);
-        expect(err.kind).toBe('infra');
-        expect(err.userMessage).toBeUndefined();
+    it('reads no verdict from the envelope problems replaced, whatever its validation_errors hold', async () => {
+        // The floor stops a CLI that writes this envelope before it runs; one whose
+        // version cannot be probed still gets here. Its items are not read, and it
+        // has no problem of its own to show, so it surfaces as infra rather than
+        // as a verdict or a synthesized stand-in item.
+        for (const envelope of [
+            { error: true, error_type: 'ValidateBundleError', message: 'invalid', validation_errors: [{ category: 'pipe_validation', message: 'bad pipe', pipe_code: 'x' }] },
+            { error: true, error_type: 'MthdsParserError', error_domain: 'input', message: 'Missing required fields', validation_errors: [] },
+            { error: true, error_type: 'PipelexSetupError', error_domain: 'config', message: 'setup needed', validation_errors: [] },
+        ]) {
+            cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify(envelope) };
+            const err = await analyze().catch(e => e);
+            expect(err).toBeInstanceOf(BackendError);
+            expect(err.kind).toBe('infra');
+            expect(err.userMessage).toBeUndefined();
+        }
     });
 
     it("shows a problem that produced no verdict with its detail and next step", async () => {
@@ -255,15 +239,6 @@ describe('CliValidationBackend', () => {
         );
     });
 
-    it('surfaces a failure of the envelope problems replace (no list) as a silent infra BackendError', async () => {
-        cliState.version = [0, 34, 0];
-        cliState.spawnReject = { exitCode: 1, stderr: JSON.stringify({ error: true, error_type: 'PipelexSetupError', error_domain: 'config', message: 'setup needed', validation_errors: [] }) };
-        const err = await analyze().catch(e => e);
-        expect(err).toBeInstanceOf(BackendError);
-        expect(err.kind).toBe('infra');
-        expect(err.userMessage).toBeUndefined();
-    });
-
     it('detects an outdated CLI that argparse-errors on an unknown flag', async () => {
         cliState.version = [0, 30, 0];
         cliState.spawnReject = { exitCode: 1, stderr: 'usage: pipelex-agent ... unrecognized arguments: --allow-signatures' };
@@ -274,16 +249,26 @@ describe('CliValidationBackend', () => {
     });
 
     it('rejects a CLI below the floor up front, even when it would validate cleanly', async () => {
-        // A CLI in [0.31.0, 0.34.0) supports --allow-signatures/--view/--format json,
-        // so it exits 0 — but emits source-less errors. The floor must be enforced
+        // A CLI older than 0.90.0 supports --allow-signatures/--view/--format json,
+        // so it exits 0 on a valid method — but reports an invalid one as the
+        // validation_errors envelope, which is not read. The floor must be enforced
         // before we trust its output, not only on a spawn failure.
-        cliState.version = [0, 32, 0];
+        cliState.version = [0, 89, 0];
         cliState.spawnResolve = { stdout: JSON.stringify({ graphspec: { nodes: [], edges: [] } }), stderr: '' };
         const err = await analyze(true).catch(e => e);
         expect(err).toBeInstanceOf(BackendError);
         expect(err.kind).toBe('too-old');
-        expect(err.installedVersion).toBe('0.32.0');
+        expect(err.installedVersion).toBe('0.89.0');
+        expect(err.minVersion).toBe('0.90.0');
         const processUtils = await import('../validation/processUtils');
         expect(vi.mocked(processUtils.spawnCli)).not.toHaveBeenCalled();
+    });
+
+    it('runs a CLI at the floor, the first release that writes problem items', async () => {
+        cliState.version = [0, 90, 0];
+        const analysis = await analyze(false);
+        expect(analysis.validation.ok).toBe(true);
+        const processUtils = await import('../validation/processUtils');
+        expect(vi.mocked(processUtils.spawnCli)).toHaveBeenCalledTimes(1);
     });
 });

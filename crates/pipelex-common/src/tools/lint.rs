@@ -140,7 +140,7 @@ pub async fn lint_mthds_with_env<E: Environment>(
 /// thread that is already driving a Tokio runtime panics ("Cannot start a
 /// runtime from within a runtime"). This is sound for the only caller — the
 /// PyO3 wrapper (`pipelex-py`'s `python.rs`), invoked via
-/// `Python::allow_threads` from plain Python/OS threads (e.g. a FastAPI
+/// `Python::detach` from plain Python/OS threads (e.g. a FastAPI
 /// threadpool) that have no ambient runtime. We can't simply offload the
 /// `block_on` to a worker thread: `Schemas::validate_root` borrows the
 /// `dom::Node` across its `.await` for error-position mapping, and the DOM is
