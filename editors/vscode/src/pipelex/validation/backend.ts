@@ -22,8 +22,10 @@ export interface BundleFile {
     /** On-disk URI — where diagnostics for errors owned by this file are placed. */
     uri: vscode.Uri;
     /**
-     * The name sent to the backend (API `mthds_sources[]` entry) and matched against
-     * an item's `location.file`. Stable across backends so cross-file mapping is uniform.
+     * The file's basename, matched against an item's `location.file` with its
+     * on-disk path (`matchSourceFile`): the API names a file by its path in the
+     * method tree, and the CLI by its path. Stable across backends so cross-file
+     * mapping is uniform.
      */
     name: string;
     /** File text. v1 reads from disk (CLI `--library-dir` parity). */
@@ -31,10 +33,19 @@ export interface BundleFile {
 }
 
 export interface BundleRequest {
-    /** The saved/active file the analysis is anchored on (errors with no owner land here). */
+    /**
+     * The file the analysis is anchored on (errors with no owner land here): the
+     * saved or opened file, or, when the method graph panel shows an ancillary
+     * file, the graph primary that declares the directory's `main_pipe`.
+     */
     primaryUri: vscode.Uri;
-    /** Every `.mthds` file in the primary's directory, including the primary itself. */
-    files: BundleFile[];
+    /**
+     * The file that was saved, or opened in the method graph panel, which is not
+     * `primaryUri` when that is the graph primary. The API backend validates this
+     * file's method tree and refuses one that does not hold it, since a verdict on
+     * the tree would say nothing about the file.
+     */
+    savedUri: vscode.Uri;
     /** Working directory for the CLI spawn (the owning workspace folder). */
     cwd?: string;
     /** Per-call timeout in milliseconds. */
@@ -95,8 +106,9 @@ export interface GraphAnalysisSink {
      * analysis anchored on (the graph primary — a sibling when `uri` is a
      * helper). Errors that resolve to no owning file fall back to the primary,
      * matching where the Problems panel places them. `validatedFiles` are the
-     * bundle's files as the request carried them (or, for the CLI, as they
-     * were gathered for it): the text the verdict's items speak of.
+     * bundle's `.mthds` files as they were gathered for the request, which the
+     * API's method tree holds and the CLI read itself: the text the verdict's
+     * items speak of.
      */
     applyAnalysis(
         uri: vscode.Uri,
@@ -134,6 +146,13 @@ export type BackendErrorKind =
     | 'auth'
     /** No API key is available for a hosted Pipelex API, which always requires one. Nothing was sent. */
     | 'no-key'
+    /**
+     * The saved file's method tree could not be sent to the API: the lister refused it (a
+     * symbolic link or a special file in it, past the API's limits, no file at all), the
+     * saved file is not one of its files, or a file changed while it was being sent.
+     * Nothing was validated.
+     */
+    | 'tree'
     /** The backend ran but failed for an infrastructural reason (setup error, spawn failure, unparseable output). */
     | 'infra'
     /** The user declined to send bundle contents to a remote API. */

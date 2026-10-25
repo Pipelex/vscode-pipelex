@@ -20,6 +20,13 @@ export const DEFAULT_API_BASE_URL = 'https://api.pipelex.com';
 export const SEND_TO_API_CHOICE = 'Send to API';
 
 /**
+ * Where a host's remote-send grant is remembered, followed by the host. It names
+ * what was granted, the method tree, so the grant given to the earlier, narrower
+ * send (under `pipelex.api.remoteConsent.<host>`) does not stand for this one.
+ */
+export const REMOTE_CONSENT_KEY_PREFIX = 'pipelex.api.methodTreeConsent.';
+
+/**
  * Builds the configured {@link ValidationBackend} for a document.
  *
  * Settings are read per call (resource scope) so a `pipelex.backend` /
@@ -64,19 +71,22 @@ export class BackendFactory {
     }
 
     /**
-     * Per-host confirmation before bundle contents leave the machine, fired before
-     * the first remote request. The prompt states that the WHOLE directory's
-     * `.mthds` contents are sent, not just the active file.
+     * Per-host confirmation before a method's files leave the machine, fired before
+     * the first remote request. The prompt states that the saved file's WHOLE
+     * method tree is sent, every file of it and not just the active file, and that
+     * the API may keep the files it receives.
      *
      * The API backend is the default, so this reaches users who never chose it:
      * the wording says what validation does rather than assuming they picked a
      * backend, and names the way to keep files local. A grant is remembered per
-     * host across sessions. A decline is remembered for the session only, so a
-     * modal does not return on every save, while a reload asks again.
+     * host across sessions, under a key naming what was granted, so a grant given
+     * to the narrower send that preceded the method tree (the directory's `.mthds`
+     * files alone) is asked again once. A decline is remembered for the session
+     * only, so a modal does not return on every save, while a reload asks again.
      */
     private async confirmRemote(baseUrl: string): Promise<boolean> {
         const host = hostOf(baseUrl);
-        const key = `pipelex.api.remoteConsent.${host}`;
+        const key = `${REMOTE_CONSENT_KEY_PREFIX}${host}`;
         if (this.context.globalState.get<boolean>(key)) {
             return true;
         }
@@ -84,14 +94,17 @@ export class BackendFactory {
             return false;
         }
         const choice = await vscode.window.showWarningMessage(
-            `Validate your .mthds files on the Pipelex API at ${host}?`,
+            `Validate your methods on the Pipelex API at ${host}?`,
             {
                 modal: true,
                 detail:
-                    `On each save, the extension sends the contents of every .mthds file in the saved file's ` +
-                    `directory, not just the active file, to ${baseUrl} for validation. ` +
-                    `To keep your files on this machine, cancel and set pipelex.backend to cli, which validates ` +
-                    `with a local pipelex-agent.`,
+                    `On each save, the extension sends the saved file's whole method tree to ${baseUrl} for ` +
+                    `validation, not just the active file: every file under the method's root (the nearest ` +
+                    `directory holding METHODS.toml, else the saved file's directory), such as its other .mthds ` +
+                    `files, templates and Python modules, except files and directories whose names start with a ` +
+                    `dot and what a .gitignore inside the tree or the manifest's exclude keeps out. The API may ` +
+                    `keep the files it receives in your organization's storage. To keep your files on this ` +
+                    `machine, cancel and set pipelex.backend to cli, which validates with a local pipelex-agent.`,
             },
             SEND_TO_API_CHOICE,
         );

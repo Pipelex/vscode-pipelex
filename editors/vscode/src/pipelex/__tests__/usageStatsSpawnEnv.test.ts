@@ -107,8 +107,9 @@ describe('every process the extension starts runs with usage statistics off', ()
 
     it('the CLI validation backend, which the validator on save and the graph panel both call', async () => {
         const backend = new CliValidationBackend();
+        const main = { fsPath: '/project/main.mthds', toString: () => 'file:///project/main.mthds' } as any;
         await backend.analyze(
-            { primaryUri: { fsPath: '/project/main.mthds', toString: () => 'file:///project/main.mthds' } as any, files: [], cwd: '/project', timeout: 1000 },
+            { primaryUri: main, savedUri: main, cwd: '/project', timeout: 1000 },
             { withGraph: false },
             new AbortController().signal,
         );

@@ -180,7 +180,7 @@ export function describeBackendErrorIssue(err: unknown): GraphValidationIssue {
                 break;
             case 'declined':
                 message =
-                    'Sending your .mthds files to the Pipelex API was declined, so validation is off until you ' +
+                    "Sending your method's files to the Pipelex API was declined, so validation is off until you " +
                     'reload the window and are asked again. To validate locally instead, set pipelex.backend to cli.';
                 break;
             default:

@@ -56,7 +56,7 @@ The extension looks for a settings file at **`.pipelex/plxt.toml`** (preferred) 
 
 ### Method validation
 
-On every save, the extension validates your method on the hosted Pipelex API at `https://api.pipelex.com`, and reports the errors in the Problems panel and in the method graph. There is nothing to install and no setting to change: an API key is the only setup step (see Installation below). Before the first validation, the extension asks once for your consent to send the `.mthds` files in the saved file's directory.
+On every save, the extension validates your method on the hosted Pipelex API at `https://api.pipelex.com`, and reports the errors in the Problems panel and in the method graph. There is nothing to install and no setting to change: an API key is the only setup step (see Installation below). What it sends is the saved file's method tree, the files a run of the method would send: every file under the nearest directory holding a `METHODS.toml`, or else under the saved file's directory, such as the method's `.mthds` files, templates and Python modules, minus what the MTHDS membership rule keeps out, which includes every name starting with a dot and what a `.gitignore` inside the tree names. Before the first validation, the extension asks once for your consent to send it.
 
 - **Use your own server:** point `pipelex.api.baseUrl` at a self-hosted Pipelex API server, such as `http://localhost:8081`. The server is the [`api/` member of the pipelex repository](https://github.com/Pipelex/pipelex/tree/main/api), published as the `pipelex/pipelex-api` Docker image.
 - **Validate locally:** set `pipelex.backend` to `cli` to validate with a local `pipelex-agent`, so nothing leaves your machine.

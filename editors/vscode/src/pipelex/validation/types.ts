@@ -61,9 +61,9 @@ export interface ProblemLocation {
     /** The field at fault: a field name or a dotted path. */
     field?: string;
     /**
-     * The file at fault: the per-content name the API was sent in
-     * `mthds_sources`, or the path `pipelex-agent` read. The owning file for
-     * cross-file diagnostics.
+     * The file at fault: its path in the method tree the API was sent, or
+     * the path `pipelex-agent` read. The owning file for cross-file
+     * diagnostics.
      */
     file?: string;
     /** The line within `file`, 1-based. */
