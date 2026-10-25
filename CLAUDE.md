@@ -2,7 +2,7 @@
 
 ## Project Overview
 Fork of [tamasfe/taplo](https://github.com/tamasfe/taplo) (TOML toolkit) extended with MTHDS (the language for AI methods) support.
-Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packages + VitePress docs site.
+Polyglot monorepo: Rust workspace + TypeScript VS Code extension + JS npm packages.
 Publishes two PyPI packages from separate `pyproject.toml` files:
 - `pipelex-tools`: native `plxt` CLI, published from the repo-root `pyproject.toml`
 - `pipelex-tools-py`: importable Python library (`import pipelex_tools`), published from `crates/pipelex-py/pyproject.toml`
@@ -29,7 +29,6 @@ Publishes two PyPI packages from separate `pyproject.toml` files:
 - `editors/vscode/src/pipelex/` - MTHDS-specific extension code
 - `editors/vscode/src/syntax/mthds/` - MTHDS grammar generator (generates mthds.tmLanguage.json)
 - `js/` - npm packages (@taplo/core, @taplo/cli, @taplo/lib, @taplo/lsp)
-- `site/` - Documentation site (VitePress + Tailwind)
 - `test-data/` - Test fixtures for TOML/MTHDS parsing
 - `test-data/mthds/` - MTHDS grammar test fixtures
 - `test-data/mthds-corpus/` - vendored copy of the MTHDS Test Corpus, owned by `pipelex` and synced by the workspace's `mthds-corpus-sync` skill. **Never edit it here** — fix the entry upstream and re-sync. Deliberately outside `test-data/mthds/`, which the wasm suite snapshot-pins
@@ -56,7 +55,7 @@ Publishes two PyPI packages from separate `pyproject.toml` files:
 - `cd editors/vscode && yarn test` - Run semantic token provider tests (vitest)
 
 ## Key Technical Details
-- **Rust MSRV**: 1.74 (CI tests against this)
+- **Rust MSRV**: 1.88, declared once as the workspace `rust-version` (`ci.yaml`'s MSRV jobs check every workspace crate against it)
 - **Rust toolchain**: `rust-toolchain.toml` pins the release used locally and by every workflow, so never add `rustup update` to a workflow; the weekly `rust-canary.yml` runs `make check` on the latest stable, and a red canary means moving the pin in its own PR. Select another toolchain with `RUSTUP_TOOLCHAIN`, never `rustup default`, which the file outranks (`docs/dev/ci-and-branch-protection.md#the-rust-toolchain`).
 - **VS Code engine**: ^1.90.0
 - **Package manager**: Yarn 4 (via corepack)
@@ -127,8 +126,8 @@ When modifying graph rendering, always consult `../pipelex/pipelex/graph/graphsp
   - `check.yml` → runs `make check` (fmt + clippy + crate/extension tests + locked compile checks, incl. both WASM crates)
   - `test-all.yml` → runs `make test-all` (every fast suite + the Python library smoke test)
   - Both trigger on PRs into `main`+`dev` and are the **required status checks** named by the `dev` and `main` rulesets — pinned to the GitHub Actions app, non-strict on `dev`, **strict on `main`** (a release PR must be up to date with `main`). Both rulesets require a PR with **0 approvals**, require thread resolution, and block force-push/deletion; `pipelex-staff` bypasses them (that's how the post-release `main`→`dev` push lands). `release/v*` blocks force-push only. The workflows' `branches:` filter must track the ruleset'd branches. **The check names live only in the ruleset** — the workspace policy carries every other field but reads these off GitHub, so renaming a gate job means renaming the required check in the same move. See `docs/dev/ci-and-branch-protection.md`.
-- `ci.yaml` — what the make gates don't cover: release auto-tagging (push to `main`), the e2e `pipelex-tools-py` wheel build/install, `toml-test` conformance, and MSRV (1.74) builds. Triggers on push/PR to `main` **only** (gates the `dev`→`main` boundary, not every feature PR). Not required checks.
+- `ci.yaml` — what the make gates don't cover: release auto-tagging (push to `main`), the e2e `pipelex-tools-py` wheel build/install, `toml-test` conformance, and MSRV (1.88) builds. Triggers on push/PR to `main` **only** (gates the `dev`→`main` boundary, not every feature PR). Not required checks.
 - Releases: `releases.yaml` — PyPI, VS Code Marketplace, Open VSX
 - Auto-tagging via inline shell in `ci.yaml`
-- **Enterprise allowlist:** Pipelex Enterprise restricts third-party actions. Only 4 are allowed (`Swatinem/rust-cache`, `PyO3/maturin-action`, `pypa/gh-action-pypi-publish`, `peaceiris/actions-gh-pages`) — all SHA-pinned in workflows. See `docs/dev/release-publishing.md` for details and allowlist management.
-- **When adding a new third-party action:** either replace with inline shell, or add its `owner/repo@*` pattern to the enterprise allowlist at `github.com/enterprises/Pipelex/settings/actions/policies` and SHA-pin in the workflow.
+- **Enterprise allowlist:** the Pipelex enterprise runs only GitHub-owned actions and the third-party patterns in `github-manager`'s `enterprise/actions.tf`. This repo's workflows use `Swatinem/rust-cache`, `PyO3/maturin-action` and `pypa/gh-action-pypi-publish`, each SHA-pinned. See `docs/dev/release-publishing.md`.
+- **When adding a new third-party action:** either replace it with inline shell, or add its `owner/repo@*` pattern to `enterprise/actions.tf` through a pull request in `github-manager`, and SHA-pin it in the workflow.

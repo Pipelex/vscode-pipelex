@@ -17,6 +17,8 @@ They coexist in one environment with no file overlap (a script in `bin/` vs a mo
 
 The PyO3 glue is behind a `python` cargo feature, so plain `cargo build` / `cargo test` and the MSRV jobs stay PyO3-free; maturin turns the feature on for the wheel build (`[tool.maturin] features = ["python"]`).
 
+The glue is written against PyO3 0.29 and `pythonize` 0.29, with the single `abi3-py38` feature, so one wheel per platform serves every CPython from 3.8. It enables neither `extension-module` nor `generate-import-lib`, which PyO3 0.29 documents as deprecated: maturin 1.9.4 and later sets `PYO3_BUILD_EXTENSION_MODULE`, which keeps the extension from linking libpython, and PyO3 links Windows through `raw-dylib`, which needs no import library. That is why `crates/pipelex-py/pyproject.toml` asks for `maturin>=1.9.4` in its `[build-system]`, and why the wheel must come from maturin: a plain `cargo build --features python` produces a library linked to libpython, which is not the shipped artifact.
+
 ## API
 
 ```python
