@@ -14,7 +14,7 @@ use rowan::{GreenNode, NodeOrToken, TextRange};
 use std::{
     cmp,
     collections::VecDeque,
-    iter::{repeat, FromIterator},
+    iter::{repeat_n, FromIterator},
     ops::Range,
     rc::Rc,
 };
@@ -187,7 +187,10 @@ impl Options {
     }
 
     fn newlines(&self, count: usize) -> impl Iterator<Item = &'static str> {
-        repeat(self.newline()).take(usize::min(count, self.allowed_blank_lines + 1))
+        repeat_n(
+            self.newline(),
+            usize::min(count, self.allowed_blank_lines + 1),
+        )
     }
 
     fn should_align_comments(&self, comment_count: usize) -> bool {
@@ -235,7 +238,7 @@ impl Context {
     }
 
     fn indent<'o>(&self, opts: &'o Options) -> impl Iterator<Item = &'o str> {
-        repeat(opts.indent_string.as_ref()).take(self.indent_level)
+        repeat_n(opts.indent_string.as_ref(), self.indent_level)
     }
 }
 
@@ -1295,7 +1298,7 @@ where
                 && item_idx < row.as_ref().len() - 1
             {
                 let diff = diff_widths(last_align_idx..item_idx + 1, row);
-                out.extend(repeat(" ").take(diff));
+                out.extend(repeat_n(" ", diff));
                 last_align_idx = item_idx + 1;
             }
         }

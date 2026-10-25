@@ -6,7 +6,7 @@ name: Continuous integration
 #   - test-all.yml  -> `make test-all`  (every fast suite + the Python library smoke test)
 # This file holds what those targets do NOT cover: release auto-tagging, the
 # end-to-end pipelex_tools wheel build/install, toml-test conformance, and the
-# MSRV (1.74) builds.
+# MSRV (1.88) builds.
 
 on:
   push:
@@ -17,7 +17,6 @@ on:
       - pipelex-vscode-ext/v*
       - pipelex-tools-py/v*
     paths-ignore:
-      - "site/**/*"
       - schemas/**/*
       - util/**/*
   workflow_dispatch: {}
@@ -156,57 +155,58 @@ jobs:
       - name: Run toml-test
         run: ./toml-test-v1.1.0-linux-amd64 ./target/debug/taplo -- toml-test
 
-  # The MSRV jobs select 1.74 through RUSTUP_TOOLCHAIN, never `rustup default`:
-  # rust-toolchain.toml outranks the default, so `rustup default 1.74` would
+  # The MSRV jobs select 1.88 through RUSTUP_TOOLCHAIN, never `rustup default`:
+  # rust-toolchain.toml outranks the default, so `rustup default 1.88` would
   # leave a job building on the pinned toolchain and passing without testing
-  # 1.74. Each install step also fails the job if any other rustc is active.
+  # 1.88. Each install step also fails the job if any other rustc is active.
+  # Together they cover every workspace crate, upstream taplo and Pipelex alike,
+  # since `rust-version` is declared once for the whole workspace.
   test-msrv-lib:
     name: Test libraries with MSRV
     runs-on: ubuntu-latest
     env:
-      RUSTUP_TOOLCHAIN: "1.74"
+      RUSTUP_TOOLCHAIN: "1.88"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install the MSRV toolchain
         run: |
           rustup toolchain install --no-self-update "$RUSTUP_TOOLCHAIN" --profile minimal
-          rustc --version | grep '^rustc 1\.74\.' || { echo "::error::expected Rust 1.74, got $(rustc --version)"; exit 1; }
+          rustc --version | grep '^rustc 1\.88\.' || { echo "::error::expected Rust 1.88, got $(rustc --version)"; exit 1; }
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      - name: Test MSRV for taplo
+      - name: Test the libraries
         run: |
-          cargo check -p lsp-async-stub -p taplo-common -p taplo-lsp -p taplo
-          cargo test  -p lsp-async-stub -p taplo-common -p taplo-lsp -p taplo
+          cargo check -p lsp-async-stub -p taplo-common -p taplo-lsp -p taplo -p pipelex-common -p pipelex-lsp -p pipelex-py
+          cargo test  -p lsp-async-stub -p taplo-common -p taplo-lsp -p taplo -p pipelex-common -p pipelex-lsp -p pipelex-py
 
   test-msrv-bin:
     name: Test binaries with MSRV
     runs-on: ubuntu-latest
     env:
-      RUSTUP_TOOLCHAIN: "1.74"
+      RUSTUP_TOOLCHAIN: "1.88"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install the MSRV toolchain
         run: |
           rustup toolchain install --no-self-update "$RUSTUP_TOOLCHAIN" --profile minimal
-          rustc --version | grep '^rustc 1\.74\.' || { echo "::error::expected Rust 1.74, got $(rustc --version)"; exit 1; }
+          rustc --version | grep '^rustc 1\.88\.' || { echo "::error::expected Rust 1.88, got $(rustc --version)"; exit 1; }
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      - name: Test taplo-cli
+      - name: Test taplo-cli and pipelex-cli
         run: |
-          cargo check -p taplo-cli
-          cargo test  -p taplo-cli
+          cargo check -p taplo-cli -p pipelex-cli
+          cargo test  -p taplo-cli -p pipelex-cli
 
   test-msrv-wasm:
     name: Test WASM with MSRV
     runs-on: ubuntu-latest
     env:
-      RUSTUP_TOOLCHAIN: "1.74"
+      RUSTUP_TOOLCHAIN: "1.88"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install the MSRV toolchain
         run: |
           rustup toolchain install --no-self-update "$RUSTUP_TOOLCHAIN" --profile minimal --target wasm32-unknown-unknown
-          rustc --version | grep '^rustc 1\.74\.' || { echo "::error::expected Rust 1.74, got $(rustc --version)"; exit 1; }
+          rustc --version | grep '^rustc 1\.88\.' || { echo "::error::expected Rust 1.88, got $(rustc --version)"; exit 1; }
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      - name: Test taplo-wasm
-        working-directory: crates/taplo-wasm
+      - name: Check the WASM crates
         run: |
-          cargo check
+          cargo check -p taplo-wasm -p pipelex-wasm -p pipelex-tools-wasm --target wasm32-unknown-unknown

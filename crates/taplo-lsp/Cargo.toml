@@ -33,7 +33,6 @@ futures     = { workspace = true }
 indexmap    = { workspace = true, features = ["serde"] }
 itertools   = { workspace = true }
 lsp-types   = { version = "0.93.0", features = ["proposed"] }
-once_cell   = { workspace = true }
 parking_lot = { workspace = true }
 regex       = { workspace = true }
 reqwest     = { workspace = true, features = ["json"] }

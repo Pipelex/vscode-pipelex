@@ -16,9 +16,12 @@ function runNode(args: string[]) {
 describe("native Node ESM consumers", () => {
   it("supports the documented default-import + destructure usage", () => {
     const result = runNode([path.join(__dirname, "esmConsumer.mjs")]);
-    // stderr may carry a wasm-bindgen deprecation warning; only the exit
-    // status decides, with stderr surfaced for debugging on failure.
+    // The exit status decides, with stderr surfaced for debugging on failure.
     expect(result.status, result.stderr).toBe(0);
+    // The bundle hands wasm-bindgen's init a single options object, as
+    // rollup-plugin-rust 3 does; the positional form of rollup-plugin-rust 2
+    // printed this deprecation warning on every load.
+    expect(result.stderr).not.toMatch(/deprecated parameters/);
   });
 
   it("rejects named imports — why the README documents the default-import form", () => {
