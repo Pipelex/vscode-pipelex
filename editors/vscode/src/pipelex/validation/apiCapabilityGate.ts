@@ -73,18 +73,22 @@ export interface CapabilityRequirement {
 }
 
 /**
+ * The first `pipelex-api` whose `/validate` lists an invalid verdict's faults as
+ * the problem items of `errors[]`, where it listed `validation_errors[]`. It is
+ * released with pipelex under one version number, so this is pipelex 0.90.0.
+ */
+export const PIPELEX_API_PROBLEM_ITEMS_VERSION: Semver = [0, 90, 0];
+
+/**
  * Structured per-error diagnostics carrying the file each lives in — what the
- * API backend maps into cross-file diagnostics: `validation_errors[]` with
- * `source`, which the problem items of `errors[]` with `location.file` replace
- * from the pipelex release that speaks the problem document.
+ * API backend maps into cross-file diagnostics: the problem items of `errors[]`,
+ * each naming its file as `location.file`. The `validation_errors[]` they
+ * replaced is not read, so a server writing only that has no readable fault.
  */
 export const STRUCTURED_VALIDATION_DIAGNOSTICS: CapabilityRequirement = {
     capability: 'structured validation diagnostics',
     floors: {
-        // Landed in pipelex-api 0.4.0 ("MTHDS Protocol surface alignment (Phase 2)"):
-        // the 200-diagnostic `/validate`, structured `validation_errors[]`, and the
-        // `mthds_sources` threading that puts `source` on each error.
-        'pipelex-api': [0, 4, 0],
+        'pipelex-api': PIPELEX_API_PROBLEM_ITEMS_VERSION,
 
         // 'pipelex-hosted' is deliberately ABSENT. Its `implementation_version` is
         // the platform front door's own release line; the runner implementing

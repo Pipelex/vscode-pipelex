@@ -7,8 +7,8 @@ import { childProcessEnv } from '../usageStats/childEnv';
  * for the lifetime of the extension host.
  *
  * Used to give actionable error messages when an installed `pipelex-agent`
- * predates a feature the extension relies on (e.g. the validation items
- * carrying the file each lives in, which landed in 0.34.0).
+ * predates a feature the extension relies on (e.g. the problem items of an
+ * invalid verdict, which landed in 0.90.0).
  */
 
 export type Semver = readonly [number, number, number];
@@ -18,16 +18,16 @@ export type Semver = readonly [number, number, number];
  * this floor:
  * - `validate bundle --format json` (landed in 0.29.0)
  * - `validate bundle --allow-signatures` (landed in 0.31.0)
- * - structured `validation_errors[]` carrying `source` / `field_name` (landed in
- *   0.34.0) — needed for cross-file diagnostics and parity with the API backend.
- *   The pipelex release that speaks the problem document replaces them with the
- *   problem items of the `method.invalid` problem, carrying `location.file`;
- *   the CLI backend reads both until this floor reaches that release.
+ * - an invalid verdict reported as the `method.invalid` problem, whose faults
+ *   are the problem items of its `errors[]`, each naming its file as
+ *   `location.file` (landed in 0.90.0, replacing the `validation_errors[]`
+ *   envelope) — the only verdict shape the CLI backend reads, and the one the
+ *   API backend reads too, so the two produce the same diagnostics.
  *
  * This is a compatibility-floor break: an older `pipelex-agent` is reported as
  * too old (the extension's behavior is otherwise unchanged).
  */
-export const MIN_AGENT_VERSION: Semver = [0, 34, 0];
+export const MIN_AGENT_VERSION: Semver = [0, 90, 0];
 
 const cache = new Map<string, Promise<Semver | null>>();
 

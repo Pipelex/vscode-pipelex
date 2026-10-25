@@ -157,7 +157,6 @@ type _TransferErrorFields = Pick<RealMethodFileTransferError, 'code' | 'status'>
 
 import { ApiCapabilityGate } from '../validation/apiCapabilityGate';
 import { AnalyzeAbortError, BackendError } from '../validation/backend';
-import { UNDESCRIBED_ITEM_DETAIL } from '../validation/problemItems';
 
 // ---------- Method trees on disk ----------
 const tempDirs: string[] = [];
@@ -512,7 +511,11 @@ describe('ApiValidationBackend', () => {
         expect(analysis.validation.warnings).toEqual([warning]);
     });
 
-    it('reads the verdict of a runner that still writes validation_errors, as the hosted plane does', async () => {
+    it('reads no fault from a runner that still writes validation_errors, and names the release that writes problem items', async () => {
+        // A runner older than pipelex-api 0.90.0 lists its faults in the shape
+        // problem items replaced, which is not read: its invalid verdict carries
+        // no readable item, so it is the contract violation below, never a verdict
+        // with zero diagnostics.
         apiState.validate = async () => ({
             is_valid: false,
             validation_errors: [{ category: 'dry_run', error_type: 'DryRunError', message: 'Dry run failed: ...', pipe_code: 'main', domain_code: 'd', source: 'a.mthds' }],
@@ -520,34 +523,28 @@ describe('ApiValidationBackend', () => {
             is_runnable: false,
             message: 'MTHDS validation found errors',
         });
-        const analysis = await analyze(makeBackend());
-        expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toEqual([
-            {
-                detail: 'Dry run failed: ...',
-                location: { pipe: 'main', file: 'a.mthds' },
-                legacy: { domainCode: 'd', errorType: 'DryRunError' },
-            },
-        ]);
+        const err = await analyze(makeBackend()).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        expect(err.logMessage).toMatch(/no readable errors/);
+        expect(err.userMessage).toContain('pipelex-api 0.90.0');
+        expect(err.userMessage).toContain('upgrade the server');
+        expect(err.userMessage).toContain('`pipelex.backend`');
     });
 
-    it('keeps a verdict item of the shape problem items replace whose message is empty', async () => {
-        // That shape allows an empty message; its fault is still the verdict's,
-        // so it must not read as an invalid verdict with no item.
+    it('points a hosted-API user whose runner writes validation_errors at the cli backend, not at an upgrade', async () => {
         apiState.validate = async () => ({
             is_valid: false,
-            validation_errors: [
-                { category: 'dry_run', error_type: 'DryRunError', message: '', pipe_code: 'main', source: 'a.mthds' },
-                { category: 'pipe_validation', pipe_code: 'other' },
-            ],
+            validation_errors: [{ category: 'dry_run', message: 'Dry run failed: ...', pipe_code: 'main' }],
             is_runnable: false,
         });
-        const analysis = await analyze(makeBackend());
-        expect(analysis.validation.ok).toBe(false);
-        expect(analysis.validation.errors).toEqual([
-            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'main', file: 'a.mthds' }, legacy: { errorType: 'DryRunError' } },
-            { detail: UNDESCRIBED_ITEM_DETAIL, location: { pipe: 'other' } },
-        ]);
+        const err = await analyze(makeBackend({ baseUrl: 'https://api.pipelex.com' })).catch(e => e);
+        expect(err).toBeInstanceOf(BackendError);
+        expect(err.kind).toBe('api-error');
+        expect(err.userMessage).toContain('hosted Pipelex API');
+        expect(err.userMessage).toContain('pipelex-api 0.90.0');
+        expect(err.userMessage).not.toContain('upgrade the server');
+        expect(err.userMessage).toContain('`pipelex.backend`');
     });
 
     it('treats is_valid:false with an empty errors list as an api-error BackendError (contract violation)', async () => {

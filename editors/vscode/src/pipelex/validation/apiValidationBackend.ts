@@ -14,8 +14,9 @@ import { listMethodTree, MethodTreeError, TreeLimitExceededError } from 'mthds';
 import type { MethodTree } from 'mthds';
 import { AnalyzeAbortError, BackendError } from './backend';
 import type { AnalyzeOptions, BackendErrorAction, BundleAnalysis, BundleRequest, ValidationBackend, ValidationOutcome } from './backend';
-import { asSentence, problemFacts, readProblemItems, readProblemSummary, readVerdictErrors, withNextStep } from './problemItems';
-import { isHostedPipelexApi, type ApiCapabilityGate } from './apiCapabilityGate';
+import { asSentence, problemFacts, readProblemItems, readProblemSummary, withNextStep } from './problemItems';
+import { isHostedPipelexApi, PIPELEX_API_PROBLEM_ITEMS_VERSION, type ApiCapabilityGate } from './apiCapabilityGate';
+import { formatSemver } from './agentCliVersion';
 import { PIPELEX_PLATFORM_URL, SET_API_KEY_COMMAND } from './apiKey';
 
 export interface ApiBackendDeps {
@@ -58,9 +59,10 @@ export interface ApiBackendDeps {
  * same items the CLI path reads), and either arm may carry advisory findings as
  * problem items in `warnings[]`; a valid bundle with pending signatures is
  * `is_valid: true` / `is_runnable: false` — a runnability fact, not an error
- * (the `--allow-signatures` sweep tolerates them). A runner that still writes
- * the shape problem items replace (the hosted plane's, until it runs a pipelex
- * that writes problems) is read through `problemItems.ts`.
+ * (the `--allow-signatures` sweep tolerates them). A runner older than pipelex
+ * 0.90.0 lists an invalid verdict's faults in `validation_errors[]`, which is
+ * not read, so its invalid verdict is refused below as one carrying no
+ * readable item.
  *
  * Transport / no-verdict failures (server unreachable, non-`problem+json`, auth,
  * a request-shape 422, timeout, unparseable, a tree that cannot be listed or
@@ -157,12 +159,12 @@ export class ApiValidationBackend implements ValidationBackend {
         // bundle is a produced verdict (`is_valid: false`), not a transport error.
         // (The extension tsconfig is `strict:false`, where boolean-literal
         // discriminants don't narrow — read `is_valid` and cast the arm explicitly.)
-        // The SDK types the shape problem items replace, so the items are read
-        // loosely off the body itself.
+        // The SDK still types the invalid arm as the `validation_errors[]` problem
+        // items replaced, so the items are read loosely off the body itself.
         const body = report as unknown as Record<string, unknown>;
         const warnings = readProblemItems(body.warnings);
         if (report.is_valid === false) {
-            const errors = readVerdictErrors(body);
+            const errors = readProblemItems(body.errors);
             // The runtime's structured-info invariant is total: an invalid verdict
             // ALWAYS carries a non-empty `errors[]`. An `is_valid: false` body with
             // no readable item is a backend/contract violation, NOT an empty invalid
@@ -488,11 +490,22 @@ function apiResponseMessage(err: ApiResponseError, baseUrl: string, nextStep: st
  * Guidance for an `is_valid:false` body that carried no readable item in its
  * required `errors[]`. The server WAS reached and returned a 200, but the
  * verdict is unusable — a backend/protocol breakdown, surfaced as an api-error.
+ * The likeliest cause is a server older than the release that writes problem
+ * items, whose `validation_errors[]` the extension no longer reads, so the
+ * message names that release. Its remedy depends on who runs the server, as
+ * the capability gate's does: a self-hosted operator can upgrade it, a user of
+ * the hosted API cannot.
  */
 function apiInvalidContractMessage(baseUrl: string): string {
-    return `Pipelex API at ${baseUrl} reported the bundle invalid but returned no error details — ` +
-        `the server response is malformed. Retry; if it persists, the pipelex-api server may be out of ` +
-        `date, or switch \`pipelex.backend\` to \`cli\`.`;
+    const release = `pipelex-api ${formatSemver(PIPELEX_API_PROBLEM_ITEMS_VERSION)}`;
+    if (isHostedPipelexApi(baseUrl)) {
+        return `The hosted Pipelex API at ${baseUrl} reported the bundle invalid but returned no error the ` +
+            `extension can read, as a runner older than ${release} does. Switch \`pipelex.backend\` to ` +
+            `\`cli\` to validate locally until it runs that release.`;
+    }
+    return `Pipelex API at ${baseUrl} reported the bundle invalid but returned no error the extension ` +
+        `can read. A server older than ${release} lists its errors in a shape the extension no longer ` +
+        `reads: upgrade the server, or switch \`pipelex.backend\` to \`cli\`.`;
 }
 
 /**
