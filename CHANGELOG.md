@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Security
+
+- **Extension dependencies past their security advisories**: the extension now bundles `dompurify` 3.4.17, `zod` 4.6.7 and `follow-redirects` 1.16.2, and its packaging toolchain resolves `qs` 6.17.1, releases that fix the advisories raised against the versions they replace.
+
 ## [0.22.0] - 2026-10-25
 
 ### Changed
