@@ -128,7 +128,11 @@ jobs:
     name: Build plxt wheels (${{ matrix.os }}-${{ matrix.arch }})
     if: startsWith(github.ref, 'refs/tags/plxt-cli/v') || contains(fromJSON('["workflow_dispatch", "pull_request"]'), github.event_name)
     needs: ["wait_for_ci"]
-    runs-on: ${{ matrix.os }}-latest
+    # Linux legs stay on ubuntu-24.04: on ubuntu-26.04 the CentOS 7
+    # manylinux2014_i686 container cannot resolve vault.centos.org, so the
+    # x86 leg fails and both PyPI publishes are skipped. See
+    # docs/dev/release-publishing.md before moving it.
+    runs-on: ${{ matrix.os == 'ubuntu' && 'ubuntu-24.04' || format('{0}-latest', matrix.os) }}
     strategy:
       fail-fast: false
       matrix:
@@ -219,7 +223,11 @@ jobs:
     name: Build pipelex-tools-py wheels (${{ matrix.os }}-${{ matrix.arch }})
     if: startsWith(github.ref, 'refs/tags/pipelex-tools-py/v') || contains(fromJSON('["workflow_dispatch", "pull_request"]'), github.event_name)
     needs: ["wait_for_ci"]
-    runs-on: ${{ matrix.os }}-latest
+    # Linux legs stay on ubuntu-24.04: on ubuntu-26.04 the CentOS 7
+    # manylinux2014_i686 container cannot resolve vault.centos.org, so the
+    # x86 leg fails and both PyPI publishes are skipped. See
+    # docs/dev/release-publishing.md before moving it.
+    runs-on: ${{ matrix.os == 'ubuntu' && 'ubuntu-24.04' || format('{0}-latest', matrix.os) }}
     strategy:
       fail-fast: false
       matrix:
