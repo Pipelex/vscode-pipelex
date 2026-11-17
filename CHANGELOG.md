@@ -1,10 +1,10 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
-## [Unreleased]
+## [0.22.1] - 2026-11-17
 
 ### Changed
 
-- **Bundled MTHDS schema follows pipelex v0.107.0, which reads a workbook's rows and edits a supplied workbook**: `plxt`, the editor, `pipelex-tools-py` and `@pipelex/tools-wasm` now accept a `PipeStructure`'s optional `table` and `row_field`, which read an Excel Table or a CSV file into a list of records, and a `PipeDocGen`'s optional `template_input`, `table_fill` (`replace`, `append` or `update`), `match_on`, `match_row` and `cells` (`fill_empty` or `overwrite`), which return an edited copy of a workbook the run is given; until now they flagged each of them as "Additional properties are not allowed", although pipelex validates and runs them. Nothing is removed or renamed, so a bundle that linted before still lints, and the vendored MTHDS Test Corpus is already pipelex v0.107.0's.
+- **Bundled MTHDS schema follows pipelex v0.107.0, which reads a workbook's rows and edits a supplied workbook**: `plxt`, the editor, `pipelex-tools-py` and `@pipelex/tools-wasm` now accept a `PipeStructure`'s optional `table` and `row_field`, which read an Excel Table or a CSV file into a list of records, and a `PipeDocGen`'s optional `template_input`, `table_fill` (`replace`, `append` or `update`), `match_on`, `match_row` and `cells` (`fill_empty` or `overwrite`), which return an edited copy of a workbook the run is given; until now they flagged each of them as "Additional properties are not allowed", although pipelex validates and runs them. Nothing is removed or renamed, so a bundle that linted before still lints, and the vendored MTHDS Test Corpus is already pipelex v0.107.0's. (plxt 0.14.1, pipelex-tools-py 0.7.1, @pipelex/tools-wasm 0.6.2)
 
 ### Security
 
