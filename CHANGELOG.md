@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Bundled MTHDS schema follows pipelex v0.108.0, which reads and fills a worksheet that holds no Excel Table**: `plxt`, the editor, `pipelex-tools-py` and `@pipelex/tools-wasm` now accept a `PipeStructure`'s optional `sheet_range`, with its optional `sheet` and `header_row`, which reads a range of rows into a list of records, and a `PipeDocGen`'s optional `sheet_range`, with its required `list` and optional `sheet` and `header_row`, which fills such a range under `table_fill = "append"` or `"update"`. Until now they flagged `sheet_range` as "Additional properties are not allowed", although pipelex validates and runs it. Nothing is removed or renamed, so a bundle that linted before still lints, and the vendored MTHDS Test Corpus is already pipelex v0.108.0's.
+
 ## [0.22.1] - 2026-11-17
 
 ### Changed
