@@ -1,5 +1,11 @@
 # Pipelex IDE Extension and `plxt` CLI Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Bundled MTHDS schema follows pipelex v0.110.0, which checks a structure field's `item_type` and `value_type` (Breaking)**: `plxt`, the editor, `pipelex-tools-py` and `@pipelex/tools-wasm` now accept only `text`, `list`, `dict`, `integer`, `boolean`, `number`, `date`, `datetime`, `time`, `concept` or `Any` as a concept structure field's `item_type` or `value_type`, where they accepted any string, matching what pipelex validates. A bundle that declares another value now fails `plxt lint` and is flagged in the editor; nothing is added or renamed. The vendored MTHDS Test Corpus is pipelex v0.110.0's, whose structured-output entry now names its list items with `item_type = "concept"` and `item_concept_ref`.
+
 ## [0.22.2] - 2026-11-17
 
 ### Changed
